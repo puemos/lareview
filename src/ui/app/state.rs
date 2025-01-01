@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use agent_client_protocol::SessionUpdate;
 
@@ -249,6 +249,13 @@ pub struct UiState {
     pub push_feedback_pending: Option<String>,
     pub push_feedback_error: Option<String>,
     pub show_push_feedback_modal: Option<String>,
+    // Batch Send to PR
+    pub send_to_pr_modal_open: bool,
+    pub send_to_pr_selection: HashSet<String>,
+    pub send_to_pr_include_summary: bool,
+    pub send_to_pr_pending: bool,
+    pub send_to_pr_error: Option<String>,
+    pub review_summary_links: HashMap<String, String>,
     // Agent settings
     pub agent_path_overrides: std::collections::HashMap<String, String>,
     pub custom_agents: Vec<crate::infra::app_config::CustomAgentConfig>,

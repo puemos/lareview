@@ -28,6 +28,12 @@ pub struct GitHubReviewComment {
     pub url: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct GitHubReview {
+    pub id: String,
+    pub url: Option<String>,
+}
+
 lazy_static! {
     static ref GH_PR_URL_RE: Regex =
         Regex::new(r"^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/pull/(\d+)")
@@ -199,6 +205,71 @@ pub async fn create_review_comment(
         .map(|s| s.to_string());
 
     Ok(GitHubReviewComment { id, url })
+}
+
+/// Create a PR review with a single overall comment.
+pub async fn create_review(
+    owner: &str,
+    repo: &str,
+    number: u32,
+    body: &str,
+) -> Result<GitHubReview> {
+    let gh_path = shell::find_bin("gh").context("resolve `gh` path")?;
+
+    let payload = serde_json::json!({
+        "event": "COMMENT",
+        "body": body,
+    });
+
+    let mut child = Command::new(&gh_path)
+        .args([
+            "api",
+            &format!("repos/{owner}/{repo}/pulls/{number}/reviews"),
+            "--method",
+            "POST",
+            "-H",
+            "Accept: application/vnd.github+json",
+            "--input",
+            "-",
+        ])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .context("spawn `gh api` for pull review creation")?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin
+            .write_all(payload.to_string().as_bytes())
+            .await
+            .context("write payload to gh stdin")?;
+    }
+
+    let output = child
+        .wait_with_output()
+        .await
+        .context("run `gh api` to create review")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!(format!("`gh api` failed: {stderr}")));
+    }
+
+    let json = String::from_utf8(output.stdout).context("decode `gh api` stdout")?;
+    let parsed: serde_json::Value =
+        serde_json::from_str(&json).context("parse `gh api` response json")?;
+
+    let id = parsed
+        .get("id")
+        .and_then(|v| v.as_i64())
+        .ok_or_else(|| anyhow::anyhow!("Missing review id in GitHub response"))?
+        .to_string();
+    let url = parsed
+        .get("html_url")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    Ok(GitHubReview { id, url })
 }
 
 #[cfg(test)]

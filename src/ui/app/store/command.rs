@@ -75,6 +75,11 @@ pub enum Command {
         feedback_id: String,
         title: String,
     },
+    SendFeedbacksToPr {
+        review_id: String,
+        feedback_ids: Vec<String>,
+        include_summary: bool,
+    },
     SendFeedbackToPr {
         feedback_id: String,
     },

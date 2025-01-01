@@ -80,9 +80,19 @@ impl LaReviewApp {
                     view.line_number,
                 );
 
-                if let Some(action) =
-                    render_feedback_header(ui, feedback.as_ref(), &theme, &view.task_id, &draft_key)
-                {
+                let sent_url = feedback_id
+                    .as_ref()
+                    .and_then(|id| self.state.domain.feedback_links.get(id))
+                    .map(|l| l.provider_root_comment_id.clone());
+
+                if let Some(action) = render_feedback_header(
+                    ui,
+                    feedback.as_ref(),
+                    sent_url,
+                    &theme,
+                    &view.task_id,
+                    &draft_key,
+                ) {
                     self.dispatch(Action::Review(action));
                 }
 
@@ -100,27 +110,19 @@ impl LaReviewApp {
                         .as_ref()
                         .and_then(|id| self.state.domain.feedback_links.get(id))
                         .map(|l| l.provider_root_comment_id.clone());
-                    let is_pending =
-                        self.state.ui.push_feedback_pending.as_deref() == feedback_id.as_deref();
 
                     ui.add_space(spacing::SPACING_SM);
                     ui.horizontal(|ui| {
                         if let Some(link_url) = sent_url.clone() {
                             ui.label(typography::body("Sent to PR").color(theme.success));
                             ui.hyperlink_to(typography::label("View on GitHub"), &link_url);
-                        } else if let Some(id) = feedback_id.clone() {
-                            let btn = ui.add_enabled(
-                                !is_pending,
-                                egui::Button::new(typography::label(format!(
-                                    "{} Send to PR",
-                                    crate::ui::icons::ICON_GITHUB
-                                ))),
+                        } else {
+                            ui.label(
+                                typography::body(
+                                    "Not sent to PR yet. Use the toolbar “Send to PR” to publish.",
+                                )
+                                .color(theme.text_muted),
                             );
-                            if btn.clicked() {
-                                self.dispatch(Action::Review(
-                                    ReviewAction::ShowSendFeedbackConfirm { feedback_id: id },
-                                ));
-                            }
                         }
                     });
                 }

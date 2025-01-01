@@ -82,6 +82,11 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
         Command::UpdateFeedbackTitle { feedback_id, title } => {
             review::update_feedback_title(app, feedback_id, title)
         }
+        Command::SendFeedbacksToPr {
+            review_id,
+            feedback_ids,
+            include_summary,
+        } => review::send_feedbacks_to_pr(app, review_id, feedback_ids, include_summary),
         Command::SendFeedbackToPr { feedback_id } => review::send_feedback_to_pr(app, feedback_id),
         Command::SaveRepo { repo } => settings::save_repo(app, repo),
         Command::DeleteRepo { repo_id } => settings::delete_repo(app, repo_id),

@@ -1,5 +1,6 @@
 use crate::domain::{Feedback, FeedbackImpact, ReviewStatus};
 use crate::ui::app::ReviewAction;
+use crate::ui::components::pills::pill_action_button;
 use crate::ui::components::{PopupOption, popup_selector};
 use crate::ui::theme::Theme;
 use crate::ui::{spacing, typography};
@@ -9,6 +10,7 @@ use egui::Color32;
 pub(crate) fn render_feedback_header(
     ui: &mut egui::Ui,
     feedback: Option<&Feedback>,
+    link_url: Option<String>,
     theme: &Theme,
     task_id: &str,
     draft_key: &str,
@@ -25,27 +27,15 @@ pub(crate) fn render_feedback_header(
     let existing_title = feedback.map(|t| t.title.clone()).unwrap_or_default();
     let can_edit_feedback = feedback_id.is_some();
 
+    // Row 1: title only
     ui.horizontal(|ui| {
-        let status_width = 120.0;
-        let impact_width = 150.0;
-        let selector_gap = spacing::SPACING_MD;
-        let delete_btn_total = if feedback_id.is_some() {
-            spacing::SPACING_LG + 32.0 // gap + approx button width
-        } else {
-            0.0
-        };
-        let selector_total_width = status_width + impact_width + selector_gap + delete_btn_total;
-        let title_width = (ui.available_width() - selector_total_width).max(120.0);
-
-        // Edit Title
         let mut edit_text = feedback_title_draft.to_string();
-
         let response = ui
             .scope(|ui| {
                 ui.add(
                     egui::TextEdit::singleline(&mut edit_text)
                         .hint_text("Feedback Title")
-                        .desired_width(title_width)
+                        .desired_width(ui.available_width())
                         .text_color(Color32::WHITE)
                         .text_color_opt(Some(theme.text_muted))
                         .font(typography::body_font(16.0))
@@ -73,16 +63,20 @@ pub(crate) fn render_feedback_header(
                 title: edit_text.clone(),
             });
         }
+    });
 
-        // Disable automatic item spacing for precise control
-        let old_spacing = ui.spacing().item_spacing.x;
-        ui.spacing_mut().item_spacing.x = 0.0;
+    ui.add_space(spacing::SPACING_SM);
 
-        let status_choices = status_options(theme);
-        let impact_choices = impact_options(theme);
+    // Row 2: actions (left aligned)
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = spacing::SPACING_SM;
+
+        let status_width = 120.0;
+        let impact_width = 150.0;
 
         // Status selector
         let status = feedback.map(|t| t.status).unwrap_or(ReviewStatus::Todo);
+        let status_choices = status_options(theme);
         if let Some(next_status) = popup_selector(
             ui,
             ui.make_persistent_id(("feedback_status_popup", task_id, &feedback_id)),
@@ -98,12 +92,11 @@ pub(crate) fn render_feedback_header(
             });
         }
 
-        ui.add_space(selector_gap);
-
         // Impact selector
         let impact = feedback
             .map(|t| t.impact)
             .unwrap_or(FeedbackImpact::Nitpick);
+        let impact_choices = impact_options(theme);
         if let Some(next_impact) = popup_selector(
             ui,
             ui.make_persistent_id(("feedback_impact_popup", task_id, &feedback_id)),
@@ -119,21 +112,25 @@ pub(crate) fn render_feedback_header(
             });
         }
 
-        ui.spacing_mut().item_spacing.x = old_spacing;
-        ui.add_space(spacing::SPACING_LG);
+        if let Some(url) = link_url.as_ref() {
+            ui.hyperlink_to(typography::label("See on GitHub"), url);
+        }
 
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if let Some(feedback_id) = feedback_id.clone()
-                && ui
-                    .button(
-                        typography::label(crate::ui::icons::ACTION_DELETE).color(theme.destructive),
-                    )
-                    .on_hover_text("Delete Feedback")
-                    .clicked()
+        // Delete
+        if let Some(feedback_id) = feedback_id.clone() {
+            if pill_action_button(
+                ui,
+                crate::ui::icons::ACTION_DELETE,
+                "Delete",
+                true,
+                theme.destructive,
+            )
+            .on_hover_text("Delete Feedback")
+            .clicked()
             {
                 action_out = Some(ReviewAction::DeleteFeedback(feedback_id));
             }
-        });
+        }
     });
 
     action_out

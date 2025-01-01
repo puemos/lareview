@@ -114,6 +114,15 @@ pub enum ReviewAction {
     SendFeedbackToPr {
         feedback_id: String,
     },
+    OpenSendToPrModal,
+    CloseSendToPrModal,
+    ToggleSendToPrFeedback {
+        feedback_id: String,
+    },
+    ToggleSendToPrSummary {
+        include: bool,
+    },
+    ConfirmSendToPr,
 }
 
 #[derive(Debug)]
@@ -159,6 +168,7 @@ pub enum AsyncAction {
     RepoDeleted(Result<String, String>),
     NewRepoPicked(crate::domain::LinkedRepo),
     FeedbackPushed(Result<crate::domain::FeedbackLink, String>),
+    SendToPrFinished(Result<SendToPrResult, String>),
 }
 
 #[derive(Debug)]
@@ -179,4 +189,10 @@ pub struct ReviewFeedbacksPayload {
 pub struct ReviewFeedbackLinksPayload {
     pub review_id: String,
     pub links: std::collections::HashMap<String, crate::domain::FeedbackLink>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SendToPrResult {
+    pub links: Vec<crate::domain::FeedbackLink>,
+    pub summary_url: Option<String>,
 }

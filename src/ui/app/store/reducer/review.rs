@@ -3,6 +3,7 @@ use super::super::action::{ReviewAction, ReviewDataPayload};
 use super::super::command::Command;
 use crate::domain::{ReviewStatus, TaskId};
 use chrono::Utc;
+use std::collections::HashSet;
 use std::path::Path; // Keep Path as it's used
 // The user's diff suggested adding HashMap and removing Path, but Path is used.
 // The instruction was "remove unused HashSet import" which is not present.
@@ -491,6 +492,46 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
             state.ui.push_feedback_error = None;
             vec![Command::SendFeedbackToPr { feedback_id }]
         }
+        ReviewAction::OpenSendToPrModal => {
+            state.ui.send_to_pr_modal_open = true;
+            state.ui.send_to_pr_pending = false;
+            state.ui.send_to_pr_error = None;
+            state.ui.send_to_pr_include_summary = true;
+            state.ui.send_to_pr_selection = default_send_to_pr_selection(state);
+            Vec::new()
+        }
+        ReviewAction::CloseSendToPrModal => {
+            state.ui.send_to_pr_modal_open = false;
+            state.ui.send_to_pr_pending = false;
+            state.ui.send_to_pr_error = None;
+            Vec::new()
+        }
+        ReviewAction::ToggleSendToPrSummary { include } => {
+            state.ui.send_to_pr_include_summary = include;
+            Vec::new()
+        }
+        ReviewAction::ToggleSendToPrFeedback { feedback_id } => {
+            if state.ui.send_to_pr_selection.contains(&feedback_id) {
+                state.ui.send_to_pr_selection.remove(&feedback_id);
+            } else {
+                state.ui.send_to_pr_selection.insert(feedback_id);
+            }
+            Vec::new()
+        }
+        ReviewAction::ConfirmSendToPr => {
+            let Some(review_id) = state.ui.selected_review_id.clone() else {
+                state.ui.send_to_pr_error = Some("Select a review first.".into());
+                return Vec::new();
+            };
+            state.ui.send_to_pr_pending = true;
+            state.ui.send_to_pr_error = None;
+            let feedback_ids: Vec<String> = state.ui.send_to_pr_selection.iter().cloned().collect();
+            vec![Command::SendFeedbacksToPr {
+                review_id,
+                feedback_ids,
+                include_summary: state.ui.send_to_pr_include_summary,
+            }]
+        }
     }
 }
 
@@ -529,6 +570,36 @@ where
     } else {
         false
     }
+}
+
+fn default_send_to_pr_selection(state: &AppState) -> HashSet<String> {
+    let mut selection = HashSet::new();
+    let Some(review_id) = state.ui.selected_review_id.as_ref() else {
+        return selection;
+    };
+
+    let Some(review) = state.domain.reviews.iter().find(|r| &r.id == review_id) else {
+        return selection;
+    };
+
+    if !matches!(review.source, crate::domain::ReviewSource::GitHubPr { .. }) {
+        return selection;
+    }
+
+    for feedback in state
+        .domain
+        .feedbacks
+        .iter()
+        .filter(|f| &f.review_id == review_id)
+    {
+        if let Some(anchor) = &feedback.anchor {
+            if anchor.file_path.is_some() && anchor.line_number.is_some() && anchor.side.is_some() {
+                selection.insert(feedback.id.clone());
+            }
+        }
+    }
+
+    selection
 }
 
 pub fn apply_review_data(state: &mut AppState, payload: ReviewDataPayload) -> Vec<Command> {

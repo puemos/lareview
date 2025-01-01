@@ -159,6 +159,41 @@ pub fn reduce(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
             }
             Vec::new()
         }
+        AsyncAction::SendToPrFinished(result) => {
+            state.ui.send_to_pr_pending = false;
+            match result {
+                Ok(res) => {
+                    state.ui.send_to_pr_modal_open = false;
+                    state.ui.send_to_pr_error = None;
+                    for link in res.links {
+                        state
+                            .domain
+                            .feedback_links
+                            .insert(link.feedback_id.clone(), link);
+                    }
+                    if let (Some(review_id), Some(summary_url)) =
+                        (state.ui.selected_review_id.clone(), res.summary_url.clone())
+                    {
+                        state
+                            .ui
+                            .review_summary_links
+                            .insert(review_id.clone(), summary_url);
+                    }
+                    if let Some(review_id) = state.ui.selected_review_id.clone() {
+                        return vec![
+                            Command::LoadReviewFeedbacks {
+                                review_id: review_id.clone(),
+                            },
+                            Command::LoadFeedbackLinks { review_id },
+                        ];
+                    }
+                }
+                Err(err) => {
+                    state.ui.send_to_pr_error = Some(err);
+                }
+            }
+            Vec::new()
+        }
         AsyncAction::NewRepoPicked(repo) => {
             vec![Command::SaveRepo { repo }]
         }

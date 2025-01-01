@@ -108,6 +108,18 @@ impl LaReviewApp {
 
                             // Delete Button
                             let review_selected = self.state.ui.selected_review_id.is_some();
+                            let is_github_review = self
+                                .state
+                                .ui
+                                .selected_review_id
+                                .as_ref()
+                                .and_then(|id| {
+                                    self.state.domain.reviews.iter().find(|r| &r.id == id)
+                                })
+                                .map(|r| {
+                                    matches!(r.source, crate::domain::ReviewSource::GitHubPr { .. })
+                                })
+                                .unwrap_or(false);
                             if review_selected {
                                 if pill_action_button(
                                     ui,
@@ -120,6 +132,20 @@ impl LaReviewApp {
                                 .clicked()
                                 {
                                     trigger_delete_review = true;
+                                }
+                                ui.add_space(spacing::SPACING_XS);
+
+                                if pill_action_button(
+                                    ui,
+                                    crate::ui::icons::ICON_GITHUB,
+                                    "Send to PR",
+                                    review_selected && is_github_review,
+                                    theme.border,
+                                )
+                                .on_hover_text("Send selected feedback to GitHub")
+                                .clicked()
+                                {
+                                    self.dispatch(Action::Review(ReviewAction::OpenSendToPrModal));
                                 }
                                 ui.add_space(spacing::SPACING_XS);
 

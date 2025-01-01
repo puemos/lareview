@@ -4,9 +4,11 @@ use super::super::action::{
     ReviewFeedbacksPayload,
 };
 use super::super::command::ReviewDataRefreshReason;
+use crate::application::review::export::{ExportData, ExportOptions, ReviewExporter};
 use crate::domain::{
     Comment, Feedback, FeedbackAnchor, FeedbackImpact, FeedbackSide, ReviewId, ReviewStatus,
 };
+use crate::ui::app::store::action::SendToPrResult;
 use std::collections::HashMap;
 use unidiff::PatchSet;
 
@@ -105,14 +107,14 @@ pub fn send_feedback_to_pr(app: &mut LaReviewApp, feedback_id: String) {
                 .map_err(|e| format!("Failed to load review: {e}"))?
                 .ok_or_else(|| "Review not found".to_string())?;
 
-            let (owner, repo, number, head_sha) = match review.source {
+            let (owner, repo, number, head_sha) = match &review.source {
                 crate::domain::ReviewSource::GitHubPr {
                     owner,
                     repo,
                     number,
                     head_sha,
                     ..
-                } => (owner, repo, number, head_sha),
+                } => (owner.clone(), repo.clone(), *number, head_sha.clone()),
                 _ => return Err("Review is not a GitHub PR".to_string()),
             };
 
@@ -155,21 +157,19 @@ pub fn send_feedback_to_pr(app: &mut LaReviewApp, feedback_id: String) {
                 .list_for_feedback(&feedback.id)
                 .map_err(|e| format!("Failed to load feedback comments: {e}"))?;
 
-            let side_label = match side {
-                FeedbackSide::New => "new",
-                FeedbackSide::Old => "old",
-            };
             let emoji = impact_emoji(feedback.impact);
+            let severity = human_impact(feedback.impact);
 
             let mut body = format!(
-                "**Feedback:** {} · **Status:** {} · **Impact:** {} {}\n**Location:** {}:{} (side: {})\n\n",
-                feedback.title, feedback.status, feedback.impact, emoji, path, line, side_label
+                "**Feedback:** {}\n**Severity:** {} {}\n\n",
+                feedback.title, emoji, severity
             );
             if comments.is_empty() {
                 body.push_str("No comments provided.\n");
             } else {
                 for comment in &comments {
-                    body.push_str(&format!("**{}:**\n{}\n\n", comment.author, comment.body));
+                    let author = normalize_author(&comment.author);
+                    body.push_str(&format!("**{}:**\n{}\n\n", author, comment.body));
                 }
             }
 
@@ -202,11 +202,225 @@ pub fn send_feedback_to_pr(app: &mut LaReviewApp, feedback_id: String) {
     });
 }
 
+pub fn send_feedbacks_to_pr(
+    app: &mut LaReviewApp,
+    review_id: String,
+    feedback_ids: Vec<String>,
+    include_summary: bool,
+) {
+    let feedback_repo = app.feedback_repo.clone();
+    let comment_repo = app.comment_repo.clone();
+    let review_repo = app.review_repo.clone();
+    let feedback_link_repo = app.feedback_link_repo.clone();
+    let task_repo = app.task_repo.clone();
+    let run_repo = app.run_repo.clone();
+    let action_tx = app.action_tx.clone();
+
+    tokio::spawn(async move {
+        let result: Result<SendToPrResult, String> = async {
+            let review = review_repo
+                .find_by_id(&review_id)
+                .map_err(|e| format!("Failed to load review: {e}"))?
+                .ok_or_else(|| "Review not found".to_string())?;
+
+            let (owner, repo, number, head_sha) = match &review.source {
+                crate::domain::ReviewSource::GitHubPr {
+                    owner,
+                    repo,
+                    number,
+                    head_sha,
+                    ..
+                } => (owner.clone(), repo.clone(), *number, head_sha.clone()),
+                _ => return Err("Review is not a GitHub PR".to_string()),
+            };
+
+            let commit_id =
+                head_sha.ok_or_else(|| "Missing PR head SHA; re-run PR fetch".to_string())?;
+
+            let mut links = Vec::new();
+            let mut summary_url = None;
+
+            if include_summary {
+                let run_id = review
+                    .active_run_id
+                    .clone()
+                    .ok_or_else(|| "No active run for this review; cannot build summary.".to_string())?;
+                let run = run_repo
+                    .find_by_id(&run_id)
+                    .map_err(|e| format!("Failed to load run: {e}"))?
+                    .ok_or_else(|| "Run not found for review.".to_string())?;
+                let tasks = task_repo
+                    .find_by_run(&run_id)
+                    .map_err(|e| format!("Failed to load tasks: {e}"))?;
+                let feedbacks = feedback_repo
+                    .find_by_review(&review.id)
+                    .map_err(|e| format!("Failed to load feedbacks: {e}"))?;
+                let mut comments = Vec::new();
+                for f in &feedbacks {
+                    let mut feedback_comments = comment_repo
+                        .list_for_feedback(&f.id)
+                        .map_err(|e| format!("Failed to load feedback comments: {e}"))?;
+                    comments.append(&mut feedback_comments);
+                }
+
+                let export_data = ExportData {
+                    review: review.clone(),
+                    run: run.clone(),
+                    tasks,
+                    feedbacks: feedbacks.clone(),
+                    comments,
+                };
+                let export_options = ExportOptions {
+                    include_summary: true,
+                    include_stats: true,
+                    include_metadata: false,
+                    include_tasks: true,
+                    include_feedbacks: false,
+                    include_feedback_ids: None,
+                };
+
+                let summary = ReviewExporter::export_to_markdown(&export_data, &export_options)
+                    .await
+                    .map_err(|e| format!("Failed to render summary: {e}"))?;
+
+                let posted = crate::infra::github::create_review(
+                    &owner,
+                    &repo,
+                    number,
+                    &summary.markdown,
+                )
+                .await
+                .map_err(|e| format!("Failed to post summary review: {e}"))?;
+                summary_url = posted.url;
+            }
+
+            for feedback_id in feedback_ids {
+                let feedback = feedback_repo
+                    .find_by_id(&feedback_id)
+                    .map_err(|e| format!("Failed to load feedback: {e}"))?
+                    .ok_or_else(|| "Feedback not found".to_string())?;
+
+                if feedback.review_id != review.id {
+                    return Err("Feedback does not belong to selected review".to_string());
+                }
+
+                let anchor = feedback.anchor.as_ref().ok_or_else(|| {
+                    "Feedback missing anchor; open it from the diff to attach a location."
+                        .to_string()
+                })?;
+                let path = anchor
+                    .file_path
+                    .as_deref()
+                    .ok_or_else(|| "Feedback missing file path".to_string())?;
+                let line = anchor
+                    .line_number
+                    .ok_or_else(|| "Feedback missing line number".to_string())?;
+                let side = anchor.side.ok_or_else(|| {
+                    "Feedback missing side; add the feedback from the diff again.".to_string()
+                })?;
+
+                let task_id = feedback
+                    .task_id
+                    .clone()
+                    .ok_or_else(|| "Feedback is not linked to a task; open it from a task to send it to the PR.".to_string())?;
+                let task = task_repo
+                    .find_by_id(&task_id)
+                    .map_err(|e| format!("Failed to load task: {e}"))?
+                    .ok_or_else(|| "Task not found for feedback; refresh the review data.".to_string())?;
+                let run = run_repo
+                    .find_by_id(&task.run_id)
+                    .map_err(|e| format!("Failed to load run: {e}"))?
+                    .ok_or_else(|| "Run not found for task; refresh the review data.".to_string())?;
+
+                let position = compute_diff_position(&run.diff_text, path, line, side)?;
+
+                let comments = comment_repo
+                    .list_for_feedback(&feedback.id)
+                    .map_err(|e| format!("Failed to load feedback comments: {e}"))?;
+
+                let emoji = impact_emoji(feedback.impact);
+                let severity = human_impact(feedback.impact);
+
+                let mut body = format!(
+                    "**Feedback:** {}\n**Severity:** {} {}\n\n",
+                    feedback.title, emoji, severity
+                );
+                if comments.is_empty() {
+                    body.push_str("No comments provided.\n");
+                } else {
+                    for comment in &comments {
+                        let author = normalize_author(&comment.author);
+                        body.push_str(&format!("**{}:**\n{}\n\n", author, comment.body));
+                    }
+                }
+
+                let posted = crate::infra::github::create_review_comment(
+                    &owner,
+                    &repo,
+                    number,
+                    &body,
+                    &commit_id,
+                    path,
+                    position,
+                )
+                .await
+                .map_err(|e| format!("Failed to post review comment: {e}"))?;
+
+                let link = crate::domain::FeedbackLink {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    feedback_id: feedback.id.clone(),
+                    provider: "github".to_string(),
+                    provider_feedback_id: posted.id.clone(),
+                    provider_root_comment_id: posted.url.clone().unwrap_or_else(|| posted.id.clone()),
+                    last_synced_at: chrono::Utc::now().to_rfc3339(),
+                };
+
+                feedback_link_repo
+                    .save(&link)
+                    .map_err(|e| format!("Failed to save feedback link: {e}"))?;
+
+                links.push(link);
+            }
+
+            Ok(SendToPrResult { links, summary_url })
+        }
+        .await;
+
+        let _ = action_tx
+            .send(Action::Async(AsyncAction::SendToPrFinished(result)))
+            .await;
+    });
+}
+
 fn impact_emoji(impact: FeedbackImpact) -> &'static str {
     match impact {
         FeedbackImpact::Blocking => "🔴",
         FeedbackImpact::NiceToHave => "🟡",
         FeedbackImpact::Nitpick => "🔵",
+    }
+}
+
+fn human_impact(impact: FeedbackImpact) -> &'static str {
+    match impact {
+        FeedbackImpact::Blocking => "Blocking",
+        FeedbackImpact::NiceToHave => "Nice to have",
+        FeedbackImpact::Nitpick => "Nitpick",
+    }
+}
+
+fn normalize_author(author: &str) -> String {
+    if let Some(stripped) = author.strip_prefix("agent:") {
+        let mut s = String::from("Agent ");
+        let mut chars = stripped.chars();
+        if let Some(first) = chars.next() {
+            s.push(first.to_ascii_uppercase());
+            s.extend(chars);
+        } else {
+            s.push_str("Agent");
+        }
+        s
+    } else {
+        author.to_string()
     }
 }
 

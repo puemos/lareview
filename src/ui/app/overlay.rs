@@ -595,6 +595,209 @@ impl LaReviewApp {
             self.dispatch(Action::Review(ReviewAction::CancelSendFeedbackConfirm));
         }
     }
+
+    pub(crate) fn render_send_to_pr_overlay(&mut self, ctx: &egui::Context) {
+        if !self.state.ui.send_to_pr_modal_open {
+            return;
+        }
+
+        let Some(review_id) = self.state.ui.selected_review_id.clone() else {
+            self.dispatch(Action::Review(ReviewAction::CloseSendToPrModal));
+            return;
+        };
+
+        let Some(review) = self
+            .state
+            .domain
+            .reviews
+            .iter()
+            .find(|r| r.id == review_id)
+            .cloned()
+        else {
+            self.dispatch(Action::Review(ReviewAction::CloseSendToPrModal));
+            return;
+        };
+
+        let theme = current_theme();
+        let mut open = true;
+
+        let feedbacks: Vec<crate::domain::Feedback> = self
+            .state
+            .domain
+            .feedbacks
+            .iter()
+            .filter(|f| f.review_id == review_id)
+            .cloned()
+            .collect();
+
+        egui::Window::new("Send to GitHub PR")
+            .id(egui::Id::new("send_to_pr_overlay"))
+            .open(&mut open)
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+            .frame(
+                egui::Frame::window(&ctx.style()).inner_margin(egui::Margin::same(
+                    spacing::SPACING_LG as i8,
+                )),
+            )
+            .show(ctx, |ui| {
+                ui.vertical(|ui| {
+                    ui.set_width(ui.available_width().max(520.0));
+                    ui.label(typography::h2("Send review to GitHub PR"));
+
+                    let is_github =
+                        matches!(review.source, crate::domain::ReviewSource::GitHubPr { .. });
+                    if !is_github {
+                        ui.label(
+                            typography::body("Selected review is not linked to a GitHub PR.")
+                                .color(theme.destructive),
+                        );
+                        return;
+                    }
+
+                    ui.add_space(spacing::SPACING_MD);
+                    let mut include_summary = self.state.ui.send_to_pr_include_summary;
+                    if ui
+                        .checkbox(
+                            &mut include_summary,
+                            typography::body("Include summary for all tasks"),
+                        )
+                        .changed()
+                    {
+                        self.dispatch(Action::Review(ReviewAction::ToggleSendToPrSummary {
+                            include: include_summary,
+                        }));
+                    }
+
+                    ui.add_space(spacing::SPACING_MD);
+                    ui.label(typography::body("Select feedback to send:").color(theme.text_muted));
+                    ui.add_space(spacing::SPACING_SM);
+                    egui::ScrollArea::vertical()
+                        .max_height(360.0)
+                        .show(ui, |ui| {
+                            for feedback in &feedbacks {
+                                ui.group(|ui| {
+                                    ui.set_width(ui.available_width());
+                                    ui.set_min_height(54.0);
+                                    ui.horizontal_top(|ui| {
+                                        ui.set_width(ui.available_width());
+                                        let eligible = feedback
+                                            .anchor
+                                            .as_ref()
+                                            .map(|a| {
+                                                a.file_path.is_some()
+                                                    && a.line_number.is_some()
+                                                    && a.side.is_some()
+                                            })
+                                            .unwrap_or(false);
+                                        let mut checked = self
+                                            .state
+                                            .ui
+                                            .send_to_pr_selection
+                                            .contains(&feedback.id);
+                                        let title = typography::body(feedback.title.clone());
+                                        let meta = typography::body(format!(
+                                            "{} · {}",
+                                            feedback.status, feedback.impact
+                                        ))
+                                        .color(theme.text_muted);
+
+                                        ui.vertical(|ui| {
+                                            ui.horizontal(|ui| {
+                                                if eligible {
+                                                    if ui.checkbox(&mut checked, title).changed() {
+                                                        self.dispatch(Action::Review(
+                                                            ReviewAction::ToggleSendToPrFeedback {
+                                                                feedback_id: feedback.id.clone(),
+                                                            },
+                                                        ));
+                                                    }
+                                                } else {
+                                                    ui.add_enabled_ui(false, |ui| {
+                                                        ui.checkbox(
+                                                            &mut checked,
+                                                            title.color(theme.text_muted),
+                                                        )
+                                                    });
+                                                }
+                                            });
+                                            ui.add_space(spacing::SPACING_XS);
+                                            ui.label(meta);
+                                            if let Some(anchor) = &feedback.anchor {
+                                                if let (Some(path), Some(line)) =
+                                                    (anchor.file_path.as_ref(), anchor.line_number)
+                                                {
+                                                    ui.label(
+                                                        typography::body(format!(
+                                                            "{}:{} ({:?})",
+                                                            path, line, anchor.side
+                                                        ))
+                                                        .color(theme.text_muted),
+                                                    );
+                                                }
+                                            }
+                                            if !eligible {
+                                                ui.add_space(spacing::SPACING_XS);
+                                                ui.label(
+                                                    typography::body(
+                                                        "Missing anchor; open from diff to attach line/side.",
+                                                    )
+                                                    .color(theme.text_muted),
+                                                );
+                                            }
+                                        });
+                                    });
+                                });
+                                ui.add_space(spacing::SPACING_SM);
+                            }
+                        });
+
+                    if let Some(err) = self.state.ui.send_to_pr_error.clone() {
+                        ui.add_space(spacing::SPACING_SM);
+                        ui.label(typography::body(err).color(theme.destructive));
+                    }
+
+                    ui.add_space(spacing::SPACING_MD);
+                    ui.horizontal(|ui| {
+                        let send_disabled = self.state.ui.send_to_pr_pending
+                            || (!self.state.ui.send_to_pr_include_summary
+                                && self.state.ui.send_to_pr_selection.is_empty());
+
+                        if ui
+                            .add_enabled(
+                                !send_disabled,
+                                egui::Button::new(typography::label(format!(
+                                    "{} Send",
+                                    crate::ui::icons::ICON_GITHUB
+                                ))),
+                            )
+                            .clicked()
+                        {
+                            self.dispatch(Action::Review(ReviewAction::ConfirmSendToPr));
+                        }
+
+                        if ui
+                            .add_enabled(
+                                !self.state.ui.send_to_pr_pending,
+                                egui::Button::new(typography::label("Cancel")),
+                            )
+                            .clicked()
+                        {
+                            self.dispatch(Action::Review(ReviewAction::CloseSendToPrModal));
+                        }
+
+                        if self.state.ui.send_to_pr_pending {
+                            ui.spinner();
+                        }
+                    });
+                });
+            });
+
+        if !open {
+            self.dispatch(Action::Review(ReviewAction::CloseSendToPrModal));
+        }
+    }
 }
 
 fn render_requirement_row(
