@@ -196,6 +196,8 @@ impl<'a> ListItem<'a> {
 impl<'a> ListItem<'a> {
     pub fn show_with_bg(self, ui: &mut egui::Ui, theme: &Theme) -> egui::Response {
         let is_selected = self.selected;
+        let mut action = self.action;
+        let mut checkbox_clicked = false;
 
         // Placeholder for background
         let bg_shape_idx = ui.painter().add(egui::Shape::Noop);
@@ -224,12 +226,25 @@ impl<'a> ListItem<'a> {
                                 } else {
                                     crate::ui::icons::ICON_SQUARE
                                 };
-                                // Use a simple label so the click passes through to the parent frame/response
-                                ui.label(
-                                    typography::body(icon)
-                                        .size(18.0)
-                                        .color(egui::Color32::WHITE),
+                                let checkbox_resp = ui.add(
+                                    egui::Label::new(
+                                        typography::body(icon)
+                                            .size(18.0)
+                                            .color(egui::Color32::WHITE),
+                                    )
+                                    .sense(egui::Sense::click()),
                                 );
+                                checkbox_resp.widget_info(|| {
+                                    egui::WidgetInfo::selected(
+                                        egui::WidgetType::Checkbox,
+                                        checked,
+                                        true,
+                                        title_text.clone(),
+                                    )
+                                });
+                                if checkbox_resp.clicked() {
+                                    checkbox_clicked = true;
+                                }
                             });
                             ui.add_space(spacing::SPACING_SM);
                         }
@@ -294,10 +309,11 @@ impl<'a> ListItem<'a> {
             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
         }
 
-        if response.clicked()
-            && let Some(action) = self.action
-        {
-            action();
+        let triggered = checkbox_clicked || response.clicked();
+        if triggered {
+            if let Some(action) = action.take() {
+                action();
+            }
         }
 
         response
