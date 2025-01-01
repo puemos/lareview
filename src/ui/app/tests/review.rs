@@ -206,6 +206,7 @@ async fn test_feedback_reply_flow() {
             task_id: "task_1".to_string(),
             file_path: None,
             line_number: None,
+            side: None,
         });
     }
     harness.run();

@@ -3,6 +3,7 @@ use crate::ui::app::{Action, LaReviewApp, ReviewAction};
 use crate::ui::components::DiffAction;
 use crate::ui::spacing;
 use crate::ui::theme::current_theme;
+use crate::ui::typography;
 use eframe::egui;
 use egui::epaint::MarginF32;
 use unidiff::PatchSet;
@@ -17,6 +18,7 @@ pub struct FeedbackDetailView {
     pub feedback_id: Option<String>,
     pub file_path: Option<String>,
     pub line_number: Option<u32>,
+    pub side: Option<crate::domain::FeedbackSide>,
 }
 
 impl LaReviewApp {
@@ -51,6 +53,11 @@ impl LaReviewApp {
         };
 
         let feedback_id = feedback.as_ref().map(|t| t.id.clone());
+        let side = view.side.or_else(|| {
+            feedback
+                .as_ref()
+                .and_then(|f| f.anchor.as_ref().and_then(|a| a.side))
+        });
         let comments = feedback_id
             .as_ref()
             .and_then(|id| self.state.domain.feedback_comments.get(id))
@@ -77,6 +84,45 @@ impl LaReviewApp {
                     render_feedback_header(ui, feedback.as_ref(), &theme, &view.task_id, &draft_key)
                 {
                     self.dispatch(Action::Review(action));
+                }
+
+                let is_github_review = self
+                    .state
+                    .ui
+                    .selected_review_id
+                    .as_ref()
+                    .and_then(|id| self.state.domain.reviews.iter().find(|r| &r.id == id))
+                    .map(|r| matches!(r.source, crate::domain::ReviewSource::GitHubPr { .. }))
+                    .unwrap_or(false);
+
+                if is_github_review {
+                    let sent_url = feedback_id
+                        .as_ref()
+                        .and_then(|id| self.state.domain.feedback_links.get(id))
+                        .map(|l| l.provider_root_comment_id.clone());
+                    let is_pending =
+                        self.state.ui.push_feedback_pending.as_deref() == feedback_id.as_deref();
+
+                    ui.add_space(spacing::SPACING_SM);
+                    ui.horizontal(|ui| {
+                        if let Some(link_url) = sent_url.clone() {
+                            ui.label(typography::body("Sent to PR").color(theme.success));
+                            ui.hyperlink_to(typography::label("View on GitHub"), &link_url);
+                        } else if let Some(id) = feedback_id.clone() {
+                            let btn = ui.add_enabled(
+                                !is_pending,
+                                egui::Button::new(typography::label(format!(
+                                    "{} Send to PR",
+                                    crate::ui::icons::ICON_GITHUB
+                                ))),
+                            );
+                            if btn.clicked() {
+                                self.dispatch(Action::Review(
+                                    ReviewAction::ShowSendFeedbackConfirm { feedback_id: id },
+                                ));
+                            }
+                        }
+                    });
                 }
 
                 let diff_snippet =
@@ -139,6 +185,7 @@ impl LaReviewApp {
                         feedback_id.clone(),
                         view.file_path.clone(),
                         view.line_number,
+                        side,
                         &draft_key,
                     ) {
                         // Clear drafts after sending

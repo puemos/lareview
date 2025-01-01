@@ -31,6 +31,7 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
         } => generate::start_generation(app, *run_context, selected_agent_id),
         Command::RefreshReviewData { reason } => review::refresh_review_data(app, reason),
         Command::LoadReviewFeedbacks { review_id } => review::load_review_feedbacks(app, review_id),
+        Command::LoadFeedbackLinks { review_id } => review::load_feedback_links(app, review_id),
         Command::UpdateTaskStatus { task_id, status } => {
             review::update_task_status(app, task_id, status)
         }
@@ -41,6 +42,7 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
             feedback_id,
             file_path,
             line_number,
+            side,
             title,
             body,
         } => review::create_feedback_comment(
@@ -50,6 +52,7 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
             feedback_id,
             file_path,
             line_number,
+            side,
             title,
             body,
         ),
@@ -79,6 +82,7 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
         Command::UpdateFeedbackTitle { feedback_id, title } => {
             review::update_feedback_title(app, feedback_id, title)
         }
+        Command::SendFeedbackToPr { feedback_id } => review::send_feedback_to_pr(app, feedback_id),
         Command::SaveRepo { repo } => settings::save_repo(app, repo),
         Command::DeleteRepo { repo_id } => settings::delete_repo(app, repo_id),
         Command::PickFolderForLink => settings::pick_folder_for_link(app),

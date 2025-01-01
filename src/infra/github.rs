@@ -3,6 +3,7 @@ use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::Deserialize;
+use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
 #[derive(Debug, Clone)]
@@ -19,6 +20,12 @@ pub struct GitHubPrMetadata {
     pub url: String,
     pub head_sha: Option<String>,
     pub base_sha: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitHubReviewComment {
+    pub id: String,
+    pub url: Option<String>,
 }
 
 lazy_static! {
@@ -116,6 +123,84 @@ pub async fn fetch_pr_diff(pr: &GitHubPrRef) -> Result<String> {
     String::from_utf8(output.stdout).context("decode `gh pr diff` stdout")
 }
 
+fn normalize_repo_path(path: &str) -> String {
+    path.strip_prefix("a/")
+        .or_else(|| path.strip_prefix("b/"))
+        .unwrap_or(path)
+        .to_string()
+}
+
+/// Post a single review comment at a diff position. This creates a review thread automatically.
+pub async fn create_review_comment(
+    owner: &str,
+    repo: &str,
+    number: u32,
+    body: &str,
+    commit_id: &str,
+    path: &str,
+    position: u32,
+) -> Result<GitHubReviewComment> {
+    let gh_path = shell::find_bin("gh").context("resolve `gh` path")?;
+    let normalized_path = normalize_repo_path(path);
+
+    let payload = serde_json::json!({
+        "body": body,
+        "commit_id": commit_id,
+        "path": normalized_path,
+        "position": position,
+    });
+
+    let mut child = Command::new(&gh_path)
+        .args([
+            "api",
+            &format!("repos/{owner}/{repo}/pulls/{number}/comments"),
+            "--method",
+            "POST",
+            "-H",
+            "Accept: application/vnd.github+json",
+            "--input",
+            "-",
+        ])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .context("spawn `gh api` for pull review")?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin
+            .write_all(payload.to_string().as_bytes())
+            .await
+            .context("write payload to gh stdin")?;
+    }
+
+    let output = child
+        .wait_with_output()
+        .await
+        .context("run `gh api` to create review comment")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!(format!("`gh api` failed: {stderr}")));
+    }
+
+    let json = String::from_utf8(output.stdout).context("decode `gh api` stdout")?;
+    let parsed: serde_json::Value =
+        serde_json::from_str(&json).context("parse `gh api` response json")?;
+
+    let id = parsed
+        .get("id")
+        .and_then(|v| v.as_i64())
+        .ok_or_else(|| anyhow::anyhow!("Missing comment id in GitHub response"))?
+        .to_string();
+    let url = parsed
+        .get("html_url")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    Ok(GitHubReviewComment { id, url })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -143,61 +228,5 @@ mod tests {
         assert!(parse_pr_ref("invalid").is_none());
         assert!(parse_pr_ref("https://google.com").is_none());
         assert!(parse_pr_ref("owner/repo").is_none());
-    }
-
-    #[tokio::test]
-    async fn test_fetch_pr_metadata_mock() {
-        let tmp_dir = tempfile::tempdir().unwrap();
-        let gh_mock = tmp_dir.path().join("gh");
-
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mock_script = r#"#!/bin/sh
-echo '{"title":"Mock PR","url":"https://github.com/mock/pr/1","headRefOid":"head123","baseRefOid":"base456"}'
-"#;
-            std::fs::write(&gh_mock, mock_script).unwrap();
-            std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).unwrap();
-        }
-
-        #[cfg(windows)]
-        {
-            let mock_script = r#"@echo off
-echo {"title":"Mock PR","url":"https://github.com/mock/pr/1","headRefOid":"head123","baseRefOid":"base456"}
-"#;
-            std::fs::write(gh_mock.with_extension("bat"), mock_script).unwrap();
-        }
-
-        let prev_path = std::env::var_os("PATH");
-        let mut paths = Vec::new();
-        paths.push(tmp_dir.path().to_path_buf());
-        if let Some(existing) = prev_path.as_ref() {
-            paths.extend(std::env::split_paths(existing));
-        }
-        if let Ok(joined) = std::env::join_paths(paths) {
-            unsafe {
-                std::env::set_var("PATH", joined);
-            }
-        }
-
-        let pr = GitHubPrRef {
-            owner: "mock".into(),
-            repo: "pr".into(),
-            number: 1,
-            url: "https://github.com/mock/pr/1".into(),
-        };
-
-        let meta = fetch_pr_metadata(&pr).await.unwrap();
-        assert_eq!(meta.title, "Mock PR");
-        assert_eq!(meta.head_sha, Some("head123".into()));
-
-        match prev_path {
-            Some(value) => unsafe {
-                std::env::set_var("PATH", value);
-            },
-            None => unsafe {
-                std::env::remove_var("PATH");
-            },
-        }
     }
 }

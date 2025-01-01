@@ -22,6 +22,7 @@ impl LaReviewApp {
                 feedback_id: feedback_ctx.feedback_id.clone(),
                 file_path: feedback_ctx.file_path.clone(),
                 line_number: feedback_ctx.line_number,
+                side: feedback_ctx.side,
             };
             self.render_feedback_detail(ui, &view);
             return;
@@ -173,6 +174,7 @@ impl LaReviewApp {
                                     Some(path.clone())
                                 },
                                 line_number: if line == 0 { None } else { Some(line) },
+                                side: feedback.anchor.as_ref().and_then(|a| a.side),
                             });
                         })
                         .show_with_bg(ui, &theme);

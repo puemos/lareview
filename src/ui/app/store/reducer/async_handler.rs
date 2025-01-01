@@ -57,6 +57,19 @@ pub fn reduce(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
             }
             Vec::new()
         }
+        AsyncAction::ReviewFeedbackLinksLoaded(result) => {
+            match result {
+                Ok(payload) => {
+                    if state.ui.selected_review_id.as_deref() == Some(payload.review_id.as_str()) {
+                        state.domain.feedback_links = payload.links;
+                    }
+                }
+                Err(err) => {
+                    state.ui.review_error = Some(err);
+                }
+            }
+            Vec::new()
+        }
         AsyncAction::ExportPreviewGenerated(result) => {
             state.ui.is_exporting = false;
             match result {
@@ -119,6 +132,31 @@ pub fn reduce(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
         }
         AsyncAction::D2InstallComplete => {
             state.ui.is_d2_installing = false;
+            Vec::new()
+        }
+        AsyncAction::FeedbackPushed(result) => {
+            state.ui.push_feedback_pending = None;
+            match result {
+                Ok(link) => {
+                    state.ui.show_push_feedback_modal = None;
+                    state.ui.push_feedback_error = None;
+                    state
+                        .domain
+                        .feedback_links
+                        .insert(link.feedback_id.clone(), link);
+                    if let Some(review_id) = state.ui.selected_review_id.clone() {
+                        return vec![
+                            Command::LoadReviewFeedbacks {
+                                review_id: review_id.clone(),
+                            },
+                            Command::LoadFeedbackLinks { review_id },
+                        ];
+                    }
+                }
+                Err(err) => {
+                    state.ui.push_feedback_error = Some(err);
+                }
+            }
             Vec::new()
         }
         AsyncAction::NewRepoPicked(repo) => {

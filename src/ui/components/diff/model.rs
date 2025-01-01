@@ -15,6 +15,7 @@ pub enum DiffAction {
         line_idx: usize,
         line_number: usize,
         file_path: String,
+        side: crate::domain::FeedbackSide,
     },
     /// View existing feedback items for a line.
     ViewNotes { file_path: String, line_number: u32 },

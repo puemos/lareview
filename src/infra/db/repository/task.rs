@@ -56,6 +56,45 @@ impl TaskRepository {
         Ok(())
     }
 
+    pub fn find_by_id(&self, task_id: &TaskId) -> Result<Option<ReviewTask>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, run_id, title, description, files, stats, insight, diff_refs, diagram, ai_generated, status, sub_flow FROM tasks WHERE id = ?1",
+        )?;
+
+        let mut rows = stmt.query_map([task_id], |row| {
+            let run_id: String = row.get(1)?;
+            let files_json: String = row.get(4)?;
+            let stats_json: String = row.get(5)?;
+            let diff_refs_json: Option<String> = row.get(7)?;
+            let status_str: String = row.get(10)?;
+            let sub_flow: Option<String> = row.get(11)?;
+
+            Ok(ReviewTask {
+                id: row.get::<_, String>(0)?,
+                run_id,
+                title: row.get::<_, String>(2)?,
+                description: row.get::<_, String>(3)?,
+                files: serde_json::from_str(&files_json).unwrap_or_default(),
+                stats: serde_json::from_str(&stats_json).unwrap_or_default(),
+                insight: row.get::<_, Option<String>>(6)?.map(Arc::from),
+                diff_refs: diff_refs_json
+                    .map(|s| serde_json::from_str(&s).unwrap_or_default())
+                    .unwrap_or_default(),
+                diagram: row.get::<_, Option<String>>(8)?.map(Arc::from),
+                ai_generated: row.get::<_, i32>(9)? != 0,
+                status: ReviewStatus::from_str(&status_str).unwrap_or_default(),
+                sub_flow,
+            })
+        })?;
+
+        if let Some(row) = rows.next() {
+            row.map(Some).map_err(Into::into)
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn delete_by_ids(&self, task_ids: &[TaskId]) -> Result<usize> {
         if task_ids.is_empty() {
             return Ok(0);

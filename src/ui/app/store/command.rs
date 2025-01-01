@@ -43,6 +43,9 @@ pub enum Command {
     LoadReviewFeedbacks {
         review_id: ReviewId,
     },
+    LoadFeedbackLinks {
+        review_id: ReviewId,
+    },
     UpdateTaskStatus {
         task_id: TaskId,
         status: ReviewStatus,
@@ -56,6 +59,7 @@ pub enum Command {
         feedback_id: Option<String>,
         file_path: Option<String>,
         line_number: Option<u32>,
+        side: Option<crate::domain::FeedbackSide>,
         title: Option<String>,
         body: String,
     },
@@ -70,6 +74,9 @@ pub enum Command {
     UpdateFeedbackTitle {
         feedback_id: String,
         title: String,
+    },
+    SendFeedbackToPr {
+        feedback_id: String,
     },
     RunD2 {
         command: D2Command,

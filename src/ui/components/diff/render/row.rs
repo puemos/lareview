@@ -4,6 +4,7 @@ use super::super::{
 };
 use super::types::DiffLineInfo;
 use super::utils::{DIFF_FONT_SIZE, paint_inline_text_job};
+use crate::domain::FeedbackSide;
 use crate::ui::{spacing, theme};
 use eframe::egui::{self, FontId, TextFormat, text::LayoutJob};
 use egui_phosphor::regular::{ARROW_SQUARE_OUT, PENCIL};
@@ -25,6 +26,11 @@ pub fn render_unified_row(
     let line_number = match line.change_type {
         ChangeType::Equal | ChangeType::Delete => line.old_line_num,
         ChangeType::Insert => line.new_line_num,
+    };
+    let side_for_action = match line.change_type {
+        ChangeType::Delete => FeedbackSide::Old,
+        ChangeType::Insert => FeedbackSide::New,
+        ChangeType::Equal => FeedbackSide::New,
     };
 
     let (prefix, mut bg_color, text_color, mut line_num_bg) = match line.change_type {
@@ -221,6 +227,7 @@ pub fn render_unified_row(
                     line_idx: ctx.line_idx,
                     line_number: num,
                     file_path: ctx.file_path.clone(),
+                    side: side_for_action,
                 };
             }
         }

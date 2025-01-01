@@ -489,6 +489,112 @@ impl LaReviewApp {
             self.dispatch(Action::Settings(SettingsAction::ClearPreferredEditor));
         }
     }
+
+    pub(crate) fn render_push_feedback_overlay(&mut self, ctx: &egui::Context) {
+        let Some(feedback_id) = self.state.ui.show_push_feedback_modal.clone() else {
+            return;
+        };
+
+        let Some(feedback) = self
+            .state
+            .domain
+            .feedbacks
+            .iter()
+            .find(|f| f.id == feedback_id)
+            .cloned()
+        else {
+            self.dispatch(Action::Review(ReviewAction::CancelSendFeedbackConfirm));
+            return;
+        };
+
+        let is_pending = self
+            .state
+            .ui
+            .push_feedback_pending
+            .as_deref()
+            .map(|id| id == feedback_id)
+            .unwrap_or(false);
+        let error = self.state.ui.push_feedback_error.clone();
+
+        let theme = current_theme();
+        let mut open = true;
+        let path_line = feedback
+            .anchor
+            .as_ref()
+            .and_then(|a| a.file_path.as_ref().map(|p| p.clone()))
+            .unwrap_or_else(|| "<no file>".to_string());
+        let line_num = feedback
+            .anchor
+            .as_ref()
+            .and_then(|a| a.line_number)
+            .map(|n| n.to_string())
+            .unwrap_or_else(|| "?".to_string());
+
+        egui::Window::new("Send feedback to GitHub?")
+            .id(egui::Id::new("push_feedback_to_pr_overlay"))
+            .open(&mut open)
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+            .frame(
+                egui::Frame::window(&ctx.style())
+                    .inner_margin(egui::Margin::same(spacing::SPACING_MD as i8)),
+            )
+            .show(ctx, |ui| {
+                ui.vertical(|ui| {
+                    ui.label(typography::h2("Send this feedback to the linked PR?"));
+                    ui.add_space(spacing::SPACING_SM);
+                    ui.label(
+                        typography::body(format!(
+                            "Feedback: {} • Status: {} • Impact: {}",
+                            feedback.title, feedback.status, feedback.impact
+                        ))
+                        .color(theme.text_primary),
+                    );
+                    ui.label(
+                        typography::body(format!("Location: {path_line}:{line_num}"))
+                            .color(theme.text_muted),
+                    );
+
+                    if let Some(err) = error {
+                        ui.add_space(spacing::SPACING_SM);
+                        ui.label(typography::body(err).color(theme.destructive));
+                    }
+
+                    ui.add_space(spacing::SPACING_MD);
+                    ui.horizontal(|ui| {
+                        if ui
+                            .add_enabled(
+                                !is_pending,
+                                egui::Button::new(typography::label(format!(
+                                    "{} Send",
+                                    crate::ui::icons::ICON_GITHUB
+                                ))),
+                            )
+                            .clicked()
+                        {
+                            self.dispatch(Action::Review(ReviewAction::SendFeedbackToPr {
+                                feedback_id: feedback.id.clone(),
+                            }));
+                        }
+
+                        if ui
+                            .add_enabled(
+                                !is_pending,
+                                egui::Button::new(typography::label("Cancel")),
+                            )
+                            .clicked()
+                        {
+                            self.dispatch(Action::Review(ReviewAction::CancelSendFeedbackConfirm));
+                        }
+                    });
+                });
+            });
+
+        if !open {
+            self.dispatch(Action::Review(ReviewAction::CancelSendFeedbackConfirm));
+        }
+    }
 }
 
 fn render_requirement_row(

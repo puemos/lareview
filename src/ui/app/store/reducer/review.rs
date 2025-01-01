@@ -18,12 +18,14 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
                 // 2. Set the active feedback context
                 let file_path = feedback.anchor.as_ref().and_then(|a| a.file_path.clone());
                 let line_number = feedback.anchor.as_ref().and_then(|a| a.line_number);
+                let side = feedback.anchor.as_ref().and_then(|a| a.side);
 
                 state.ui.active_feedback = Some(crate::ui::app::FeedbackContext {
                     feedback_id: Some(feedback.id),
                     task_id,
                     file_path,
                     line_number,
+                    side,
                 });
             } else {
                 state.ui.selected_task_id = None;
@@ -71,9 +73,15 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
 
             state.ui.selected_task_id = None;
             state.ui.active_feedback = None;
+            state.ui.show_push_feedback_modal = None;
+            state.ui.push_feedback_error = None;
+            state.ui.push_feedback_pending = None;
 
             let mut commands = select_default_task_for_current_run(state);
-            commands.push(Command::LoadReviewFeedbacks { review_id });
+            commands.push(Command::LoadReviewFeedbacks {
+                review_id: review_id.clone(),
+            });
+            commands.push(Command::LoadFeedbackLinks { review_id });
             commands
         }
         ReviewAction::SelectRun { run_id } => {
@@ -115,6 +123,7 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
             feedback_id,
             file_path,
             line_number,
+            side,
             title,
             body,
         } => {
@@ -129,6 +138,7 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
                 feedback_id,
                 file_path,
                 line_number,
+                side,
                 title,
                 body,
             }]
@@ -195,6 +205,7 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
             feedback_id,
             file_path,
             line_number,
+            side,
         } => {
             // Initialize title draft from existing thread data
             state.ui.active_feedback = Some(crate::ui::app::FeedbackContext {
@@ -202,6 +213,7 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
                 task_id,
                 file_path,
                 line_number,
+                side,
             });
             Vec::new()
         }
@@ -464,6 +476,21 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
         } => {
             vec![Command::DeleteComment(comment_id)]
         }
+        ReviewAction::ShowSendFeedbackConfirm { feedback_id } => {
+            state.ui.push_feedback_error = None;
+            state.ui.show_push_feedback_modal = Some(feedback_id);
+            Vec::new()
+        }
+        ReviewAction::CancelSendFeedbackConfirm => {
+            state.ui.show_push_feedback_modal = None;
+            state.ui.push_feedback_error = None;
+            Vec::new()
+        }
+        ReviewAction::SendFeedbackToPr { feedback_id } => {
+            state.ui.push_feedback_pending = Some(feedback_id.clone());
+            state.ui.push_feedback_error = None;
+            vec![Command::SendFeedbackToPr { feedback_id }]
+        }
     }
 }
 
@@ -551,7 +578,10 @@ pub fn apply_review_data(state: &mut AppState, payload: ReviewDataPayload) -> Ve
         let mut commands = Vec::new();
 
         if let Some(review_id) = state.ui.selected_review_id.clone() {
-            commands.push(Command::LoadReviewFeedbacks { review_id });
+            commands.push(Command::LoadReviewFeedbacks {
+                review_id: review_id.clone(),
+            });
+            commands.push(Command::LoadFeedbackLinks { review_id });
         }
 
         if state.ui.selected_task_id.is_none()

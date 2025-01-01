@@ -59,6 +59,7 @@ pub enum ReviewAction {
         feedback_id: Option<String>,
         file_path: Option<String>,
         line_number: Option<u32>,
+        side: Option<crate::domain::FeedbackSide>,
         title: Option<String>,
         body: String,
     },
@@ -79,6 +80,7 @@ pub enum ReviewAction {
         feedback_id: Option<String>,
         file_path: Option<String>,
         line_number: Option<u32>,
+        side: Option<crate::domain::FeedbackSide>,
     },
     NavigateToFeedback(crate::domain::Feedback),
     CloseFeedback,
@@ -104,6 +106,13 @@ pub enum ReviewAction {
     DeleteComment {
         feedback_id: String,
         comment_id: String,
+    },
+    ShowSendFeedbackConfirm {
+        feedback_id: String,
+    },
+    CancelSendFeedbackConfirm,
+    SendFeedbackToPr {
+        feedback_id: String,
     },
 }
 
@@ -137,6 +146,7 @@ pub enum AsyncAction {
         result: Result<ReviewDataPayload, String>,
     },
     ReviewFeedbacksLoaded(Result<ReviewFeedbacksPayload, String>),
+    ReviewFeedbackLinksLoaded(Result<ReviewFeedbackLinksPayload, String>),
     FeedbackCommentSaved(Result<(), String>),
     TaskStatusSaved(Result<(), String>),
     ReviewDeleted(Result<(), String>),
@@ -148,6 +158,7 @@ pub enum AsyncAction {
     RepoSaved(Result<crate::domain::LinkedRepo, String>),
     RepoDeleted(Result<String, String>),
     NewRepoPicked(crate::domain::LinkedRepo),
+    FeedbackPushed(Result<crate::domain::FeedbackLink, String>),
 }
 
 #[derive(Debug)]
@@ -162,4 +173,10 @@ pub struct ReviewFeedbacksPayload {
     pub review_id: String,
     pub feedbacks: Vec<crate::domain::Feedback>,
     pub comments: std::collections::HashMap<String, Vec<crate::domain::Comment>>,
+}
+
+#[derive(Debug)]
+pub struct ReviewFeedbackLinksPayload {
+    pub review_id: String,
+    pub links: std::collections::HashMap<String, crate::domain::FeedbackLink>,
 }

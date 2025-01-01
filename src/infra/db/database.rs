@@ -133,6 +133,10 @@ impl Database {
         crate::infra::db::repository::FeedbackRepository::new(self.connection())
     }
 
+    pub fn feedback_link_repo(&self) -> crate::infra::db::repository::FeedbackLinkRepository {
+        crate::infra::db::repository::FeedbackLinkRepository::new(self.connection())
+    }
+
     pub fn comment_repo(&self) -> crate::infra::db::repository::CommentRepository {
         crate::infra::db::repository::CommentRepository::new(self.connection())
     }

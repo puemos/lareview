@@ -73,6 +73,7 @@ impl LaReviewApp {
                             DiffAction::AddNote {
                                 line_number,
                                 file_path,
+                                side,
                                 ..
                             } => {
                                 self.dispatch(Action::Review(ReviewAction::OpenFeedback {
@@ -80,6 +81,7 @@ impl LaReviewApp {
                                     feedback_id: None,
                                     file_path: Some(file_path),
                                     line_number: Some(line_number as u32),
+                                    side: Some(side),
                                 }));
                             }
                             DiffAction::ViewNotes {
@@ -102,11 +104,19 @@ impl LaReviewApp {
                                                 == Some(line_number)
                                     })
                                     .map(|feedback| feedback.id.clone());
+                                let side = self
+                                    .state
+                                    .domain
+                                    .feedbacks
+                                    .iter()
+                                    .find(|feedback| Some(&feedback.id) == feedback_id.as_ref())
+                                    .and_then(|f| f.anchor.as_ref().and_then(|a| a.side));
                                 self.dispatch(Action::Review(ReviewAction::OpenFeedback {
                                     task_id: task.id.clone(),
                                     feedback_id,
                                     file_path: Some(file_path),
                                     line_number: Some(line_number),
+                                    side,
                                 }));
                             }
                             DiffAction::OpenInEditor {

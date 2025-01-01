@@ -471,6 +471,28 @@
     }
     ```
 
+    **Feedback body structure** (keep it concise and actionable):
+    ```
+    Summary:
+    - {one-line summary}
+
+    Details:
+    - {supporting point 1}
+    - {supporting point 2}
+
+    Next steps:
+    - [ ] {actionable fix or question}
+    - [ ] {follow-up if needed}
+
+    Suggestion (optional, include only if you have a concrete fix):
+    ```diff
+    - old code
+    + new code
+    ```
+    ```
+    - Keep each section to the minimum bullets needed (single bullet is fine).
+    - Only include the Suggestion block when you have a specific fix; otherwise omit it.
+
     **How to fill `diff_refs.hunks`**:
     - **sub_flow usage**: Only set `sub_flow` if you are grouping multiple tasks under the same flow. If a flow only has one task, omit `sub_flow`.
     - **Copy from `<hunk_manifest_json>` (preferred) or `<hunk_manifest>`**: Find your file, copy the JSON object for the hunk(s) you need.

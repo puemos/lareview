@@ -295,6 +295,7 @@ async fn test_create_feedback_comment_runtime() {
         None,
         Some("file.rs".into()),
         Some(1),
+        Some(crate::domain::FeedbackSide::New),
         Some("Title".into()),
         "Body".into(),
     );
@@ -312,6 +313,7 @@ async fn test_create_feedback_comment_runtime() {
         "rev1".into(),
         "task1".into(),
         Some(feedback_id),
+        None,
         None,
         None,
         None,

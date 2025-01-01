@@ -72,6 +72,7 @@ pub struct FeedbackContext {
     pub task_id: String,
     pub file_path: Option<String>,
     pub line_number: Option<u32>,
+    pub side: Option<crate::domain::FeedbackSide>,
 }
 
 #[derive(Debug, Clone)]
@@ -88,6 +89,7 @@ pub struct DomainState {
     pub runs: Vec<crate::domain::ReviewRun>,
     pub feedbacks: Vec<crate::domain::Feedback>,
     pub feedback_comments: HashMap<String, Vec<crate::domain::Comment>>,
+    pub feedback_links: HashMap<String, crate::domain::FeedbackLink>,
     pub linked_repos: Vec<crate::domain::LinkedRepo>,
 }
 
@@ -243,6 +245,10 @@ pub struct UiState {
     pub export_copy_shown_frames: u8,
     pub export_save_success: bool,
     pub export_save_shown_frames: u8,
+    // Feedback → PR sync
+    pub push_feedback_pending: Option<String>,
+    pub push_feedback_error: Option<String>,
+    pub show_push_feedback_modal: Option<String>,
     // Agent settings
     pub agent_path_overrides: std::collections::HashMap<String, String>,
     pub custom_agents: Vec<crate::infra::app_config::CustomAgentConfig>,

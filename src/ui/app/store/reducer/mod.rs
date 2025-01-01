@@ -138,8 +138,10 @@ mod tests {
         assert!(
             matches!(
                 commands.as_slice(),
-                [Command::LoadReviewFeedbacks { review_id }]
-                if review_id == "rev1"
+                [
+                    Command::LoadReviewFeedbacks { review_id },
+                    Command::LoadFeedbackLinks { review_id: review_id_links }
+                ] if review_id == "rev1" && review_id_links == "rev1"
             ),
             "expected feedback load for selected review"
         );
@@ -289,6 +291,7 @@ mod tests {
                 feedback_id: None,
                 file_path: Some("src/main.rs".into()),
                 line_number: Some(42),
+                side: None,
                 title: Some("Title".into()),
                 body: "Hello".into(),
             }),
@@ -655,6 +658,7 @@ mod tests {
                     task_id: "t1".into(),
                     file_path: None,
                     line_number: None,
+                    side: None,
                 }),
                 ..Default::default()
             },

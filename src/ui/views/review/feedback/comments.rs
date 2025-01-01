@@ -1,4 +1,5 @@
 use crate::domain::Comment;
+use crate::ui::components::markdown::render_markdown;
 use crate::ui::theme::Theme;
 use crate::ui::typography;
 use crate::ui::views::review::format_timestamp;
@@ -55,11 +56,7 @@ fn render_comment_bubble(
             });
         });
 
-        ui.label(
-            typography::body(&comment.body)
-                .color(theme.text_secondary)
-                .line_height(Some(26.0)),
-        );
+        render_markdown(ui, &comment.body);
     });
 
     action_out

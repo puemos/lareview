@@ -9,6 +9,7 @@ pub(crate) fn render_reply_composer(
     feedback_id: Option<String>,
     file_path: Option<String>,
     line_number: Option<u32>,
+    side: Option<crate::domain::FeedbackSide>,
     draft_key: &str,
 ) -> Option<ReviewAction> {
     let ctx = ui.ctx().clone();
@@ -65,6 +66,7 @@ pub(crate) fn render_reply_composer(
                         feedback_id: feedback_id.clone(),
                         file_path: file_path.clone(),
                         line_number,
+                        side,
                         title,
                         body: text.trim().to_string(),
                     });
@@ -86,7 +88,7 @@ mod tests {
     #[test]
     fn test_render_reply_composer() {
         let mut harness = Harness::new_ui(|ui| {
-            render_reply_composer(ui, "task1", None, None, None, "test_draft");
+            render_reply_composer(ui, "task1", None, None, None, None, "test_draft");
         });
         harness.run();
         harness.get_by_role(egui::accesskit::Role::MultilineTextInput);
