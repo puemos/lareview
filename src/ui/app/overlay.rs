@@ -621,7 +621,7 @@ impl LaReviewApp {
         let theme = current_theme();
         let mut open = true;
 
-        let feedbacks: Vec<crate::domain::Feedback> = self
+        let mut feedbacks: Vec<crate::domain::Feedback> = self
             .state
             .domain
             .feedbacks
@@ -630,6 +630,16 @@ impl LaReviewApp {
             .cloned()
             .collect();
 
+        feedbacks.sort_by(|a, b| {
+            let rank_a = a.status.rank();
+            let rank_b = b.status.rank();
+            if rank_a != rank_b {
+                rank_a.cmp(&rank_b)
+            } else {
+                b.updated_at.cmp(&a.updated_at)
+            }
+        });
+
         egui::Window::new("Send to GitHub PR")
             .id(egui::Id::new("send_to_pr_overlay"))
             .open(&mut open)
@@ -637,9 +647,8 @@ impl LaReviewApp {
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
             .frame(
-                egui::Frame::window(&ctx.style()).inner_margin(egui::Margin::same(
-                    spacing::SPACING_LG as i8,
-                )),
+                egui::Frame::window(&ctx.style())
+                    .inner_margin(egui::Margin::same(spacing::SPACING_LG as i8)),
             )
             .show(ctx, |ui| {
                 ui.vertical(|ui| {
@@ -676,80 +685,150 @@ impl LaReviewApp {
                     egui::ScrollArea::vertical()
                         .max_height(360.0)
                         .show(ui, |ui| {
+                            ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
                             for feedback in &feedbacks {
-                                ui.group(|ui| {
-                                    ui.set_width(ui.available_width());
-                                    ui.set_min_height(54.0);
-                                    ui.horizontal_top(|ui| {
-                                        ui.set_width(ui.available_width());
-                                        let eligible = feedback
-                                            .anchor
-                                            .as_ref()
-                                            .map(|a| {
-                                                a.file_path.is_some()
-                                                    && a.line_number.is_some()
-                                                    && a.side.is_some()
-                                            })
-                                            .unwrap_or(false);
-                                        let mut checked = self
-                                            .state
-                                            .ui
-                                            .send_to_pr_selection
-                                            .contains(&feedback.id);
-                                        let title = typography::body(feedback.title.clone());
-                                        let meta = typography::body(format!(
-                                            "{} · {}",
-                                            feedback.status, feedback.impact
-                                        ))
-                                        .color(theme.text_muted);
+                                use crate::ui::components::list_item::ListItem;
+                                use crate::ui::views::review::visuals;
 
-                                        ui.vertical(|ui| {
-                                            ui.horizontal(|ui| {
-                                                if eligible {
-                                                    if ui.checkbox(&mut checked, title).changed() {
-                                                        self.dispatch(Action::Review(
-                                                            ReviewAction::ToggleSendToPrFeedback {
-                                                                feedback_id: feedback.id.clone(),
-                                                            },
-                                                        ));
-                                                    }
-                                                } else {
-                                                    ui.add_enabled_ui(false, |ui| {
-                                                        ui.checkbox(
-                                                            &mut checked,
-                                                            title.color(theme.text_muted),
-                                                        )
-                                                    });
-                                                }
-                                            });
-                                            ui.add_space(spacing::SPACING_XS);
-                                            ui.label(meta);
-                                            if let Some(anchor) = &feedback.anchor {
-                                                if let (Some(path), Some(line)) =
-                                                    (anchor.file_path.as_ref(), anchor.line_number)
-                                                {
-                                                    ui.label(
-                                                        typography::body(format!(
-                                                            "{}:{} ({:?})",
-                                                            path, line, anchor.side
-                                                        ))
-                                                        .color(theme.text_muted),
-                                                    );
-                                                }
-                                            }
-                                            if !eligible {
-                                                ui.add_space(spacing::SPACING_XS);
-                                                ui.label(
-                                                    typography::body(
-                                                        "Missing anchor; open from diff to attach line/side.",
-                                                    )
-                                                    .color(theme.text_muted),
-                                                );
-                                            }
-                                        });
-                                    });
-                                });
-                                ui.add_space(spacing::SPACING_SM);
+                                let eligible = feedback
+                                    .anchor
+                                    .as_ref()
+                                    .map(|a| {
+                                        a.file_path.is_some()
+                                            && a.line_number.is_some()
+                                            && a.side.is_some()
+                                    })
+                                    .unwrap_or(false);
+
+                                let mut checked =
+                                    self.state.ui.send_to_pr_selection.contains(&feedback.id);
+
+                                // -- Visuals --
+
+                                let impact_v = visuals::impact_visuals(feedback.impact, &theme);
+
+                                // -- Title --
+                                let title_text = if eligible {
+                                    typography::bold(&feedback.title).color(theme.text_primary)
+                                } else {
+                                    typography::bold(&feedback.title).color(theme.text_muted)
+                                };
+
+                                // -- Metadata --
+                                let mut metadata_job = egui::text::LayoutJob::default();
+
+                                // Impact Icon + Label
+                                metadata_job.append(
+                                    impact_v.icon,
+                                    0.0,
+                                    egui::TextFormat {
+                                        font_id: egui::FontId::proportional(12.0),
+                                        color: impact_v.color,
+                                        ..Default::default()
+                                    },
+                                );
+                                metadata_job.append(
+                                    &format!(" {} ", impact_v.label),
+                                    0.0,
+                                    egui::TextFormat {
+                                        font_id: egui::FontId::proportional(12.0),
+                                        color: impact_v.color,
+                                        ..Default::default()
+                                    },
+                                );
+
+                                // Separator
+                                metadata_job.append(
+                                    "· ",
+                                    0.0,
+                                    egui::TextFormat {
+                                        font_id: egui::FontId::proportional(12.0),
+                                        color: theme.text_disabled,
+                                        ..Default::default()
+                                    },
+                                );
+
+                                // Location
+                                if let Some(anchor) = &feedback.anchor {
+                                    if let (Some(path), Some(line)) =
+                                        (anchor.file_path.as_ref(), anchor.line_number)
+                                    {
+                                        let loc_text = format!(
+                                            "{}:{} ({:?})",
+                                            path,
+                                            line,
+                                            anchor.side.unwrap_or(crate::domain::FeedbackSide::New)
+                                        );
+                                        metadata_job.append(
+                                            &loc_text,
+                                            0.0,
+                                            egui::TextFormat {
+                                                font_id: egui::FontId::proportional(12.0),
+                                                color: theme.text_muted,
+                                                ..Default::default()
+                                            },
+                                        );
+                                    } else {
+                                        metadata_job.append(
+                                            "No location",
+                                            0.0,
+                                            egui::TextFormat {
+                                                font_id: egui::FontId::proportional(12.0),
+                                                color: theme.text_muted,
+                                                ..Default::default()
+                                            },
+                                        );
+                                    }
+                                } else {
+                                    metadata_job.append(
+                                        "No anchor",
+                                        0.0,
+                                        egui::TextFormat {
+                                            font_id: egui::FontId::proportional(12.0),
+                                            color: theme.text_muted,
+                                            ..Default::default()
+                                        },
+                                    );
+                                }
+
+                                if !eligible {
+                                    metadata_job.append(
+                                        " (Missing context)",
+                                        0.0,
+                                        egui::TextFormat {
+                                            font_id: egui::FontId::proportional(12.0),
+                                            color: theme.destructive,
+                                            ..Default::default()
+                                        },
+                                    );
+                                }
+
+                                let metadata = egui::WidgetText::from(metadata_job);
+
+                                let mut item = ListItem::new(title_text)
+                                    .metadata(metadata)
+                                    .inner_margin(egui::Margin::same(spacing::SPACING_MD as i8));
+
+                                if eligible {
+                                    item = item.checkbox(&mut checked);
+                                }
+
+                                if item.show_with_bg(ui, &theme).clicked() && eligible {
+                                    self.dispatch(Action::Review(
+                                        ReviewAction::ToggleSendToPrFeedback {
+                                            feedback_id: feedback.id.clone(),
+                                        },
+                                    ));
+                                }
+
+                                // Separator
+                                ui.painter().line_segment(
+                                    [
+                                        egui::pos2(ui.min_rect().min.x, ui.min_rect().max.y),
+                                        egui::pos2(ui.max_rect().max.x, ui.min_rect().max.y),
+                                    ],
+                                    egui::Stroke::new(1.0, theme.border),
+                                );
                             }
                         });
 

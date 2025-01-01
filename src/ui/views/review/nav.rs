@@ -5,7 +5,7 @@ use crate::domain::ReviewTask;
 use crate::ui::app::ReviewAction;
 use crate::ui::components::list_item::ListItem;
 use crate::ui::theme::Theme;
-use crate::ui::{icons, spacing, typography};
+use crate::ui::{spacing, typography};
 use eframe::egui;
 
 /// Renders the logic for the Left Panel (Navigation)
@@ -23,7 +23,8 @@ pub(crate) fn render_navigation_tree(
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.add(
-                    egui::Label::new(typography::bold("Tasks").color(theme.text_primary)).wrap(),
+                    egui::Label::new(typography::bold("Review Tasks").color(theme.text_primary))
+                        .wrap(),
                 );
             });
         });
@@ -114,12 +115,8 @@ pub(crate) fn render_nav_item(
     let is_selected = selected_task_id == Some(&task.id);
 
     // -- Status Icon --
-    let (status_icon, status_color) = match task.status {
-        crate::domain::ReviewStatus::Todo => (icons::STATUS_TODO, theme.text_muted),
-        crate::domain::ReviewStatus::InProgress => (icons::STATUS_WIP, theme.accent),
-        crate::domain::ReviewStatus::Done => (icons::STATUS_DONE, theme.success),
-        crate::domain::ReviewStatus::Ignored => (icons::STATUS_IGNORED, theme.destructive),
-    };
+    let status_v = crate::ui::views::review::visuals::status_visuals(task.status, theme);
+    let (status_icon, status_color) = (status_v.icon, status_v.color);
 
     // -- Title --
     let mut title_text = typography::body(&task.title)
@@ -135,11 +132,8 @@ pub(crate) fn render_nav_item(
     }
 
     // -- Risk / Subtitle --
-    let (risk_icon, risk_color, risk_label) = match task.stats.risk {
-        crate::domain::RiskLevel::High => (icons::RISK_HIGH, theme.destructive, "High Risk"),
-        crate::domain::RiskLevel::Medium => (icons::RISK_MEDIUM, theme.warning, "Medium Risk"),
-        crate::domain::RiskLevel::Low => (icons::RISK_LOW, theme.accent, "Low Risk"),
-    };
+    let risk_v = crate::ui::views::review::visuals::risk_visuals(task.stats.risk, theme);
+    let (risk_icon, risk_color, risk_label) = (risk_v.icon, risk_v.color, risk_v.label);
 
     let subtitle = typography::body(format!("{}  {}", risk_icon, risk_label))
         .size(11.0)

@@ -75,7 +75,7 @@ impl LaReviewApp {
                             ui.label(
                                 typography::label(format!(
                                     "{} Error/Unknown",
-                                    icons::STATUS_REJECTED
+                                    icons::STATUS_IGNORED
                                 ))
                                 .color(theme.destructive),
                             );
@@ -506,7 +506,7 @@ impl LaReviewApp {
                                 );
                             } else {
                                 ui.label(
-                                    typography::label(icons::STATUS_REJECTED)
+                                    typography::label(icons::STATUS_IGNORED)
                                         .color(theme.destructive),
                                 );
                             }

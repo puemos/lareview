@@ -1,4 +1,4 @@
-use crate::ui::spacing::SPACING_XS;
+use crate::ui::spacing::SPACING_MD;
 use crate::ui::theme::current_theme;
 use crate::ui::typography;
 use eframe::egui;
@@ -40,13 +40,6 @@ pub fn popup_selector<T: Copy + PartialEq>(
     }
 
     let visuals = ui.style().visuals.clone();
-    let bg_fill = if is_open {
-        visuals.widgets.open.bg_fill
-    } else if response.hovered() && enabled {
-        visuals.widgets.hovered.bg_fill
-    } else {
-        visuals.widgets.inactive.bg_fill
-    };
 
     let stroke = if is_open {
         visuals.widgets.open.bg_stroke
@@ -59,7 +52,7 @@ pub fn popup_selector<T: Copy + PartialEq>(
     ui.painter().rect(
         rect,
         crate::ui::spacing::RADIUS_MD,
-        bg_fill,
+        theme.bg_secondary,
         stroke,
         egui::StrokeKind::Middle,
     );
@@ -72,12 +65,18 @@ pub fn popup_selector<T: Copy + PartialEq>(
     ui.scope_builder(egui::UiBuilder::new().max_rect(content_rect), |ui| {
         ui.horizontal_centered(|ui| {
             ui.add_space(2.0);
-            let icon = selected_option.icon.unwrap_or(icons::DOT_OUTLINE);
-            ui.label(typography::body(icon).size(12.0).color(selected_option.fg));
-            ui.add_space(6.0);
+            if selected_option.icon.is_some() {
+                let icon = selected_option.icon.unwrap_or(icons::DOT_OUTLINE);
+                ui.label(typography::body(icon).size(12.0).color(selected_option.fg));
+                ui.add_space(6.0);
+            }
             ui.add(
-                egui::Label::new(typography::body(selected_option.label).color(theme.text_primary))
-                    .selectable(false),
+                egui::Label::new(
+                    typography::body(selected_option.label)
+                        .color(theme.text_primary)
+                        .size(12.0),
+                )
+                .selectable(false),
             );
             ui.allocate_ui_with_layout(
                 ui.available_size(),
@@ -98,6 +97,7 @@ pub fn popup_selector<T: Copy + PartialEq>(
 
     let mut next = None;
     egui::Popup::new(id, ui.ctx().clone(), rect, ui.layer_id())
+        .gap(4.0)
         .open_memory(None)
         .show(|ui| {
             egui::ScrollArea::vertical()
@@ -108,7 +108,7 @@ pub fn popup_selector<T: Copy + PartialEq>(
                     ui.spacing_mut().item_spacing = egui::vec2(item_spacing_x, 0.0);
 
                     let item_height = 24.0;
-                    let item_gap = SPACING_XS;
+                    let item_gap = SPACING_MD;
                     let row_height = item_height + item_gap;
                     let item_inset = item_gap * 0.5;
                     let selected_bg = theme.brand.gamma_multiply(0.25);
@@ -143,14 +143,13 @@ pub fn popup_selector<T: Copy + PartialEq>(
                         ui.scope_builder(item_ui, |ui| {
                             ui.style_mut().interaction.selectable_labels = false;
                             ui.horizontal_centered(|ui| {
-                                let icon = option.icon.unwrap_or(icons::DOT_OUTLINE);
-                                ui.label(typography::body(icon).size(12.0).color(option.fg));
-                                ui.add_space(6.0);
-                                let label = if is_selected {
-                                    typography::bold(option.label).color(text_color)
-                                } else {
-                                    typography::body(option.label).color(text_color)
-                                };
+                                if option.icon.is_some() {
+                                    let icon = option.icon.unwrap_or(icons::DOT_OUTLINE);
+                                    ui.label(typography::body(icon).size(12.0).color(option.fg));
+                                    ui.add_space(6.0);
+                                }
+                                let label =
+                                    typography::body(option.label).size(12.0).color(text_color);
                                 ui.add(egui::Label::new(label).selectable(false));
                             });
                         });

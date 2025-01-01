@@ -194,7 +194,7 @@ impl<'a> ListItem<'a> {
 
 // Redefining show with the Shape trick for background
 impl<'a> ListItem<'a> {
-    pub fn show_with_bg(mut self, ui: &mut egui::Ui, theme: &Theme) -> egui::Response {
+    pub fn show_with_bg(self, ui: &mut egui::Ui, theme: &Theme) -> egui::Response {
         let is_selected = self.selected;
 
         // Placeholder for background
@@ -224,20 +224,12 @@ impl<'a> ListItem<'a> {
                                 } else {
                                     crate::ui::icons::ICON_SQUARE
                                 };
-                                let resp = ui.selectable_label(false, icon);
-                                resp.widget_info(|| {
-                                    egui::WidgetInfo::selected(
-                                        egui::WidgetType::Checkbox,
-                                        true,
-                                        checked,
-                                        "Check Me",
-                                    )
-                                });
-                                if resp.clicked()
-                                    && let Some(action) = self.action.take()
-                                {
-                                    action();
-                                }
+                                // Use a simple label so the click passes through to the parent frame/response
+                                ui.label(
+                                    typography::body(icon)
+                                        .size(18.0)
+                                        .color(egui::Color32::WHITE),
+                                );
                             });
                             ui.add_space(spacing::SPACING_SM);
                         }

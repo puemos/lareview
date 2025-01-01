@@ -9,7 +9,7 @@ mod task;
 mod task_detail;
 mod toolbar;
 mod view;
-mod visuals;
+pub mod visuals;
 
 pub(super) fn format_timestamp(value: &str) -> String {
     chrono::DateTime::parse_from_rfc3339(value)

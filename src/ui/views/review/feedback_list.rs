@@ -1,4 +1,4 @@
-use crate::domain::{Feedback, ReviewStatus};
+use crate::domain::Feedback;
 use crate::ui::app::ReviewAction;
 use crate::ui::components::list_item::ListItem;
 use crate::ui::theme::Theme;
@@ -54,28 +54,18 @@ pub fn render_feedback_list(
                 let is_active = active_feedback_id.is_some_and(|id| id == feedback.id);
 
                 // -- Status Icon --
-                let (icon, color) = match feedback.status {
-                    ReviewStatus::Todo => (icons::STATUS_TODO, theme.text_muted),
-                    ReviewStatus::InProgress => (icons::STATUS_WIP, theme.accent),
-                    ReviewStatus::Done => (icons::STATUS_DONE, theme.success),
-                    ReviewStatus::Ignored => (icons::STATUS_IGNORED, theme.destructive),
-                };
+                let status_v =
+                    crate::ui::views::review::visuals::status_visuals(feedback.status, theme);
+                let (icon, color) = (status_v.icon, status_v.color);
 
                 // -- Title --
                 let title_text = typography::bold(&feedback.title).color(theme.text_primary);
 
                 // -- Metadata (Impact + Time) --
-                let (impact_icon, impact_label, impact_color) = match feedback.impact {
-                    crate::domain::FeedbackImpact::Blocking => {
-                        (icons::IMPACT_BLOCKING, "Blocking", theme.destructive)
-                    }
-                    crate::domain::FeedbackImpact::NiceToHave => {
-                        (icons::IMPACT_NICE_TO_HAVE, "Nice-to-have", theme.warning)
-                    }
-                    crate::domain::FeedbackImpact::Nitpick => {
-                        (icons::IMPACT_NITPICK, "Nitpick", theme.text_muted)
-                    }
-                };
+                let impact_v =
+                    crate::ui::views::review::visuals::impact_visuals(feedback.impact, theme);
+                let (impact_icon, impact_label, impact_color) =
+                    (impact_v.icon, impact_v.label, impact_v.color);
 
                 let time_str = super::format_timestamp(&feedback.updated_at);
 

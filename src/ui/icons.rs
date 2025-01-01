@@ -3,16 +3,14 @@
 //! All UI components should use these constants instead of directly
 //! referencing `egui_phosphor` to ensure visual consistency.
 
-use egui_phosphor::regular as icons;
+use egui_phosphor::regular::{self as icons};
 
 // --- Task & Feedback Status ---
-pub const STATUS_PENDING: &str = icons::CIRCLE;
-pub const STATUS_IN_PROGRESS: &str = icons::CIRCLE_HALF;
+
+pub const STATUS_TODO: &str = icons::CIRCLE;
+pub const STATUS_IN_PROGRESS: &str = icons::CIRCLE_DASHED;
 pub const STATUS_DONE: &str = icons::CHECK_CIRCLE;
 pub const STATUS_IGNORED: &str = icons::X_CIRCLE;
-pub const STATUS_REJECTED: &str = icons::PROHIBIT;
-pub const STATUS_TODO: &str = icons::CIRCLE_DASHED;
-pub const STATUS_WIP: &str = icons::CIRCLE_HALF;
 
 // --- Risk Levels ---
 pub const RISK_LOW: &str = icons::CARET_CIRCLE_DOWN;
@@ -63,6 +61,6 @@ pub const ICON_ARROW_RIGHT: &str = icons::ARROW_RIGHT;
 pub const CHEVRON_DOWN: &str = icons::CARET_DOWN;
 
 // --- Impact ---
-pub const IMPACT_BLOCKING: &str = icons::WARNING_CIRCLE;
-pub const IMPACT_NICE_TO_HAVE: &str = icons::HAND_HEART;
-pub const IMPACT_NITPICK: &str = icons::PENCIL_SIMPLE_LINE;
+pub const IMPACT_BLOCKING: &str = icons::HAND_PALM;
+pub const IMPACT_NICE_TO_HAVE: &str = icons::LIGHTBULB;
+pub const IMPACT_NITPICK: &str = icons::MICROSCOPE;

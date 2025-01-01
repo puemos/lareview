@@ -41,13 +41,13 @@ pub fn render_unified_row(
             theme.transparent,
         ),
         ChangeType::Delete => (
-            "-",
+            "- ",
             theme.destructive.gamma_multiply(0.05),
             theme.destructive,
             theme.destructive.gamma_multiply(0.05),
         ),
         ChangeType::Insert => (
-            "+",
+            "+ ",
             theme.success.gamma_multiply(0.05),
             theme.success,
             theme.success.gamma_multiply(0.05),

@@ -1,42 +1,22 @@
 use crate::domain::Feedback;
 use crate::ui::components::{DiffAction, render_diff_editor_full_view};
 use crate::ui::theme::Theme;
-use crate::ui::views::review::format_timestamp;
+
 use crate::ui::{spacing, typography};
 use eframe::egui;
 
 pub(crate) fn render_feedback_context(
     ui: &mut egui::Ui,
-    feedback: Option<&Feedback>,
+    mut _feedback: Option<&Feedback>,
     file_path: Option<&String>,
     line_number: Option<u32>,
     diff_snippet: Option<String>,
     theme: &Theme,
 ) -> DiffAction {
     let mut action = DiffAction::None;
-    if let (Some(file_path), Some(line_number)) = (file_path, line_number)
+    if let (Some(_file_path), Some(line_number)) = (file_path, line_number)
         && line_number > 0
     {
-        let updated_label = feedback
-            .map(|t| format_timestamp(&t.updated_at))
-            .unwrap_or_default();
-
-        ui.horizontal(|ui| {
-            let display_path = file_path.split('/').next_back().unwrap_or(file_path);
-            ui.label(
-                typography::body(format!("{display_path}:{line_number}"))
-                    .color(theme.text_muted)
-                    .size(12.0),
-            );
-            if !updated_label.is_empty() {
-                ui.label(
-                    typography::body(format!("• Updated {}", updated_label))
-                        .color(theme.text_muted)
-                        .size(11.0),
-                );
-            }
-        });
-
         if let Some(diff_snippet) = diff_snippet {
             ui.add_space(spacing::SPACING_MD);
             ui.label(
@@ -84,7 +64,7 @@ mod tests {
             );
         });
         harness.run();
-        harness.get_by_label("main.rs:10");
+        // harness.get_by_label("main.rs:10"); // File header no longer rendered here
         harness.get_by_label("Diff context");
     }
 }

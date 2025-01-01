@@ -48,6 +48,34 @@ pub struct Theme {
     /// Brand foreground color (text/icon on brand backgrounds)
     pub brand_fg: egui::Color32,
 
+    // --- Standardized Enum Colors ---
+
+    // ReviewStatus Colors
+    /// Status: Todo
+    pub status_todo: egui::Color32,
+    /// Status: In Progress
+    pub status_in_progress: egui::Color32,
+    /// Status: Done
+    pub status_done: egui::Color32,
+    /// Status: Ignored
+    pub status_ignored: egui::Color32,
+
+    // FeedbackImpact Colors
+    /// Impact: Nitpick
+    pub impact_nitpick: egui::Color32,
+    /// Impact: Nice to Have
+    pub impact_nice_to_have: egui::Color32,
+    /// Impact: Blocking
+    pub impact_blocking: egui::Color32,
+
+    // RiskLevel Colors
+    /// Risk: Low
+    pub risk_low: egui::Color32,
+    /// Risk: Medium
+    pub risk_medium: egui::Color32,
+    /// Risk: High
+    pub risk_high: egui::Color32,
+
     // Semantic status colors
     /// Success state color
     pub success: egui::Color32,
@@ -120,6 +148,24 @@ impl Theme {
             // Brand colors
             brand: MOCHA.mauve, // Primary terminal brand color
             brand_fg: MOCHA.base,
+
+            // --- Standardized Enum Colors ---
+
+            // ReviewStatus
+            status_todo: MOCHA.subtext0,
+            status_in_progress: MOCHA.yellow,
+            status_done: MOCHA.green,
+            status_ignored: MOCHA.red,
+
+            // FeedbackImpact
+            impact_nitpick: MOCHA.blue,
+            impact_nice_to_have: MOCHA.yellow,
+            impact_blocking: MOCHA.red,
+
+            // RiskLevel
+            risk_low: MOCHA.blue,
+            risk_medium: MOCHA.yellow,
+            risk_high: MOCHA.red,
 
             // Status colors
             success: MOCHA.green,

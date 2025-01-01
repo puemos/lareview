@@ -2,7 +2,7 @@ use crate::domain::{ReviewStatus, ReviewTask};
 use crate::ui::app::ReviewAction;
 use crate::ui::components::{PopupOption, popup_selector};
 use crate::ui::theme::Theme;
-use crate::ui::{icons, spacing, typography};
+use crate::ui::{spacing, typography};
 use eframe::egui;
 
 pub(crate) fn render_task_header(
@@ -72,13 +72,8 @@ pub(crate) fn render_task_header(
             ui.add_space(spacing::SPACING_XS);
 
             // Risk Indicator
-            let (risk_icon, risk_fg, risk_label) = match task.stats.risk {
-                crate::domain::RiskLevel::High => {
-                    (icons::RISK_HIGH, theme.destructive, "High risk")
-                }
-                crate::domain::RiskLevel::Medium => (icons::RISK_MEDIUM, theme.warning, "Med risk"),
-                crate::domain::RiskLevel::Low => (icons::RISK_LOW, theme.accent, "Low risk"),
-            };
+            let risk_v = crate::ui::views::review::visuals::risk_visuals(task.stats.risk, theme);
+            let (risk_icon, risk_fg, risk_label) = (risk_v.icon, risk_v.color, risk_v.label);
 
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 4.0;

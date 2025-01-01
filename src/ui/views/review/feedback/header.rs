@@ -69,8 +69,6 @@ pub(crate) fn render_feedback_header(
 
     // Row 2: actions (left aligned)
     ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = spacing::SPACING_SM;
-
         let status_width = 120.0;
         let impact_width = 150.0;
 
@@ -92,6 +90,8 @@ pub(crate) fn render_feedback_header(
             });
         }
 
+        ui.add_space(spacing::SPACING_SM);
+
         // Impact selector
         let impact = feedback
             .map(|t| t.impact)
@@ -112,8 +112,21 @@ pub(crate) fn render_feedback_header(
             });
         }
 
+        ui.add_space(spacing::SPACING_SM);
+
         if let Some(url) = link_url.as_ref() {
-            ui.hyperlink_to(typography::label("See on GitHub"), url);
+            if pill_action_button(
+                ui,
+                crate::ui::icons::ACTION_OPEN_WINDOW,
+                "See on GitHub",
+                true,
+                theme.brand,
+            )
+            .on_hover_text("Open in Browser")
+            .clicked()
+            {
+                ui.ctx().open_url(egui::OpenUrl::new_tab(url));
+            }
         }
 
         // Delete

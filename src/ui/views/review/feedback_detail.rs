@@ -3,7 +3,7 @@ use crate::ui::app::{Action, LaReviewApp, ReviewAction};
 use crate::ui::components::DiffAction;
 use crate::ui::spacing;
 use crate::ui::theme::current_theme;
-use crate::ui::typography;
+
 use eframe::egui;
 use egui::epaint::MarginF32;
 use unidiff::PatchSet;
@@ -106,25 +106,7 @@ impl LaReviewApp {
                     .unwrap_or(false);
 
                 if is_github_review {
-                    let sent_url = feedback_id
-                        .as_ref()
-                        .and_then(|id| self.state.domain.feedback_links.get(id))
-                        .map(|l| l.provider_root_comment_id.clone());
-
-                    ui.add_space(spacing::SPACING_SM);
-                    ui.horizontal(|ui| {
-                        if let Some(link_url) = sent_url.clone() {
-                            ui.label(typography::body("Sent to PR").color(theme.success));
-                            ui.hyperlink_to(typography::label("View on GitHub"), &link_url);
-                        } else {
-                            ui.label(
-                                typography::body(
-                                    "Not sent to PR yet. Use the toolbar “Send to PR” to publish.",
-                                )
-                                .color(theme.text_muted),
-                            );
-                        }
-                    });
+                    // status/link handled in header actions row
                 }
 
                 let diff_snippet =
