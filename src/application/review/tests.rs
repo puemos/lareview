@@ -14,10 +14,20 @@ async fn test_export_to_markdown_basics() {
     assert!(md.contains("# Test Review"));
     assert!(md.contains("This is a summary"));
     assert!(md.contains("## Overview"));
-    assert!(md.contains("### Flow A"));
-    assert!(md.contains("#### [ ] 🟡 First Task"));
-    assert!(md.contains("AI Insight"));
-    assert!(md.contains("### ⚪ [nitpick] Feedback Title"));
+    // "Details" renamed to "Review Tasks"
+    assert!(md.contains("## Review Tasks"));
+    // Flow headers are now numbered
+    assert!(md.contains("## Flow 1: Flow A"));
+    // Task headers changed format
+    assert!(md.contains("### Task: First Task"));
+    // Risk is on its own line
+    assert!(md.contains("**Risk:** 🟡 Medium"));
+    // Insight renamed
+    assert!(md.contains("> **Insight:** AI Insight"));
+
+    // Feedback rendering (now using render_single_feedback_markdown styles)
+    assert!(md.contains("**Feedback:** Feedback Title"));
+    assert!(md.contains("**Severity:** ⚪ Nitpick"));
     assert!(md.contains("Comment body"));
 }
 
@@ -102,10 +112,76 @@ async fn test_export_to_markdown_full() {
         .await
         .unwrap();
     assert!(result.markdown.contains("Full Review"));
-    assert!(result.markdown.contains("🔴"));
-    assert!(result.markdown.contains("AI Insight"));
+    assert!(result.markdown.contains("Task: Task 1"));
+    assert!(result.markdown.contains("**Risk:** 🔴 High"));
+    assert!(result.markdown.contains("**Feedback:** Feedback"));
     assert!(result.markdown.contains("Comment Body"));
-    assert!(result.markdown.contains("blocking"));
+    assert!(result.markdown.contains("Blocking"));
+}
+
+#[test]
+fn test_render_single_feedback() {
+    let feedback = Feedback {
+        id: "f1".into(),
+        review_id: "r1".into(),
+        task_id: None,
+        title: "Test Feedback".into(),
+        status: ReviewStatus::Todo,
+        impact: FeedbackImpact::NiceToHave,
+        anchor: None,
+        author: "me".into(),
+        created_at: "".into(),
+        updated_at: "".into(),
+    };
+    let comments = vec![Comment {
+        id: "c1".into(),
+        feedback_id: "f1".into(),
+        author: "agent:claude".into(),
+        body: "A comment".into(),
+        parent_id: None,
+        created_at: "".into(),
+        updated_at: "".into(),
+    }];
+
+    let md = ReviewExporter::render_single_feedback_markdown(&feedback, &comments);
+
+    assert!(md.contains("**Feedback:** Test Feedback"));
+    assert!(md.contains("**Severity:** 🔵 Nice_to_have")); // or 'Nice_to_have' depending on implementation capitalization logic
+    // Logic was: capitalize first char. nice_to_have -> Nice_to_have.
+
+    assert!(md.contains("**Agent Claude:**")); // agent:claude -> Agent Claude
+    assert!(md.contains("A comment"));
+}
+
+#[tokio::test]
+async fn test_export_github_permalinks() {
+    let mut data = create_mock_data();
+    data.review.source = ReviewSource::GitHubPr {
+        owner: "puemos".into(),
+        repo: "lareview".into(),
+        number: 123,
+        url: None,
+        head_sha: Some("sha-123".into()),
+        base_sha: None,
+    };
+    // Add a hunk ref to trigger line range logic
+    data.tasks[0].diff_refs[0].hunks = vec![crate::domain::HunkRef {
+        old_start: 10,
+        old_lines: 5,
+        new_start: 12,
+        new_lines: 5,
+    }];
+
+    let result = ReviewExporter::export_to_markdown(&data, &ExportOptions::default())
+        .await
+        .unwrap();
+
+    // Expected link: https://github.com/puemos/lareview/blob/sha-123/file.txt#L12-L17
+    assert!(
+        result
+            .markdown
+            .contains("https://github.com/puemos/lareview/blob/sha-123/file.txt#L12-L17")
+    );
 }
 
 #[test]

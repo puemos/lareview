@@ -157,21 +157,7 @@ pub fn send_feedback_to_pr(app: &mut LaReviewApp, feedback_id: String) {
                 .list_for_feedback(&feedback.id)
                 .map_err(|e| format!("Failed to load feedback comments: {e}"))?;
 
-            let emoji = impact_emoji(feedback.impact);
-            let severity = human_impact(feedback.impact);
-
-            let mut body = format!(
-                "**Feedback:** {}\n**Severity:** {} {}\n\n",
-                feedback.title, emoji, severity
-            );
-            if comments.is_empty() {
-                body.push_str("No comments provided.\n");
-            } else {
-                for comment in &comments {
-                    let author = normalize_author(&comment.author);
-                    body.push_str(&format!("**{}:**\n{}\n\n", author, comment.body));
-                }
-            }
+            let body = ReviewExporter::render_single_feedback_markdown(&feedback, &comments);
 
             let posted = crate::infra::github::create_review_comment(
                 &owner, &repo, number, &body, &commit_id, path, position,
@@ -338,21 +324,7 @@ pub fn send_feedbacks_to_pr(
                     .list_for_feedback(&feedback.id)
                     .map_err(|e| format!("Failed to load feedback comments: {e}"))?;
 
-                let emoji = impact_emoji(feedback.impact);
-                let severity = human_impact(feedback.impact);
-
-                let mut body = format!(
-                    "**Feedback:** {}\n**Severity:** {} {}\n\n",
-                    feedback.title, emoji, severity
-                );
-                if comments.is_empty() {
-                    body.push_str("No comments provided.\n");
-                } else {
-                    for comment in &comments {
-                        let author = normalize_author(&comment.author);
-                        body.push_str(&format!("**{}:**\n{}\n\n", author, comment.body));
-                    }
-                }
+                let body = ReviewExporter::render_single_feedback_markdown(&feedback, &comments);
 
                 let posted = crate::infra::github::create_review_comment(
                     &owner,
@@ -390,38 +362,6 @@ pub fn send_feedbacks_to_pr(
             .send(Action::Async(AsyncAction::SendToPrFinished(result)))
             .await;
     });
-}
-
-fn impact_emoji(impact: FeedbackImpact) -> &'static str {
-    match impact {
-        FeedbackImpact::Blocking => "🔴",
-        FeedbackImpact::NiceToHave => "🟡",
-        FeedbackImpact::Nitpick => "🔵",
-    }
-}
-
-fn human_impact(impact: FeedbackImpact) -> &'static str {
-    match impact {
-        FeedbackImpact::Blocking => "Blocking",
-        FeedbackImpact::NiceToHave => "Nice to have",
-        FeedbackImpact::Nitpick => "Nitpick",
-    }
-}
-
-fn normalize_author(author: &str) -> String {
-    if let Some(stripped) = author.strip_prefix("agent:") {
-        let mut s = String::from("Agent ");
-        let mut chars = stripped.chars();
-        if let Some(first) = chars.next() {
-            s.push(first.to_ascii_uppercase());
-            s.extend(chars);
-        } else {
-            s.push_str("Agent");
-        }
-        s
-    } else {
-        author.to_string()
-    }
 }
 
 fn compute_diff_position(
