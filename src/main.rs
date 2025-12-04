@@ -8,14 +8,13 @@ mod data;
 mod domain;
 mod ui;
 
-use gpui::prelude::*;
-use gpui::{px, size, App, AppContext, Application, Bounds, VisualContext, WindowBounds, WindowOptions};
+use gpui::{App, AppContext, Application, WindowOptions};
 use ui::app::LaReviewApp;
 
 fn main() {
-    Application::new().run(|cx| {
-        cx.open_window(WindowOptions::default(), |_, cx: &mut WindowContext| {
-            cx.new_view(|cx| LaReviewApp::new(cx))
+    Application::new().run(|cx: &mut App| {
+        cx.open_window(WindowOptions::default(), |_, cx| {
+            cx.new(|cx| LaReviewApp::new(cx))
         })
         .unwrap();
     });

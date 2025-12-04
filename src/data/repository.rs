@@ -142,7 +142,17 @@ impl TaskRepository {
 
         let mut tasks = Vec::new();
         for row in rows {
-            let (id, title, description, files_json, stats_json, insight, patches_json, diagram, ai_generated) = row?;
+            let (
+                id,
+                title,
+                description,
+                files_json,
+                stats_json,
+                insight,
+                patches_json,
+                diagram,
+                ai_generated,
+            ) = row?;
             tasks.push(ReviewTask {
                 id,
                 title,
@@ -182,7 +192,8 @@ impl NoteRepository {
 
     pub fn find_by_task(&self, task_id: &TaskId) -> Result<Option<Note>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT task_id, body, updated_at FROM notes WHERE task_id = ?1")?;
+        let mut stmt =
+            conn.prepare("SELECT task_id, body, updated_at FROM notes WHERE task_id = ?1")?;
 
         let mut rows = stmt.query([task_id])?;
         if let Some(row) = rows.next()? {
@@ -209,7 +220,8 @@ impl NoteRepository {
         );
 
         let mut stmt = conn.prepare(&query)?;
-        let params: Vec<&dyn rusqlite::ToSql> = task_ids.iter().map(|s| s as &dyn rusqlite::ToSql).collect();
+        let params: Vec<&dyn rusqlite::ToSql> =
+            task_ids.iter().map(|s| s as &dyn rusqlite::ToSql).collect();
 
         let rows = stmt.query_map(params.as_slice(), |row| {
             Ok(Note {

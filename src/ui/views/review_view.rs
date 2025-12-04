@@ -1,6 +1,6 @@
 //! Review view - main interface for reviewing tasks
 
-use gpui::{div, prelude::*, px, Context, Entity, InteractiveElement, SharedString, Window};
+use gpui::{Context, Entity, InteractiveElement, SharedString, Window, div, prelude::*, px};
 
 use crate::domain::ReviewTask;
 use crate::ui::app::AppState;
@@ -53,7 +53,8 @@ impl ReviewView {
             .child(
                 div()
                     .flex_1()
-                    .overflow_hidden() // Use hidden for now as scroll is not available
+                    .id("task-list")
+                    .overflow_scroll()
                     .flex()
                     .flex_col()
                     .children(tasks.iter().map(|task| {
@@ -67,7 +68,6 @@ impl ReviewView {
                             .on_click(cx.listener(move |this, _event, _window, cx| {
                                 this.select_task(task_id.clone(), cx);
                             }))
-
                             .p(px(spacing.space_3))
                             .cursor_pointer()
                             .bg(if is_selected {
@@ -81,7 +81,6 @@ impl ReviewView {
                             } else {
                                 gpui::Hsla::default() // Transparent
                             })
-
                             .child(
                                 div()
                                     .flex()
@@ -99,16 +98,12 @@ impl ReviewView {
                                             .child(task_title),
                                     )
                                     .child(
-                                        div()
-                                            .flex()
-                                            .items_center()
-                                            .gap(px(spacing.space_2))
-                                            .child(
-                                                div()
-                                                    .text_xs()
-                                                    .text_color(colors.text_muted)
-                                                    .child(format!("{:?}", risk)),
-                                            ),
+                                        div().flex().items_center().gap(px(spacing.space_2)).child(
+                                            div()
+                                                .text_xs()
+                                                .text_color(colors.text_muted)
+                                                .child(format!("{:?}", risk)),
+                                        ),
                                     ),
                             )
                     })),
@@ -124,6 +119,8 @@ impl ReviewView {
             .flex()
             .flex_col()
             .h_full()
+            .id("task-detail")
+            .overflow_scroll()
             .child(
                 div()
                     .p(px(spacing.space_6))
@@ -151,9 +148,21 @@ impl ReviewView {
                                 div()
                                     .flex()
                                     .gap(px(spacing.space_4))
-                                    .child(self.stat_badge("Additions", &format!("+{}", task.stats.additions), colors.success))
-                                    .child(self.stat_badge("Deletions", &format!("-{}", task.stats.deletions), colors.danger))
-                                    .child(self.stat_badge("Files", &task.files.len().to_string(), colors.primary)),
+                                    .child(self.stat_badge(
+                                        "Additions",
+                                        &format!("+{}", task.stats.additions),
+                                        colors.success,
+                                    ))
+                                    .child(self.stat_badge(
+                                        "Deletions",
+                                        &format!("-{}", task.stats.deletions),
+                                        colors.danger,
+                                    ))
+                                    .child(self.stat_badge(
+                                        "Files",
+                                        &task.files.len().to_string(),
+                                        colors.primary,
+                                    )),
                             ),
                     ),
             )
@@ -161,36 +170,33 @@ impl ReviewView {
                 div()
                     .flex_1()
                     .p(px(spacing.space_6))
-                    .overflow_hidden()
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap(px(spacing.space_6))
-                            .children(task.patches.iter().map(|patch| {
-                                div()
-                                    .flex()
-                                    .flex_col()
-                                    .gap(px(spacing.space_2))
-                                    .child(
-                                        div()
-                                            .font_weight(gpui::FontWeight::SEMIBOLD)
-                                            .text_sm()
-                                            .text_color(colors.text_muted)
-                                            .child(patch.file.clone()),
-                                    )
-                                    .child(
-                                        div()
-                                            .p(px(spacing.space_4))
-                                            .bg(colors.surface_alt)
-                                            .border_1()
-                                            .border_color(colors.border)
-                                            .font_family("JetBrains Mono")
-                                            .text_sm()
-                                            .child(patch.hunk.clone()),
-                                    )
-                            })),
-                    ),
+                    .id("patches-panel")
+                    .overflow_scroll()
+                    .child(div().flex().flex_col().gap(px(spacing.space_6)).children(
+                        task.patches.iter().map(|patch| {
+                            div()
+                                .flex()
+                                .flex_col()
+                                .gap(px(spacing.space_2))
+                                .child(
+                                    div()
+                                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                                        .text_sm()
+                                        .text_color(colors.text_muted)
+                                        .child(patch.file.clone()),
+                                )
+                                .child(
+                                    div()
+                                        .p(px(spacing.space_4))
+                                        .bg(colors.surface_alt)
+                                        .border_1()
+                                        .border_color(colors.border)
+                                        .font_family("JetBrains Mono")
+                                        .text_sm()
+                                        .child(patch.hunk.clone()),
+                                )
+                        }),
+                    )),
             )
     }
 
@@ -228,25 +234,20 @@ impl ReviewView {
         let colors = theme().colors;
         let spacing = theme().spacing;
 
-        div()
-            .flex_1()
-            .flex()
-            .items_center()
-            .justify_center()
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .items_center()
-                    .gap(px(spacing.space_4))
-                    .child(
-                        div()
-                            .text_xl()
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
-                            .text_color(colors.text_muted)
-                            .child("Select a task to view details"),
-                    ),
-            )
+        div().flex_1().flex().items_center().justify_center().child(
+            div()
+                .flex()
+                .flex_col()
+                .items_center()
+                .gap(px(spacing.space_4))
+                .child(
+                    div()
+                        .text_xl()
+                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                        .text_color(colors.text_muted)
+                        .child("Select a task to view details"),
+                ),
+        )
     }
 }
 
@@ -254,10 +255,11 @@ impl Render for ReviewView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let colors = theme().colors;
         let state = self.state.read(cx);
-        
-        let selected_task = state.selected_task_id.as_ref().and_then(|id| {
-            state.tasks.iter().find(|t| &t.id == id).cloned()
-        });
+
+        let selected_task = state
+            .selected_task_id
+            .as_ref()
+            .and_then(|id| state.tasks.iter().find(|t| &t.id == id).cloned());
 
         div()
             .flex()
