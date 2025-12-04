@@ -1,9 +1,8 @@
 //! Generate view - paste diff and generate tasks with ACP
 
-use gpui::{div, prelude::*, px, Context, Entity, SharedString, Window};
-use gpui::app::AsyncAppContext;
+use gpui::{AsyncApp, Context, Entity, SharedString, Window, div, prelude::*, px};
 
-use crate::acp::{generate_tasks_with_acp, GenerateTasksInput};
+use crate::acp::{GenerateTasksInput, generate_tasks_with_acp, list_agent_candidates};
 use crate::domain::PullRequest;
 use crate::ui::app::{AppState, AppView, SelectedAgent};
 use crate::ui::theme::theme;
@@ -18,10 +17,36 @@ impl GenerateView {
         Self { state }
     }
 
+    fn paste_from_clipboard(&self, cx: &mut Context<Self>) {
+        let clipboard = cx
+            .read_from_clipboard()
+            .and_then(|item| item.text())
+            .map(|text| text.trim().to_string())
+            .filter(|text| !text.is_empty());
+
+        self.state.update(cx, |s, _| match clipboard {
+            Some(text) => {
+                s.diff_text = text;
+                s.generation_error = None;
+            }
+            None => {
+                s.generation_error = Some("Clipboard is empty or not text".to_string());
+            }
+        });
+    }
+
+    fn clear_diff(&self, cx: &mut Context<Self>) {
+        self.state.update(cx, |s, _| {
+            s.diff_text.clear();
+            s.tasks.clear();
+            s.generation_error = None;
+        });
+    }
+
     fn start_generation(&self, cx: &mut Context<Self>) {
         // Read current state
         let state = self.state.read(cx);
-        
+
         if state.diff_text.trim().is_empty() {
             self.state.update(cx, |s, _| {
                 s.generation_error = Some("Please paste a git diff first".to_string());
@@ -43,22 +68,62 @@ impl GenerateView {
         let diff_text = state.diff_text.clone();
         let agent = state.selected_agent.clone();
 
+        // Get agent command based on selection
+        let (agent_cmd, agent_args, start_log) = match agent {
+            SelectedAgent::Codex | SelectedAgent::Gemini => {
+                let agent_id = match agent {
+                    SelectedAgent::Codex => "codex",
+                    SelectedAgent::Gemini => "gemini",
+                };
+
+                let candidates = list_agent_candidates();
+                let candidate = candidates.into_iter().find(|c| c.id == agent_id);
+
+                let Some(candidate) = candidate else {
+                    self.state.update(cx, |s, _| {
+                        s.is_generating = false;
+                        s.generation_error =
+                            Some(format!("Agent \"{}\" is not configured.", agent_id));
+                    });
+                    return;
+                };
+
+                if !candidate.available {
+                    self.state.update(cx, |s, _| {
+                        s.is_generating = false;
+                        s.generation_error = Some(format!(
+                            "{} is not available on PATH. Install it and restart (command: {} {}).",
+                            candidate.label,
+                            candidate.command.unwrap_or_else(|| agent_id.to_string()),
+                            candidate.args.join(" ")
+                        ));
+                    });
+                    return;
+                }
+
+                let command = candidate.command.unwrap_or_else(|| agent_id.to_string());
+                let args = candidate.args;
+                let start_log = format!(
+                    "Invoking {} via `{}`",
+                    candidate.label,
+                    std::iter::once(command.clone())
+                        .chain(args.iter().cloned())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                );
+                (command, args, start_log)
+            }
+        };
+
         // Set loading state
+        let start_log_for_state = start_log.clone();
         self.state.update(cx, |s, _| {
             s.is_generating = true;
             s.generation_error = None;
+            s.agent_messages.clear();
+            s.agent_thoughts.clear();
+            s.agent_logs = vec![start_log_for_state.clone()];
         });
-
-        // Get agent command based on selection
-        let (agent_cmd, agent_args) = match agent {
-            SelectedAgent::Stub => {
-                // Use built-in stub - generate simple tasks from diff
-                self.generate_stub_tasks(cx, pr, diff_text);
-                return;
-            }
-            SelectedAgent::Codex => ("codex".to_string(), vec!["--acp".to_string()]),
-            SelectedAgent::Gemini => ("gemini".to_string(), vec!["--acp".to_string()]),
-        };
 
         let input = GenerateTasksInput {
             pull_request: pr,
@@ -69,85 +134,41 @@ impl GenerateView {
         };
 
         let state_entity = self.state.clone();
+        let start_log = start_log.clone();
 
         // Spawn async task for ACP generation
-        cx.spawn(|_this, mut cx: &mut AsyncAppContext| async move {
-            let result = generate_tasks_with_acp(input).await;
+        cx.spawn(|_this, cx: &mut AsyncApp| {
+            let mut app = cx.clone();
 
-            let _ = cx.update_entity(&state_entity, |state, _| {
-                state.is_generating = false;
-                match result {
-                    Ok(res) => {
-                        state.tasks = res.tasks;
-                        if state.tasks.is_empty() {
-                            state.generation_error = Some("No tasks generated".to_string());
-                        } else {
-                            // Auto-navigate to review
-                            state.current_view = AppView::Review;
+            async move {
+                let result = generate_tasks_with_acp(input).await;
+
+                let _ = app.update_entity(&state_entity, |state, _| {
+                    state.is_generating = false;
+                    match result {
+                        Ok(res) => {
+                            state.tasks = res.tasks;
+                            state.agent_messages = res.messages;
+                            state.agent_thoughts = res.thoughts;
+                            let mut logs = res.logs;
+                            logs.insert(0, start_log.clone());
+                            state.agent_logs = logs;
+                            if state.tasks.is_empty() {
+                                state.generation_error = Some("No tasks generated".to_string());
+                            } else {
+                                // Auto-navigate to review
+                                state.current_view = AppView::Review;
+                            }
+                        }
+                        Err(e) => {
+                            state.generation_error = Some(format!("Generation failed: {}", e));
+                            state.agent_logs = vec![start_log.clone(), e.to_string()];
                         }
                     }
-                    Err(e) => {
-                        state.generation_error = Some(format!("Generation failed: {}", e));
-                    }
-                }
-            });
+                });
+            }
         })
         .detach();
-    }
-
-    fn generate_stub_tasks(&self, cx: &mut Context<Self>, pr: PullRequest, diff_text: String) {
-        use crate::acp::parse_diff;
-        use crate::domain::{Patch, ReviewTask, RiskLevel, TaskStats};
-
-        let files = parse_diff(&diff_text);
-        
-        let tasks: Vec<ReviewTask> = files
-            .iter()
-            .enumerate()
-            .map(|(i, f)| {
-                let risk = if f.additions > 50 || f.deletions > 50 {
-                    RiskLevel::High
-                } else if f.additions > 20 || f.deletions > 20 {
-                    RiskLevel::Medium
-                } else {
-                    RiskLevel::Low
-                };
-
-                ReviewTask {
-                    id: format!("task-{}", i + 1),
-                    title: format!("Review changes in {}", f.file_path),
-                    description: format!(
-                        "Review {} additions and {} deletions in {}",
-                        f.additions, f.deletions, f.file_path
-                    ),
-                    files: vec![f.file_path.clone()],
-                    stats: TaskStats {
-                        additions: f.additions,
-                        deletions: f.deletions,
-                        risk,
-                        tags: vec![],
-                    },
-                    patches: vec![Patch {
-                        file: f.file_path.clone(),
-                        hunk: f.patch.clone(),
-                    }],
-                    insight: None,
-                    diagram: None,
-                    ai_generated: false,
-                }
-            })
-            .collect();
-
-        self.state.update(cx, |state, _| {
-            state.is_generating = false;
-            state.tasks = tasks;
-            state.pr = Some(pr);
-            if state.tasks.is_empty() {
-                state.generation_error = Some("No files found in diff".to_string());
-            } else {
-                state.current_view = AppView::Review;
-            }
-        });
     }
 
     fn select_agent(&self, agent: SelectedAgent, cx: &mut Context<Self>) {
@@ -173,6 +194,12 @@ impl Render for GenerateView {
         let selected_agent = state.selected_agent.clone();
         let diff_text = state.diff_text.clone();
         let generation_error = state.generation_error.clone();
+        let agent_messages = state.agent_messages.clone();
+        let agent_thoughts = state.agent_thoughts.clone();
+        let agent_logs = state.agent_logs.clone();
+        let has_agent_feedback =
+            !agent_messages.is_empty() || !agent_thoughts.is_empty() || !agent_logs.is_empty();
+        let show_agent_panel = has_agent_feedback || is_generating;
 
         div()
             .flex()
@@ -245,8 +272,12 @@ impl Render for GenerateView {
                                     } else {
                                         colors.text
                                     })
+                                    .cursor_text()
+                                    .on_click(cx.listener(|this, _event, _window, cx| {
+                                        this.paste_from_clipboard(cx);
+                                    }))
                                     .child(if diff_text.is_empty() {
-                                        "Paste output from \"git diff\" here...".to_string()
+                                        "Click or use the Paste button to load output from \"git diff\"...".to_string()
                                     } else {
                                         let preview = diff_text.lines().take(10).collect::<Vec<_>>().join("\n");
                                         if diff_text.lines().count() > 10 {
@@ -258,9 +289,44 @@ impl Render for GenerateView {
                             )
                             .child(
                                 div()
-                                    .text_sm()
-                                    .text_color(colors.text_muted)
-                                    .child("Tip: Run 'git diff main...HEAD | pbcopy' then paste here"),
+                                    .flex()
+                                    .items_center()
+                                    .gap(px(spacing.space_3))
+                                    .child(
+                                        div()
+                                            .id("paste-diff-btn")
+                                            .px(px(spacing.space_4))
+                                            .py(px(spacing.space_2))
+                                            .bg(colors.surface_alt)
+                                            .border_1()
+                                            .border_color(colors.border_strong)
+                                            .cursor_pointer()
+                                            .on_click(cx.listener(|this, _event, _window, cx| {
+                                                this.paste_from_clipboard(cx);
+                                            }))
+                                            .child("Paste from clipboard"),
+                                    )
+                                    .child(
+                                        div()
+                                            .id("clear-diff-btn")
+                                            .px(px(spacing.space_4))
+                                            .py(px(spacing.space_2))
+                                            .bg(colors.surface)
+                                            .border_1()
+                                            .border_color(colors.border)
+                                            .cursor_pointer()
+                                            .text_color(colors.text_muted)
+                                            .on_click(cx.listener(|this, _event, _window, cx| {
+                                                this.clear_diff(cx);
+                                            }))
+                                            .child("Clear"),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_sm()
+                                            .text_color(colors.text_muted)
+                                            .child("Tip: Run 'git diff main...HEAD | pbcopy', then click Paste."),
+                                    ),
                             ),
                     )
                     // Agent selection
@@ -277,14 +343,6 @@ impl Render for GenerateView {
                                     .font_weight(gpui::FontWeight::SEMIBOLD)
                                     .child("Agent"),
                             )
-                            .child(self.render_agent_option(
-                                "Built-in stub",
-                                "Available",
-                                true,
-                                SelectedAgent::Stub,
-                                selected_agent == SelectedAgent::Stub,
-                                cx,
-                            ))
                             .child(self.render_agent_option(
                                 "Codex (ACP)",
                                 "Requires codex CLI",
@@ -328,6 +386,58 @@ impl Render for GenerateView {
                             }),
                     ),
             )
+            // Agent communication panel
+            .when(show_agent_panel, |this| {
+                this.child(
+                    div()
+                        .bg(colors.surface)
+                        .border_1()
+                        .border_color(colors.border_strong)
+                        .p(px(spacing.space_5))
+                        .flex()
+                        .flex_col()
+                        .gap(px(spacing.space_4))
+                        .child(
+                            div()
+                                .text_lg()
+                                .font_weight(gpui::FontWeight::BOLD)
+                                .text_color(colors.text_strong)
+                                .child("Agent communication"),
+                        )
+                        .child(
+                            div()
+                                .text_sm()
+                                .text_color(if is_generating {
+                                    colors.warning
+                                } else {
+                                    colors.success
+                                })
+                                .child(if is_generating {
+                                    "Waiting for agent response..."
+                                } else {
+                                    "Agent run completed."
+                                }),
+                        )
+                        .child(self.render_agent_feed(
+                            "Messages",
+                            &agent_messages,
+                            colors.text,
+                            spacing.space_2,
+                        ))
+                        .child(self.render_agent_feed(
+                            "Thoughts",
+                            &agent_thoughts,
+                            colors.text_muted,
+                            spacing.space_2,
+                        ))
+                        .child(self.render_agent_feed(
+                            "Logs",
+                            &agent_logs,
+                            colors.danger,
+                            spacing.space_2,
+                        )),
+                )
+            })
     }
 }
 
@@ -380,5 +490,56 @@ impl GenerateView {
                     })
                     .child(status.to_string()),
             )
+    }
+
+    fn render_agent_feed(
+        &self,
+        label: &str,
+        entries: &[String],
+        color: gpui::Hsla,
+        gap: f32,
+    ) -> impl IntoElement {
+        let spacing = theme().spacing;
+
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(gap))
+            .child(
+                div()
+                    .text_sm()
+                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .text_color(color)
+                    .child(label.to_string()),
+            )
+            .child(if entries.is_empty() {
+                div()
+                    .text_sm()
+                    .text_color(theme().colors.text_muted)
+                    .child("No entries yet.")
+                    .into_any_element()
+            } else {
+                div()
+                    .bg(gpui::hsla(0.0, 0.0, 1.0, 0.5))
+                    .border_1()
+                    .border_color(theme().colors.border)
+                    .rounded_md()
+                    .id(SharedString::from(format!("agent-feed-{}", label)))
+                    .p(px(spacing.space_3))
+                    .flex()
+                    .flex_col()
+                    .gap(px(spacing.space_2))
+                    .max_h(px(320.0))
+                    .overflow_scroll()
+                    .children(entries.iter().enumerate().map(|(i, entry)| {
+                        div()
+                            .id(SharedString::from(format!("agent-{}-{}", label, i)))
+                            .text_sm()
+                            .text_color(color)
+                            .child(entry.clone())
+                    }))
+                    .into_any_element()
+            })
+            .into_any_element()
     }
 }

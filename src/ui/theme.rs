@@ -1,6 +1,6 @@
 //! Theme - "Sharp & Stone" design system
 
-use gpui::{hsla, Hsla};
+use gpui::{Hsla, hsla};
 
 /// Color palette for the Sharp & Stone theme
 pub struct ThemeColors {

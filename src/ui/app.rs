@@ -1,8 +1,6 @@
 //! Main application state with Entity pattern for interactive UI
 
-use gpui::{div, prelude::*, px, Context, Entity, SharedString, VisualContext, Window};
-use gpui::window::WindowContext;
-use std::ops::DerefMut;
+use gpui::{Context, Entity, Window, div, prelude::*, px};
 
 use crate::domain::{PullRequest, ReviewTask};
 
@@ -19,15 +17,8 @@ pub enum AppView {
 /// Selected agent for task generation
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SelectedAgent {
-    Stub,
     Codex,
     Gemini,
-}
-
-impl Default for SelectedAgent {
-    fn default() -> Self {
-        Self::Stub
-    }
 }
 
 /// Shared application state
@@ -45,6 +36,9 @@ pub struct AppState {
     pub pr_author: String,
     pub pr_branch: String,
     pub selected_task_id: Option<String>,
+    pub agent_messages: Vec<String>,
+    pub agent_thoughts: Vec<String>,
+    pub agent_logs: Vec<String>,
 }
 
 impl Default for AppState {
@@ -55,7 +49,7 @@ impl Default for AppState {
             tasks: Vec::new(),
             is_generating: false,
             generation_error: None,
-            selected_agent: SelectedAgent::default(),
+            selected_agent: SelectedAgent::Codex,
             diff_text: String::new(),
             pr_id: "local-pr".to_string(),
             pr_title: "Local Review".to_string(),
@@ -63,6 +57,9 @@ impl Default for AppState {
             pr_author: "me".to_string(),
             pr_branch: "main".to_string(),
             selected_task_id: None,
+            agent_messages: Vec::new(),
+            agent_thoughts: Vec::new(),
+            agent_logs: Vec::new(),
         }
     }
 }
@@ -70,12 +67,21 @@ impl Default for AppState {
 /// Main application - holds entity reference to shared state
 pub struct LaReviewApp {
     state: Entity<AppState>,
+    generate_view: Entity<GenerateView>,
+    review_view: Entity<ReviewView>,
 }
 
 impl LaReviewApp {
     pub fn new(cx: &mut Context<Self>) -> Self {
         let state = cx.new(|_| AppState::default());
-        Self { state }
+        let generate_view = cx.new(|cx| GenerateView::new(state.clone(), cx));
+        let review_view = cx.new(|cx| ReviewView::new(state.clone(), cx));
+
+        Self {
+            state,
+            generate_view,
+            review_view,
+        }
     }
 
     pub fn switch_to_review(&mut self, cx: &mut Context<Self>) {
@@ -202,23 +208,17 @@ impl LaReviewApp {
             )
     }
 
-    fn render_content(&self, current_view: AppView, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_content(&self, current_view: AppView, _cx: &mut Context<Self>) -> impl IntoElement {
         let spacing = theme().spacing;
-        let state_entity = self.state.clone();
 
         div()
             .flex_1()
             .p(px(spacing.space_8))
-            .overflow_hidden()
+            .id("content-scroll")
+            .overflow_scroll()
             .child(match current_view {
-                AppView::Generate => {
-                    let cx: &mut WindowContext = cx.deref_mut();
-                    cx.new_view(|cx| GenerateView::new(state_entity.clone(), cx)).into_any_element()
-                }
-                AppView::Review => {
-                    let cx: &mut WindowContext = cx.deref_mut();
-                    cx.new_view(|cx| ReviewView::new(state_entity.clone(), cx)).into_any_element()
-                }
+                AppView::Generate => self.generate_view.clone().into_any_element(),
+                AppView::Review => self.review_view.clone().into_any_element(),
             })
     }
 }

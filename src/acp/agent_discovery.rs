@@ -17,8 +17,8 @@ const CANDIDATES: &[(&str, &str, &str, &[&str], &str)] = &[
         "codex",
         "Codex (ACP)",
         "npx",
-        &["@zed-industries/codex-acp"],
-        "Uses the Codex CLI via npx",
+        &["-y", "@zed-industries/codex-acp@latest"],
+        "Uses the Codex CLI via npx (pre-accept install with -y)",
     ),
     (
         "gemini",
@@ -64,8 +64,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_list_includes_stub() {
+    fn test_lists_known_agents() {
         let candidates = list_agent_candidates();
-        assert!(candidates.iter().any(|c| c.id == "stub" && c.available));
+        assert!(candidates.iter().any(|c| c.id == "codex"));
+        assert!(candidates.iter().any(|c| c.id == "gemini"));
     }
 }
