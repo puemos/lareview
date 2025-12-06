@@ -3,6 +3,8 @@
 // Components are currently implemented inline in views.
 // This module provides a namespace for reusable components.
 
+pub mod diff_view;
+
 // TODO: Extract reusable components:
 // - header.rs — PR title, metadata
 // - heatmap.rs — Risk visualization bar

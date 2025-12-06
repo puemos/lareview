@@ -18,3 +18,4 @@ async-trait = "0.1"
 pmcp = "1.8.6"
 tempfile = "3"
 chrono = { version = "0.4", features = ["clock"] }
+similar = "2.7.0"

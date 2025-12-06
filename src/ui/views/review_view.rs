@@ -1,25 +1,114 @@
 //! Review view - main interface for reviewing tasks
 
 use gpui::{
-    Context, Entity, InteractiveElement, MouseButton, SharedString, StatefulInteractiveElement,
-    Window, div, prelude::*, px,
+    div, prelude::*, px, Context, Entity, InteractiveElement, MouseButton, SharedString, StatefulInteractiveElement, Window,
 };
 
 use crate::data::repository::{NoteRepository, TaskRepository};
 use crate::domain::{Note, ReviewTask, TaskStatus};
 use crate::ui::app::AppState;
+use crate::ui::components::diff_view::{self, DiffItem, process_diff_for_list};
 use crate::ui::theme::theme;
 use std::collections::HashMap;
 use std::sync::Arc;
+
+#[derive(Clone)]
+enum ViewItem {
+    TaskHeader(ReviewTask),
+    Stats(ReviewTask),
+    StatusActions(ReviewTask),
+    Error(String),
+    Insight(String),
+    Diagram(String),
+    Notes {
+        current_note: Option<String>,
+        task_id: String,
+        task_title: String,
+    },
+    Diff(DiffItem),
+    EmptyState,
+}
 
 /// Review view for browsing and completing tasks
 pub struct ReviewView {
     state: Entity<AppState>,
     note_repo: Arc<NoteRepository>,
     task_repo: Arc<TaskRepository>,
+    items: Vec<ViewItem>,
 }
 
 impl ReviewView {
+    pub fn new(
+        state: Entity<AppState>,
+        note_repo: Arc<NoteRepository>,
+        task_repo: Arc<TaskRepository>,
+        _cx: &mut Context<Self>,
+    ) -> Self {
+        Self {
+            state,
+            note_repo,
+            task_repo,
+            items: Vec::new(),
+        }
+    }
+
+    fn rebuild_items(&mut self, cx: &mut Context<Self>) {
+        let state = self.state.read(cx);
+        let selected_task_id = state.selected_task_id.clone();
+        let current_note = state.current_note.clone();
+        let review_error = state.review_error.clone();
+        
+        let task = if let Some(id) = &selected_task_id {
+            state.tasks.iter().find(|t| &t.id == id).cloned()
+        } else {
+            None
+        };
+
+        let mut next_items = Vec::new();
+
+        if let Some(task) = task {
+            next_items.push(ViewItem::TaskHeader(task.clone()));
+            next_items.push(ViewItem::Stats(task.clone()));
+            next_items.push(ViewItem::StatusActions(task.clone()));
+
+            if let Some(err) = review_error {
+                next_items.push(ViewItem::Error(err));
+            }
+            
+            if let Some(insight) = &task.insight {
+                next_items.push(ViewItem::Insight(insight.clone()));
+            }
+            if let Some(diagram) = &task.diagram {
+                 next_items.push(ViewItem::Diagram(diagram.clone()));
+            }
+
+            next_items.push(ViewItem::Notes {
+                current_note: current_note.clone(),
+                task_id: task.id.clone(),
+                task_title: task.title.clone(),
+            });
+
+            // Flatten diffs
+            if task.patches.is_empty() {
+                 // Maybe a "No diffs" item?
+            } else {
+                for patch in &task.patches {
+                    // Pre-process patch into rows
+                    let diff_rows = process_diff_for_list(&patch.file, &patch.hunk);
+                    for item in diff_rows {
+                        next_items.push(ViewItem::Diff(item));
+                    }
+                }
+            }
+        } else {
+            next_items.push(ViewItem::EmptyState);
+        }
+
+        
+        self.items = next_items;
+        cx.notify();
+    }
+
     pub fn sync_from_db(&self, cx: &mut Context<Self>) {
         let (pr_id, selected_task_id) = {
             let state = self.state.read(cx);
@@ -61,19 +150,20 @@ impl ReviewView {
             state.current_note =
                 next_selected.and_then(|id| note_map.get(&id).map(|n| n.body.clone()));
         });
-    }
-
-    pub fn new(
-        state: Entity<AppState>,
-        note_repo: Arc<NoteRepository>,
-        task_repo: Arc<TaskRepository>,
-        _cx: &mut Context<impl Render>,
-    ) -> Self {
-        Self {
-            state,
-            note_repo,
-            task_repo,
-        }
+        
+        // Trigger rebuild via separate update or just rely on render?
+        // Wait, self.rebuild_items takes &mut self, but here we only have &self.
+        // We cannot call rebuild_items here easily unless we use cx.update_view.
+        // It's better to rebuild items in `render` if state changed (dirty checking)
+        // OR use `update` properly.
+        // Since we are `&self`, we can't mutate `self.items`.
+        // We must use `cx.update_view`? ReviewView is the view.
+        // `cx` here is Context<Self>.
+        // We can do `cx.update(|view, cx| view.rebuild_items(cx))`? No, recursive lock?
+        // `self.state.update` updates AppState.
+        // `ReviewView` holds AppState Entity.
+        // When AppState emits change, ReviewView `render` is called if subscribed.
+        // We need to subscribe to AppState changes.
     }
 
     fn select_task(&self, task_id: String, cx: &mut Context<Self>) {
@@ -304,308 +394,55 @@ impl ReviewView {
             )
     }
 
-    fn render_task_detail(
-        &self,
-        task: &ReviewTask,
-        current_note: Option<String>,
-        review_error: Option<String>,
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement {
+    fn status_chip(&self, status: TaskStatus) -> impl IntoElement {
         let colors = theme().colors;
         let spacing = theme().spacing;
-        let task_id = task.id.clone();
+        let (label, color) = match status {
+            TaskStatus::Pending => ("Pending", colors.text_muted),
+            TaskStatus::Reviewed => ("Reviewed", colors.success),
+            TaskStatus::Ignored => ("Ignored", colors.warning),
+        };
 
         div()
-            .flex_1()
+            .px(px(spacing.space_2))
+            .py(px(spacing.space_1))
+            .bg(colors.surface_alt)
+            .border_1()
+            .border_color(colors.border)
+            .rounded_md()
+            .text_xs()
+            .font_weight(gpui::FontWeight::BOLD)
+            .text_color(color)
+            .child(label.to_string())
+    }
+    
+    fn stat_badge(&self, label: &str, value: &str, color: gpui::Hsla) -> impl IntoElement {
+        let colors = theme().colors;
+        let spacing = theme().spacing;
+
+        div()
             .flex()
-            .flex_col()
-            .h_full()
-            .id("task-detail")
-            .overflow_scroll()
+            .items_center()
+            .gap(px(spacing.space_2))
             .child(
                 div()
-                    .p(px(spacing.space_6))
-                    .border_b_1()
-                    .border_color(colors.border_strong)
-                    .bg(colors.surface)
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap(px(spacing.space_4))
-                            .child(
-                                div()
-                                    .text_2xl()
-                                    .font_weight(gpui::FontWeight::BOLD)
-                                    .text_color(colors.text_strong)
-                                    .child(task.title.clone()),
-                            )
-                            .child(
-                                div()
-                                    .text_color(colors.text)
-                                    .child(task.description.clone()),
-                            )
-                            .child(
-                                div()
-                                    .flex()
-                                    .gap(px(spacing.space_4))
-                                    .child(self.stat_badge(
-                                        "Additions",
-                                        &format!("+{}", task.stats.additions),
-                                        colors.success,
-                                    ))
-                                    .child(self.stat_badge(
-                                        "Deletions",
-                                        &format!("-{}", task.stats.deletions),
-                                        colors.danger,
-                                    ))
-                                    .child(self.stat_badge(
-                                        "Files",
-                                        &task.files.len().to_string(),
-                                        colors.primary,
-                                    ))
-                                    .child(
-                                        div()
-                                            .flex_1()
-                                            .flex()
-                                            .justify_end()
-                                            .gap(px(spacing.space_2))
-                                            .child(self.render_status_button(
-                                                "Pending",
-                                                TaskStatus::Pending,
-                                                task.status,
-                                                task_id.clone(),
-                                                cx,
-                                            ))
-                                            .child(self.render_status_button(
-                                                "Reviewed",
-                                                TaskStatus::Reviewed,
-                                                task.status,
-                                                task_id.clone(),
-                                                cx,
-                                            ))
-                                            .child(self.render_status_button(
-                                                "Ignore",
-                                                TaskStatus::Ignored,
-                                                task.status,
-                                                task_id.clone(),
-                                                cx,
-                                            )),
-                                    ),
-                            ),
-                    ),
+                    .text_xs()
+                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .text_color(colors.text_muted)
+                    .child(label.to_string()),
             )
-            .when_some(review_error.clone(), |this, err| {
-                this.child(
-                    div()
-                        .bg(colors.danger)
-                        .text_color(colors.surface)
-                        .p(px(spacing.space_3))
-                        .border_b_1()
-                        .border_color(colors.border_strong)
-                        .child(err),
-                )
-            })
             .child(
                 div()
-                    .flex_1()
-                    .p(px(spacing.space_6))
-                    .id("patches-panel")
-                    .overflow_scroll()
-                    .child(if task.patches.is_empty() {
-                        div()
-                            .text_sm()
-                            .text_color(colors.text_muted)
-                            .child("No patch hunks available for this task.")
-                            .into_any_element()
-                    } else {
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap(px(spacing.space_6))
-                            .children(task.patches.iter().map(|patch| {
-                                div()
-                                    .flex()
-                                    .flex_col()
-                                    .gap(px(spacing.space_2))
-                                    .child(
-                                        div()
-                                            .font_weight(gpui::FontWeight::SEMIBOLD)
-                                            .text_sm()
-                                            .text_color(colors.text_muted)
-                                            .child(patch.file.clone()),
-                                    )
-                                    .child(
-                                        div()
-                                            .p(px(spacing.space_4))
-                                            .bg(colors.surface_alt)
-                                            .border_1()
-                                            .border_color(colors.border)
-                                            .font_family("JetBrains Mono")
-                                            .text_sm()
-                                            .child(patch.hunk.clone()),
-                                    )
-                            }))
-                            .into_any_element()
-                    }),
-            )
-            .when_some(task.insight.clone(), |this, insight| {
-                this.child(
-                    div()
-                        .p(px(spacing.space_6))
-                        .border_t_1()
-                        .border_color(colors.border)
-                        .bg(colors.surface_alt)
-                        .child(
-                            div()
-                                .font_weight(gpui::FontWeight::BOLD)
-                                .text_sm()
-                                .text_color(colors.text_muted)
-                                .mb(px(spacing.space_2))
-                                .child("INSIGHT"),
-                        )
-                        .child(div().text_sm().text_color(colors.text).child(insight)),
-                )
-            })
-            .when_some(task.diagram.clone(), |this, diagram| {
-                this.child(
-                    div()
-                        .p(px(spacing.space_6))
-                        .border_t_1()
-                        .border_color(colors.border)
-                        .bg(colors.surface)
-                        .child(
-                            div()
-                                .font_weight(gpui::FontWeight::BOLD)
-                                .text_sm()
-                                .text_color(colors.text_muted)
-                                .mb(px(spacing.space_2))
-                                .child("DIAGRAM"),
-                        )
-                        .child(
-                            div()
-                                .p(px(spacing.space_4))
-                                .bg(colors.surface_alt)
-                                .border_1()
-                                .border_color(colors.border)
-                                .font_family("JetBrains Mono")
-                                .text_sm()
-                                .child(diagram),
-                        ),
-                )
-            })
-            .child(
-                div()
-                    .p(px(spacing.space_6))
-                    .border_t_1()
-                    .border_color(colors.border)
+                    .px(px(spacing.space_2))
+                    .py(px(spacing.space_1))
                     .bg(colors.surface_alt)
-                    .child(
-                        div()
-                            .font_weight(gpui::FontWeight::BOLD)
-                            .text_sm()
-                            .text_color(colors.text_muted)
-                            .mb(px(spacing.space_2))
-                            .child("NOTES"),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap(px(spacing.space_3))
-                            .child(
-                                div()
-                                    .p(px(spacing.space_3))
-                                    .bg(colors.surface)
-                                    .border_1()
-                                    .border_color(colors.border)
-                                    .rounded_md()
-                                    .text_sm()
-                                    .text_color(if current_note.is_some() {
-                                        colors.text
-                                    } else {
-                                        colors.text_muted
-                                    })
-                                    .child(
-                                        current_note.unwrap_or_else(|| "No notes yet.".to_string()),
-                                    ),
-                            )
-                            .child(
-                                div()
-                                    .flex()
-                                    .flex_wrap()
-                                    .gap(px(spacing.space_2))
-                                    .child(
-                                        div()
-                                            .px(px(spacing.space_3))
-                                            .py(px(spacing.space_2))
-                                            .id("note-paste-btn")
-                                            .bg(colors.primary)
-                                            .text_color(colors.primary_contrast)
-                                            .rounded_md()
-                                            .text_sm()
-                                            .font_weight(gpui::FontWeight::SEMIBOLD)
-                                            .cursor_pointer()
-                                            .on_click(cx.listener({
-                                                let task_id = task_id.clone();
-                                                move |this, _event, _window, cx| {
-                                                    this.paste_note_from_clipboard(
-                                                        task_id.clone(),
-                                                        cx,
-                                                    );
-                                                }
-                                            }))
-                                            .child("Paste note from clipboard"),
-                                    )
-                                    .child(
-                                        div()
-                                            .px(px(spacing.space_3))
-                                            .py(px(spacing.space_2))
-                                            .id("note-sample-btn")
-                                            .bg(colors.surface)
-                                            .text_color(colors.text)
-                                            .border_1()
-                                            .border_color(colors.border)
-                                            .rounded_md()
-                                            .text_sm()
-                                            .font_weight(gpui::FontWeight::SEMIBOLD)
-                                            .cursor_pointer()
-                                            .on_click(cx.listener({
-                                                let task_id = task_id.clone();
-                                                let title = task.title.clone();
-                                                move |this, _event, _window, cx| {
-                                                    let sample = format!(
-                                                        "Reviewed {} — ready for follow-up.",
-                                                        title
-                                                    );
-                                                    this.save_note(&task_id, sample, cx);
-                                                }
-                                            }))
-                                            .child("Save sample note"),
-                                    )
-                                    .child(
-                                        div()
-                                            .px(px(spacing.space_3))
-                                            .py(px(spacing.space_2))
-                                            .id("note-clear-btn")
-                                            .bg(colors.surface)
-                                            .text_color(colors.text_muted)
-                                            .border_1()
-                                            .border_color(colors.border)
-                                            .rounded_md()
-                                            .text_sm()
-                                            .font_weight(gpui::FontWeight::SEMIBOLD)
-                                            .cursor_pointer()
-                                            .on_click(cx.listener({
-                                                let task_id = task_id.clone();
-                                                move |this, _event, _window, cx| {
-                                                    this.clear_note(task_id.clone(), cx);
-                                                }
-                                            }))
-                                            .child("Clear note"),
-                                    ),
-                            ),
-                    ),
+                    .border_1()
+                    .border_color(colors.border)
+                    .rounded_md()
+                    .text_xs()
+                    .font_weight(gpui::FontWeight::BOLD)
+                    .text_color(color)
+                    .child(value.to_string()),
             )
     }
 
@@ -648,103 +485,305 @@ impl ReviewView {
             )
             .child(label.to_string())
     }
+}
 
-    fn status_chip(&self, status: TaskStatus) -> impl IntoElement {
-        let colors = theme().colors;
-        let spacing = theme().spacing;
-        let (label, color) = match status {
-            TaskStatus::Pending => ("Pending", colors.text_muted),
-            TaskStatus::Reviewed => ("Reviewed", colors.success),
-            TaskStatus::Ignored => ("Ignored", colors.warning),
-        };
-
-        div()
-            .px(px(spacing.space_2))
-            .py(px(spacing.space_1))
-            .bg(colors.surface_alt)
-            .border_1()
-            .border_color(colors.border)
-            .rounded_md()
-            .text_xs()
-            .font_weight(gpui::FontWeight::BOLD)
-            .text_color(color)
-            .child(label.to_string())
-    }
-
-    fn stat_badge(&self, label: &str, value: &str, color: gpui::Hsla) -> impl IntoElement {
+impl ReviewView {
+    fn render_item(&self, item: &ViewItem, cx: &mut Context<Self>) -> impl IntoElement {
         let colors = theme().colors;
         let spacing = theme().spacing;
 
-        div()
-            .flex()
-            .items_center()
-            .gap(px(spacing.space_2))
-            .child(
+        match item {
+            ViewItem::TaskHeader(task) => {
+                let risk_color = match task.stats.risk {
+                    crate::domain::RiskLevel::High => colors.danger,
+                    crate::domain::RiskLevel::Medium => colors.warning,
+                    crate::domain::RiskLevel::Low => colors.success,
+                };
+
                 div()
-                    .text_xs()
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
-                    .text_color(colors.text_muted)
-                    .child(label.to_string()),
-            )
-            .child(
-                div()
-                    .px(px(spacing.space_2))
-                    .py(px(spacing.space_1))
-                    .bg(colors.surface_alt)
-                    .border_1()
+                    .flex()
+                    .flex_col()
+                    .bg(colors.surface)
+                    .p(px(spacing.space_6))
+                    .border_b_1()
                     .border_color(colors.border)
-                    .rounded_md()
-                    .text_xs()
-                    .font_weight(gpui::FontWeight::BOLD)
-                    .text_color(color)
-                    .child(value.to_string()),
-            )
-    }
-
-    fn render_empty_state(&self) -> impl IntoElement {
-        let colors = theme().colors;
-        let spacing = theme().spacing;
-
-        div().flex_1().flex().items_center().justify_center().child(
-            div()
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(spacing.space_2))
+                            .child(
+                                div()
+                                    .px(px(spacing.space_2))
+                                    .py(px(2.0))
+                                    .rounded_md()
+                                    .bg(risk_color.opacity(0.1))
+                                    .text_xs()
+                                    .font_weight(gpui::FontWeight::BOLD)
+                                    .text_color(risk_color)
+                                    .child(format!("{:?} RISK", task.stats.risk).to_uppercase()),
+                            )
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(gpui::FontWeight::BOLD)
+                                    .text_color(colors.text_strong)
+                                    .child(task.title.clone()),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .mt(px(spacing.space_2))
+                            .text_color(colors.text)
+                            .child(task.description.clone()),
+                    )
+                    .into_any_element()
+            }
+            ViewItem::Stats(task) => div()
                 .flex()
-                .flex_col()
                 .items_center()
-                .gap(px(spacing.space_4))
+                .justify_between()
+                .px(px(spacing.space_6))
+                .py(px(spacing.space_4))
+                .border_b_1()
+                .border_color(colors.border)
+                .bg(colors.surface_alt)
                 .child(
                     div()
-                        .text_xl()
-                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                        .text_sm()
                         .text_color(colors.text_muted)
-                        .child("Select a task to view details"),
-                ),
-        )
+                        .child(format!(
+                            "+{} -{} lines",
+                            task.stats.additions, task.stats.deletions
+                        )),
+                )
+                .into_any_element(),
+            ViewItem::StatusActions(task) => {
+                let task_id = task.id.clone();
+                let status = task.status;
+
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(spacing.space_3))
+                    .px(px(spacing.space_6))
+                    .py(px(spacing.space_4))
+                    .child(if status == TaskStatus::Pending {
+                        div()
+                            .id(SharedString::from(format!("mark-reviewed-{}", task_id)))
+                            .px(px(spacing.space_4))
+                            .py(px(spacing.space_2))
+                            .bg(colors.primary)
+                            .text_color(colors.surface)
+                            .rounded_md()
+                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .cursor_pointer()
+                            .on_click(cx.listener(move |this, _event, _window, cx| {
+                                this.set_task_status(task_id.clone(), TaskStatus::Reviewed, cx);
+                            }))
+                            .child("Mark as Reviewed")
+                    } else {
+                        div()
+                            .id(SharedString::from(format!("reviewed-{}", task_id)))
+                            .px(px(spacing.space_4))
+                            .py(px(spacing.space_2))
+                            .bg(colors.success)
+                            .text_color(colors.surface)
+                            .rounded_md()
+                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .child("Reviewed ✓")
+                    })
+                    .into_any_element()
+            }
+            ViewItem::Error(msg) => div()
+                .p(px(spacing.space_4))
+                .bg(colors.danger.opacity(0.1))
+                .text_color(colors.danger)
+                .child(msg.clone())
+                .into_any_element(),
+            ViewItem::Insight(text) => div()
+                .mx(px(spacing.space_6))
+                .mb(px(spacing.space_4))
+                .p(px(spacing.space_4))
+                .bg(colors.surface)
+                .border_1()
+                .border_color(colors.border)
+                .rounded_md()
+                .child(
+                    div()
+                        .font_weight(gpui::FontWeight::BOLD)
+                        .text_xs()
+                        .text_color(colors.primary)
+                        .mb(px(spacing.space_2))
+                        .child("INSIGHT"),
+                )
+                .child(text.clone())
+                .into_any_element(),
+            ViewItem::Diagram(text) => div()
+                .mx(px(spacing.space_6))
+                .mb(px(spacing.space_4))
+                .p(px(spacing.space_4))
+                .bg(colors.surface_alt)
+                .rounded_md()
+                .font_family("JetBrains Mono")
+                .text_xs()
+                .child(text.clone())
+                .into_any_element(),
+            ViewItem::Notes {
+                current_note,
+                task_id,
+                task_title,
+            } => {
+                div()
+                    .px(px(spacing.space_6))
+                    .py(px(spacing.space_6))
+                    .border_b_1()
+                    .border_color(colors.border)
+                    .child(
+                        div()
+                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .text_color(colors.text_strong)
+                            .mb(px(spacing.space_3))
+                            .child("Notes"),
+                    )
+                    .child(
+                        div()
+                            .p(px(spacing.space_3))
+                            .border_1()
+                            .border_color(colors.border)
+                            .rounded_md()
+                            .min_h(px(80.0))
+                            .text_sm()
+                            .child(
+                                current_note
+                                    .clone()
+                                    .unwrap_or_else(|| "No notes yet.".to_string()),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .gap(px(spacing.space_2))
+                            .mt(px(spacing.space_3))
+                            .child(
+                                div()
+                                    .px(px(spacing.space_3))
+                                    .py(px(spacing.space_2))
+                                    .id("note-paste-btn")
+                                    .bg(colors.primary)
+                                    .text_color(colors.primary_contrast)
+                                    .rounded_md()
+                                    .text_sm()
+                                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                                    .cursor_pointer()
+                                    .on_click(cx.listener({
+                                        let task_id = task_id.clone();
+                                        move |this, _event, _window, cx| {
+                                            this.paste_note_from_clipboard(
+                                                task_id.clone(),
+                                                cx,
+                                            );
+                                        }
+                                    }))
+                                    .child("Paste note"),
+                            )
+                            .child(
+                                div()
+                                    .px(px(spacing.space_3))
+                                    .py(px(spacing.space_2))
+                                    .id("note-sample-btn")
+                                    .bg(colors.surface)
+                                    .text_color(colors.text)
+                                    .border_1()
+                                    .border_color(colors.border)
+                                    .rounded_md()
+                                    .text_sm()
+                                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                                    .cursor_pointer()
+                                    .on_click(cx.listener({
+                                        let task_id = task_id.clone();
+                                        let title = task_title.clone();
+                                        move |this, _event, _window, cx| {
+                                            let sample = format!(
+                                                "Reviewed {} — ready for follow-up.",
+                                                title
+                                            );
+                                            this.save_note(&task_id, sample, cx);
+                                        }
+                                    }))
+                                    .child("Save sample"),
+                            )
+                            .child(
+                                div()
+                                    .px(px(spacing.space_3))
+                                    .py(px(spacing.space_2))
+                                    .id("note-clear-btn")
+                                    .bg(colors.surface)
+                                    .text_color(colors.text_muted)
+                                    .border_1()
+                                    .border_color(colors.border)
+                                    .rounded_md()
+                                    .text_sm()
+                                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                                    .cursor_pointer()
+                                    .on_click(cx.listener({
+                                        let task_id = task_id.clone();
+                                        move |this, _event, _window, cx| {
+                                            this.clear_note(task_id.clone(), cx);
+                                        }
+                                    }))
+                                    .child("Clear"),
+                            ),
+                    )
+                    .into_any_element()
+            }
+            ViewItem::Diff(diff_item) => {
+                diff_view::render_diff_item(diff_item.clone(), 0).into_any_element()
+            }
+            ViewItem::EmptyState => div()
+                .flex()
+                .h_full()
+                .items_center()
+                .justify_center()
+                .text_color(colors.text_muted)
+                .child("Select a task")
+                .into_any_element(),
+        }
     }
 }
 
 impl Render for ReviewView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let colors = theme().colors;
-        let state = self.state.read(cx);
-        let selected_task_id = state.selected_task_id.clone();
-        let current_note = state.current_note.clone();
-        let review_error = state.review_error.clone();
-        let selected_task = if let Some(id) = selected_task_id {
-            state.tasks.iter().find(|t| t.id == id).cloned() // Assuming ReviewTask is Clone
-        } else {
-            None
-        };
+
+        self.rebuild_items(cx);
+
+        let sidebar = self.render_sidebar(cx).into_any_element();
+        let mut items_elements = Vec::new();
+        for item in &self.items {
+            items_elements.push(self.render_item(item, cx).into_any_element());
+        }
 
         div()
             .flex()
             .size_full()
             .bg(colors.bg)
-            .child(self.render_sidebar(cx))
-            .child(if let Some(task) = selected_task {
-                self.render_task_detail(&task, current_note, review_error, cx)
-                    .into_any_element()
-            } else {
-                self.render_empty_state().into_any_element()
-            })
+            .child(sidebar)
+            .child(
+                div()
+                    .flex_1()
+                    .h_full()
+                    .bg(colors.bg)
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .size_full()
+                            // .overflow_scroll() // Todo: fix scroll API
+                            .children(items_elements)
+                            .size_full(),
+                    ),
+            )
     }
 }
+

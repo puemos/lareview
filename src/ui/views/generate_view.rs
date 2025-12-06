@@ -6,6 +6,7 @@ use crate::acp::{GenerateTasksInput, generate_tasks_with_acp, list_agent_candida
 use crate::data::repository::{PullRequestRepository, TaskRepository};
 use crate::domain::PullRequest;
 use crate::ui::app::{AppState, AppView, SelectedAgent};
+use crate::ui::components::diff_view::{parse_diff, render_diff_view};
 use crate::ui::theme::theme;
 use std::sync::Arc;
 
@@ -382,12 +383,35 @@ impl Render for GenerateView {
                                         div()
                                             .text_sm()
                                             .text_color(colors.text_muted)
-                                            .child("Tip: Run 'git diff main...HEAD | pbcopy', then click Paste."),
+                                            .child(
+                                                "Tip: Run 'git diff main...HEAD | pbcopy', then click Paste.",
+                                            ),
                                     ),
+                            )
+                            .child(
+                                div().when(!diff_text.is_empty(), |this| {
+                                    let file_diffs = parse_diff(&diff_text);
+                                    this.child(
+                                        div()
+                                            .flex()
+                                            .flex_col()
+                                            .gap(px(spacing.space_3))
+                                            .child(
+                                                div()
+                                                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                                                    .text_sm()
+                                                    .text_color(colors.text_muted)
+                                                    .child("Diff preview"),
+                                            )
+                                            .children(file_diffs.into_iter().map(|file| {
+                                                render_diff_view(&file.file_path, &file.patch).into_any_element()
+                                            })),
+                                    )
+                                }),
                             ),
                     )
-                    // Agent selection
-                    .child(
+                // Agent selection
+                .child(
                         div()
                             .flex()
                             .flex_col()
