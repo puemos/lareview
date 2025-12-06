@@ -20,6 +20,60 @@ use std::io::Write;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Stdin, Stdout};
 use tokio::sync::Mutex;
+use std::path::PathBuf;
+
+/// Configuration for the MCP server, parsed from CLI arguments
+#[derive(Debug, Clone, Default)]
+pub struct ServerConfig {
+    /// Optional path to write tasks JSON output
+    pub tasks_out: Option<PathBuf>,
+    /// Optional path for debug log file
+    pub log_file: Option<PathBuf>,
+    /// Optional path to PR context JSON file
+    pub pr_context: Option<PathBuf>,
+}
+
+impl ServerConfig {
+    /// Parse server configuration from command-line arguments
+    pub fn from_args() -> Self {
+        let mut config = ServerConfig::default();
+        let args: Vec<String> = std::env::args().collect();
+        let mut i = 0;
+        
+        while i < args.len() {
+            match args[i].as_str() {
+                "--tasks-out" => {
+                    if i + 1 < args.len() {
+                        config.tasks_out = Some(PathBuf::from(&args[i + 1]));
+                        i += 2;
+                    } else {
+                        i += 1;
+                    }
+                }
+                "--log-file" => {
+                    if i + 1 < args.len() {
+                        config.log_file = Some(PathBuf::from(&args[i + 1]));
+                        i += 2;
+                    } else {
+                        i += 1;
+                    }
+                }
+                "--pr-context" => {
+                    if i + 1 < args.len() {
+                        config.pr_context = Some(PathBuf::from(&args[i + 1]));
+                        i += 2;
+                    } else {
+                        i += 1;
+                    }
+                }
+                _ => i += 1,
+            }
+        }
+        
+        config
+    }
+}
+
 
 #[derive(Debug)]
 struct LineDelimitedStdioTransport {
@@ -107,25 +161,27 @@ impl Transport for LineDelimitedStdioTransport {
 }
 
 /// Create the return_tasks tool with proper description and schema
-fn create_return_tasks_tool() -> impl ToolHandler {
-    SimpleTool::new("return_tasks", |args: Value, _extra| {
+fn create_return_tasks_tool(config: Arc<ServerConfig>) -> impl ToolHandler {
+    SimpleTool::new("return_tasks", move |args: Value, _extra| {
+        let config = config.clone();
         Box::pin(async move {
-            log_to_file("return_tasks called");
+            log_to_file(&config, "return_tasks called");
             let persist_args = args.clone();
-            let persist_result = tokio::task::spawn_blocking(move || persist_tasks_to_db(persist_args)).await;
+            let persist_config = config.clone();
+            let persist_result = tokio::task::spawn_blocking(move || persist_tasks_to_db(&persist_config, persist_args)).await;
 
             match persist_result {
-                Ok(Ok(())) => log_to_file("ReturnTasksTool persisted tasks to DB"),
-                Ok(Err(err)) => log_to_file(&format!("ReturnTasksTool failed to persist tasks: {err}")),
-                Err(join_err) => log_to_file(&format!("ReturnTasksTool task join error: {join_err}")),
+                Ok(Ok(())) => log_to_file(&config, "ReturnTasksTool persisted tasks to DB"),
+                Ok(Err(err)) => log_to_file(&config, &format!("ReturnTasksTool failed to persist tasks: {err}")),
+                Err(join_err) => log_to_file(&config, &format!("ReturnTasksTool task join error: {join_err}")),
             }
 
-            if let Ok(path) = std::env::var("TASK_MCP_OUT") {
-                log_to_file(&format!("ReturnTasksTool writing to {path}"));
+            if let Some(path) = &config.tasks_out {
+                log_to_file(&config, &format!("ReturnTasksTool writing to {}", path.display()));
                 // Best-effort write; if it fails we still return "ok" so the agent
                 // doesn't treat it as a tool failure.
-                let _ = std::fs::write(&path, args.to_string());
-                log_to_file("ReturnTasksTool write complete");
+                let _ = std::fs::write(path, args.to_string());
+                log_to_file(&config, "ReturnTasksTool write complete");
             }
             Ok(json!({ "status": "ok", "message": "Tasks received successfully" }))
         })
@@ -174,16 +230,17 @@ fn create_return_tasks_tool() -> impl ToolHandler {
 
 /// Run the MCP server over stdio. Blocks until the process is terminated.
 pub async fn run_task_mcp_server() -> pmcp::Result<()> {
-    log_to_file("starting task MCP server");
+    let config = Arc::new(ServerConfig::from_args());
+    log_to_file(&config, "starting task MCP server");
 
     let server = Server::builder()
         .name("lareview-tasks")
         .version("0.1.0")
         .capabilities(ServerCapabilities::default())
-        .tool("return_tasks", create_return_tasks_tool())
+        .tool("return_tasks", create_return_tasks_tool(config.clone()))
         .build()?;
 
-    log_to_file("running task MCP server on stdio (line-delimited)");
+    log_to_file(&config, "running task MCP server on stdio (line-delimited)");
     let transport = LineDelimitedStdioTransport::new();
     server.run(transport).await
 }
@@ -225,9 +282,9 @@ struct RawPatch {
     hunk: String,
 }
 
-fn persist_tasks_to_db(args: Value) -> Result<()> {
+fn persist_tasks_to_db(config: &ServerConfig, args: Value) -> Result<()> {
     let tasks = parse_tasks(args)?;
-    let pull_request = pull_request_from_env();
+    let pull_request = load_pull_request(config);
 
     let db = Database::open().context("open database")?;
     let conn = db.connection();
@@ -288,28 +345,35 @@ fn parse_tasks(args: Value) -> Result<Vec<ReviewTask>> {
     Ok(tasks)
 }
 
-fn pull_request_from_env() -> PullRequest {
-    if let Ok(raw) = std::env::var("TASK_MCP_PULL_REQUEST") {
-        match serde_json::from_str::<PullRequest>(&raw) {
-            Ok(pr) => return pr,
-            Err(err) => log_to_file(&format!("failed to parse TASK_MCP_PULL_REQUEST: {err}")),
+/// Load pull request context from file or return defaults
+fn load_pull_request(config: &ServerConfig) -> PullRequest {
+    // Try to load from --pr-context file if provided
+    if let Some(path) = &config.pr_context {
+        if let Ok(content) = std::fs::read_to_string(path) {
+            match serde_json::from_str::<PullRequest>(&content) {
+                Ok(pr) => return pr,
+                Err(err) => {
+                    let _ = writeln!(std::io::stderr(), "failed to parse PR context from {}: {}", path.display(), err);
+                }
+            }
         }
     }
 
-    let now = std::env::var("TASK_MCP_PR_CREATED_AT").unwrap_or_else(|_| Utc::now().to_rfc3339());
+    // Return defaults if no context file or parsing failed
     PullRequest {
-        id: std::env::var("TASK_MCP_PR_ID").unwrap_or_else(|_| "local-pr".to_string()),
-        title: std::env::var("TASK_MCP_PR_TITLE").unwrap_or_else(|_| "MCP Review".to_string()),
-        description: std::env::var("TASK_MCP_PR_DESCRIPTION").ok(),
-        repo: std::env::var("TASK_MCP_PR_REPO").unwrap_or_else(|_| "unknown/repo".to_string()),
-        author: std::env::var("TASK_MCP_PR_AUTHOR").unwrap_or_else(|_| "unknown".to_string()),
-        branch: std::env::var("TASK_MCP_PR_BRANCH").unwrap_or_else(|_| "main".to_string()),
-        created_at: now,
+        id: "local-pr".to_string(),
+        title: "MCP Review".to_string(),
+        description: None,
+        repo: "unknown/repo".to_string(),
+        author: "unknown".to_string(),
+        branch: "main".to_string(),
+        created_at: Utc::now().to_rfc3339(),
     }
 }
 
-fn log_to_file(message: &str) {
-    if let Ok(path) = std::env::var("TASK_MCP_LOG") {
+/// Log a message to the configured log file, if any
+fn log_to_file(config: &ServerConfig, message: &str) {
+    if let Some(path) = &config.log_file {
         let _ = OpenOptions::new()
             .create(true)
             .append(true)
@@ -345,15 +409,19 @@ mod tests {
     #[tokio::test]
     async fn test_return_tasks_tool_writes_file() {
         let tmp = tempfile::NamedTempFile::new().expect("tmp file");
-        let out_path = tmp.path().to_string_lossy().to_string();
+        let out_path = tmp.path().to_path_buf();
         let tmp_db = tempfile::tempdir().expect("tmp db dir");
         let db_path = tmp_db.path().join("db.sqlite");
 
-        let prev_out = set_env("TASK_MCP_OUT", &out_path);
         let prev_db = set_env("LAREVIEW_DB_PATH", db_path.to_string_lossy().as_ref());
-        let prev_pr = set_env("TASK_MCP_PR_ID", "file-pr");
 
-        let tool = create_return_tasks_tool();
+        let config = Arc::new(ServerConfig {
+            tasks_out: Some(out_path.clone()),
+            log_file: None,
+            pr_context: None,
+        });
+
+        let tool = create_return_tasks_tool(config);
         let payload = serde_json::json!({ "tasks": [{ "id": "x", "title": "test" }] });
         let res = tool
             .handle(
@@ -369,20 +437,36 @@ mod tests {
         let written = std::fs::read_to_string(tmp.path()).expect("read tmp");
         assert_eq!(written, payload.to_string());
 
-        restore_env("TASK_MCP_OUT", prev_out);
         restore_env("LAREVIEW_DB_PATH", prev_db);
-        restore_env("TASK_MCP_PR_ID", prev_pr);
     }
 
     #[tokio::test]
     async fn test_return_tasks_tool_persists_to_db() {
         let tmp_dir = tempfile::tempdir().expect("tempdir");
         let db_path = tmp_dir.path().join("db.sqlite");
+        let pr_context_path = tmp_dir.path().join("pr.json");
 
         let prev_db = set_env("LAREVIEW_DB_PATH", db_path.to_string_lossy().as_ref());
-        let prev_pr = set_env("TASK_MCP_PR_ID", "pr-db");
 
-        let tool = create_return_tasks_tool();
+        // Write PR context to file
+        let pr_context = serde_json::json!({
+            "id": "pr-db",
+            "title": "Test PR",
+            "description": null,
+            "repo": "test/repo",
+            "author": "tester",
+            "branch": "main",
+            "created_at": "2024-01-01T00:00:00Z"
+        });
+        std::fs::write(&pr_context_path, pr_context.to_string()).expect("write PR context");
+
+        let config = Arc::new(ServerConfig {
+            tasks_out: None,
+            log_file: None,
+            pr_context: Some(pr_context_path),
+        });
+
+        let tool = create_return_tasks_tool(config);
         let payload = serde_json::json!({
             "tasks": [{
                 "id": "task-123",
@@ -410,6 +494,5 @@ mod tests {
         assert_eq!(tasks[0].status, TaskStatus::Pending);
 
         restore_env("LAREVIEW_DB_PATH", prev_db);
-        restore_env("TASK_MCP_PR_ID", prev_pr);
     }
 }

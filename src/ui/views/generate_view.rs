@@ -142,10 +142,14 @@ impl GenerateView {
 
         let input = GenerateTasksInput {
             pull_request: pr,
-            diff_text,
+            diff_text: diff_text,
             agent_command: agent_cmd,
-            agent_args,
+            agent_args: agent_args,
             progress_tx: Some(progress_tx),
+            mcp_server_binary: None, // Use default
+            timeout_secs: Some(500), // Default timeout
+            debug: false, // No debug logging in production
+            fake_tasks: None, // No test fixtures
         };
 
         let pr_for_save = input.pull_request.clone();
@@ -611,6 +615,9 @@ impl GenerateView {
                     .gap(px(spacing.space_2))
                     .max_h(px(320.0))
                     .overflow_scroll()
+                    .on_scroll_wheel(|_, _, cx| {
+                        cx.stop_propagation();
+                    })
                     .children(entries.iter().enumerate().map(|(i, entry)| {
                         let bubble = div()
                             .id(SharedString::from(format!("agent-{}-{}", label, i)))

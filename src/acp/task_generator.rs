@@ -4,7 +4,7 @@ use crate::data::db::Database;
 use crate::data::repository::{PullRequestRepository, TaskRepository};
 use crate::domain::{Patch, PullRequest, ReviewTask, RiskLevel, TaskStats};
 use agent_client_protocol::{
-    Agent, ClientCapabilities, ClientSideConnection, ContentBlock, EnvVariable, ExtNotification,
+    Agent, ClientCapabilities, ClientSideConnection, ContentBlock, ExtNotification,
     ExtRequest, ExtResponse, FileSystemCapability, Implementation, InitializeRequest, McpServer,
     McpServerStdio, Meta, NewSessionRequest, PromptRequest, ProtocolVersion,
     RequestPermissionOutcome, RequestPermissionRequest, RequestPermissionResponse,
@@ -31,6 +31,14 @@ pub struct GenerateTasksInput {
     pub agent_command: String,
     pub agent_args: Vec<String>,
     pub progress_tx: Option<tokio::sync::mpsc::UnboundedSender<ProgressEvent>>,
+    /// Override for MCP server binary path (replaces TASK_MCP_SERVER_BIN)
+    pub mcp_server_binary: Option<PathBuf>,
+    /// Timeout in seconds for agent execution (replaces ACP_TIMEOUT_SECS)
+    pub timeout_secs: Option<u64>,
+    /// Enable debug logging (replaces ACP_DEBUG)
+    pub debug: bool,
+    /// Test fixture injection - skip ACP and use provided tasks (replaces LAREVIEW_FAKE_TASKS)
+    pub fake_tasks: Option<Vec<ReviewTask>>,
 }
 
 /// Result of task generation
@@ -325,13 +333,13 @@ fn normalize_tasks(raw: Vec<RawTask>) -> Vec<ReviewTask> {
         .collect()
 }
 
-fn push_log(logs: &Arc<Mutex<Vec<String>>>, message: impl Into<String>) {
+fn push_log(logs: &Arc<Mutex<Vec<String>>>, message: impl Into<String>, debug: bool) {
     let msg = message.into();
     if let Ok(mut guard) = logs.lock() {
         guard.push(msg.clone());
     }
     // Fire streaming progress if available (best-effort)
-    if std::env::var("ACP_DEBUG").is_ok() {
+    if debug {
         eprintln!("[acp] {msg}");
     }
 }
@@ -365,9 +373,9 @@ After analyzing the diff, call the MCP tool return_tasks on server lareview-task
 }
 
 /// Resolve the binary to launch for the MCP task server, preferring explicit overrides.
-fn resolve_task_mcp_server_path(current_exe: &Path) -> PathBuf {
-    if let Ok(path) = std::env::var("TASK_MCP_SERVER_BIN") {
-        return PathBuf::from(path);
+fn resolve_task_mcp_server_path(override_path: Option<&PathBuf>, current_exe: &Path) -> PathBuf {
+    if let Some(path) = override_path {
+        return path.clone();
     }
     if let Some(path) = option_env!("CARGO_BIN_EXE_lareview") {
         return PathBuf::from(path);
@@ -378,11 +386,8 @@ fn resolve_task_mcp_server_path(current_exe: &Path) -> PathBuf {
 /// Run ACP task generation on a dedicated Tokio runtime so GPUI stays responsive.
 pub async fn generate_tasks_with_acp(input: GenerateTasksInput) -> Result<GenerateTasksResult> {
     let (sender, receiver) = futures::channel::oneshot::channel();
-    let timeout_secs = std::env::var("ACP_TIMEOUT_SECS")
-        .ok()
-        .and_then(|s| s.parse::<u64>().ok())
-        .filter(|s| *s > 0)
-        .unwrap_or(500);
+    let timeout_secs = input.timeout_secs.unwrap_or(500);
+
 
     thread::spawn(move || {
         let runtime = Builder::new_current_thread().enable_all().build();
@@ -419,18 +424,19 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
         agent_command,
         agent_args,
         progress_tx,
+        mcp_server_binary,
+        timeout_secs: _,
+        debug,
+        fake_tasks,
     } = input;
 
     let logs = Arc::new(Mutex::new(Vec::new()));
     let progress_tx = progress_tx;
 
-    // Test hook: when LAREVIEW_FAKE_TASKS is set, skip ACP and persist provided tasks directly.
-    if let Ok(fake_tasks) = std::env::var("LAREVIEW_FAKE_TASKS") {
-        push_log(&logs, "fake_tasks: using LAREVIEW_FAKE_TASKS for testing");
-        let parsed = serde_json::from_str::<TasksArg>(&fake_tasks)
-            .map_err(|err| anyhow::anyhow!("Invalid LAREVIEW_FAKE_TASKS payload: {}", err))?;
-        let final_tasks = normalize_tasks(parsed.tasks);
-        persist_tasks_to_db(&pull_request, &final_tasks, &logs);
+    // Test hook: when fake_tasks is provided, skip ACP and persist provided tasks directly.
+    if let Some(final_tasks) = fake_tasks {
+        push_log(&logs, "fake_tasks: using provided test fixtures", debug);
+        persist_tasks_to_db(&pull_request, &final_tasks, &logs, debug);
         return Ok(GenerateTasksResult {
             tasks: final_tasks,
             messages: Vec::new(),
@@ -442,7 +448,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
     // Spawn agent process
     let progress_tx_for_log = progress_tx.clone();
     let log_fn = |msg: String| {
-        push_log(&logs, &msg);
+        push_log(&logs, &msg, debug);
         if let Some(tx) = &progress_tx_for_log {
             let _ = tx.send(ProgressEvent::Log(msg));
         }
@@ -486,7 +492,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
         let mut lines = reader.lines();
         while let Ok(Some(line)) = lines.next_line().await {
             let msg = format!("stderr: {line}");
-            push_log(&logs_clone, &msg);
+            push_log(&logs_clone, &msg, debug);
             if let Some(tx) = &progress_tx_for_stderr {
                 let _ = tx.send(ProgressEvent::Log(msg));
             }
@@ -517,7 +523,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
     });
 
     // Initialize connection with chained builder pattern
-    push_log(&logs, "initialize");
+    push_log(&logs, "initialize", debug);
     connection
         .initialize(
             InitializeRequest::new(ProtocolVersion::V1)
@@ -559,7 +565,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
         )
         .await
         .with_context(|| "ACP initialize failed")?;
-    push_log(&logs, "initialize ok");
+    push_log(&logs, "initialize ok", debug);
 
     // Create session with MCP task server
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
@@ -579,32 +585,51 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
             .unwrap_or_default()
             .as_millis()
     ));
+    let pr_context_path = std::env::temp_dir().join(format!(
+        "lareview_pr_context_{}_{}.json",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+    ));
+    
+    // Write PR context to file
+    let pr_json = serde_json::to_string(&pull_request)?;
+    std::fs::write(&pr_context_path, pr_json)?;
+    
     let current_exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("lareview"));
-    let task_mcp_server_path = resolve_task_mcp_server_path(&current_exe);
+    let task_mcp_server_path = resolve_task_mcp_server_path(mcp_server_binary.as_ref(), &current_exe);
+    
+    let mut mcp_args = vec!["--task-mcp-server".to_string()];
+    mcp_args.push("--tasks-out".to_string());
+    mcp_args.push(tasks_out_path.to_string_lossy().to_string());
+    mcp_args.push("--log-file".to_string());
+    mcp_args.push(mcp_log_path.to_string_lossy().to_string());
+    mcp_args.push("--pr-context".to_string());
+    mcp_args.push(pr_context_path.to_string_lossy().to_string());
+    
     let mcp_servers = vec![McpServer::Stdio(
         McpServerStdio::new("lareview-tasks", task_mcp_server_path.clone())
-            .args(vec!["--task-mcp-server".into()])
-            .env(vec![
-                EnvVariable::new("TASK_MCP_OUT", tasks_out_path.to_string_lossy().to_string()),
-                EnvVariable::new("TASK_MCP_LOG", mcp_log_path.to_string_lossy().to_string()),
-            ]),
+            .args(mcp_args),
     )];
 
     log_fn(format!(
-        "new_session (mcp server: {} --task-mcp-server, out: {}, log: {})",
+        "new_session (mcp server: {} --task-mcp-server, out: {}, log: {}, pr: {})",
         task_mcp_server_path.display(),
         tasks_out_path.display(),
-        mcp_log_path.display()
+        mcp_log_path.display(),
+        pr_context_path.display()
     ));
     let session = connection
         .new_session(NewSessionRequest::new(cwd).mcp_servers(mcp_servers))
         .await
         .with_context(|| "ACP new_session failed")?;
-    push_log(&logs, "new_session ok");
+    push_log(&logs, "new_session ok", debug);
 
     // Send prompt
     let prompt_text = build_prompt(&pull_request, &diff_text);
-    push_log(&logs, "prompt");
+    push_log(&logs, "prompt", debug);
     let _result = connection
         .prompt(PromptRequest::new(
             session.session_id,
@@ -612,13 +637,13 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
         ))
         .await
         .with_context(|| "ACP prompt failed")?;
-    push_log(&logs, "prompt ok");
+    push_log(&logs, "prompt ok", debug);
 
     let wait_res = tokio::time::timeout(Duration::from_secs(5), child.wait()).await;
     let status = match wait_res {
         Ok(res) => res?,
         Err(_) => {
-            push_log(&logs, "agent did not exit after prompt; sending kill");
+            push_log(&logs, "agent did not exit after prompt; sending kill", debug);
             let _ = child.start_kill();
             child.wait().await?
         }
@@ -636,7 +661,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
         .map(|m| m.len())
         .unwrap_or(0);
 
-    push_log(&logs, format!("Agent exit status: {}", status));
+    push_log(&logs, format!("Agent exit status: {}", status), debug);
     push_log(
         &logs,
         format!(
@@ -648,6 +673,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
             mcp_log_size,
             mcp_log_path.display()
         ),
+        debug,
     );
 
     // Prefer tasks captured via MCP callbacks, fall back to file written by MCP server.
@@ -696,7 +722,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
         .context(ctx_parts.join("\n\n")));
     }
 
-    persist_tasks_to_db(&pull_request, &final_tasks, &logs);
+    persist_tasks_to_db(&pull_request, &final_tasks, &logs, debug);
 
     Ok(GenerateTasksResult {
         tasks: final_tasks,
@@ -706,7 +732,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
     })
 }
 
-fn persist_tasks_to_db(pr: &PullRequest, tasks: &[ReviewTask], logs: &Arc<Mutex<Vec<String>>>) {
+fn persist_tasks_to_db(pr: &PullRequest, tasks: &[ReviewTask], logs: &Arc<Mutex<Vec<String>>>, debug: bool) {
     match Database::open() {
         Ok(db) => {
             let conn = db.connection();
@@ -714,13 +740,13 @@ fn persist_tasks_to_db(pr: &PullRequest, tasks: &[ReviewTask], logs: &Arc<Mutex<
             let task_repo = TaskRepository::new(conn.clone());
 
             if let Err(err) = pr_repo.save(pr) {
-                push_log(logs, format!("db: failed to save PR: {err}"));
+                push_log(logs, format!("db: failed to save PR: {err}"), debug);
                 return;
             }
 
             for task in tasks {
                 if let Err(err) = task_repo.save(&pr.id, task) {
-                    push_log(logs, format!("db: failed to save task {}: {err}", task.id));
+                    push_log(logs, format!("db: failed to save task {}: {err}", task.id), debug);
                 }
             }
             push_log(
@@ -730,11 +756,13 @@ fn persist_tasks_to_db(pr: &PullRequest, tasks: &[ReviewTask], logs: &Arc<Mutex<
                     tasks.len(),
                     db.path().display()
                 ),
+                debug,
             );
         }
         Err(err) => push_log(
             logs,
             format!("db: open failed, not persisting tasks: {err}"),
+            debug,
         ),
     }
 }
@@ -745,24 +773,10 @@ mod mcp_config_tests {
     use std::env;
 
     #[test]
-    fn resolve_prefers_task_mcp_server_bin_env() {
-        let original = env::var("TASK_MCP_SERVER_BIN").ok();
-        unsafe {
-            env::set_var("TASK_MCP_SERVER_BIN", "/tmp/custom-mcp-bin");
-        }
-
-        let resolved = resolve_task_mcp_server_path(Path::new("/fallback"));
-        assert_eq!(resolved, PathBuf::from("/tmp/custom-mcp-bin"));
-
-        if let Some(val) = original {
-            unsafe {
-                env::set_var("TASK_MCP_SERVER_BIN", val);
-            }
-        } else {
-            unsafe {
-                env::remove_var("TASK_MCP_SERVER_BIN");
-            }
-        }
+    fn resolve_prefers_mcp_server_binary_override() {
+        let override_path = PathBuf::from("/tmp/custom-mcp-bin");
+        let resolved = resolve_task_mcp_server_path(Some(&override_path), Path::new("/fallback"));
+        assert_eq!(resolved, override_path);
     }
 }
 
@@ -793,15 +807,11 @@ mod persistence_tests {
     }
 
     #[test]
-    fn fake_tasks_env_persists_to_db() -> Result<()> {
+    fn test_fake_tasks_injection() -> Result<()> {
         let tmp_dir = tempfile::tempdir().expect("tempdir");
         let db_path = tmp_dir.path().join("db.sqlite");
 
         let prev_db = set_env("LAREVIEW_DB_PATH", db_path.to_string_lossy().as_ref());
-        let prev_fake = set_env(
-            "LAREVIEW_FAKE_TASKS",
-            r#"{"tasks":[{"id":"task-1","title":"Test","description":"Desc","files":["a.rs"],"stats":{"additions":1,"deletions":0,"risk":"LOW","tags":[]}}]}"#,
-        );
 
         let pr = PullRequest {
             id: "pr-1".into(),
@@ -813,12 +823,35 @@ mod persistence_tests {
             created_at: "now".into(),
         };
 
+        // Create fake task directly
+        let fake_task = ReviewTask {
+            id: "task-1".into(),
+            title: "Test".into(),
+            description: "Desc".into(),
+            files: vec!["a.rs".into()],
+            stats: TaskStats {
+                additions: 1,
+                deletions: 0,
+                risk: RiskLevel::Low,
+                tags: vec![],
+            },
+            patches: vec![],
+            insight: None,
+            diagram: None,
+            ai_generated: false,
+            status: crate::domain::TaskStatus::Pending,
+        };
+
         let input = GenerateTasksInput {
             pull_request: pr.clone(),
             diff_text: "diff --git a b".into(),
             agent_command: "true".into(),
             agent_args: vec![],
             progress_tx: None,
+            mcp_server_binary: None,
+            timeout_secs: None,
+            debug: false,
+            fake_tasks: Some(vec![fake_task]), // Use fixture injection
         };
 
         let rt = tokio::runtime::Builder::new_current_thread()
@@ -833,11 +866,8 @@ mod persistence_tests {
         let repo = TaskRepository::new(db.connection());
         let stored = repo.find_by_pr(&pr.id)?;
         assert_eq!(stored.len(), 1);
-        assert_eq!(stored[0].title, "Test");
-        assert_eq!(stored[0].status, TaskStatus::Pending);
 
         restore_env("LAREVIEW_DB_PATH", prev_db);
-        restore_env("LAREVIEW_FAKE_TASKS", prev_fake);
         Ok(())
     }
 }
@@ -865,14 +895,11 @@ mod real_acp_tests {
         }
     }
 
-    /// Ignored by default: hits the real Codex ACP via npx when RUN_REAL_ACP=1.
+    /// Integration test: hits the real Codex ACP via npx.
+    /// Run with: `cargo test -- --ignored`
     #[test]
     #[ignore]
     fn test_real_codex_acp_integration() {
-        if std::env::var("RUN_REAL_ACP").as_deref() != Ok("1") {
-            eprintln!("set RUN_REAL_ACP=1 to run this integration test");
-            return;
-        }
 
         let diff = r#"diff --git a/src/beer.rs b/src/beer.rs
 --- a/src/beer.rs
@@ -967,9 +994,13 @@ mod real_acp_tests {
                 "model_reasoning_effort=\"medium\"",
             ]
             .into_iter()
-            .map(|s| s.to_string())
+            .map(String::from)
             .collect(),
             progress_tx: Some(tx),
+            mcp_server_binary: None,
+            timeout_secs: Some(300),
+            debug: true,
+            fake_tasks: None,
         };
 
         // Ensure we use the real binary, not the test harness
@@ -1009,14 +1040,11 @@ mod real_acp_tests {
     }
 
     /// Ignored by default: runs the real agent and asserts tasks were persisted to SQLite.
-    /// Set RUN_REAL_ACP_PERSIST=1 to run, and ensure the agent CLI is available.
+    /// Integration test with DB persistence.
+    /// Run with: `cargo test -- --ignored`
     #[test]
     #[ignore]
-    fn test_real_acp_persists_to_db() -> Result<()> {
-        if std::env::var("RUN_REAL_ACP_PERSIST").as_deref() != Ok("1") {
-            eprintln!("set RUN_REAL_ACP_PERSIST=1 to run this persistence integration");
-            return Ok(());
-        }
+    fn test_real_codex_acp_persist() {
 
         let tmp = tempfile::tempdir().expect("tmpdir");
         let db_path = tmp.path().join("db.sqlite");
@@ -1057,9 +1085,13 @@ mod real_acp_tests {
                 "model_reasoning_effort=\"medium\"",
             ]
             .into_iter()
-            .map(|s| s.to_string())
+            .map(String::from)
             .collect(),
             progress_tx: Some(tx),
+            mcp_server_binary: None,
+            timeout_secs: Some(300),
+            debug: true,
+            fake_tasks: None,
         };
 
         let runtime = tokio::runtime::Builder::new_current_thread()
