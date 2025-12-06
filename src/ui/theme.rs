@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Theme - "Sharp & Stone" design system
 
 use gpui::{Hsla, hsla};
@@ -118,20 +119,11 @@ impl Default for Spacing {
 }
 
 /// Complete theme
+#[derive(Default)]
 pub struct Theme {
     pub colors: ThemeColors,
     pub typography: Typography,
     pub spacing: Spacing,
-}
-
-impl Default for Theme {
-    fn default() -> Self {
-        Self {
-            colors: ThemeColors::default(),
-            typography: Typography::default(),
-            spacing: Spacing::default(),
-        }
-    }
 }
 
 /// Global theme instance

@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Agent discovery - detect available ACP agents
 
 /// Candidate ACP agent

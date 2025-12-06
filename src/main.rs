@@ -14,7 +14,7 @@ use ui::app::LaReviewApp;
 fn main() {
     Application::new().run(|cx: &mut App| {
         cx.open_window(WindowOptions::default(), |_, cx| {
-            cx.new(|cx| LaReviewApp::new(cx))
+            cx.new(LaReviewApp::new)
         })
         .unwrap();
     });
