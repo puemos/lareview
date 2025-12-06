@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex};
 /// Database wrapper with connection pooling
 pub struct Database {
     conn: Arc<Mutex<Connection>>,
+    path: PathBuf,
 }
 
 impl Database {
@@ -28,13 +29,26 @@ impl Database {
         let conn = Connection::open(&path)?;
         let db = Self {
             conn: Arc::new(Mutex::new(conn)),
+            path: path.clone(),
         };
         db.init()?;
+
+        // Expose chosen path for downstream consumers (ACP worker) if not already set
+        if std::env::var("LAREVIEW_DB_PATH").is_err() {
+            // set_var is currently unsafe on nightly; this is limited to process-local config.
+            unsafe {
+                std::env::set_var("LAREVIEW_DB_PATH", path.to_string_lossy().to_string());
+            }
+        }
         Ok(db)
     }
 
     /// Get the default database path
     fn default_path() -> PathBuf {
+        if let Ok(path) = std::env::var("LAREVIEW_DB_PATH") {
+            return PathBuf::from(path);
+        }
+
         let cwd = std::env::current_dir().unwrap_or_default();
         cwd.join(".lareview").join("db.sqlite")
     }
@@ -65,6 +79,7 @@ impl Database {
                 patches TEXT,
                 diagram TEXT,
                 ai_generated INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'PENDING',
                 FOREIGN KEY(pull_request_id) REFERENCES pull_requests(id)
             );
 
@@ -89,5 +104,10 @@ impl Database {
     /// Get a reference to the connection
     pub fn connection(&self) -> Arc<Mutex<Connection>> {
         self.conn.clone()
+    }
+
+    /// Path backing this database
+    pub fn path(&self) -> PathBuf {
+        self.path.clone()
     }
 }

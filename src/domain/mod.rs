@@ -48,6 +48,21 @@ pub struct Patch {
     pub hunk: String,
 }
 
+/// Status of a review task
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum TaskStatus {
+    Pending,
+    Reviewed,
+    Ignored,
+}
+
+impl Default for TaskStatus {
+    fn default() -> Self {
+        Self::Pending
+    }
+}
+
 /// A review task spanning one or more files
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReviewTask {
@@ -62,21 +77,14 @@ pub struct ReviewTask {
     pub diagram: Option<String>,
     #[serde(default)]
     pub ai_generated: bool,
+    #[serde(default)]
+    pub status: TaskStatus,
 }
 
-/// A note attached to a task
+/// Review note stored per task
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Note {
     pub task_id: TaskId,
     pub body: String,
     pub updated_at: String,
-}
-
-/// Parsed file diff from git
-#[derive(Debug, Clone)]
-pub struct ParsedFileDiff {
-    pub file_path: String,
-    pub patch: String,
-    pub additions: u32,
-    pub deletions: u32,
 }

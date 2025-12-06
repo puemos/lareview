@@ -2,10 +2,13 @@
 
 use gpui::{Context, Entity, Window, div, prelude::*, px};
 
-use crate::domain::{PullRequest, ReviewTask};
+use crate::data::db::Database;
+use crate::data::repository::{NoteRepository, PullRequestRepository, TaskRepository};
+use crate::domain::ReviewTask;
 
 use super::theme::theme;
 use super::views::{generate_view::GenerateView, review_view::ReviewView};
+use std::sync::Arc;
 
 /// Current view in the application
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,8 +27,6 @@ pub enum SelectedAgent {
 /// Shared application state
 pub struct AppState {
     pub current_view: AppView,
-    #[allow(dead_code)]
-    pub pr: Option<PullRequest>,
     pub tasks: Vec<ReviewTask>,
     pub is_generating: bool,
     pub generation_error: Option<String>,
@@ -40,13 +41,14 @@ pub struct AppState {
     pub agent_messages: Vec<String>,
     pub agent_thoughts: Vec<String>,
     pub agent_logs: Vec<String>,
+    pub current_note: Option<String>,
+    pub review_error: Option<String>,
 }
 
 impl Default for AppState {
     fn default() -> Self {
         Self {
             current_view: AppView::Generate,
-            pr: None,
             tasks: Vec::new(),
             is_generating: false,
             generation_error: None,
@@ -61,6 +63,8 @@ impl Default for AppState {
             agent_messages: Vec::new(),
             agent_thoughts: Vec::new(),
             agent_logs: Vec::new(),
+            current_note: None,
+            review_error: None,
         }
     }
 }
@@ -70,24 +74,53 @@ pub struct LaReviewApp {
     state: Entity<AppState>,
     generate_view: Entity<GenerateView>,
     review_view: Entity<ReviewView>,
+    _db: Database, // Keep db alive
 }
 
 impl LaReviewApp {
     pub fn new(cx: &mut Context<Self>) -> Self {
-        let state = cx.new(|_| AppState::default());
-        let generate_view = cx.new(|cx| GenerateView::new(state.clone(), cx));
-        let review_view = cx.new(|cx| ReviewView::new(state.clone(), cx));
+        let db = Database::open().expect("Failed to open database");
+        // Make DB path discoverable for ACP worker threads
+        let _ = std::env::var("LAREVIEW_DB_PATH").map_err(|_| unsafe {
+            std::env::set_var("LAREVIEW_DB_PATH", db.path().to_string_lossy().to_string())
+        });
+        let conn = db.connection();
+
+        let task_repo = Arc::new(TaskRepository::new(conn.clone()));
+        let pr_repo = Arc::new(PullRequestRepository::new(conn.clone()));
+        let note_repo = Arc::new(NoteRepository::new(conn.clone()));
+
+        // Load existing tasks for the default PR (local-pr)
+        // In a real app we'd have a PR selection screen
+        let initial_tasks = task_repo
+            .find_by_pr(&"local-pr".to_string())
+            .unwrap_or_default();
+
+        let state = cx.new(|_| AppState {
+            tasks: initial_tasks,
+            ..AppState::default()
+        });
+
+        let generate_view =
+            cx.new(|cx| GenerateView::new(state.clone(), task_repo.clone(), pr_repo, cx));
+        let review_view =
+            cx.new(|cx| ReviewView::new(state.clone(), note_repo, task_repo.clone(), cx));
 
         Self {
             state,
             generate_view,
             review_view,
+            _db: db,
         }
     }
 
     pub fn switch_to_review(&mut self, cx: &mut Context<Self>) {
         self.state.update(cx, |state, _| {
             state.current_view = AppView::Review;
+        });
+        let review_view = self.review_view.clone();
+        cx.update_entity(&review_view, |view, cx| {
+            view.sync_from_db(cx);
         });
     }
 

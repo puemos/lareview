@@ -9,26 +9,43 @@ pub struct AgentCandidate {
     pub command: Option<String>,
     pub args: Vec<String>,
     pub available: bool,
-    pub description: Option<String>,
 }
 
-/// Known ACP agent candidates
-const CANDIDATES: &[(&str, &str, &str, &[&str], &str)] = &[
-    (
-        "codex",
-        "Codex (ACP)",
-        "npx",
-        &["-y", "@zed-industries/codex-acp@latest"],
-        "Uses the Codex CLI via npx (pre-accept install with -y)",
-    ),
-    (
-        "gemini",
-        "Gemini (ACP)",
-        "gemini",
-        &["--experimental-acp"],
-        "Uses the Gemini CLI with --experimental-acp",
-    ),
-];
+/// Build the Codex candidate, allowing overrides for binary/package.
+fn codex_candidate() -> AgentCandidate {
+    // Allow overrides for package/bin; do not inject partial MCP config via -c.
+    let package = std::env::var("CODEX_ACP_PACKAGE")
+        .unwrap_or_else(|_| "@zed-industries/codex-acp@latest".to_string());
+
+    if let Ok(bin_path) = std::env::var("CODEX_ACP_BIN") {
+        AgentCandidate {
+            id: "codex".to_string(),
+            label: "Codex (ACP)".to_string(),
+            command: Some(bin_path.clone()),
+            args: Vec::new(),
+            available: is_command_available(&bin_path),
+        }
+    } else {
+        AgentCandidate {
+            id: "codex".to_string(),
+            label: "Codex (ACP)".to_string(),
+            command: Some("npx".to_string()),
+            args: vec!["-y".to_string(), package],
+            available: is_command_available("npx"),
+        }
+    }
+}
+
+/// Gemini candidate (static for now).
+fn gemini_candidate() -> AgentCandidate {
+    AgentCandidate {
+        id: "gemini".to_string(),
+        label: "Gemini (ACP)".to_string(),
+        command: Some("gemini".to_string()),
+        args: vec!["--experimental-acp".to_string()],
+        available: is_command_available("gemini"),
+    }
+}
 
 /// Check if a command is available in PATH
 fn is_command_available(command: &str) -> bool {
@@ -43,19 +60,10 @@ pub fn list_agent_candidates() -> Vec<AgentCandidate> {
         command: None,
         args: Vec::new(),
         available: true,
-        description: Some("Generates one task per file locally".to_string()),
     }];
 
-    for (id, label, command, args, description) in CANDIDATES {
-        candidates.push(AgentCandidate {
-            id: id.to_string(),
-            label: label.to_string(),
-            command: Some(command.to_string()),
-            args: args.iter().map(|s| s.to_string()).collect(),
-            available: is_command_available(command),
-            description: Some(description.to_string()),
-        });
-    }
+    candidates.push(codex_candidate());
+    candidates.push(gemini_candidate());
 
     candidates
 }

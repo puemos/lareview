@@ -1,4 +1,4 @@
 //! Data layer - SQLite persistence
 
-mod db;
-mod repository;
+pub mod db;
+pub mod repository;

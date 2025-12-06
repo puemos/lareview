@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 //! Repository traits and implementations for data access
 
-use crate::domain::{Note, PullRequest, PullRequestId, ReviewTask, TaskId};
+use crate::domain::{Note, PullRequest, PullRequestId, ReviewTask, TaskId, TaskStatus};
 use anyhow::Result;
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
@@ -96,10 +96,12 @@ impl TaskRepository {
         let stats_json = serde_json::to_string(&task.stats)?;
         let patches_json = serde_json::to_string(&task.patches)?;
 
+        let status_str = serde_json::to_string(&task.status)?.replace("\"", "");
+
         conn.execute(
             r#"
-            INSERT OR REPLACE INTO tasks (id, pull_request_id, title, description, files, stats, insight, patches, diagram, ai_generated)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+            INSERT OR REPLACE INTO tasks (id, pull_request_id, title, description, files, stats, insight, patches, diagram, ai_generated, status)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
             "#,
             (
                 &task.id,
@@ -112,6 +114,7 @@ impl TaskRepository {
                 &patches_json,
                 &task.diagram,
                 task.ai_generated as i32,
+                &status_str,
             ),
         )?;
         Ok(())
@@ -120,13 +123,14 @@ impl TaskRepository {
     pub fn find_by_pr(&self, pr_id: &PullRequestId) -> Result<Vec<ReviewTask>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, title, description, files, stats, insight, patches, diagram, ai_generated FROM tasks WHERE pull_request_id = ?1",
+            "SELECT id, title, description, files, stats, insight, patches, diagram, ai_generated, status FROM tasks WHERE pull_request_id = ?1",
         )?;
 
         let rows = stmt.query_map([pr_id], |row| {
             let files_json: String = row.get(3)?;
             let stats_json: String = row.get(4)?;
             let patches_json: Option<String> = row.get(6)?;
+            let status_str: String = row.get(9)?;
 
             Ok((
                 row.get::<_, String>(0)?,
@@ -138,6 +142,7 @@ impl TaskRepository {
                 patches_json,
                 row.get::<_, Option<String>>(7)?,
                 row.get::<_, i32>(8)?,
+                status_str,
             ))
         })?;
 
@@ -153,7 +158,15 @@ impl TaskRepository {
                 patches_json,
                 diagram,
                 ai_generated,
+                status_str,
             ) = row?;
+
+            let status = match status_str.as_str() {
+                "REVIEWED" => TaskStatus::Reviewed,
+                "IGNORED" => TaskStatus::Ignored,
+                _ => TaskStatus::Pending,
+            };
+
             tasks.push(ReviewTask {
                 id,
                 title,
@@ -166,9 +179,21 @@ impl TaskRepository {
                     .unwrap_or_default(),
                 diagram,
                 ai_generated: ai_generated != 0,
+                status,
             });
         }
         Ok(tasks)
+    }
+
+    pub fn update_status(&self, task_id: &TaskId, status: TaskStatus) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let status_str = serde_json::to_string(&status)?.replace("\"", "");
+
+        conn.execute(
+            "UPDATE tasks SET status = ?1 WHERE id = ?2",
+            (&status_str, task_id),
+        )?;
+        Ok(())
     }
 }
 
@@ -233,5 +258,96 @@ impl NoteRepository {
         })?;
 
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    pub fn delete_by_task(&self, task_id: &TaskId) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM notes WHERE task_id = ?1", [task_id])?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::data::db::Database;
+    use crate::domain::TaskStats;
+
+    #[test]
+    fn test_task_status_persistence() -> Result<()> {
+        let db = Database::open_at(std::path::PathBuf::from(":memory:"))?;
+        let conn = db.connection();
+        let repo = TaskRepository::new(conn.clone());
+        let pr_repo = PullRequestRepository::new(conn.clone());
+
+        let pr = PullRequest {
+            id: "pr-1".to_string(),
+            title: "Test PR".to_string(),
+            description: None,
+            repo: "test/repo".to_string(),
+            author: "me".to_string(),
+            branch: "main".to_string(),
+            created_at: "now".to_string(),
+        };
+        pr_repo.save(&pr)?;
+
+        let task = ReviewTask {
+            id: "task-1".to_string(),
+            title: "Test Task".to_string(),
+            description: "Desc".to_string(),
+            files: vec![],
+            stats: TaskStats::default(),
+            patches: vec![],
+            insight: None,
+            diagram: None,
+            ai_generated: false,
+            status: TaskStatus::Pending,
+        };
+
+        repo.save(&pr.id, &task)?;
+
+        // Verify initial status
+        let tasks = repo.find_by_pr(&pr.id)?;
+        assert_eq!(tasks[0].status, TaskStatus::Pending);
+
+        // Update status
+        repo.update_status(&task.id, TaskStatus::Reviewed)?;
+
+        // Verify updated status
+        let tasks = repo.find_by_pr(&pr.id)?;
+        assert_eq!(tasks[0].status, TaskStatus::Reviewed);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_note_repository_round_trip() -> Result<()> {
+        let db = Database::open_at(std::path::PathBuf::from(":memory:"))?;
+        let conn = db.connection();
+        let note_repo = NoteRepository::new(conn.clone());
+
+        let task_id = "task-note-1".to_string();
+        let note = Note {
+            task_id: task_id.clone(),
+            body: "Body".into(),
+            updated_at: "now".into(),
+        };
+
+        // Save and fetch single note
+        note_repo.save(&note)?;
+        let fetched = note_repo.find_by_task(&task_id)?;
+        assert!(fetched.is_some());
+        assert_eq!(fetched.unwrap().body, "Body");
+
+        // Fetch via find_by_tasks
+        let all = note_repo.find_by_tasks(&[task_id.clone()])?;
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].task_id, task_id);
+
+        // Delete and ensure removal
+        note_repo.delete_by_task(&note.task_id)?;
+        assert!(note_repo.find_by_task(&note.task_id)?.is_none());
+
+        Ok(())
     }
 }

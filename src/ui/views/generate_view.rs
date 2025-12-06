@@ -3,18 +3,31 @@
 use gpui::{AsyncApp, Context, Entity, SharedString, Window, div, prelude::*, px};
 
 use crate::acp::{GenerateTasksInput, generate_tasks_with_acp, list_agent_candidates};
+use crate::data::repository::{PullRequestRepository, TaskRepository};
 use crate::domain::PullRequest;
 use crate::ui::app::{AppState, AppView, SelectedAgent};
 use crate::ui::theme::theme;
+use std::sync::Arc;
 
 /// Generate view for creating review tasks from git diff
 pub struct GenerateView {
     state: Entity<AppState>,
+    task_repo: Arc<TaskRepository>,
+    pr_repo: Arc<PullRequestRepository>,
 }
 
 impl GenerateView {
-    pub fn new(state: Entity<AppState>, _cx: &mut Context<impl Render>) -> Self {
-        Self { state }
+    pub fn new(
+        state: Entity<AppState>,
+        task_repo: Arc<TaskRepository>,
+        pr_repo: Arc<PullRequestRepository>,
+        _cx: &mut Context<impl Render>,
+    ) -> Self {
+        Self {
+            state,
+            task_repo,
+            pr_repo,
+        }
     }
 
     fn paste_from_clipboard(&self, cx: &mut Context<Self>) {
@@ -125,29 +138,68 @@ impl GenerateView {
             s.agent_logs = vec![start_log_for_state.clone()];
         });
 
+        let (progress_tx, mut progress_rx) = tokio::sync::mpsc::unbounded_channel();
+
         let input = GenerateTasksInput {
             pull_request: pr,
-            files: vec![],
-            diff_text: Some(diff_text),
+            diff_text,
             agent_command: agent_cmd,
             agent_args,
+            progress_tx: Some(progress_tx),
         };
 
+        let pr_for_save = input.pull_request.clone();
+        let pr_id_for_save = pr_for_save.id.clone();
         let state_entity = self.state.clone();
         let start_log = start_log.clone();
+        let task_repo = self.task_repo.clone();
+        let pr_repo = self.pr_repo.clone();
 
         // Spawn async task for ACP generation
         cx.spawn(|_this, cx: &mut AsyncApp| {
             let mut app = cx.clone();
 
             async move {
-                let result = generate_tasks_with_acp(input).await;
+                let mut result_fut = std::pin::pin!(generate_tasks_with_acp(input));
+
+                let result = loop {
+                    tokio::select! {
+                        evt = progress_rx.recv() => {
+                            if let Some(evt) = evt {
+                                let _ = app.update_entity(&state_entity, |state, _| match evt {
+                                    crate::acp::ProgressEvent::Message { content, is_new } => {
+                                        if is_new || state.agent_messages.is_empty() {
+                                            state.agent_messages.push(content);
+                                        } else if let Some(latest) = state.agent_messages.last_mut() {
+                                            *latest = content;
+                                        }
+                                    }
+                                    crate::acp::ProgressEvent::Thought { content, is_new } => {
+                                        if is_new || state.agent_thoughts.is_empty() {
+                                            state.agent_thoughts.push(content);
+                                        } else if let Some(latest) = state.agent_thoughts.last_mut() {
+                                            *latest = content;
+                                        }
+                                    }
+                                    crate::acp::ProgressEvent::Log(log) => {
+                                        state.agent_logs.push(log);
+                                    }
+                                });
+                            } else {
+                                // channel closed
+                            }
+                        }
+                        res = &mut result_fut => {
+                            break res;
+                        }
+                    }
+                };
 
                 let _ = app.update_entity(&state_entity, |state, _| {
                     state.is_generating = false;
                     match result {
                         Ok(res) => {
-                            state.tasks = res.tasks;
+                            state.tasks = res.tasks.clone();
                             state.agent_messages = res.messages;
                             state.agent_thoughts = res.thoughts;
                             let mut logs = res.logs;
@@ -156,6 +208,12 @@ impl GenerateView {
                             if state.tasks.is_empty() {
                                 state.generation_error = Some("No tasks generated".to_string());
                             } else {
+                                // Save to DB
+                                let _ = pr_repo.save(&pr_for_save);
+                                for task in &state.tasks {
+                                    let _ = task_repo.save(&pr_id_for_save, task);
+                                }
+
                                 // Auto-navigate to review
                                 state.current_view = AppView::Review;
                             }
@@ -174,13 +232,6 @@ impl GenerateView {
     fn select_agent(&self, agent: SelectedAgent, cx: &mut Context<Self>) {
         self.state.update(cx, |s, _| {
             s.selected_agent = agent;
-        });
-    }
-
-    #[allow(dead_code)]
-    fn update_diff(&self, text: String, cx: &mut Context<Self>) {
-        self.state.update(cx, |s, _| {
-            s.diff_text = text;
         });
     }
 }
@@ -501,6 +552,14 @@ impl GenerateView {
         gap: f32,
     ) -> impl IntoElement {
         let spacing = theme().spacing;
+        let colors = theme().colors;
+        let accent_bg = gpui::Hsla {
+            h: color.h,
+            s: color.s,
+            l: color.l,
+            a: 0.12,
+        };
+        let is_log = label == "Logs";
 
         div()
             .flex()
@@ -508,22 +567,42 @@ impl GenerateView {
             .gap(px(gap))
             .child(
                 div()
-                    .text_sm()
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
-                    .text_color(color)
-                    .child(label.to_string()),
+                    .flex()
+                    .items_center()
+                    .gap(px(spacing.space_2))
+                    .child(
+                        div()
+                            .text_sm()
+                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .text_color(color)
+                            .child(label.to_string()),
+                    )
+                    .child(
+                        div()
+                            .px(px(spacing.space_2))
+                            .py(px(4.0))
+                            .bg(accent_bg)
+                            .rounded_md()
+                            .text_sm()
+                            .text_color(color)
+                            .child(format!(
+                                "{} {}",
+                                entries.len(),
+                                if entries.len() == 1 { "item" } else { "items" }
+                            )),
+                    ),
             )
             .child(if entries.is_empty() {
                 div()
                     .text_sm()
-                    .text_color(theme().colors.text_muted)
+                    .text_color(colors.text_muted)
                     .child("No entries yet.")
                     .into_any_element()
             } else {
                 div()
-                    .bg(gpui::hsla(0.0, 0.0, 1.0, 0.5))
+                    .bg(colors.surface_alt)
                     .border_1()
-                    .border_color(theme().colors.border)
+                    .border_color(colors.border)
                     .rounded_md()
                     .id(SharedString::from(format!("agent-feed-{}", label)))
                     .p(px(spacing.space_3))
@@ -533,11 +612,21 @@ impl GenerateView {
                     .max_h(px(320.0))
                     .overflow_scroll()
                     .children(entries.iter().enumerate().map(|(i, entry)| {
-                        div()
+                        let bubble = div()
                             .id(SharedString::from(format!("agent-{}-{}", label, i)))
+                            .bg(colors.surface)
+                            .border_1()
+                            .border_color(colors.border)
+                            .rounded_md()
+                            .p(px(spacing.space_2))
                             .text_sm()
-                            .text_color(color)
-                            .child(entry.clone())
+                            .text_color(color);
+
+                        if is_log {
+                            bubble.font_family("JetBrains Mono").child(entry.clone())
+                        } else {
+                            bubble.child(entry.clone())
+                        }
                     }))
                     .into_any_element()
             })
