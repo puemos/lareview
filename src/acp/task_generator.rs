@@ -770,7 +770,6 @@ fn persist_tasks_to_db(pr: &PullRequest, tasks: &[ReviewTask], logs: &Arc<Mutex<
 #[cfg(test)]
 mod mcp_config_tests {
     use super::*;
-    use std::env;
 
     #[test]
     fn resolve_prefers_mcp_server_binary_override() {
@@ -785,7 +784,10 @@ mod persistence_tests {
     use super::*;
     use crate::data::db::Database;
     use crate::data::repository::TaskRepository;
-    use crate::domain::TaskStatus;
+    use std::sync::Mutex;
+
+    // Serialize tests that use LAREVIEW_DB_PATH to avoid env var conflicts
+    static DB_TEST_LOCK: Mutex<()> = Mutex::new(());
 
     fn set_env(key: &str, val: &str) -> Option<String> {
         let prev = std::env::var(key).ok();
@@ -802,12 +804,13 @@ mod persistence_tests {
             },
             None => unsafe {
                 std::env::remove_var(key);
-            },
+    },
         }
     }
 
     #[test]
-    fn test_fake_tasks_injection() -> Result<()> {
+    fn test_fake_tasks_injection() -> anyhow::Result<()> {
+        let _lock = DB_TEST_LOCK.lock().unwrap();
         let tmp_dir = tempfile::tempdir().expect("tempdir");
         let db_path = tmp_dir.path().join("db.sqlite");
 
@@ -1044,7 +1047,7 @@ mod real_acp_tests {
     /// Run with: `cargo test -- --ignored`
     #[test]
     #[ignore]
-    fn test_real_codex_acp_persist() {
+    fn test_real_codex_acp_persist() -> anyhow::Result<()> {
 
         let tmp = tempfile::tempdir().expect("tmpdir");
         let db_path = tmp.path().join("db.sqlite");

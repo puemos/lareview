@@ -386,6 +386,10 @@ fn log_to_file(config: &ServerConfig, message: &str) {
 mod tests {
     use super::*;
     use tokio_util::sync::CancellationToken;
+    use std::sync::Mutex;
+
+    // Serialize tests that use LAREVIEW_DB_PATH to avoid env var conflicts
+    static DB_TEST_LOCK: Mutex<()> = Mutex::new(());
 
     fn set_env(key: &str, val: &str) -> Option<String> {
         let prev = std::env::var(key).ok();
@@ -408,6 +412,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_return_tasks_tool_writes_file() {
+        let _lock = DB_TEST_LOCK.lock().unwrap();
         let tmp = tempfile::NamedTempFile::new().expect("tmp file");
         let out_path = tmp.path().to_path_buf();
         let tmp_db = tempfile::tempdir().expect("tmp db dir");
@@ -442,6 +447,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_return_tasks_tool_persists_to_db() {
+        let _lock = DB_TEST_LOCK.lock().unwrap();
         let tmp_dir = tempfile::tempdir().expect("tempdir");
         let db_path = tmp_dir.path().join("db.sqlite");
         let pr_context_path = tmp_dir.path().join("pr.json");
@@ -484,6 +490,9 @@ mod tests {
             )
             .await
             .expect("tool call ok");
+
+        // Give the spawn_blocking task time to complete persistence
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
 
         let db = Database::open_at(db_path.clone()).expect("open db");
         let repo = TaskRepository::new(db.connection());
