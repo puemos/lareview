@@ -74,10 +74,9 @@ impl LaReviewClient {
                 | "return_tasks"
                 | "lareview/create_review_tasks"
                 | "create_review_tasks"
-        ) {
-            if let Ok(value) = serde_json::from_str::<serde_json::Value>(params.get()) {
-                return self.store_tasks_from_value(value);
-            }
+        ) && let Ok(value) = serde_json::from_str::<serde_json::Value>(params.get())
+        {
+            return self.store_tasks_from_value(value);
         }
         false
     }
@@ -118,10 +117,10 @@ impl agent_client_protocol::Client for LaReviewClient {
             }
             SessionUpdate::ToolCall(call) => {
                 // Check title for tool name and extract tasks from raw_input
-                if call.title.contains("return_tasks") || call.title.contains("task") {
-                    if let Some(input) = call.raw_input {
-                        self.store_tasks_from_value(input);
-                    }
+                if (call.title.contains("return_tasks") || call.title.contains("task"))
+                    && let Some(input) = call.raw_input
+                {
+                    self.store_tasks_from_value(input);
                 }
                 // Also check raw_output for returned tasks
                 if let Some(output) = call.raw_output {

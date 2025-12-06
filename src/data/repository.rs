@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Repository traits and implementations for data access
 
 use crate::domain::{Note, PullRequest, PullRequestId, ReviewTask, TaskId};

@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Diff parser - parse unified git diff into file hunks
 
 use crate::domain::ParsedFileDiff;
