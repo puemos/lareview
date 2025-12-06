@@ -150,6 +150,7 @@ impl GenerateView {
             timeout_secs: Some(500), // Default timeout
             debug: false, // No debug logging in production
             fake_tasks: None, // No test fixtures
+            db_path: None, // Use default database path
         };
 
         let pr_for_save = input.pull_request.clone();

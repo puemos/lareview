@@ -31,6 +31,8 @@ pub struct ServerConfig {
     pub log_file: Option<PathBuf>,
     /// Optional path to PR context JSON file
     pub pr_context: Option<PathBuf>,
+    /// Optional explicit database path (for tests)
+    pub db_path: Option<PathBuf>,
 }
 
 impl ServerConfig {
@@ -286,7 +288,10 @@ fn persist_tasks_to_db(config: &ServerConfig, args: Value) -> Result<()> {
     let tasks = parse_tasks(args)?;
     let pull_request = load_pull_request(config);
 
-    let db = Database::open().context("open database")?;
+    let db = match &config.db_path {
+        Some(path) => Database::open_at(path.clone()),
+        None => Database::open(),
+    }.context("open database")?;
     let conn = db.connection();
     let pr_repo = PullRequestRepository::new(conn.clone());
     let task_repo = TaskRepository::new(conn);
@@ -386,44 +391,19 @@ fn log_to_file(config: &ServerConfig, message: &str) {
 mod tests {
     use super::*;
     use tokio_util::sync::CancellationToken;
-    use std::sync::Mutex;
-
-    // Serialize tests that use LAREVIEW_DB_PATH to avoid env var conflicts
-    static DB_TEST_LOCK: Mutex<()> = Mutex::new(());
-
-    fn set_env(key: &str, val: &str) -> Option<String> {
-        let prev = std::env::var(key).ok();
-        unsafe {
-            std::env::set_var(key, val);
-        }
-        prev
-    }
-
-    fn restore_env(key: &str, prev: Option<String>) {
-        match prev {
-            Some(val) => unsafe {
-                std::env::set_var(key, val);
-            },
-            None => unsafe {
-                std::env::remove_var(key);
-            },
-        }
-    }
 
     #[tokio::test]
     async fn test_return_tasks_tool_writes_file() {
-        let _lock = DB_TEST_LOCK.lock().unwrap();
         let tmp = tempfile::NamedTempFile::new().expect("tmp file");
         let out_path = tmp.path().to_path_buf();
         let tmp_db = tempfile::tempdir().expect("tmp db dir");
         let db_path = tmp_db.path().join("db.sqlite");
 
-        let prev_db = set_env("LAREVIEW_DB_PATH", db_path.to_string_lossy().as_ref());
-
         let config = Arc::new(ServerConfig {
             tasks_out: Some(out_path.clone()),
             log_file: None,
             pr_context: None,
+            db_path: Some(db_path), // Use explicit db_path
         });
 
         let tool = create_return_tasks_tool(config);
@@ -441,18 +421,13 @@ mod tests {
         );
         let written = std::fs::read_to_string(tmp.path()).expect("read tmp");
         assert_eq!(written, payload.to_string());
-
-        restore_env("LAREVIEW_DB_PATH", prev_db);
     }
 
     #[tokio::test]
     async fn test_return_tasks_tool_persists_to_db() {
-        let _lock = DB_TEST_LOCK.lock().unwrap();
         let tmp_dir = tempfile::tempdir().expect("tempdir");
         let db_path = tmp_dir.path().join("db.sqlite");
         let pr_context_path = tmp_dir.path().join("pr.json");
-
-        let prev_db = set_env("LAREVIEW_DB_PATH", db_path.to_string_lossy().as_ref());
 
         // Write PR context to file
         let pr_context = serde_json::json!({
@@ -470,6 +445,7 @@ mod tests {
             tasks_out: None,
             log_file: None,
             pr_context: Some(pr_context_path),
+            db_path: Some(db_path.clone()), // Use explicit db_path
         });
 
         let tool = create_return_tasks_tool(config);
@@ -492,7 +468,7 @@ mod tests {
             .expect("tool call ok");
 
         // Give the spawn_blocking task time to complete persistence
-        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
         let db = Database::open_at(db_path.clone()).expect("open db");
         let repo = TaskRepository::new(db.connection());
@@ -501,7 +477,5 @@ mod tests {
         assert_eq!(tasks[0].id, "task-123");
         assert_eq!(tasks[0].title, "DB Task");
         assert_eq!(tasks[0].status, TaskStatus::Pending);
-
-        restore_env("LAREVIEW_DB_PATH", prev_db);
     }
 }

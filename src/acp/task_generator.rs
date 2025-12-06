@@ -39,6 +39,8 @@ pub struct GenerateTasksInput {
     pub debug: bool,
     /// Test fixture injection - skip ACP and use provided tasks (replaces LAREVIEW_FAKE_TASKS)
     pub fake_tasks: Option<Vec<ReviewTask>>,
+    /// Explicit database path for persistence (replaces LAREVIEW_DB_PATH for tests)
+    pub db_path: Option<PathBuf>,
 }
 
 /// Result of task generation
@@ -428,6 +430,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
         timeout_secs: _,
         debug,
         fake_tasks,
+        db_path,
     } = input;
 
     let logs = Arc::new(Mutex::new(Vec::new()));
@@ -436,7 +439,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
     // Test hook: when fake_tasks is provided, skip ACP and persist provided tasks directly.
     if let Some(final_tasks) = fake_tasks {
         push_log(&logs, "fake_tasks: using provided test fixtures", debug);
-        persist_tasks_to_db(&pull_request, &final_tasks, &logs, debug);
+        persist_tasks_to_db(&pull_request, &final_tasks, &logs, debug, db_path.as_ref());
         return Ok(GenerateTasksResult {
             tasks: final_tasks,
             messages: Vec::new(),
@@ -722,7 +725,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
         .context(ctx_parts.join("\n\n")));
     }
 
-    persist_tasks_to_db(&pull_request, &final_tasks, &logs, debug);
+    persist_tasks_to_db(&pull_request, &final_tasks, &logs, debug, db_path.as_ref());
 
     Ok(GenerateTasksResult {
         tasks: final_tasks,
@@ -732,8 +735,18 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
     })
 }
 
-fn persist_tasks_to_db(pr: &PullRequest, tasks: &[ReviewTask], logs: &Arc<Mutex<Vec<String>>>, debug: bool) {
-    match Database::open() {
+fn persist_tasks_to_db(
+    pr: &PullRequest,
+    tasks: &[ReviewTask],
+    logs: &Arc<Mutex<Vec<String>>>,
+    debug: bool,
+    db_path: Option<&PathBuf>,
+) {
+    let db_result = match db_path {
+        Some(path) => Database::open_at(path.clone()),
+        None => Database::open(),
+    };
+    match db_result {
         Ok(db) => {
             let conn = db.connection();
             let pr_repo = PullRequestRepository::new(conn.clone());
@@ -784,37 +797,11 @@ mod persistence_tests {
     use super::*;
     use crate::data::db::Database;
     use crate::data::repository::TaskRepository;
-    use std::sync::Mutex;
-
-    // Serialize tests that use LAREVIEW_DB_PATH to avoid env var conflicts
-    static DB_TEST_LOCK: Mutex<()> = Mutex::new(());
-
-    fn set_env(key: &str, val: &str) -> Option<String> {
-        let prev = std::env::var(key).ok();
-        unsafe {
-            std::env::set_var(key, val);
-        }
-        prev
-    }
-
-    fn restore_env(key: &str, prev: Option<String>) {
-        match prev {
-            Some(val) => unsafe {
-                std::env::set_var(key, val);
-            },
-            None => unsafe {
-                std::env::remove_var(key);
-    },
-        }
-    }
 
     #[test]
     fn test_fake_tasks_injection() -> anyhow::Result<()> {
-        let _lock = DB_TEST_LOCK.lock().unwrap();
         let tmp_dir = tempfile::tempdir().expect("tempdir");
         let db_path = tmp_dir.path().join("db.sqlite");
-
-        let prev_db = set_env("LAREVIEW_DB_PATH", db_path.to_string_lossy().as_ref());
 
         let pr = PullRequest {
             id: "pr-1".into(),
@@ -854,7 +841,8 @@ mod persistence_tests {
             mcp_server_binary: None,
             timeout_secs: None,
             debug: false,
-            fake_tasks: Some(vec![fake_task]), // Use fixture injection
+            fake_tasks: Some(vec![fake_task]),
+            db_path: Some(db_path.clone()), // Use explicit db_path
         };
 
         let rt = tokio::runtime::Builder::new_current_thread()
@@ -870,7 +858,6 @@ mod persistence_tests {
         let stored = repo.find_by_pr(&pr.id)?;
         assert_eq!(stored.len(), 1);
 
-        restore_env("LAREVIEW_DB_PATH", prev_db);
         Ok(())
     }
 }
@@ -1004,6 +991,7 @@ mod real_acp_tests {
             timeout_secs: Some(300),
             debug: true,
             fake_tasks: None,
+            db_path: None,
         };
 
         // Ensure we use the real binary, not the test harness
@@ -1095,6 +1083,7 @@ mod real_acp_tests {
             timeout_secs: Some(300),
             debug: true,
             fake_tasks: None,
+            db_path: Some(db_path.clone()),
         };
 
         let runtime = tokio::runtime::Builder::new_current_thread()
