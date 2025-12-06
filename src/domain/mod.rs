@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Domain types for LaReview
 
 use serde::{Deserialize, Serialize};
@@ -9,18 +10,13 @@ pub type PullRequestId = String;
 pub type TaskId = String;
 
 /// Risk level for a task
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum RiskLevel {
+    #[default]
     Low,
     Medium,
     High,
-}
-
-impl Default for RiskLevel {
-    fn default() -> Self {
-        Self::Low
-    }
 }
 
 /// A pull request to be reviewed

@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! SQLite database setup and connection
 
 use anyhow::Result;

@@ -24,6 +24,7 @@ pub enum SelectedAgent {
 /// Shared application state
 pub struct AppState {
     pub current_view: AppView,
+    #[allow(dead_code)]
     pub pr: Option<PullRequest>,
     pub tasks: Vec<ReviewTask>,
     pub is_generating: bool,

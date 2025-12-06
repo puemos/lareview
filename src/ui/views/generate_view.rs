@@ -177,6 +177,7 @@ impl GenerateView {
         });
     }
 
+    #[allow(dead_code)]
     fn update_diff(&self, text: String, cx: &mut Context<Self>) {
         self.state.update(cx, |s, _| {
             s.diff_text = text;

@@ -61,7 +61,7 @@ impl ReviewView {
                         let is_selected = Some(task.id.clone()) == selected_id;
                         let task_id = task.id.clone();
                         let task_title = task.title.clone();
-                        let risk = task.stats.risk.clone();
+                        let risk = task.stats.risk;
 
                         div()
                             .id(SharedString::from(format!("task-{}", task_id)))
