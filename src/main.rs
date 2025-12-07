@@ -15,19 +15,19 @@ fn main() -> Result<(), eframe::Error> {
         .enable_all()
         .build()
         .expect("Failed to create Tokio runtime");
-    
+
     RUNTIME.set(rt).expect("Runtime already initialized");
-    
+
     // Enter the runtime context
     let _guard = RUNTIME.get().unwrap().enter();
-    
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1200.0, 800.0])
             .with_title("LaReview"),
         ..Default::default()
     };
-    
+
     eframe::run_native(
         "LaReview",
         options,

@@ -19,10 +19,10 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use std::fs::OpenOptions;
 use std::io::Write;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Stdin, Stdout};
 use tokio::sync::Mutex;
-use std::path::PathBuf;
 
 /// Configuration for the MCP server, parsed from CLI arguments
 #[derive(Debug, Clone, Default)]
@@ -43,7 +43,7 @@ impl ServerConfig {
         let mut config = ServerConfig::default();
         let args: Vec<String> = std::env::args().collect();
         let mut i = 0;
-        
+
         while i < args.len() {
             match args[i].as_str() {
                 "--tasks-out" => {
@@ -73,11 +73,10 @@ impl ServerConfig {
                 _ => i += 1,
             }
         }
-        
+
         config
     }
 }
-
 
 #[derive(Debug)]
 struct LineDelimitedStdioTransport {
@@ -293,7 +292,8 @@ fn persist_tasks_to_db(config: &ServerConfig, args: Value) -> Result<()> {
     let db = match &config.db_path {
         Some(path) => Database::open_at(path.clone()),
         None => Database::open(),
-    }.context("open database")?;
+    }
+    .context("open database")?;
     let conn = db.connection();
     let pr_repo = PullRequestRepository::new(conn.clone());
     let task_repo = TaskRepository::new(conn);
@@ -360,7 +360,12 @@ fn load_pull_request(config: &ServerConfig) -> PullRequest {
             match serde_json::from_str::<PullRequest>(&content) {
                 Ok(pr) => return pr,
                 Err(err) => {
-                    let _ = writeln!(std::io::stderr(), "failed to parse PR context from {}: {}", path.display(), err);
+                    let _ = writeln!(
+                        std::io::stderr(),
+                        "failed to parse PR context from {}: {}",
+                        path.display(),
+                        err
+                    );
                 }
             }
         }
