@@ -62,6 +62,7 @@ pub enum TaskStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReviewTask {
     pub id: TaskId,
+    pub pr_id: PullRequestId, // Added field
     pub title: String,
     pub description: String,
     pub files: Vec<String>,

@@ -90,7 +90,7 @@ impl TaskRepository {
         Self { conn }
     }
 
-    pub fn save(&self, pr_id: &PullRequestId, task: &ReviewTask) -> Result<()> {
+    pub fn save(&self, task: &ReviewTask) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let files_json = serde_json::to_string(&task.files)?;
         let stats_json = serde_json::to_string(&task.stats)?;
@@ -105,7 +105,7 @@ impl TaskRepository {
             "#,
             (
                 &task.id,
-                pr_id,
+                &task.pr_id, // Use task.pr_id directly
                 &task.title,
                 &task.description,
                 &files_json,
@@ -120,28 +120,30 @@ impl TaskRepository {
         Ok(())
     }
 
-    pub fn find_by_pr(&self, pr_id: &PullRequestId) -> Result<Vec<ReviewTask>> {
+    pub fn find_by_pr(&self, pr_id_filter: &PullRequestId) -> Result<Vec<ReviewTask>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, title, description, files, stats, insight, patches, diagram, ai_generated, status FROM tasks WHERE pull_request_id = ?1",
+            "SELECT id, pull_request_id, title, description, files, stats, insight, patches, diagram, ai_generated, status FROM tasks WHERE pull_request_id = ?1",
         )?;
 
-        let rows = stmt.query_map([pr_id], |row| {
-            let files_json: String = row.get(3)?;
-            let stats_json: String = row.get(4)?;
-            let patches_json: Option<String> = row.get(6)?;
-            let status_str: String = row.get(9)?;
+        let rows = stmt.query_map([pr_id_filter], |row| {
+            let pr_id: String = row.get(1)?; // Retrieve pr_id
+            let files_json: String = row.get(4)?;
+            let stats_json: String = row.get(5)?;
+            let patches_json: Option<String> = row.get(7)?;
+            let status_str: String = row.get(10)?;
 
             Ok((
                 row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
+                pr_id, // Pass pr_id
                 row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
                 files_json,
                 stats_json,
-                row.get::<_, Option<String>>(5)?,
+                row.get::<_, Option<String>>(6)?,
                 patches_json,
-                row.get::<_, Option<String>>(7)?,
-                row.get::<_, i32>(8)?,
+                row.get::<_, Option<String>>(8)?,
+                row.get::<_, i32>(9)?,
                 status_str,
             ))
         })?;
@@ -150,6 +152,7 @@ impl TaskRepository {
         for row in rows {
             let (
                 id,
+                pr_id,
                 title,
                 description,
                 files_json,
@@ -169,6 +172,76 @@ impl TaskRepository {
 
             tasks.push(ReviewTask {
                 id,
+                pr_id, // Populate pr_id
+                title,
+                description,
+                files: serde_json::from_str(&files_json).unwrap_or_default(),
+                stats: serde_json::from_str(&stats_json).unwrap_or_default(),
+                insight,
+                patches: patches_json
+                    .map(|s| serde_json::from_str(&s).unwrap_or_default())
+                    .unwrap_or_default(),
+                diagram,
+                ai_generated: ai_generated != 0,
+                status,
+            });
+        }
+        Ok(tasks)
+    }
+
+    pub fn find_all(&self) -> Result<Vec<ReviewTask>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, pull_request_id, title, description, files, stats, insight, patches, diagram, ai_generated, status FROM tasks",
+        )?;
+
+        let rows = stmt.query_map([], |row| {
+            let pr_id: String = row.get(1)?; // Retrieve pr_id
+            let files_json: String = row.get(4)?;
+            let stats_json: String = row.get(5)?;
+            let patches_json: Option<String> = row.get(7)?;
+            let status_str: String = row.get(10)?;
+
+            Ok((
+                row.get::<_, String>(0)?,
+                pr_id, // Pass pr_id
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                files_json,
+                stats_json,
+                row.get::<_, Option<String>>(6)?,
+                patches_json,
+                row.get::<_, Option<String>>(8)?,
+                row.get::<_, i32>(9)?,
+                status_str,
+            ))
+        })?;
+
+        let mut tasks = Vec::new();
+        for row in rows {
+            let (
+                id,
+                pr_id,
+                title,
+                description,
+                files_json,
+                stats_json,
+                insight,
+                patches_json,
+                diagram,
+                ai_generated,
+                status_str,
+            ) = row?;
+
+            let status = match status_str.as_str() {
+                "REVIEWED" => TaskStatus::Reviewed,
+                "IGNORED" => TaskStatus::Ignored,
+                _ => TaskStatus::Pending,
+            };
+
+            tasks.push(ReviewTask {
+                id,
+                pr_id, // Populate pr_id
                 title,
                 description,
                 files: serde_json::from_str(&files_json).unwrap_or_default(),
@@ -193,6 +266,12 @@ impl TaskRepository {
             "UPDATE tasks SET status = ?1 WHERE id = ?2",
             (&status_str, task_id),
         )?;
+        Ok(())
+    }
+
+    pub fn delete(&self, task_id: &TaskId) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM tasks WHERE id = ?1", [task_id])?;
         Ok(())
     }
 }
@@ -293,6 +372,7 @@ mod tests {
 
         let task = ReviewTask {
             id: "task-1".to_string(),
+            pr_id: pr.id.clone(), // Add the required pr_id field
             title: "Test Task".to_string(),
             description: "Desc".to_string(),
             files: vec![],
@@ -304,7 +384,7 @@ mod tests {
             status: TaskStatus::Pending,
         };
 
-        repo.save(&pr.id, &task)?;
+        repo.save(&task)?;
 
         // Verify initial status
         let tasks = repo.find_by_pr(&pr.id)?;

@@ -9,7 +9,9 @@ use crate::data::db::Database;
 use crate::data::repository::{NoteRepository, PullRequestRepository, TaskRepository};
 use crate::domain::{Note, PullRequest, ReviewTask};
 
+use catppuccin_egui::MOCHA;
 use eframe::egui;
+use eframe::egui::{FontData, FontDefinitions, FontFamily};
 use tokio::sync::mpsc;
 
 /// Which screen is active
@@ -29,7 +31,7 @@ pub enum SelectedAgent {
     Qwen,
 }
 
-#[derive(PartialEq, Default)]
+#[derive(PartialEq, Default, Clone, Copy)]
 pub enum GenTab {
     #[default]
     Diff,
@@ -40,7 +42,8 @@ pub enum GenTab {
 #[derive(Default)]
 pub struct AppState {
     pub current_view: AppView,
-    pub tasks: Vec<ReviewTask>,
+    // Renamed tasks to all_tasks to hold all tasks regardless of PR
+    pub all_tasks: Vec<ReviewTask>,
 
     pub is_generating: bool,
     pub generation_error: Option<String>,
@@ -49,6 +52,11 @@ pub struct AppState {
 
     pub diff_text: String,
 
+    pub prs: Vec<PullRequest>,          // New field to hold all loaded PRs
+    pub selected_pr_id: Option<String>, // New field to track the currently selected PR ID
+
+    // Existing PR-related fields, these will be set based on selected_pr_id or current_pull_request
+    // These specific fields (pr_id, pr_title, etc.) will eventually be sourced from the selected_pr_id's corresponding PullRequest object.
     pub pr_id: String,
     pub pr_title: String,
     pub pr_repo: String,
@@ -63,6 +71,24 @@ pub struct AppState {
 
     pub current_note: Option<String>,
     pub review_error: Option<String>,
+}
+
+impl AppState {
+    // Getter for tasks, filtered by selected_pr_id
+    pub fn tasks(&self) -> Vec<ReviewTask> {
+        if let Some(selected_pr_id) = &self.selected_pr_id {
+            self.all_tasks
+                .iter()
+                .filter(|task| task.pr_id == *selected_pr_id)
+                .cloned()
+                .collect()
+        } else {
+            // When no specific PR is selected, we might want to display all tasks, or none.
+            // For now, let's display all tasks if no PR is selected.
+            // In the future, this could be an empty vec or a specific "All PRs" view.
+            self.all_tasks.clone()
+        }
+    }
 }
 
 /// Payload we care about from ACP
@@ -96,7 +122,26 @@ pub struct LaReviewApp {
 }
 
 impl LaReviewApp {
-    pub fn new_egui(_cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new_egui(cc: &eframe::CreationContext<'_>) -> Self {
+        // Configure fonts
+        let mut fonts = FontDefinitions::default();
+        fonts.font_data.insert(
+            "SpaceMono".to_owned(),
+            FontData::from_static(include_bytes!("../../assets/fonts/SpaceMono-Regular.ttf"))
+                .into(),
+        );
+        fonts
+            .families
+            .entry(FontFamily::Proportional)
+            .or_default()
+            .insert(0, "SpaceMono".to_owned());
+        fonts
+            .families
+            .entry(FontFamily::Monospace)
+            .or_default()
+            .insert(0, "SpaceMono".to_owned());
+        cc.egui_ctx.set_fonts(fonts);
+
         // Open database as before
         let db = Database::open().expect("db open");
 
@@ -105,12 +150,12 @@ impl LaReviewApp {
         let note_repo = Arc::new(NoteRepository::new(conn.clone()));
         let pr_repo = Arc::new(PullRequestRepository::new(conn.clone()));
 
-        // Same defaults as original app
-        let state = AppState {
+        // Initial state
+        let mut state = AppState {
             current_view: AppView::Generate,
             selected_agent: SelectedAgent::Codex,
             diff_text: String::new(),
-            pr_id: "local-pr".to_string(),
+            pr_id: "local-pr".to_string(), // Default local PR
             pr_title: "Local Review".to_string(),
             pr_repo: "local/repo".to_string(),
             pr_author: "me".to_string(),
@@ -118,9 +163,24 @@ impl LaReviewApp {
             ..Default::default()
         };
 
+        // Load all PRs and set selected PR
+        if let Ok(prs) = pr_repo.list_all() {
+            state.prs = prs;
+            if let Some(first_pr) = state.prs.first() {
+                state.selected_pr_id = Some(first_pr.id.clone());
+                state.pr_id = first_pr.id.clone();
+                state.pr_title = first_pr.title.clone();
+                state.pr_repo = first_pr.repo.clone();
+                state.pr_author = first_pr.author.clone();
+                state.pr_branch = first_pr.branch.clone();
+            }
+        } else {
+            state.review_error = Some("Failed to load pull requests".to_string());
+        }
+
         let (gen_tx, gen_rx) = mpsc::channel(32);
 
-        Self {
+        let mut app = Self {
             state,
             task_repo,
             note_repo,
@@ -128,7 +188,11 @@ impl LaReviewApp {
             _db: db,
             gen_tx,
             gen_rx,
-        }
+        };
+
+        app.sync_review_from_db(); // Load tasks for the initial state
+
+        app
     }
 
     /// Switch to review screen
@@ -144,8 +208,13 @@ impl LaReviewApp {
 
     /// Build a PullRequest struct from current state
     pub fn current_pull_request(&self) -> PullRequest {
+        // If a PR is selected, use its details, otherwise use the local-pr defaults
+        if let Some(selected_pr_id) = &self.state.selected_pr_id
+            && let Some(pr) = self.state.prs.iter().find(|p| &p.id == selected_pr_id) {
+            return pr.clone();
+        }
         PullRequest {
-            id: self.state.pr_id.clone(),
+            id: self.state.pr_id.clone(), // Fallback to current state's pr_id (local-pr)
             title: self.state.pr_title.clone(),
             repo: self.state.pr_repo.clone(),
             author: self.state.pr_author.clone(),
@@ -156,48 +225,84 @@ impl LaReviewApp {
     }
 
     /// Load tasks and notes when switching or refreshing review
-    fn sync_review_from_db(&mut self) {
-        match self.task_repo.find_by_pr(&self.state.pr_id) {
-            Ok(tasks) => {
-                self.state.tasks = tasks;
+    pub fn sync_review_from_db(&mut self) {
+        // Load all PRs
+        match self.pr_repo.list_all() {
+            Ok(prs) => {
+                self.state.prs = prs;
+                // If selected_pr_id is invalid or not set, try to set it to the first PR
+                if self.state.selected_pr_id.is_none()
+                    || !self
+                        .state
+                        .prs
+                        .iter()
+                        .any(|p| Some(&p.id) == self.state.selected_pr_id.as_ref())
+                {
+                    if let Some(first_pr) = self.state.prs.first() {
+                        self.state.selected_pr_id = Some(first_pr.id.clone());
+                    } else {
+                        self.state.selected_pr_id = None; // No PRs available
+                    }
+                }
             }
             Err(err) => {
-                self.state.review_error = Some(format!("{err}"));
+                self.state.review_error = Some(format!("Failed to load pull requests: {}", err));
                 return;
             }
         }
 
-        match self.note_repo.find_by_tasks(
-            &self
-                .state
-                .tasks
-                .iter()
-                .map(|t| t.id.clone())
-                .collect::<Vec<_>>(),
-        ) {
-            Ok(notes) => {
-                // map notes to current_note if selected
-                if let Some(task_id) = &self.state.selected_task_id {
-                    self.state.current_note = notes
-                        .iter()
-                        .find(|n| &n.task_id == task_id)
-                        .map(|n| n.body.clone());
+        // Load all tasks
+        match self.task_repo.find_all() {
+            // Use find_all to get all tasks
+            Ok(all_tasks) => {
+                self.state.all_tasks = all_tasks;
+
+                // Update current PR details based on selected_pr_id
+                if let Some(selected_pr_id) = &self.state.selected_pr_id {
+                    if let Some(pr) = self.state.prs.iter().find(|p| &p.id == selected_pr_id) {
+                        self.state.pr_id = pr.id.clone();
+                        self.state.pr_title = pr.title.clone();
+                        self.state.pr_repo = pr.repo.clone();
+                        self.state.pr_author = pr.author.clone();
+                        self.state.pr_branch = pr.branch.clone();
+                    }
+                } else {
+                    // Reset to default local-pr if no PR is selected
+                    self.state.pr_id = "local-pr".to_string();
+                    self.state.pr_title = "Local Review".to_string();
+                    self.state.pr_repo = "local/repo".to_string();
+                    self.state.pr_author = "me".to_string();
+                    self.state.pr_branch = "main".to_string();
                 }
-
-                let next_task = self
-                    .state
-                    .selected_task_id
-                    .clone()
-                    .filter(|id| self.state.tasks.iter().any(|t| &t.id == id))
-                    .or_else(|| self.state.tasks.first().map(|t| t.id.clone()));
-
-                self.state.selected_task_id = next_task;
-                self.state.review_error = None;
             }
             Err(err) => {
-                self.state.review_error = Some(format!("Failed to load notes: {err}"));
+                self.state.review_error = Some(format!("Failed to load tasks: {}", err));
+                return;
             }
         }
+
+        // After loading/filtering, re-evaluate selected task and note
+        let current_tasks = self.state.tasks(); // This calls the getter which filters
+        let next_task = self
+            .state
+            .selected_task_id
+            .clone()
+            .filter(|id| current_tasks.iter().any(|t| &t.id == id))
+            .or_else(|| current_tasks.first().map(|t| t.id.clone()));
+
+        self.state.selected_task_id = next_task;
+
+        if let Some(task_id) = &self.state.selected_task_id {
+            if let Ok(Some(note)) = self.note_repo.find_by_task(task_id) {
+                self.state.current_note = Some(note.body);
+            } else {
+                self.state.current_note = Some(String::new());
+            }
+        } else {
+            self.state.current_note = None;
+        }
+
+        self.state.review_error = None;
     }
 
     /// Save the current note for the selected task using real NoteRepository
@@ -226,11 +331,39 @@ impl LaReviewApp {
             }
         }
     }
+
+    /// Delete a review task and its associated notes
+    pub fn delete_review_task(&mut self, task_id: &crate::domain::TaskId) {
+        match self.task_repo.delete(task_id) {
+            Ok(_) => {
+                // Also delete notes associated with the task
+                if let Err(err) = self.note_repo.delete_by_task(task_id) {
+                    self.state.review_error =
+                        Some(format!("Failed to delete associated notes: {}", err));
+                    return;
+                }
+                // Remove from local state
+                self.state.all_tasks.retain(|task| &task.id != task_id); // Changed to all_tasks
+                // If the deleted task was selected, clear the selection
+                if self.state.selected_task_id.as_ref() == Some(task_id) {
+                    self.state.selected_task_id = None;
+                    self.state.current_note = None;
+                }
+                self.state.review_error = None; // Clear any previous error
+            }
+            Err(err) => {
+                self.state.review_error = Some(format!("Failed to delete task: {}", err));
+            }
+        }
+    }
 }
 
 /// Implement the egui application
 impl eframe::App for LaReviewApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Set Catppuccin theme
+        catppuccin_egui::set_theme(ctx, MOCHA);
+
         // poll async generation messages
         while let Ok(msg) = self.gen_rx.try_recv() {
             match msg {
@@ -257,16 +390,17 @@ impl eframe::App for LaReviewApp {
                     self.state.is_generating = false;
                     match result {
                         Ok(payload) => {
-                            self.state.tasks = payload.tasks;
+                            self.state.all_tasks = payload.tasks; // Changed to all_tasks
                             self.state.agent_messages = payload.messages;
                             self.state.agent_thoughts = payload.thoughts;
                             self.state.agent_logs = payload.logs;
 
-                            if self.state.tasks.is_empty() {
+                            if self.state.all_tasks.is_empty() {
+                                // Changed to all_tasks
                                 self.state.generation_error =
                                     Some("No tasks generated".to_string());
                             } else {
-                                self.state.current_view = AppView::Review;
+                                self.switch_to_review();
                             }
                         }
                         Err(err) => {
@@ -277,17 +411,57 @@ impl eframe::App for LaReviewApp {
             }
         }
 
-        // top bar (header + nav)
+        // Top panel with app title and navigation
         egui::TopBottomPanel::top("header").show(ctx, |ui| {
-            ui.heading("LaReview");
             ui.horizontal(|ui| {
-                if ui.button("Generate").clicked() {
-                    self.switch_to_generate();
-                }
-                if ui.button("Review").clicked() {
-                    self.switch_to_review();
-                }
+                ui.add_space(8.0); // Padding from the left
+
+                // App Title
+                ui.heading(
+                    egui::RichText::new("LA REVIEW")
+                        .strong()
+                        .color(MOCHA.subtext0)
+                        .size(16.0), // Smaller size for more subtle header
+                );
+
+                ui.add_space(16.0); // Space between title and navigation
+
+                // Navigation Buttons
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    // Generate Button
+                    let generate_response = ui.add(
+                        egui::Button::new(egui::RichText::new("GENERATE").color(
+                            if self.state.current_view == AppView::Generate {
+                                MOCHA.mauve
+                            } else {
+                                MOCHA.subtext0
+                            },
+                        ))
+                        .frame(false), // Make it look like a text link
+                    );
+                    if generate_response.clicked() {
+                        self.switch_to_generate();
+                    }
+
+                    ui.add_space(8.0); // Space between buttons
+
+                    // Review Button
+                    let review_response = ui.add(
+                        egui::Button::new(egui::RichText::new("REVIEW").color(
+                            if self.state.current_view == AppView::Review {
+                                MOCHA.mauve
+                            } else {
+                                MOCHA.subtext0
+                            },
+                        ))
+                        .frame(false), // Make it look like a text link
+                    );
+                    if review_response.clicked() {
+                        self.switch_to_review();
+                    }
+                });
             });
+            ui.add_space(4.0); // Padding at the bottom of the header
         });
 
         // main content

@@ -1,24 +1,16 @@
-//! Generate view (egui tabbed version)
+//! Generate view with a "2001: A Space Odyssey" inspired UI
 
+use catppuccin_egui::MOCHA;
 use eframe::egui;
 use tokio;
 
 use crate::acp::{GenerateTasksInput, generate_tasks_with_acp, list_agent_candidates};
-use crate::ui::app::GenTab;
-use crate::ui::app::{GenMsg, GenResultPayload, LaReviewApp, SelectedAgent};
+use crate::ui::app::{GenMsg, GenResultPayload, GenTab, LaReviewApp, SelectedAgent};
 use crate::ui::components::diff::render_diff_editor;
-use crate::ui::components::theme::AppTheme; // make sure you have the enum in your state module
 
 impl LaReviewApp {
     pub fn ui_generate(&mut self, ui: &mut egui::Ui) {
-        let theme = AppTheme::default();
         let mut trigger_generate = false;
-
-        let diff_line_count = if self.state.diff_text.is_empty() {
-            0
-        } else {
-            self.state.diff_text.lines().count()
-        };
 
         ui.vertical(|ui| {
             ui.add_space(8.0);
@@ -26,34 +18,43 @@ impl LaReviewApp {
             // Header
             ui.horizontal(|ui| {
                 ui.heading(
-                    egui::RichText::new("🔍 Generate review tasks")
+                    egui::RichText::new("╱ GENERATE TASKS")
                         .size(20.0)
-                        .color(theme.text_primary),
+                        .color(MOCHA.text),
                 );
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    // Generate button
                     let can_generate =
                         !self.state.diff_text.trim().is_empty() && !self.state.is_generating;
 
                     let generate_label = if self.state.is_generating {
                         "⏳ Generating..."
                     } else {
-                        "✨ Generate tasks"
+                        "▶ RUN"
                     };
 
-                    let generate_button = egui::Button::new(
-                        egui::RichText::new(generate_label)
-                            .size(15.0)
-                            .color(egui::Color32::WHITE),
-                    )
-                    .fill(if can_generate {
-                        theme.accent
-                    } else {
-                        egui::Color32::from_rgb(60, 60, 65)
-                    })
-                    .corner_radius(6.0)
-                    .min_size(egui::vec2(160.0, 32.0));
+                    let generate_button =
+                        egui::Button::new(egui::RichText::new(generate_label).size(15.0).color(
+                            if can_generate {
+                                MOCHA.crust
+                            } else {
+                                MOCHA.subtext0
+                            },
+                        ))
+                        .fill(if can_generate {
+                            MOCHA.mauve
+                        } else {
+                            MOCHA.surface1
+                        })
+                        .stroke(egui::Stroke::new(
+                            1.0,
+                            if can_generate {
+                                MOCHA.overlay0
+                            } else {
+                                MOCHA.surface2
+                            },
+                        ))
+                        .min_size(egui::vec2(140.0, 32.0));
 
                     if ui.add_enabled(can_generate, generate_button).clicked() {
                         trigger_generate = true;
@@ -61,247 +62,223 @@ impl LaReviewApp {
 
                     ui.add_space(8.0);
 
-                    // Agent selector chips
-                    for agent in [SelectedAgent::Codex, SelectedAgent::Gemini, SelectedAgent::Qwen]
-                    {
+                    // Agent selection chips
+                    for agent in [
+                        SelectedAgent::Codex,
+                        SelectedAgent::Gemini,
+                        SelectedAgent::Qwen,
+                    ] {
                         let selected = self.state.selected_agent == agent;
-                        let label = format!("{:?}", agent);
+                        let label = format!("{:?}", agent).to_uppercase();
 
                         let text = egui::RichText::new(label).color(if selected {
-                            egui::Color32::WHITE
+                            MOCHA.crust
                         } else {
-                            theme.text_secondary
+                            MOCHA.subtext0
                         });
 
                         let chip = egui::Button::new(text)
-                            .fill(if selected {
-                                theme.accent
-                            } else {
-                                egui::Color32::from_rgb(45, 45, 50)
-                            })
-                            .corner_radius(4.0);
+                            .fill(if selected { MOCHA.sky } else { MOCHA.surface0 })
+                            .stroke(egui::Stroke::NONE);
 
                         if ui.add(chip).clicked() {
                             self.state.selected_agent = agent;
                         }
                     }
+                    ui.label("AGENT:");
                 });
             });
 
             ui.add_space(4.0);
 
-            // Status line
+            // Status
             let status_text = if self.state.is_generating {
                 "Analyzing diff with the selected agent..."
             } else if self.state.diff_text.trim().is_empty() {
-                "Paste a git diff below to get started."
+                "Awaiting diff input."
             } else if self.state.generation_error.is_some() {
-                "Last generation failed. See details in the banner below."
+                "Last generation failed. See details below."
             } else {
-                "Ready to generate tasks for this diff."
+                "Ready to generate tasks."
             };
-
             ui.label(
                 egui::RichText::new(status_text)
-                    .color(theme.text_secondary)
+                    .color(MOCHA.subtext1)
                     .size(12.0),
             );
 
-            // Error banner below header
+            // Error banner
             if let Some(err) = &self.state.generation_error {
                 ui.add_space(4.0);
-                egui::Frame::NONE
-                    .fill(egui::Color32::from_rgb(64, 31, 31))
+                egui::Frame::new()
+                    .fill(MOCHA.red.gamma_multiply(0.2))
                     .inner_margin(egui::Margin::symmetric(12, 8))
-                    .corner_radius(4.0)
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            ui.label(egui::RichText::new("⚠").size(16.0));
-                            ui.label(
-                                egui::RichText::new(err).color(theme.diff_removed_text),
-                            );
+                            ui.label(egui::RichText::new("error:").color(MOCHA.red));
+                            ui.label(egui::RichText::new(err).color(MOCHA.text));
                         });
                     });
             }
 
             ui.add_space(8.0);
             ui.separator();
-            ui.add_space(4.0);
 
-            // Tabs
+            // Custom tab bar
             ui.horizontal(|ui| {
-                let tab_label = |text: &str, active: bool| {
-                    if active {
-                        egui::RichText::new(text).color(theme.accent)
+                let tabs = [("Diff", GenTab::Diff), ("Agent", GenTab::Agent)];
+                for (title, tab_val) in tabs.iter() {
+                    let is_active = self.state.selected_tab == *tab_val;
+                    let text_color = if is_active {
+                        MOCHA.mauve
                     } else {
-                        egui::RichText::new(text).color(theme.text_secondary)
+                        MOCHA.subtext0
+                    };
+
+                    let response = ui.add(
+                        egui::Button::new(egui::RichText::new(*title).size(14.0).color(text_color))
+                            .frame(false),
+                    );
+
+                    if is_active {
+                        let rect = response.rect;
+                        ui.painter().hline(
+                            rect.x_range(),
+                            rect.bottom(),
+                            egui::Stroke::new(2.0, MOCHA.mauve),
+                        );
                     }
-                };
 
-                let is_diff = self.state.selected_tab == GenTab::Diff;
-                if ui.selectable_label(is_diff, tab_label("Diff", is_diff)).clicked() {
-                    self.state.selected_tab = GenTab::Diff;
-                }
-
-                let is_agent = self.state.selected_tab == GenTab::Agent;
-                let agent_title = if self.state.is_generating {
-                    "Agent (running)"
-                } else {
-                    "Agent"
-                };
-                if ui
-                    .selectable_label(is_agent, tab_label(agent_title, is_agent))
-                    .clicked()
-                {
-                    self.state.selected_tab = GenTab::Agent;
+                    if response.clicked() {
+                        self.state.selected_tab = *tab_val;
+                    }
+                    ui.add_space(10.0);
                 }
             });
-
-            ui.add_space(6.0);
             ui.separator();
             ui.add_space(6.0);
 
             // Tab content
             match self.state.selected_tab {
                 GenTab::Diff => {
-                    egui::Frame::NONE
-                        .fill(egui::Color32::from_rgb(30, 30, 35))
-                        .inner_margin(egui::Margin::symmetric(12, 10))
-                        .corner_radius(6.0)
-                        .stroke(egui::Stroke::new(
-                            1.0,
-                            egui::Color32::from_rgb(60, 60, 65),
-                        ))
-                        .show(ui, |ui| {
-                            ui.horizontal(|ui| {
-                                if diff_line_count > 0 {
-                                    ui.label(
-                                        egui::RichText::new(format!(
-                                            "{} lines",
-                                            diff_line_count
-                                        ))
-                                        .color(theme.text_secondary)
-                                        .weak(),
-                                    );
-                                }
-
-                                ui.with_layout(
-                                    egui::Layout::right_to_left(egui::Align::Center),
-                                    |ui| {
-                                        if !self.state.diff_text.is_empty()
-                                            && ui
-                                                .button(
-                                                    egui::RichText::new("🗑 Clear")
-                                                        .color(theme.diff_removed_text),
-                                                )
-                                                .clicked()
-                                        {
-                                            self.state.diff_text.clear();
-                                            self.state.generation_error = None;
-                                        }
-                                    },
-                                );
-                            });
-
-                            ui.add_space(6.0);
-
-                            if self.state.diff_text.is_empty() {
-                                ui.add(
-                                    egui::TextEdit::multiline(&mut self.state.diff_text)
-                                        .hint_text("Paste your git diff here...")
-                                        .desired_rows(18)
-                                        .font(egui::TextStyle::Monospace),
-                                );
-                            } else {
-                                render_diff_editor(ui, &self.state.diff_text, "diff");
-                            }
+                    if self.state.diff_text.is_empty() {
+                        // Empty state for Diff tab
+                        ui.vertical_centered(|ui| {
+                            ui.add_space(60.0);
+                            ui.label(egui::RichText::new("🔴").size(40.0).color(MOCHA.blue));
+                            ui.add_space(10.0);
+                            ui.heading(egui::RichText::new("Paste Git Diff").color(MOCHA.text));
+                            ui.label(
+                                egui::RichText::new("Generate a diff with a command like:")
+                                    .color(MOCHA.subtext1),
+                            );
+                            ui.code("git diff HEAD~1 > my_diff.txt");
                         });
+
+                        // Show a minimal text editor for pasting
+                        egui::Frame::new()
+                            .fill(MOCHA.crust)
+                            .inner_margin(egui::Margin::same(4))
+                            .stroke(egui::Stroke::new(1.0, MOCHA.surface0))
+                            .show(ui, |ui| {
+                                egui::ScrollArea::vertical().show(ui, |ui| {
+                                    let editor =
+                                        egui::TextEdit::multiline(&mut self.state.diff_text)
+                                            .hint_text("Paste your git diff here...")
+                                            .font(egui::TextStyle::Monospace)
+                                            .desired_width(f32::INFINITY)
+                                            .desired_rows(1);
+                                    ui.add(editor);
+                                });
+                            });
+                    } else {
+                        if ui
+                            .button(egui::RichText::new("🗑 Clear").color(MOCHA.red))
+                            .clicked()
+                        {
+                            self.state.diff_text.clear();
+                            self.state.generation_error = None;
+                        }
+                        render_diff_editor(ui, &self.state.diff_text, "diff");
+                    }
                 }
 
                 GenTab::Agent => {
-                    egui::Frame::NONE
-                        .fill(egui::Color32::from_rgb(30, 30, 35))
-                        .inner_margin(egui::Margin::symmetric(12, 10))
-                        .corner_radius(6.0)
-                        .stroke(egui::Stroke::new(
-                            1.0,
-                            egui::Color32::from_rgb(60, 60, 65),
-                        ))
-                        .show(ui, |ui| {
-                            let status = if self.state.is_generating {
-                                "Running"
-                            } else if self.state.generation_error.is_some() {
-                                "Error"
-                            } else if self.state.agent_logs.is_empty()
-                                && self.state.agent_messages.is_empty()
-                                && self.state.agent_thoughts.is_empty()
-                            {
-                                "Idle"
-                            } else {
-                                "Done"
-                            };
+                    let has_activity = !self.state.agent_logs.is_empty()
+                        || !self.state.agent_messages.is_empty()
+                        || !self.state.agent_thoughts.is_empty();
 
+                    if !has_activity && !self.state.is_generating {
+                        // Empty state for Agent tab
+                        ui.vertical_centered(|ui| {
+                            ui.add_space(60.0);
+                            ui.label(egui::RichText::new("🔴").size(40.0).color(MOCHA.red));
+                            ui.add_space(10.0);
+                            ui.heading(egui::RichText::new("Agent Idle").color(MOCHA.text));
                             ui.label(
-                                egui::RichText::new(status)
-                                    .color(theme.text_secondary)
-                                    .size(11.0),
+                                egui::RichText::new(
+                                    "The agent is ready and waiting for instructions.",
+                                )
+                                .color(MOCHA.subtext1),
                             );
-
-                            ui.add_space(6.0);
-
-                            egui::ScrollArea::vertical()
-                                .stick_to_bottom(true)
-                                .show(ui, |ui| {
-                                    let has_activity = !self.state.agent_logs.is_empty()
-                                        || !self.state.agent_messages.is_empty()
-                                        || !self.state.agent_thoughts.is_empty();
-
-                                    if !has_activity && !self.state.is_generating {
-                                        ui.label(
-                                            egui::RichText::new(
-                                                "No agent activity yet. Run generation to see logs.",
-                                            )
-                                            .color(theme.text_secondary)
-                                            .size(12.0),
-                                        );
-                                        return;
-                                    }
-
-                                    if self.state.is_generating && !has_activity {
-                                        ui.label(
-                                            egui::RichText::new("Waiting for agent output...")
-                                                .color(theme.text_secondary)
-                                                .size(12.0),
-                                        );
-                                    }
-
-                                    for log in &self.state.agent_logs {
-                                        ui.label(
-                                            egui::RichText::new(log)
-                                                .color(theme.text_secondary)
-                                                .monospace()
-                                                .size(12.0),
-                                        );
-                                    }
-
-                                    for msg in &self.state.agent_messages {
-                                        ui.label(
-                                            egui::RichText::new(msg)
-                                                .color(theme.text_primary)
-                                                .size(12.0),
-                                        );
-                                    }
-
-                                    for thought in &self.state.agent_thoughts {
-                                        ui.label(
-                                            egui::RichText::new(thought)
-                                                .color(theme.accent)
-                                                .size(12.0)
-                                                .italics(),
-                                        );
-                                    }
-                                });
+                            ui.label("1. Paste a diff in the 'Diff' tab.");
+                            ui.label("2. Click the '▶ RUN' button.");
+                            ui.label("3. Agent logs and thoughts will appear here.");
                         });
+                    } else {
+                        // Agent activity logs
+                        egui::Frame::new()
+                            .fill(MOCHA.crust)
+                            .stroke(egui::Stroke::new(1.0, MOCHA.surface0))
+                            .inner_margin(egui::Margin::same(10))
+                            .show(ui, |ui| {
+                                ui.label(
+                                    egui::RichText::new("AGENT ACTIVITY")
+                                        .size(11.0)
+                                        .color(MOCHA.subtext0),
+                                );
+                                ui.add_space(6.0);
+                                ui.separator();
+
+                                egui::ScrollArea::vertical()
+                                    .stick_to_bottom(true)
+                                    .show(ui, |ui| {
+                                        if self.state.is_generating && !has_activity {
+                                            ui.label(
+                                                egui::RichText::new("Waiting for agent output...")
+                                                    .color(MOCHA.subtext1)
+                                                    .size(12.0),
+                                            );
+                                        }
+
+                                        for log in &self.state.agent_logs {
+                                            ui.label(
+                                                egui::RichText::new(log)
+                                                    .color(MOCHA.subtext0)
+                                                    .monospace()
+                                                    .size(12.0),
+                                            );
+                                        }
+
+                                        for msg in &self.state.agent_messages {
+                                            ui.label(
+                                                egui::RichText::new(msg)
+                                                    .color(MOCHA.text)
+                                                    .size(12.0),
+                                            );
+                                        }
+
+                                        for thought in &self.state.agent_thoughts {
+                                            ui.label(
+                                                egui::RichText::new(thought)
+                                                    .color(MOCHA.sky)
+                                                    .size(12.0)
+                                                    .italics(),
+                                            );
+                                        }
+                                    });
+                            });
+                    }
                 }
             }
         });
@@ -384,7 +361,6 @@ impl LaReviewApp {
             mcp_server_binary: None,
             timeout_secs: Some(500),
             debug: false,
-            fake_tasks: None,
             db_path: None,
         };
 

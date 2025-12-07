@@ -300,9 +300,11 @@ fn persist_tasks_to_db(config: &ServerConfig, args: Value) -> Result<()> {
 
     pr_repo.save(&pull_request).context("save pull request")?;
 
-    for task in tasks {
+    for mut task in tasks {
+        // Set the pr_id before saving the task
+        task.pr_id = pull_request.id.clone();
         task_repo
-            .save(&pull_request.id, &task)
+            .save(&task)
             .with_context(|| format!("save task {}", task.id))?;
     }
 
@@ -324,6 +326,7 @@ fn parse_tasks(args: Value) -> Result<Vec<ReviewTask>> {
 
             ReviewTask {
                 id: task.id,
+                pr_id: String::new(), // Will be set in persist_tasks_to_db
                 title: task.title,
                 description: task.description,
                 files: task.files,

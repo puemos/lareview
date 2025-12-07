@@ -2,7 +2,7 @@
 //!
 //! Uses `unidiff` for parsing and `similar` for inline changes.
 
-use super::theme::AppTheme;
+use catppuccin_egui::MOCHA;
 use eframe::egui::{self, FontId, TextFormat, text::LayoutJob};
 use similar::{ChangeTag, TextDiff};
 use unidiff::{Hunk, PatchSet, Result as UnidiffResult};
@@ -256,25 +256,20 @@ fn paint_inline_text(
 }
 
 pub fn render_diff_editor(ui: &mut egui::Ui, code: &str, _language: &str) {
-    let theme = AppTheme::default();
-
     let files = match parse_diff_by_files(code) {
         Ok(files) => files,
         Err(err) => {
-            ui.colored_label(
-                theme.diff_removed_text,
-                format!("Failed to parse diff: {err}"),
-            );
+            ui.colored_label(MOCHA.red, format!("Failed to parse diff: {err}"));
             return;
         }
     };
 
     ui.group(|ui| {
         ui.horizontal(|ui| {
-            ui.heading(egui::RichText::new("📄 Diff").color(theme.text_primary));
+            ui.heading(egui::RichText::new("📄 Diff").color(MOCHA.text));
             ui.label(
                 egui::RichText::new(format!("({} files)", files.len()))
-                    .color(theme.text_secondary)
+                    .color(MOCHA.subtext1)
                     .weak(),
             );
         });
@@ -285,7 +280,7 @@ pub fn render_diff_editor(ui: &mut egui::Ui, code: &str, _language: &str) {
             ui.label(
                 egui::RichText::new("No diff detected")
                     .italics()
-                    .color(theme.text_secondary),
+                    .color(MOCHA.subtext1),
             );
             return;
         }
@@ -316,7 +311,7 @@ pub fn render_diff_editor(ui: &mut egui::Ui, code: &str, _language: &str) {
                         ui.label(
                             egui::RichText::new(display_path)
                                 .strong()
-                                .color(theme.text_primary)
+                                .color(MOCHA.text)
                                 .size(DIFF_HEADER_FONT_SIZE),
                         );
 
@@ -324,14 +319,14 @@ pub fn render_diff_editor(ui: &mut egui::Ui, code: &str, _language: &str) {
                             if file.deletions > 0 {
                                 ui.label(
                                     egui::RichText::new(format!("-{}", file.deletions))
-                                        .color(theme.diff_removed_text)
+                                        .color(MOCHA.red)
                                         .size(DIFF_FONT_SIZE),
                                 );
                             }
                             if file.additions > 0 {
                                 ui.label(
                                     egui::RichText::new(format!("+{}", file.additions))
-                                        .color(theme.diff_added_text)
+                                        .color(MOCHA.green)
                                         .size(DIFF_FONT_SIZE),
                                 );
                             }
@@ -348,13 +343,13 @@ pub fn render_diff_editor(ui: &mut egui::Ui, code: &str, _language: &str) {
                                 ui.label(
                                     egui::RichText::new("Before")
                                         .strong()
-                                        .color(theme.text_primary)
+                                        .color(MOCHA.text)
                                         .size(DIFF_FONT_SIZE),
                                 );
                                 ui.separator();
 
                                 for line in &file.lines {
-                                    render_line_left(ui, line, &theme);
+                                    render_line_left(ui, line);
                                 }
                             });
 
@@ -362,13 +357,13 @@ pub fn render_diff_editor(ui: &mut egui::Ui, code: &str, _language: &str) {
                                 ui.label(
                                     egui::RichText::new("After")
                                         .strong()
-                                        .color(theme.text_primary)
+                                        .color(MOCHA.text)
                                         .size(DIFF_FONT_SIZE),
                                 );
                                 ui.separator();
 
                                 for line in &file.lines {
-                                    render_line_right(ui, line, &theme);
+                                    render_line_right(ui, line);
                                 }
                             });
                         });
@@ -380,13 +375,11 @@ pub fn render_diff_editor(ui: &mut egui::Ui, code: &str, _language: &str) {
     });
 }
 
-fn render_line_left(ui: &mut egui::Ui, line: &DiffLine, theme: &AppTheme) {
+fn render_line_left(ui: &mut egui::Ui, line: &DiffLine) {
     // Color configuration. Insert uses transparent background.
     let (bg_color, text_color) = match line.change_type {
-        ChangeType::Delete | ChangeType::Replace => {
-            (theme.diff_removed_bg, theme.diff_removed_text)
-        }
-        ChangeType::Equal | ChangeType::Insert => (egui::Color32::TRANSPARENT, theme.text_primary),
+        ChangeType::Delete | ChangeType::Replace => (MOCHA.red.gamma_multiply(0.2), MOCHA.red),
+        ChangeType::Equal | ChangeType::Insert => (egui::Color32::TRANSPARENT, MOCHA.text),
     };
 
     ui.horizontal(|ui| {
@@ -394,7 +387,7 @@ fn render_line_left(ui: &mut egui::Ui, line: &DiffLine, theme: &AppTheme) {
         if let Some(num) = line.old_line_num {
             ui.label(
                 egui::RichText::new(format!("{:>4} ", num))
-                    .color(theme.diff_line_num)
+                    .color(MOCHA.overlay0)
                     .monospace()
                     .size(DIFF_FONT_SIZE),
             );
@@ -428,7 +421,7 @@ fn render_line_left(ui: &mut egui::Ui, line: &DiffLine, theme: &AppTheme) {
                             content,
                             line.new_content.as_deref().unwrap_or_default(),
                         );
-                        paint_inline_text(ui, &segments, theme.text_primary, text_color);
+                        paint_inline_text(ui, &segments, MOCHA.text, text_color);
                     } else {
                         ui.label(
                             egui::RichText::new(content)
@@ -451,11 +444,11 @@ fn render_line_left(ui: &mut egui::Ui, line: &DiffLine, theme: &AppTheme) {
     });
 }
 
-fn render_line_right(ui: &mut egui::Ui, line: &DiffLine, theme: &AppTheme) {
+fn render_line_right(ui: &mut egui::Ui, line: &DiffLine) {
     // Color configuration. Delete uses transparent background on the empty side.
     let (bg_color, text_color) = match line.change_type {
-        ChangeType::Insert | ChangeType::Replace => (theme.diff_added_bg, theme.diff_added_text),
-        ChangeType::Equal | ChangeType::Delete => (egui::Color32::TRANSPARENT, theme.text_primary),
+        ChangeType::Insert | ChangeType::Replace => (MOCHA.green.gamma_multiply(0.2), MOCHA.green),
+        ChangeType::Equal | ChangeType::Delete => (egui::Color32::TRANSPARENT, MOCHA.text),
     };
 
     ui.horizontal(|ui| {
@@ -463,7 +456,7 @@ fn render_line_right(ui: &mut egui::Ui, line: &DiffLine, theme: &AppTheme) {
         if let Some(num) = line.new_line_num {
             ui.label(
                 egui::RichText::new(format!("{:>4} ", num))
-                    .color(theme.diff_line_num)
+                    .color(MOCHA.overlay0)
                     .monospace()
                     .size(DIFF_FONT_SIZE),
             );
@@ -497,7 +490,7 @@ fn render_line_right(ui: &mut egui::Ui, line: &DiffLine, theme: &AppTheme) {
                             line.old_content.as_deref().unwrap_or_default(),
                             content,
                         );
-                        paint_inline_text(ui, &segments, theme.text_primary, text_color);
+                        paint_inline_text(ui, &segments, MOCHA.text, text_color);
                     } else {
                         ui.label(
                             egui::RichText::new(content)
