@@ -1,0 +1,112 @@
+--- a/src/ui/components/diff.rs
++++ b/src/ui/components/diff.rs
+@@ -70,6 +70,8 @@ fn build_lines_for_hunk(hunk: &Hunk, out: &mut Vec<DiffLine>) {
+         // Change block: one run of removed lines followed by one run of added lines
+-        let remove_start = i;
+-        let mut j = i;
++        let remove_start = i;
++        let mut j = i;
++
+         while j < lines.len() && lines[j].is_removed() {
+             j += 1;
+         }
+@@ -84,40 +86,92 @@ fn build_lines_for_hunk(hunk: &Hunk, out: &mut Vec<DiffLine>) {
+         let remove_count = insert_start - remove_start;
+         let insert_count = j - insert_start;
+-        let row_count = std::cmp::max(remove_count, insert_count);
+-
+-        for k in 0..row_count {
+-            let left_line = if k < remove_count {
+-                Some(&lines[remove_start + k])
+-            } else {
+-                None
+-            };
+-            let right_line = if k < insert_count {
+-                Some(&lines[insert_start + k])
+-            } else {
+-                None
+-            };
+-
+-            let mut change_type = match (left_line, right_line) {
+-                (Some(_), Some(_)) => ChangeType::Replace,
+-                (Some(_), None) => ChangeType::Delete,
+-                (None, Some(_)) => ChangeType::Insert,
+-                (None, None) => unreachable!(),
+-            };
+-
+-            if let (Some(l), Some(r)) = (left_line, right_line) {
+-                if l.value == r.value {
+-                    change_type = ChangeType::Equal;
+-                }
+-            }
+-
+-            out.push(DiffLine {
+-                old_line_num: left_line.and_then(|l| l.source_line_no),
+-                new_line_num: right_line.and_then(|r| r.target_line_no),
+-                old_content: left_line.map(|l| l.value.clone()),
+-                new_content: right_line.map(|r| r.value.clone()),
+-                change_type,
+-            });
+-        }
++
++        // new block diff: use TextDiff for line alignment
++        use similar::TextDiff;
++
++        let old_block: Vec<&str> = lines[remove_start..insert_start]
++            .iter()
++            .map(|l| l.value.as_str())
++            .collect();
++        let new_block: Vec<&str> = lines[insert_start..j]
++            .iter()
++            .map(|l| l.value.as_str())
++            .collect();
++
++        let diff = TextDiff::from_slices(&old_block, &new_block);
++
++        for op in diff.ops() {
++            let old_range = op.old_range();
++            let new_range = op.new_range();
++
++            let left_len = old_range.len();
++            let right_len = new_range.len();
++
++            let max_len = std::cmp::max(left_len, right_len);
++
++            for k in 0..max_len {
++                let left_line = if k < left_len {
++                    Some(&lines[remove_start + old_range.start + k])
++                } else {
++                    None
++                };
++
++                let right_line = if k < right_len {
++                    Some(&lines[insert_start + new_range.start + k])
++                } else {
++                    None
++                };
++
++                let change_type =
++                    match (left_line, right_line) {
++                        (Some(l), Some(r)) => {
++                            if l.value == r.value {
++                                ChangeType::Equal
++                            } else {
++                                ChangeType::Replace
++                            }
++                        }
++                        (Some(_), None) => ChangeType::Delete,
++                        (None, Some(_)) => ChangeType::Insert,
++                        _ => unreachable!(),
++                    };
++
++                out.push(DiffLine {
++                    old_line_num: left_line.and_then(|l| l.source_line_no),
++                    new_line_num: right_line.and_then(|r| r.target_line_no),
++                    old_content: left_line.map(|l| l.value.clone()),
++                    new_content: right_line.map(|r| r.value.clone()),
++                    change_type,
++                });
++            }
++        }
+ 
+         i = j;

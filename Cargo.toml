@@ -4,7 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-gpui = { version = "*" }
+egui = "0.33.2"
+eframe = "0.33.2"
+egui_extras = "0.33.2"
+
 agent-client-protocol = "0.8"
 rusqlite = { version = "0.32", features = ["bundled"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -18,4 +21,5 @@ async-trait = "0.1"
 pmcp = "1.8.6"
 tempfile = "3"
 chrono = { version = "0.4", features = ["clock"] }
+unidiff = "0.4.0"
 similar = "2.7.0"

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 //! Minimal MCP server that exposes a single `return_tasks` tool.
 //!
 //! The tool expects a JSON object `{ "tasks": [...] }` and writes it verbatim to

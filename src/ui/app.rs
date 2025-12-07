@@ -1,258 +1,306 @@
-//! Main application state with Entity pattern for interactive UI
+#![allow(dead_code)]
 
-use gpui::{Context, Entity, Window, div, prelude::*, px};
+//! Main application state (egui version)
 
-use crate::data::db::Database;
-use crate::data::repository::{NoteRepository, PullRequestRepository, TaskRepository};
-use crate::domain::ReviewTask;
-
-use super::theme::theme;
-use super::views::{generate_view::GenerateView, review_view::ReviewView};
 use std::sync::Arc;
 
-/// Current view in the application
+use crate::acp::ProgressEvent;
+use crate::data::db::Database;
+use crate::data::repository::{NoteRepository, PullRequestRepository, TaskRepository};
+use crate::domain::{Note, PullRequest, ReviewTask};
+
+use eframe::egui;
+use tokio::sync::mpsc;
+
+/// Which screen is active
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AppView {
     Generate,
     Review,
 }
 
-/// Selected agent for task generation
-#[derive(Debug, Clone, PartialEq, Eq)]
+impl Default for AppView {
+    fn default() -> Self {
+        Self::Generate
+    }
+}
+
+/// Which agent is selected (matches original code)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SelectedAgent {
     Codex,
     Gemini,
 }
 
-/// Shared application state
+impl Default for SelectedAgent {
+    fn default() -> Self {
+        Self::Codex
+    }
+}
+
+/// All app state in one struct
+#[derive(Default)]
 pub struct AppState {
     pub current_view: AppView,
     pub tasks: Vec<ReviewTask>,
+
     pub is_generating: bool,
     pub generation_error: Option<String>,
     pub selected_agent: SelectedAgent,
+
     pub diff_text: String,
+
     pub pr_id: String,
     pub pr_title: String,
     pub pr_repo: String,
     pub pr_author: String,
     pub pr_branch: String,
+
     pub selected_task_id: Option<String>,
+
     pub agent_messages: Vec<String>,
     pub agent_thoughts: Vec<String>,
     pub agent_logs: Vec<String>,
+
     pub current_note: Option<String>,
     pub review_error: Option<String>,
 }
 
-impl Default for AppState {
-    fn default() -> Self {
-        Self {
-            current_view: AppView::Generate,
-            tasks: Vec::new(),
-            is_generating: false,
-            generation_error: None,
-            selected_agent: SelectedAgent::Codex,
-            diff_text: String::new(),
-            pr_id: "local-pr".to_string(),
-            pr_title: "Local Review".to_string(),
-            pr_repo: "local/repo".to_string(),
-            pr_author: "me".to_string(),
-            pr_branch: "main".to_string(),
-            selected_task_id: None,
-            agent_messages: Vec::new(),
-            agent_thoughts: Vec::new(),
-            agent_logs: Vec::new(),
-            current_note: None,
-            review_error: None,
-        }
-    }
+/// Payload we care about from ACP
+pub struct GenResultPayload {
+    pub tasks: Vec<ReviewTask>,
+    pub messages: Vec<String>,
+    pub thoughts: Vec<String>,
+    pub logs: Vec<String>,
 }
 
-/// Main application - holds entity reference to shared state
+/// Messages coming back from the async generation task
+pub enum GenMsg {
+    Progress(ProgressEvent),
+    Done(Result<GenResultPayload, String>),
+}
+
+/// Root egui application
 pub struct LaReviewApp {
-    state: Entity<AppState>,
-    generate_view: Entity<GenerateView>,
-    review_view: Entity<ReviewView>,
-    _db: Database, // Keep db alive
+    pub state: AppState,
+
+    pub task_repo: Arc<TaskRepository>,
+    #[allow(dead_code)]
+    pub note_repo: Arc<NoteRepository>,
+    #[allow(dead_code)]
+    pub pr_repo: Arc<PullRequestRepository>,
+
+    pub _db: Database,
+
+    pub gen_tx: mpsc::Sender<GenMsg>,
+    pub gen_rx: mpsc::Receiver<GenMsg>,
 }
 
 impl LaReviewApp {
-    pub fn new(cx: &mut Context<Self>) -> Self {
-        let db = Database::open().expect("Failed to open database");
-        // Make DB path discoverable for ACP worker threads
-        let _ = std::env::var("LAREVIEW_DB_PATH").map_err(|_| unsafe {
-            std::env::set_var("LAREVIEW_DB_PATH", db.path().to_string_lossy().to_string())
-        });
+    pub fn new_egui(_cc: &eframe::CreationContext<'_>) -> Self {
+        // Open database as before
+        let db = Database::open().expect("db open");
+
         let conn = db.connection();
-
         let task_repo = Arc::new(TaskRepository::new(conn.clone()));
-        let pr_repo = Arc::new(PullRequestRepository::new(conn.clone()));
         let note_repo = Arc::new(NoteRepository::new(conn.clone()));
+        let pr_repo = Arc::new(PullRequestRepository::new(conn.clone()));
 
-        // Load existing tasks for the default PR (local-pr)
-        // In a real app we'd have a PR selection screen
-        let initial_tasks = task_repo
-            .find_by_pr(&"local-pr".to_string())
-            .unwrap_or_default();
+        // Same defaults as original app
+        let mut state = AppState::default();
+        state.current_view = AppView::Generate;
+        state.selected_agent = SelectedAgent::Codex;
+        state.diff_text = String::new();
+        state.pr_id = "local-pr".to_string();
+        state.pr_title = "Local Review".to_string();
+        state.pr_repo = "local/repo".to_string();
+        state.pr_author = "me".to_string();
+        state.pr_branch = "main".to_string();
 
-        let state = cx.new(|_| AppState {
-            tasks: initial_tasks,
-            ..AppState::default()
-        });
-
-        let generate_view =
-            cx.new(|cx| GenerateView::new(state.clone(), task_repo.clone(), pr_repo, cx));
-        let review_view =
-            cx.new(|cx| ReviewView::new(state.clone(), note_repo, task_repo.clone(), cx));
+        let (gen_tx, gen_rx) = mpsc::channel(32);
 
         Self {
             state,
-            generate_view,
-            review_view,
+            task_repo,
+            note_repo,
+            pr_repo,
             _db: db,
+            gen_tx,
+            gen_rx,
         }
     }
 
-    pub fn switch_to_review(&mut self, cx: &mut Context<Self>) {
-        self.state.update(cx, |state, _| {
-            state.current_view = AppView::Review;
-        });
-        let review_view = self.review_view.clone();
-        cx.update_entity(&review_view, |view, cx| {
-            view.sync_from_db(cx);
-        });
+    /// Switch to review screen
+    pub fn switch_to_review(&mut self) {
+        self.state.current_view = AppView::Review;
+        self.sync_review_from_db();
     }
 
-    pub fn switch_to_generate(&mut self, cx: &mut Context<Self>) {
-        self.state.update(cx, |state, _| {
-            state.current_view = AppView::Generate;
-        });
+    /// Switch to generate screen
+    pub fn switch_to_generate(&mut self) {
+        self.state.current_view = AppView::Generate;
+    }
+
+    /// Build a PullRequest struct from current state
+    pub fn current_pull_request(&self) -> PullRequest {
+        PullRequest {
+            id: self.state.pr_id.clone(),
+            title: self.state.pr_title.clone(),
+            repo: self.state.pr_repo.clone(),
+            author: self.state.pr_author.clone(),
+            branch: self.state.pr_branch.clone(),
+            description: None,
+            created_at: String::new(),
+        }
+    }
+
+    /// Load tasks and notes when switching or refreshing review
+    fn sync_review_from_db(&mut self) {
+        match self.task_repo.find_by_pr(&self.state.pr_id) {
+            Ok(tasks) => {
+                self.state.tasks = tasks;
+            }
+            Err(err) => {
+                self.state.review_error = Some(format!("{err}"));
+                return;
+            }
+        }
+
+        match self.note_repo.find_by_tasks(
+            &self
+                .state
+                .tasks
+                .iter()
+                .map(|t| t.id.clone())
+                .collect::<Vec<_>>(),
+        ) {
+            Ok(notes) => {
+                // map notes to current_note if selected
+                if let Some(task_id) = &self.state.selected_task_id {
+                    self.state.current_note = notes
+                        .iter()
+                        .find(|n| &n.task_id == task_id)
+                        .map(|n| n.body.clone());
+                }
+
+                let next_task = self
+                    .state
+                    .selected_task_id
+                    .clone()
+                    .filter(|id| self.state.tasks.iter().any(|t| &t.id == id))
+                    .or_else(|| self.state.tasks.first().map(|t| t.id.clone()));
+
+                self.state.selected_task_id = next_task;
+                self.state.review_error = None;
+            }
+            Err(err) => {
+                self.state.review_error = Some(format!("Failed to load notes: {err}"));
+            }
+        }
+    }
+
+    /// Save the current note for the selected task using real NoteRepository
+    pub fn save_current_note(&mut self) {
+        let Some(task_id) = &self.state.selected_task_id else {
+            return;
+        };
+        let body = self.state.current_note.clone().unwrap_or_default();
+
+        let timestamp = chrono::Utc::now().to_rfc3339();
+        let note = Note {
+            task_id: task_id.clone(),
+            body: body.clone(),
+            updated_at: timestamp,
+        };
+
+        let result = self.note_repo.save(&note);
+
+        match result {
+            Ok(()) => {
+                // Keep state.current_note as-is, clear errors
+                self.state.review_error = None;
+            }
+            Err(err) => {
+                self.state.review_error = Some(format!("Failed to save note: {}", err));
+            }
+        }
     }
 }
 
-impl Render for LaReviewApp {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let colors = theme().colors;
-        let state = self.state.read(cx);
-        let current_view = state.current_view;
+/// Implement the egui application
+impl eframe::App for LaReviewApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // poll async generation messages
+        while let Ok(msg) = self.gen_rx.try_recv() {
+            match msg {
+                GenMsg::Progress(evt) => match evt {
+                    ProgressEvent::Message { content, is_new } => {
+                        if is_new || self.state.agent_messages.is_empty() {
+                            self.state.agent_messages.push(content);
+                        } else if let Some(latest) = self.state.agent_messages.last_mut() {
+                            *latest = content;
+                        }
+                    }
+                    ProgressEvent::Thought { content, is_new } => {
+                        if is_new || self.state.agent_thoughts.is_empty() {
+                            self.state.agent_thoughts.push(content);
+                        } else if let Some(latest) = self.state.agent_thoughts.last_mut() {
+                            *latest = content;
+                        }
+                    }
+                    ProgressEvent::Log(log) => {
+                        self.state.agent_logs.push(log);
+                    }
+                },
+                GenMsg::Done(result) => {
+                    self.state.is_generating = false;
+                    match result {
+                        Ok(payload) => {
+                            self.state.tasks = payload.tasks;
+                            self.state.agent_messages = payload.messages;
+                            self.state.agent_thoughts = payload.thoughts;
+                            self.state.agent_logs = payload.logs;
 
-        div()
-            .flex()
-            .flex_col()
-            .size_full()
-            .bg(colors.bg)
-            .text_color(colors.text)
-            .font_family("Inter")
-            .child(self.render_header(current_view, cx))
-            .child(self.render_content(current_view, cx))
-    }
-}
+                            if self.state.tasks.is_empty() {
+                                self.state.generation_error =
+                                    Some("No tasks generated".to_string());
+                            } else {
+                                self.state.current_view = AppView::Review;
+                            }
+                        }
+                        Err(err) => {
+                            self.state.generation_error = Some(err);
+                        }
+                    }
+                }
+            }
+        }
 
-impl LaReviewApp {
-    fn render_header(&self, current_view: AppView, cx: &mut Context<Self>) -> impl IntoElement {
-        let colors = theme().colors;
-        let spacing = theme().spacing;
+        // top bar (header + nav)
+        egui::TopBottomPanel::top("header").show(ctx, |ui| {
+            ui.heading("LaReview");
+            ui.horizontal(|ui| {
+                if ui.button("Generate").clicked() {
+                    self.switch_to_generate();
+                }
+                if ui.button("Review").clicked() {
+                    self.switch_to_review();
+                }
+            });
+        });
 
-        div()
-            .flex()
-            .items_center()
-            .justify_between()
-            .px(px(spacing.space_8))
-            .py(px(spacing.space_4))
-            .bg(colors.surface)
-            .border_b_1()
-            .border_color(colors.border_strong)
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(spacing.space_4))
-                    .child(
-                        div()
-                            .text_xl()
-                            .font_weight(gpui::FontWeight::BOLD)
-                            .text_color(colors.text_strong)
-                            .child("LaReview"),
-                    )
-                    .child(
-                        div()
-                            .text_sm()
-                            .text_color(colors.text_muted)
-                            .child("Intent-first PR review"),
-                    ),
-            )
-            .child(self.render_nav(current_view, cx))
-    }
-
-    fn render_nav(&self, current_view: AppView, cx: &mut Context<Self>) -> impl IntoElement {
-        let colors = theme().colors;
-        let spacing = theme().spacing;
-
-        div()
-            .flex()
-            .gap(px(spacing.space_4))
-            .child(
-                div()
-                    .id("nav-generate")
-                    .px(px(spacing.space_4))
-                    .py(px(spacing.space_2))
-                    .bg(if current_view == AppView::Generate {
-                        colors.primary
-                    } else {
-                        colors.surface_alt
-                    })
-                    .text_color(if current_view == AppView::Generate {
-                        colors.primary_contrast
-                    } else {
-                        colors.text
-                    })
-                    .border_1()
-                    .border_color(colors.border_strong)
-                    .text_sm()
-                    .cursor_pointer()
-                    .on_click(cx.listener(|this, _event, _window, cx| {
-                        this.switch_to_generate(cx);
-                    }))
-                    .child("Generate"),
-            )
-            .child(
-                div()
-                    .id("nav-review")
-                    .px(px(spacing.space_4))
-                    .py(px(spacing.space_2))
-                    .bg(if current_view == AppView::Review {
-                        colors.primary
-                    } else {
-                        colors.surface_alt
-                    })
-                    .text_color(if current_view == AppView::Review {
-                        colors.primary_contrast
-                    } else {
-                        colors.text
-                    })
-                    .border_1()
-                    .border_color(colors.border_strong)
-                    .text_sm()
-                    .cursor_pointer()
-                    .on_click(cx.listener(|this, _event, _window, cx| {
-                        this.switch_to_review(cx);
-                    }))
-                    .child("Review"),
-            )
-    }
-
-    fn render_content(&self, current_view: AppView, _cx: &mut Context<Self>) -> impl IntoElement {
-        let spacing = theme().spacing;
-
-        div()
-            .flex_1()
-            .p(px(spacing.space_8))
-            .id("content-scroll")
-            .overflow_scroll()
-            .child(match current_view {
-                AppView::Generate => self.generate_view.clone().into_any_element(),
-                AppView::Review => self.review_view.clone().into_any_element(),
-            })
+        // main content
+        egui::CentralPanel::default().show(ctx, |ui| {
+            egui::ScrollArea::vertical()
+                .auto_shrink([false; 2])
+                .show(ui, |ui| match self.state.current_view {
+                    AppView::Generate => {
+                        self.ui_generate(ui);
+                    }
+                    AppView::Review => {
+                        self.ui_review(ui);
+                    }
+                });
+        });
     }
 }

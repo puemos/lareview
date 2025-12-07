@@ -1,88 +1,329 @@
-//! Generate view - paste diff and generate tasks with ACP
+//! Generate view (egui version)
 
-use gpui::{AsyncApp, Context, Entity, SharedString, Window, div, prelude::*, px};
+use eframe::egui;
+use tokio;
 
 use crate::acp::{GenerateTasksInput, generate_tasks_with_acp, list_agent_candidates};
-use crate::data::repository::{PullRequestRepository, TaskRepository};
-use crate::domain::PullRequest;
-use crate::ui::app::{AppState, AppView, SelectedAgent};
-use crate::ui::components::diff_view::{parse_diff, render_diff_view};
-use crate::ui::theme::theme;
-use std::sync::Arc;
+use crate::ui::app::{GenMsg, GenResultPayload, LaReviewApp, SelectedAgent};
+use crate::ui::components::diff::render_diff_editor;
+use crate::ui::components::theme::AppTheme;
 
-/// Generate view for creating review tasks from git diff
-pub struct GenerateView {
-    state: Entity<AppState>,
-    task_repo: Arc<TaskRepository>,
-    pr_repo: Arc<PullRequestRepository>,
-}
+impl LaReviewApp {
+    pub fn ui_generate(&mut self, ui: &mut egui::Ui) {
+        let theme = AppTheme::default();
 
-impl GenerateView {
-    pub fn new(
-        state: Entity<AppState>,
-        task_repo: Arc<TaskRepository>,
-        pr_repo: Arc<PullRequestRepository>,
-        _cx: &mut Context<impl Render>,
-    ) -> Self {
-        Self {
-            state,
-            task_repo,
-            pr_repo,
+        // Header section
+        ui.vertical(|ui| {
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                ui.heading(
+                    egui::RichText::new("🔍 Generate Review Tasks")
+                        .size(20.0)
+                        .color(theme.text_primary),
+                );
+            });
+            ui.label(
+                egui::RichText::new(
+                    "Paste a git diff to automatically generate review tasks using AI",
+                )
+                .color(theme.text_secondary),
+            );
+            ui.add_space(4.0);
+        });
+
+        // Error banner
+        if let Some(err) = &self.state.generation_error {
+            ui.add_space(8.0);
+            egui::Frame::NONE
+                .fill(egui::Color32::from_rgb(64, 31, 31))
+                .inner_margin(egui::Margin::symmetric(12, 8))
+                .corner_radius(4.0)
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(egui::RichText::new("⚠️").size(16.0));
+                        ui.label(egui::RichText::new(err).color(theme.diff_removed_text));
+                    });
+                });
+            ui.add_space(8.0);
+        }
+
+        ui.separator();
+
+        // Main content area
+        ui.vertical(|ui| {
+            // Configuration panel
+            egui::Frame::NONE
+                .fill(egui::Color32::from_rgb(35, 35, 40))
+                .inner_margin(egui::Margin::symmetric(12, 10))
+                .corner_radius(6.0)
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            egui::RichText::new("⚙️ Configuration")
+                                .strong()
+                                .color(theme.text_primary)
+                        );
+                    });
+
+                    ui.add_space(8.0);
+
+                    // Agent selector
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            egui::RichText::new("AI Agent:")
+                                .color(theme.text_primary)
+                        );
+                        ui.add_space(8.0);
+
+                        for agent in [SelectedAgent::Codex, SelectedAgent::Gemini] {
+                            let selected = self.state.selected_agent == agent;
+                            let button_text = format!("{:?}", agent);
+
+                            let button = egui::Button::new(
+                                egui::RichText::new(&button_text)
+                                    .color(if selected {
+                                        egui::Color32::WHITE
+                                    } else {
+                                        theme.text_secondary
+                                    })
+                            )
+                            .fill(if selected {
+                                theme.accent
+                            } else {
+                                egui::Color32::from_rgb(45, 45, 50)
+                            })
+                            .corner_radius(4.0);
+
+                            if ui.add(button).clicked() {
+                                self.state.selected_agent = agent;
+                            }
+                        }
+                    });
+                });
+
+            ui.add_space(12.0);
+
+            // Diff input section
+            ui.vertical(|ui| {
+                ui.horizontal(|ui| {
+                    ui.label(
+                        egui::RichText::new("📝 Git Diff")
+                            .strong()
+                            .size(15.0)
+                            .color(theme.text_primary)
+                    );
+
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if !self.state.diff_text.is_empty() {
+                            ui.label(
+                                egui::RichText::new(format!(
+                                    "{} lines",
+                                    self.state.diff_text.lines().count()
+                                ))
+                                .color(theme.text_secondary)
+                                .weak()
+                            );
+                        }
+
+                        // Note about pasting
+                        ui.label(
+                            egui::RichText::new("💡 Tip: Focus the text area below and use Ctrl+V (Cmd+V on Mac) to paste")
+                                .color(theme.text_secondary)
+                                .weak()
+                                .size(11.0)
+                        );
+
+                        // Clear button
+                        if !self.state.diff_text.is_empty() {
+                            if ui.button(
+                                egui::RichText::new("🗑️ Clear")
+                                    .color(theme.diff_removed_text)
+                            ).clicked() {
+                                self.state.diff_text.clear();
+                            }
+                        }
+                    });
+                });
+
+                ui.add_space(4.0);
+
+                // Show diff editor or placeholder
+                if self.state.diff_text.is_empty() {
+                    // Empty state - show placeholder
+                    egui::Frame::NONE
+                        .fill(egui::Color32::from_rgb(30, 30, 35))
+                        .inner_margin(egui::Margin::symmetric(16, 24))
+                        .corner_radius(6.0)
+                        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(60, 60, 65)))
+                        .show(ui, |ui| {
+                            ui.vertical_centered(|ui| {
+                                ui.label(
+                                    egui::RichText::new("📄")
+                                        .size(48.0)
+                                );
+                                ui.add_space(8.0);
+                                ui.label(
+                                    egui::RichText::new("No diff provided")
+                                        .size(16.0)
+                                        .color(theme.text_primary)
+                                );
+                                ui.label(
+                                    egui::RichText::new("Paste a git diff to get started")
+                                        .color(theme.text_secondary)
+                                );
+                                ui.add_space(16.0);
+
+                                // Help text
+                                ui.label(
+                                    egui::RichText::new("💡 Tip: Use Ctrl+V (Cmd+V on Mac) to paste in the text area below")
+                                        .color(theme.text_secondary)
+                                        .weak()
+                                        .size(11.0)
+                                );
+
+                                ui.add_space(12.0);
+
+                                // Manual input option
+                                ui.label(
+                                    egui::RichText::new("or type/paste directly:")
+                                        .color(theme.text_secondary)
+                                        .weak()
+                                );
+                                ui.add_space(4.0);
+
+                                ui.add(
+                                    egui::TextEdit::multiline(&mut self.state.diff_text)
+                                        .hint_text("Paste your git diff here...")
+                                        .desired_rows(6)
+                                        .desired_width(ui.available_width() * 0.8)
+                                        .font(egui::TextStyle::Monospace)
+                                );
+                            });
+                        });
+                } else {
+                    // Show the diff with syntax highlighting
+                    render_diff_editor(ui, &mut self.state.diff_text, "diff");
+                }
+            });
+
+            ui.add_space(16.0);
+
+            // Action buttons
+            ui.horizontal(|ui| {
+                let can_generate = !self.state.diff_text.trim().is_empty()
+                    && !self.state.is_generating;
+
+                let button = egui::Button::new(
+                    egui::RichText::new(if self.state.is_generating {
+                        "⏳ Generating..."
+                    } else {
+                        "✨ Generate Tasks"
+                    })
+                    .size(15.0)
+                    .color(egui::Color32::WHITE)
+                )
+                .fill(if can_generate {
+                    theme.accent
+                } else {
+                    egui::Color32::from_rgb(60, 60, 65)
+                })
+                .corner_radius(6.0)
+                .min_size(egui::vec2(160.0, 36.0));
+
+                if ui.add_enabled(can_generate, button).clicked() {
+                    self.start_generation_async();
+                }
+
+                if self.state.is_generating {
+                    ui.spinner();
+                    ui.label(
+                        egui::RichText::new("Analyzing diff with AI...")
+                            .color(theme.text_secondary)
+                    );
+                }
+            });
+        });
+
+        // Agent progress messages
+        if !self.state.agent_messages.is_empty() || !self.state.agent_logs.is_empty() {
+            ui.add_space(16.0);
+            ui.separator();
+            ui.add_space(8.0);
+
+            egui::Frame::NONE
+                .fill(egui::Color32::from_rgb(30, 30, 35))
+                .inner_margin(egui::Margin::symmetric(12, 10))
+                .corner_radius(6.0)
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            egui::RichText::new("📡 Agent Activity")
+                                .strong()
+                                .color(theme.text_primary),
+                        );
+                    });
+
+                    ui.add_space(8.0);
+
+                    egui::ScrollArea::vertical()
+                        .max_height(200.0)
+                        .show(ui, |ui| {
+                            // Show logs
+                            for log in &self.state.agent_logs {
+                                ui.horizontal(|ui| {
+                                    ui.label(egui::RichText::new("•").color(theme.text_secondary));
+                                    ui.label(
+                                        egui::RichText::new(log)
+                                            .color(theme.text_secondary)
+                                            .monospace()
+                                            .size(12.0),
+                                    );
+                                });
+                            }
+
+                            // Show messages
+                            for msg in &self.state.agent_messages {
+                                ui.horizontal(|ui| {
+                                    ui.label(egui::RichText::new("💬").size(12.0));
+                                    ui.label(
+                                        egui::RichText::new(msg)
+                                            .color(theme.text_primary)
+                                            .size(12.0),
+                                    );
+                                });
+                            }
+
+                            // Show thoughts
+                            for thought in &self.state.agent_thoughts {
+                                ui.horizontal(|ui| {
+                                    ui.label(egui::RichText::new("💭").size(12.0));
+                                    ui.label(
+                                        egui::RichText::new(thought)
+                                            .color(theme.accent)
+                                            .size(12.0)
+                                            .italics(),
+                                    );
+                                });
+                            }
+                        });
+                });
         }
     }
 
-    fn paste_from_clipboard(&self, cx: &mut Context<Self>) {
-        let clipboard = cx
-            .read_from_clipboard()
-            .and_then(|item| item.text())
-            .map(|text| text.trim().to_string())
-            .filter(|text| !text.is_empty());
-
-        self.state.update(cx, |s, _| match clipboard {
-            Some(text) => {
-                s.diff_text = text;
-                s.generation_error = None;
-            }
-            None => {
-                s.generation_error = Some("Clipboard is empty or not text".to_string());
-            }
-        });
-    }
-
-    fn clear_diff(&self, cx: &mut Context<Self>) {
-        self.state.update(cx, |s, _| {
-            s.diff_text.clear();
-            s.tasks.clear();
-            s.generation_error = None;
-        });
-    }
-
-    fn start_generation(&self, cx: &mut Context<Self>) {
-        // Read current state
-        let state = self.state.read(cx);
-
-        if state.diff_text.trim().is_empty() {
-            self.state.update(cx, |s, _| {
-                s.generation_error = Some("Please paste a git diff first".to_string());
-            });
+    /// Equivalent of the old gpui `start_generation`, now for egui + tokio
+    pub fn start_generation_async(&mut self) {
+        if self.state.diff_text.trim().is_empty() {
+            self.state.generation_error = Some("Please paste a git diff first".into());
             return;
         }
 
-        // Build input
-        let pr = PullRequest {
-            id: state.pr_id.clone(),
-            title: state.pr_title.clone(),
-            repo: state.pr_repo.clone(),
-            author: state.pr_author.clone(),
-            branch: state.pr_branch.clone(),
-            description: None,
-            created_at: String::new(),
-        };
+        // Build input PR from current state
+        let pr = self.current_pull_request();
 
-        let diff_text = state.diff_text.clone();
-        let agent = state.selected_agent.clone();
+        let diff_text = self.state.diff_text.clone();
+        let agent = self.state.selected_agent;
 
-        // Get agent command based on selection
+        // Get agent command based on selection (same logic as original)
         let (agent_cmd, agent_args, start_log) = match agent {
             SelectedAgent::Codex | SelectedAgent::Gemini => {
                 let agent_id = match agent {
@@ -94,24 +335,23 @@ impl GenerateView {
                 let candidate = candidates.into_iter().find(|c| c.id == agent_id);
 
                 let Some(candidate) = candidate else {
-                    self.state.update(cx, |s, _| {
-                        s.is_generating = false;
-                        s.generation_error =
-                            Some(format!("Agent \"{}\" is not configured.", agent_id));
-                    });
+                    self.state.is_generating = false;
+                    self.state.generation_error =
+                        Some(format!("Agent \"{}\" is not configured.", agent_id));
                     return;
                 };
 
                 if !candidate.available {
-                    self.state.update(cx, |s, _| {
-                        s.is_generating = false;
-                        s.generation_error = Some(format!(
-                            "{} is not available on PATH. Install it and restart (command: {} {}).",
-                            candidate.label,
-                            candidate.command.unwrap_or_else(|| agent_id.to_string()),
-                            candidate.args.join(" ")
-                        ));
-                    });
+                    self.state.is_generating = false;
+                    self.state.generation_error = Some(format!(
+                        "{} is not available on PATH. Install it and restart (command: {} {}).",
+                        candidate.label,
+                        candidate
+                            .command
+                            .clone()
+                            .unwrap_or_else(|| agent_id.to_string()),
+                        candidate.args.join(" ")
+                    ));
                     return;
                 }
 
@@ -130,538 +370,67 @@ impl GenerateView {
         };
 
         // Set loading state
-        let start_log_for_state = start_log.clone();
-        self.state.update(cx, |s, _| {
-            s.is_generating = true;
-            s.generation_error = None;
-            s.agent_messages.clear();
-            s.agent_thoughts.clear();
-            s.agent_logs = vec![start_log_for_state.clone()];
-        });
+        self.state.is_generating = true;
+        self.state.generation_error = None;
+        self.state.agent_messages.clear();
+        self.state.agent_thoughts.clear();
+        self.state.agent_logs = vec![start_log.clone()];
 
+        // Progress channel for ACP
         let (progress_tx, mut progress_rx) = tokio::sync::mpsc::unbounded_channel();
 
+        // Build GenerateTasksInput exactly as original
         let input = GenerateTasksInput {
             pull_request: pr,
-            diff_text: diff_text,
+            diff_text,
             agent_command: agent_cmd,
-            agent_args: agent_args,
+            agent_args,
             progress_tx: Some(progress_tx),
-            mcp_server_binary: None, // Use default
-            timeout_secs: Some(500), // Default timeout
-            debug: false, // No debug logging in production
-            fake_tasks: None, // No test fixtures
-            db_path: None, // Use default database path
+            mcp_server_binary: None, // default
+            timeout_secs: Some(500), // default timeout
+            debug: false,            // no debug
+            fake_tasks: None,        // no fixtures
+            db_path: None,           // default DB
         };
 
-        let pr_for_save = input.pull_request.clone();
-        let pr_id_for_save = pr_for_save.id.clone();
-        let state_entity = self.state.clone();
-        let start_log = start_log.clone();
-        let task_repo = self.task_repo.clone();
-        let pr_repo = self.pr_repo.clone();
+        // Sender for messages back into egui loop
+        let gen_tx = self.gen_tx.clone();
 
-        // Spawn async task for ACP generation
-        cx.spawn(|_this, cx: &mut AsyncApp| {
-            let mut app = cx.clone();
+        tokio::spawn(async move {
+            let mut result_fut = std::pin::pin!(generate_tasks_with_acp(input));
 
-            async move {
-                let mut result_fut = std::pin::pin!(generate_tasks_with_acp(input));
-
-                let result = loop {
-                    tokio::select! {
-                        evt = progress_rx.recv() => {
-                            if let Some(evt) = evt {
-                                let _ = app.update_entity(&state_entity, |state, _| match evt {
-                                    crate::acp::ProgressEvent::Message { content, is_new } => {
-                                        if is_new || state.agent_messages.is_empty() {
-                                            state.agent_messages.push(content);
-                                        } else if let Some(latest) = state.agent_messages.last_mut() {
-                                            *latest = content;
-                                        }
-                                    }
-                                    crate::acp::ProgressEvent::Thought { content, is_new } => {
-                                        if is_new || state.agent_thoughts.is_empty() {
-                                            state.agent_thoughts.push(content);
-                                        } else if let Some(latest) = state.agent_thoughts.last_mut() {
-                                            *latest = content;
-                                        }
-                                    }
-                                    crate::acp::ProgressEvent::Log(log) => {
-                                        state.agent_logs.push(log);
-                                    }
-                                });
-                            } else {
-                                // channel closed
-                            }
-                        }
-                        res = &mut result_fut => {
-                            break res;
-                        }
-                    }
-                };
-
-                let _ = app.update_entity(&state_entity, |state, _| {
-                    state.is_generating = false;
-                    match result {
-                        Ok(res) => {
-                            state.tasks = res.tasks.clone();
-                            state.agent_messages = res.messages;
-                            state.agent_thoughts = res.thoughts;
-                            let mut logs = res.logs;
-                            logs.insert(0, start_log.clone());
-                            state.agent_logs = logs;
-                            if state.tasks.is_empty() {
-                                state.generation_error = Some("No tasks generated".to_string());
-                            } else {
-                                // Save to DB
-                                let _ = pr_repo.save(&pr_for_save);
-                                for task in &state.tasks {
-                                    let _ = task_repo.save(&pr_id_for_save, task);
-                                }
-
-                                // Auto-navigate to review
-                                state.current_view = AppView::Review;
-                            }
-                        }
-                        Err(e) => {
-                            state.generation_error = Some(format!("Generation failed: {}", e));
-                            state.agent_logs = vec![start_log.clone(), e.to_string()];
-                        }
-                    }
-                });
-            }
-        })
-        .detach();
-    }
-
-    fn select_agent(&self, agent: SelectedAgent, cx: &mut Context<Self>) {
-        self.state.update(cx, |s, _| {
-            s.selected_agent = agent;
-        });
-    }
-}
-
-impl Render for GenerateView {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let colors = theme().colors;
-        let spacing = theme().spacing;
-        let state = self.state.read(cx);
-
-        let is_generating = state.is_generating;
-        let selected_agent = state.selected_agent.clone();
-        let diff_text = state.diff_text.clone();
-        let generation_error = state.generation_error.clone();
-        let agent_messages = state.agent_messages.clone();
-        let agent_thoughts = state.agent_thoughts.clone();
-        let agent_logs = state.agent_logs.clone();
-        let has_agent_feedback =
-            !agent_messages.is_empty() || !agent_thoughts.is_empty() || !agent_logs.is_empty();
-        let show_agent_panel = has_agent_feedback || is_generating;
-
-        div()
-            .flex()
-            .flex_col()
-            .gap(px(spacing.space_6))
-            .max_w(px(960.0))
-            .mx_auto()
-            // Header
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap(px(spacing.space_2))
-                    .child(
-                        div()
-                            .text_2xl()
-                            .font_weight(gpui::FontWeight::BOLD)
-                            .text_color(colors.text_strong)
-                            .child("Generate review tasks from a git diff"),
-                    )
-                    .child(
-                        div()
-                            .text_color(colors.text_muted)
-                            .child("Paste a unified git diff. We'll analyze it and create review tasks."),
-                    ),
-            )
-            // Error message
-            .when_some(generation_error, |this, err| {
-                this.child(
-                    div()
-                        .bg(colors.danger)
-                        .text_color(colors.surface)
-                        .p(px(spacing.space_3))
-                        .child(err),
-                )
-            })
-            // Form panel
-            .child(
-                div()
-                    .bg(colors.surface)
-                    .border_1()
-                    .border_color(colors.border_strong)
-                    .p(px(spacing.space_6))
-                    .flex()
-                    .flex_col()
-                    .gap(px(spacing.space_5))
-                    // Diff textarea (simplified - shows current content)
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap(px(spacing.space_2))
-                            .child(
-                                div()
-                                    .font_weight(gpui::FontWeight::SEMIBOLD)
-                                    .child("Git diff"),
-                            )
-                            .child(
-                                div()
-                                    .id("diff-input")
-                                    .bg(colors.surface_alt)
-                                    .border_1()
-                                    .border_color(colors.border_strong)
-                                    .p(px(spacing.space_3))
-                                    .min_h(px(200.0))
-                                    .font_family("JetBrains Mono")
-                                    .text_sm()
-                                    .text_color(if diff_text.is_empty() {
-                                        colors.text_muted
-                                    } else {
-                                        colors.text
-                                    })
-                                    .cursor_text()
-                                    .on_click(cx.listener(|this, _event, _window, cx| {
-                                        this.paste_from_clipboard(cx);
-                                    }))
-                                    .child(if diff_text.is_empty() {
-                                        "Click or use the Paste button to load output from \"git diff\"...".to_string()
-                                    } else {
-                                        let preview = diff_text.lines().take(10).collect::<Vec<_>>().join("\n");
-                                        if diff_text.lines().count() > 10 {
-                                            format!("{}\\n... ({} more lines)", preview, diff_text.lines().count() - 10)
-                                        } else {
-                                            preview
-                                        }
-                                    }),
-                            )
-                            .child(
-                                div()
-                                    .flex()
-                                    .items_center()
-                                    .gap(px(spacing.space_3))
-                                    .child(
-                                        div()
-                                            .id("paste-diff-btn")
-                                            .px(px(spacing.space_4))
-                                            .py(px(spacing.space_2))
-                                            .bg(colors.surface_alt)
-                                            .border_1()
-                                            .border_color(colors.border_strong)
-                                            .cursor_pointer()
-                                            .on_click(cx.listener(|this, _event, _window, cx| {
-                                                this.paste_from_clipboard(cx);
-                                            }))
-                                            .child("Paste from clipboard"),
-                                    )
-                                    .child(
-                                        div()
-                                            .id("clear-diff-btn")
-                                            .px(px(spacing.space_4))
-                                            .py(px(spacing.space_2))
-                                            .bg(colors.surface)
-                                            .border_1()
-                                            .border_color(colors.border)
-                                            .cursor_pointer()
-                                            .text_color(colors.text_muted)
-                                            .on_click(cx.listener(|this, _event, _window, cx| {
-                                                this.clear_diff(cx);
-                                            }))
-                                            .child("Clear"),
-                                    )
-                                    .child(
-                                        div()
-                                            .text_sm()
-                                            .text_color(colors.text_muted)
-                                            .child(
-                                                "Tip: Run 'git diff main...HEAD | pbcopy', then click Paste.",
-                                            ),
-                                    ),
-                            )
-                            .child(
-                                div().when(!diff_text.is_empty(), |this| {
-                                    let file_diffs = parse_diff(&diff_text);
-                                    this.child(
-                                        div()
-                                            .flex()
-                                            .flex_col()
-                                            .gap(px(spacing.space_3))
-                                            .child(
-                                                div()
-                                                    .font_weight(gpui::FontWeight::SEMIBOLD)
-                                                    .text_sm()
-                                                    .text_color(colors.text_muted)
-                                                    .child("Diff preview"),
-                                            )
-                                            .children(file_diffs.into_iter().map(|file| {
-                                                render_diff_view(&file.file_path, &file.patch).into_any_element()
-                                            })),
-                                    )
-                                }),
-                            ),
-                    )
-                // Agent selection
-                .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap(px(spacing.space_3))
-                            .border_1()
-                            .border_color(colors.border)
-                            .p(px(spacing.space_4))
-                            .child(
-                                div()
-                                    .font_weight(gpui::FontWeight::SEMIBOLD)
-                                    .child("Agent"),
-                            )
-                            .child(self.render_agent_option(
-                                "Codex (ACP)",
-                                "Requires codex CLI",
-                                false,
-                                SelectedAgent::Codex,
-                                selected_agent == SelectedAgent::Codex,
-                                cx,
-                            ))
-                            .child(self.render_agent_option(
-                                "Gemini (ACP)",
-                                "Requires gemini CLI",
-                                false,
-                                SelectedAgent::Gemini,
-                                selected_agent == SelectedAgent::Gemini,
-                                cx,
-                            )),
-                    )
-                    // Submit button
-                    .child(
-                        div()
-                            .id("generate-btn")
-                            .bg(if is_generating {
-                                colors.text_muted
-                            } else {
-                                colors.text_strong
-                            })
-                            .text_color(colors.surface)
-                            .px(px(spacing.space_6))
-                            .py(px(spacing.space_3))
-                            .border_1()
-                            .border_color(colors.text_strong)
-                            .cursor_pointer()
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
-                            .on_click(cx.listener(|this, _event, _window, cx| {
-                                this.start_generation(cx);
-                            }))
-                            .child(if is_generating {
-                                "Generating..."
-                            } else {
-                                "Generate tasks"
-                            }),
-                    ),
-            )
-            // Agent communication panel
-            .when(show_agent_panel, |this| {
-                this.child(
-                    div()
-                        .bg(colors.surface)
-                        .border_1()
-                        .border_color(colors.border_strong)
-                        .p(px(spacing.space_5))
-                        .flex()
-                        .flex_col()
-                        .gap(px(spacing.space_4))
-                        .child(
-                            div()
-                                .text_lg()
-                                .font_weight(gpui::FontWeight::BOLD)
-                                .text_color(colors.text_strong)
-                                .child("Agent communication"),
-                        )
-                        .child(
-                            div()
-                                .text_sm()
-                                .text_color(if is_generating {
-                                    colors.warning
-                                } else {
-                                    colors.success
-                                })
-                                .child(if is_generating {
-                                    "Waiting for agent response..."
-                                } else {
-                                    "Agent run completed."
-                                }),
-                        )
-                        .child(self.render_agent_feed(
-                            "Messages",
-                            &agent_messages,
-                            colors.text,
-                            spacing.space_2,
-                        ))
-                        .child(self.render_agent_feed(
-                            "Thoughts",
-                            &agent_thoughts,
-                            colors.text_muted,
-                            spacing.space_2,
-                        ))
-                        .child(self.render_agent_feed(
-                            "Logs",
-                            &agent_logs,
-                            colors.danger,
-                            spacing.space_2,
-                        )),
-                )
-            })
-    }
-}
-
-impl GenerateView {
-    fn render_agent_option(
-        &self,
-        label: &str,
-        status: &str,
-        available: bool,
-        agent: SelectedAgent,
-        selected: bool,
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement {
-        let colors = theme().colors;
-        let spacing = theme().spacing;
-        let agent_clone = agent.clone();
-
-        div()
-            .id(SharedString::from(format!("agent-{:?}", agent)))
-            .flex()
-            .items_center()
-            .gap(px(spacing.space_3))
-            .cursor_pointer()
-            .on_click(cx.listener(move |this, _event, _window, cx| {
-                this.select_agent(agent_clone.clone(), cx);
-            }))
-            .child(
-                div()
-                    .size(px(16.0))
-                    .border_1()
-                    .border_color(colors.border_strong)
-                    .bg(if selected {
-                        colors.primary
-                    } else {
-                        colors.surface
-                    }),
-            )
-            .child(
-                div()
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
-                    .child(label.to_string()),
-            )
-            .child(
-                div()
-                    .text_sm()
-                    .text_color(if available {
-                        colors.success
-                    } else {
-                        colors.text_muted
-                    })
-                    .child(status.to_string()),
-            )
-    }
-
-    fn render_agent_feed(
-        &self,
-        label: &str,
-        entries: &[String],
-        color: gpui::Hsla,
-        gap: f32,
-    ) -> impl IntoElement {
-        let spacing = theme().spacing;
-        let colors = theme().colors;
-        let accent_bg = gpui::Hsla {
-            h: color.h,
-            s: color.s,
-            l: color.l,
-            a: 0.12,
-        };
-        let is_log = label == "Logs";
-
-        div()
-            .flex()
-            .flex_col()
-            .gap(px(gap))
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(spacing.space_2))
-                    .child(
-                        div()
-                            .text_sm()
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
-                            .text_color(color)
-                            .child(label.to_string()),
-                    )
-                    .child(
-                        div()
-                            .px(px(spacing.space_2))
-                            .py(px(4.0))
-                            .bg(accent_bg)
-                            .rounded_md()
-                            .text_sm()
-                            .text_color(color)
-                            .child(format!(
-                                "{} {}",
-                                entries.len(),
-                                if entries.len() == 1 { "item" } else { "items" }
-                            )),
-                    ),
-            )
-            .child(if entries.is_empty() {
-                div()
-                    .text_sm()
-                    .text_color(colors.text_muted)
-                    .child("No entries yet.")
-                    .into_any_element()
-            } else {
-                div()
-                    .bg(colors.surface_alt)
-                    .border_1()
-                    .border_color(colors.border)
-                    .rounded_md()
-                    .id(SharedString::from(format!("agent-feed-{}", label)))
-                    .p(px(spacing.space_3))
-                    .flex()
-                    .flex_col()
-                    .gap(px(spacing.space_2))
-                    .max_h(px(320.0))
-                    .overflow_scroll()
-                    .on_scroll_wheel(|_, _, cx| {
-                        cx.stop_propagation();
-                    })
-                    .children(entries.iter().enumerate().map(|(i, entry)| {
-                        let bubble = div()
-                            .id(SharedString::from(format!("agent-{}-{}", label, i)))
-                            .bg(colors.surface)
-                            .border_1()
-                            .border_color(colors.border)
-                            .rounded_md()
-                            .p(px(spacing.space_2))
-                            .text_sm()
-                            .text_color(color);
-
-                        if is_log {
-                            bubble.font_family("JetBrains Mono").child(entry.clone())
+            loop {
+                tokio::select! {
+                    evt = progress_rx.recv() => {
+                        if let Some(evt) = evt {
+                            let _ = gen_tx.send(GenMsg::Progress(evt)).await;
                         } else {
-                            bubble.child(entry.clone())
+                            // channel closed
                         }
-                    }))
-                    .into_any_element()
-            })
-            .into_any_element()
+                    }
+                    res = &mut result_fut => {
+                        let msg = match res {
+                            Ok(res) => {
+                                // ACP already persisted tasks to DB; we just reflect state
+                                let mut logs = res.logs;
+                                logs.insert(0, start_log.clone());
+                                GenMsg::Done(Ok(GenResultPayload {
+                                    tasks: res.tasks,
+                                    messages: res.messages,
+                                    thoughts: res.thoughts,
+                                    logs,
+                                }))
+                            }
+                            Err(e) => {
+                                GenMsg::Done(Err(format!("Generation failed: {}", e)))
+                            }
+                        };
+
+                        let _ = gen_tx.send(msg).await;
+                        break;
+                    }
+                }
+            }
+        });
     }
 }

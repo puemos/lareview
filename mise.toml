@@ -1,5 +1,0 @@
-[settings]
-trusted_config_paths = ["."]
-
-[tools]
-rust = "nightly-2025-12-06"
