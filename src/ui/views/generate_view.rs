@@ -7,6 +7,10 @@ use tokio;
 use crate::acp::{GenerateTasksInput, generate_tasks_with_acp, list_agent_candidates};
 use crate::ui::app::{GenMsg, GenResultPayload, GenTab, LaReviewApp, SelectedAgent};
 use crate::ui::components::diff::render_diff_editor;
+use crate::ui::components::header::header_with_action;
+use crate::ui::components::selection_chips::selection_chips;
+use crate::ui::components::status::{error_banner, status_label};
+use crate::ui::components::tabs::TabBar;
 
 impl LaReviewApp {
     pub fn ui_generate(&mut self, ui: &mut egui::Ui) {
@@ -16,78 +20,35 @@ impl LaReviewApp {
             ui.add_space(8.0);
 
             // Header
-            ui.horizontal(|ui| {
-                ui.heading(
-                    egui::RichText::new("╱ GENERATE TASKS")
-                        .size(20.0)
-                        .color(MOCHA.text),
-                );
+            header_with_action(
+                ui,
+                "╱ GENERATE TASKS",
+                if self.state.is_generating {
+                    "⏳ Generating..."
+                } else {
+                    "▶ RUN"
+                },
+                !self.state.diff_text.trim().is_empty() && !self.state.is_generating,
+                MOCHA.mauve,
+                || {
+                    trigger_generate = true;
+                },
+            );
 
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let can_generate =
-                        !self.state.diff_text.trim().is_empty() && !self.state.is_generating;
+            ui.add_space(8.0);
 
-                    let generate_label = if self.state.is_generating {
-                        "⏳ Generating..."
-                    } else {
-                        "▶ RUN"
-                    };
-
-                    let generate_button =
-                        egui::Button::new(egui::RichText::new(generate_label).size(15.0).color(
-                            if can_generate {
-                                MOCHA.crust
-                            } else {
-                                MOCHA.subtext0
-                            },
-                        ))
-                        .fill(if can_generate {
-                            MOCHA.mauve
-                        } else {
-                            MOCHA.surface1
-                        })
-                        .stroke(egui::Stroke::new(
-                            1.0,
-                            if can_generate {
-                                MOCHA.overlay0
-                            } else {
-                                MOCHA.surface2
-                            },
-                        ))
-                        .min_size(egui::vec2(140.0, 32.0));
-
-                    if ui.add_enabled(can_generate, generate_button).clicked() {
-                        trigger_generate = true;
-                    }
-
-                    ui.add_space(8.0);
-
-                    // Agent selection chips
-                    for agent in [
-                        SelectedAgent::Codex,
-                        SelectedAgent::Gemini,
-                        SelectedAgent::Qwen,
-                    ] {
-                        let selected = self.state.selected_agent == agent;
-                        let label = format!("{:?}", agent).to_uppercase();
-
-                        let text = egui::RichText::new(label).color(if selected {
-                            MOCHA.crust
-                        } else {
-                            MOCHA.subtext0
-                        });
-
-                        let chip = egui::Button::new(text)
-                            .fill(if selected { MOCHA.sky } else { MOCHA.surface0 })
-                            .stroke(egui::Stroke::NONE);
-
-                        if ui.add(chip).clicked() {
-                            self.state.selected_agent = agent;
-                        }
-                    }
-                    ui.label("AGENT:");
-                });
-            });
+            // Agent selection chips
+            selection_chips(
+                ui,
+                &mut self.state.selected_agent,
+                &[
+                    SelectedAgent::Codex,
+                    SelectedAgent::Gemini,
+                    SelectedAgent::Qwen,
+                ],
+                &["CODEX", "GEMINI", "QWEN"],
+                "AGENT:",
+            );
 
             ui.add_space(4.0);
 
@@ -101,60 +62,22 @@ impl LaReviewApp {
             } else {
                 "Ready to generate tasks."
             };
-            ui.label(
-                egui::RichText::new(status_text)
-                    .color(MOCHA.subtext1)
-                    .size(12.0),
-            );
+            status_label(ui, status_text, MOCHA.subtext1);
 
             // Error banner
             if let Some(err) = &self.state.generation_error {
                 ui.add_space(4.0);
-                egui::Frame::new()
-                    .fill(MOCHA.red.gamma_multiply(0.2))
-                    .inner_margin(egui::Margin::symmetric(12, 8))
-                    .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label(egui::RichText::new("error:").color(MOCHA.red));
-                            ui.label(egui::RichText::new(err).color(MOCHA.text));
-                        });
-                    });
+                error_banner(ui, err);
             }
 
             ui.add_space(8.0);
             ui.separator();
 
-            // Custom tab bar
-            ui.horizontal(|ui| {
-                let tabs = [("Diff", GenTab::Diff), ("Agent", GenTab::Agent)];
-                for (title, tab_val) in tabs.iter() {
-                    let is_active = self.state.selected_tab == *tab_val;
-                    let text_color = if is_active {
-                        MOCHA.mauve
-                    } else {
-                        MOCHA.subtext0
-                    };
-
-                    let response = ui.add(
-                        egui::Button::new(egui::RichText::new(*title).size(14.0).color(text_color))
-                            .frame(false),
-                    );
-
-                    if is_active {
-                        let rect = response.rect;
-                        ui.painter().hline(
-                            rect.x_range(),
-                            rect.bottom(),
-                            egui::Stroke::new(2.0, MOCHA.mauve),
-                        );
-                    }
-
-                    if response.clicked() {
-                        self.state.selected_tab = *tab_val;
-                    }
-                    ui.add_space(10.0);
-                }
-            });
+            // Tab bar
+            TabBar::new(&mut self.state.selected_tab)
+                .add("Diff", GenTab::Diff)
+                .add("Agent", GenTab::Agent)
+                .show(ui);
             ui.separator();
             ui.add_space(6.0);
 

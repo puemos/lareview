@@ -3,6 +3,7 @@ use crate::ui::app::LaReviewApp;
 use eframe::egui;
 // diff editor helper
 use crate::ui::components::diff::render_diff_editor;
+use crate::ui::components::status::error_banner;
 use catppuccin_egui::MOCHA;
 
 impl LaReviewApp {
@@ -11,7 +12,7 @@ impl LaReviewApp {
 
         // show error if any
         if let Some(err) = &self.state.review_error {
-            ui.colored_label(MOCHA.red, err); // Use MOCHA.red for error
+            error_banner(ui, err);
         }
 
         ui.separator();

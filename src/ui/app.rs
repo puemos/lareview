@@ -210,7 +210,8 @@ impl LaReviewApp {
     pub fn current_pull_request(&self) -> PullRequest {
         // If a PR is selected, use its details, otherwise use the local-pr defaults
         if let Some(selected_pr_id) = &self.state.selected_pr_id
-            && let Some(pr) = self.state.prs.iter().find(|p| &p.id == selected_pr_id) {
+            && let Some(pr) = self.state.prs.iter().find(|p| &p.id == selected_pr_id)
+        {
             return pr.clone();
         }
         PullRequest {
