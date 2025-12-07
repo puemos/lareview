@@ -43,12 +43,6 @@ Before creating tasks, reason internally as follows:
 3. Use these sub-flows as the primary way to group and scope tasks.
 4. Do not output this analysis as text. Use it only to drive the tasks you return.
 
-OPTIONAL CONTEXT USE
-
-- If tools are available to read files from the repository, you may use them to understand the surrounding code and how the sub-flows work.
-- Only fetch context that is related to the diff and the flows you identified.
-- Do not add tasks based only on unrelated code outside the diff.
-
 TASK STRATEGY
 
 - Aim for about 2 to 7 tasks in total, depending on the size and risk of the pull request.
@@ -95,10 +89,7 @@ For each task, fill the following fields:
     - What changed in this pull request for this sub-flow.
     - Where it appears in the code (key files, modules, components, or functions).
     - Why it matters in terms of correctness, safety, tests, performance, or maintainability.
-    - What you recommend doing, for example:
-      - Concrete checks a reviewer should perform.
-      - Specific edge cases to test.
-      - Suggested refactors or additional tests.
+    - What you recommend doing.
 
   Example description:
   "This task covers changes to the authentication timeout flow. The PR adds a new validate_session() function in auth.rs that checks JWT expiry, which is now called by the auth middleware in middleware.rs on every authenticated request. The timeout duration comes from a new SESSION_TIMEOUT_MINUTES config in config.rs. This affects all protected endpoints. The risk is that this adds a Redis call per request, which could impact latency. Recommend: verify Redis connection pooling is adequate, test concurrent session validation, and add integration tests for timeout edge cases."
@@ -109,80 +100,59 @@ For each task, fill the following fields:
   - Include all files that participate in this sub-flow, and avoid unrelated ones.
 
 - stats:
-  - additions:
-    - Rough count of lines added that are relevant to this task across all included files.
-  - deletions:
-    - Rough count of lines removed that are relevant to this task.
+  - additions: Rough count of lines added that are relevant.
+  - deletions: Rough count of lines removed that are relevant.
   - risk: "LOW", "MEDIUM", or "HIGH".
-    - Use HIGH for likely bugs, security issues, data loss, breaking changes, or risky migrations in this flow.
-    - Use MEDIUM for behavior changes, non trivial refactors, or code that is hard to reason about.
-    - Use LOW for style, minor cleanups, or low impact suggestions.
-  - tags:
-    - A small set of tags that describe the task, for example:
-      - "bug", "tests", "refactor", "performance", "style", "docs", "api-change", "migration", "security", "infra", "ux", "observability".
-    - Prefer tags that will help route the task to the right reviewer or engineer.
+  - tags: A small set of descriptive tags.
 
 - patches:
-  - A list of patch snippets that show the most relevant parts of the diff for this task.
+  - A list of patch snippets that show the most relevant parts of the diff.
   - For each patch:
     - file: The file path.
-    - hunk:
-      - A standalone, valid unified git diff for that single file and the changes relevant to this task.
-      - It must include the standard headers for that file: a "diff --git a/{{file}} b/{{file}}" line, a "--- a/{{file}}" line, a "+++ b/{{file}}" line, and one or more "@@" hunks with context.
-      - Do not output bare "@@" bodies or partial snippets without these headers.
-  - Prefer one file per patch object. If a sub-flow touches multiple files, create multiple patch objects, one per file.
-  - Include enough context to understand the change, but do not include the entire file.
-  - Avoid duplicating the same diff across multiple tasks unless it genuinely belongs to more than one flow.
+    - hunk: A standalone, valid unified diff including:
+      - diff --git a/\{{file\}} b/\{{file\}}
+      - --- a/\{{file\}}
+      - +++ b/\{{file\}}
+      - One or more @@ hunks.
 
 EDGE CASES
 
-- If there is no meaningful follow up work and the changes are clearly safe and mechanical, you may return an empty "tasks" list or a single LOW risk "General verification" task that briefly explains what was changed and what to sanity check.
-- If the pull request mixes many unrelated concerns, favor tasks that reflect the most important and risk heavy flows first, and skip low value noise.
+- If there is no meaningful follow up work and the changes are clearly safe and mechanical, you may return an empty tasks list or a simple LOW risk general verification task.
+- If the pull request mixes many unrelated concerns, focus on the highest value and highest risk flows.
 
 IMPORTANT MCP USAGE
 
-- There is an MCP server named "lareview-tasks" that exposes a tool named "return_tasks".
-- Discover or confirm the server and tool using normal MCP discovery (for example by listing servers and tools).
-- To submit your tasks, you must call the MCP tool "return_tasks" on server "lareview-tasks".
-- Do not try to run "return_tasks" as a shell command. It must be invoked as an MCP tool.
-- Do not print the tasks JSON in your chat reply. The tasks must be returned only through the MCP tool call.
+- There is an MCP server named "lareview-tasks" with a tool named "return_tasks".
+- You must call that tool with a JSON payload shaped like:
 
-Important format requirement for patches:
-
-- Every "patches[].hunk" value you send to the MCP tool must be a complete unified git diff for its file, not just a raw "@@" hunk.
-- Each hunk string must include "diff --git a/{{file}} b/{{file}}", the "--- a/{{file}}" and "+++ b/{{file}}" lines, and at least one "@@" section with context, so that external git renderers can display it correctly.
-
-The MCP tool expects a JSON payload with this exact shape:
-
-{{
+\{{
   "tasks": [
-    {{
+    \{{
       "id": "string",
       "title": "string",
       "description": "string",
       "files": ["string"],
-      "stats": {{
+      "stats": \{{
         "additions": number,
         "deletions": number,
         "risk": "LOW" | "MEDIUM" | "HIGH",
         "tags": ["string"]
-      }},
+      \}},
       "patches": [
-        {{
+        \{{
           "file": "string",
           "hunk": "string"
-        }}
+        \}}
       ]
-    }}
+    \}}
   ]
-}}
+\}}
 
 WORKFLOW
 
-1. Read and understand the pull request intent and the unified diff.
-2. Identify the key sub-flows touched by the changes.
-3. For each important sub-flow, decide what the reviewer should focus on and what follow up work or verification is needed.
-4. Decide on a small set of high value review tasks grouped by sub-flow.
-5. Build the JSON payload in your internal state that matches the schema above.
-6. Call the MCP tool "return_tasks" on server "lareview-tasks" with that JSON payload.
-7. Do not output the JSON directly to the terminal or as plain text in the chat.
+1. Read and understand the pull request intent and the diff.
+2. Identify the key sub-flows.
+3. Create a small set of high value review tasks.
+4. Build the JSON payload.
+5. Call the MCP tool "return_tasks" on server "lareview-tasks".
+6. Do not output the JSON in chat.

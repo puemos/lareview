@@ -353,20 +353,13 @@ fn parse_tasks(args: Value) -> Result<Vec<ReviewTask>> {
 }
 
 /// Load pull request context from file or return defaults
+#[allow(clippy::collapsible_if)]
 fn load_pull_request(config: &ServerConfig) -> PullRequest {
     // Try to load from --pr-context file if provided
     if let Some(path) = &config.pr_context {
         if let Ok(content) = std::fs::read_to_string(path) {
-            match serde_json::from_str::<PullRequest>(&content) {
-                Ok(pr) => return pr,
-                Err(err) => {
-                    let _ = writeln!(
-                        std::io::stderr(),
-                        "failed to parse PR context from {}: {}",
-                        path.display(),
-                        err
-                    );
-                }
+            if let Ok(pr) = serde_json::from_str::<PullRequest>(&content) {
+                return pr;
             }
         }
     }

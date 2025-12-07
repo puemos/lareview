@@ -224,13 +224,13 @@ impl agent_client_protocol::Client for LaReviewClient {
                 }
 
                 // Check title for tool name and extract tasks from raw_input
-                if call.title.contains("return_tasks") || call.title.contains("task") {
-                    if let Some(ref input) = call.raw_input {
-                        self.store_tasks_from_value(input.clone());
-                        if let Some(tx) = &self.progress {
-                            let _ = tx
-                                .send(ProgressEvent::Log("received tool call return_tasks".into()));
-                        }
+                if (call.title.contains("return_tasks") || call.title.contains("task"))
+                    && let Some(ref input) = call.raw_input
+                {
+                    self.store_tasks_from_value(input.clone());
+                    if let Some(tx) = &self.progress {
+                        let _ =
+                            tx.send(ProgressEvent::Log("received tool call return_tasks".into()));
                     }
                 }
                 // Also check raw_output for returned tasks
@@ -673,12 +673,11 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
 
     // Prefer tasks captured via MCP callbacks, fall back to file written by MCP server.
     let mut final_tasks = tasks_capture.lock().unwrap().clone().unwrap_or_default();
-    if final_tasks.is_empty() {
-        if let Ok(content) = std::fs::read_to_string(&tasks_out_path) {
-            if let Ok(parsed) = serde_json::from_str::<TasksArg>(&content) {
-                final_tasks = normalize_tasks(parsed.tasks);
-            }
-        }
+    if final_tasks.is_empty()
+        && let Ok(content) = std::fs::read_to_string(&tasks_out_path)
+        && let Ok(parsed) = serde_json::from_str::<TasksArg>(&content)
+    {
+        final_tasks = normalize_tasks(parsed.tasks);
     }
 
     // Collect output for return and for richer error contexts

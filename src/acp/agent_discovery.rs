@@ -11,6 +11,47 @@ pub struct AgentCandidate {
     pub available: bool,
 }
 
+fn ensure_qwen_mcp_registered() {
+    use std::env;
+    use std::process::Command;
+
+    // Full path of this executable
+    let exe = env::current_exe().unwrap_or_else(|_| "lareview".into());
+    let exe_str = exe.to_string_lossy().to_string();
+
+    // Check if already exists
+    let check = Command::new("qwen").args(["mcp", "list"]).output();
+
+    if let Ok(out) = check {
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        if stdout.contains("lareview-tasks") {
+            return; // Already there, nothing to do
+        }
+    }
+
+    // Not found, register it
+    let _ = Command::new("qwen")
+        .args([
+            "mcp",
+            "add",
+            &format!("stdio:lareview-tasks:{}:--task-mcp-server", exe_str),
+        ])
+        .status();
+}
+
+fn qwen_candidate() -> AgentCandidate {
+    // make sure our MCP is installed once
+    ensure_qwen_mcp_registered();
+
+    AgentCandidate {
+        id: "qwen".to_string(),
+        label: "Qwen Code (ACP)".to_string(),
+        command: Some("qwen".to_string()),
+        args: vec!["--experimental-acp".to_string()],
+        available: is_command_available("qwen"),
+    }
+}
+
 /// Build the Codex candidate, allowing overrides for binary/package.
 fn codex_candidate() -> AgentCandidate {
     // Allow overrides for package/bin; do not inject partial MCP config via -c.
@@ -64,6 +105,7 @@ pub fn list_agent_candidates() -> Vec<AgentCandidate> {
 
     candidates.push(codex_candidate());
     candidates.push(gemini_candidate());
+    candidates.push(qwen_candidate());
 
     candidates
 }

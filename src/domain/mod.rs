@@ -49,18 +49,13 @@ pub struct Patch {
 }
 
 /// Status of a review task
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum TaskStatus {
+    #[default]
     Pending,
     Reviewed,
     Ignored,
-}
-
-impl Default for TaskStatus {
-    fn default() -> Self {
-        Self::Pending
-    }
 }
 
 /// A review task spanning one or more files

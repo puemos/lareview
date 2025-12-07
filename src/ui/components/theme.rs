@@ -1,12 +1,12 @@
 //! Dark theme configuration for the app
 use eframe::egui;
 
+#[allow(dead_code)]
 pub struct AppTheme {
     pub diff_added_bg: egui::Color32,
     pub diff_added_text: egui::Color32,
     pub diff_removed_bg: egui::Color32,
     pub diff_removed_text: egui::Color32,
-    #[allow(dead_code)]
     pub diff_header: egui::Color32,
     pub diff_line_num: egui::Color32,
     pub text_primary: egui::Color32,

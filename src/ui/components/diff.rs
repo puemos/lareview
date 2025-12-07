@@ -207,8 +207,10 @@ fn parse_diff_by_files(diff_text: &str) -> UnidiffResult<Vec<FileDiff>> {
     Ok(files_out)
 }
 
+type InlineSegments = (Vec<(String, bool)>, Vec<(String, bool)>);
+
 /// Build inline segments for left and right side from a pair of strings.
-fn inline_segments(old: &str, new: &str) -> (Vec<(String, bool)>, Vec<(String, bool)>) {
+fn inline_segments(old: &str, new: &str) -> InlineSegments {
     let diff = TextDiff::from_chars(old, new);
 
     let mut left = Vec::new();

@@ -90,8 +90,8 @@ impl LaReviewApp {
                             for patch in &patches {
                                 ui.group(|ui| {
                                     ui.label(format!("File: {}", patch.file));
-                                    let mut hunk = patch.hunk.clone();
-                                    render_diff_editor(ui, &mut hunk, "diff");
+                                    let hunk = patch.hunk.clone();
+                                    render_diff_editor(ui, &hunk, "diff");
                                 });
                             }
                         }

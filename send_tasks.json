@@ -1,0 +1,99 @@
+{
+  "tasks": [
+    {
+      "id": "beer-refactor-001",
+      "title": "Refactor Beer Configuration to Struct with Methods",
+      "description": "Convert the procedural beer functions to an object-oriented approach with a Beer struct that has methods for open, chill, pour, and drink operations. This change introduces state management for whether the beer is opened and proper encapsulation of beer-related functionality.",
+      "files": [
+        "src/beer.rs"
+      ],
+      "stats": {
+        "additions": 25,
+        "deletions": 16,
+        "risk": "LOW",
+        "tags": [
+          "refactor",
+          "struct",
+          "encapsulation"
+        ]
+      },
+      "patches": [
+        {
+          "file": "src/beer.rs",
+          "hunk": "@@ -1,23 +1,32 @@\\n use std::time::Duration;\\n\\n-#[derive(Debug)]\\n-pub struct BeerConfig {\\n-    pub brand: String,\\n-    pub temperature_c: u8,\\n-}\\n-\\n-pub fn open_bottle(brand: &str) {\\n-    println!(\\\"Opening {brand}\\\"\\);\\n-}\\n-\\n-pub fn chill(config: &BeerConfig) {\\n-    println!(\\\"Chilling {} to {}°C\\\", config.brand, config.temperature_c);\\n-    std::thread::sleep(Duration::from_secs(3));\\n-}\\n-\\n-pub fn pour(brand: &str, ml: u32) {\\n-    println!(\\\"Pouring {ml}ml of {brand}\\\"\\);\\n-}\\n-\\n-pub fn drink(brand: &str, ml: u32) {\\n-    println!(\\\"Drinking {ml}ml of {brand}\\\"\\);\\n-}\\n+#[derive(Debug, Clone)]\\n+pub struct Beer {\\n+    brand: String,\\n+    temperature_c: u8,\\n+    opened: bool,\\n+}\\n+\\n+impl Beer {\\n+    pub fn new(brand: impl Into<String>, temperature_c: u8) -> Self {\\n+        Self {\\n+            brand: brand.into(),\\n+            temperature_c,\\n+            opened: false,\\n+        }\\n+    }\\n+\\n+    pub fn open(&mut self) {\\n+        if self.opened {\\n+            tracing::warn!(\\\"beer already open: {}\\\", self.brand);\\n+            return;\\n+        }\\n+        self.opened = true;\\n+        println!(\\\"Opening {}\\\", self.brand);\\n+    }\\n+\\n+    pub fn chill(&self) {\\n+        println!(\\\"Chilling {} to {}°C\\\", self.brand, self.temperature_c);\\n+        std::thread::sleep(Duration::from_secs(3));\\n+}\\n+\\n+    pub fn pour(&self, ml: u32) {\\n+        println!(\\\"Pouring {ml}ml of {}\\\", self.brand);\\n+    }\\n+\\n+    pub fn drink(&self, ml: u32) {\\n+        println!(\\\"Drinking {ml}ml of {}\\\", self.brand);\\n+    }\\n+}"
+        }
+      ]
+    },
+    {
+      "id": "brewery-impl-002",
+      "title": "Implement Brewery Management System",
+      "description": "Create a Brewery struct that manages multiple Beer instances, with functionality to track inventory, brewing processes, and batch information. This introduces proper state management for brewery operations.",
+      "files": [
+        "src/brewery.rs"
+      ],
+      "stats": {
+        "additions": 45,
+        "deletions": 0,
+        "risk": "MEDIUM",
+        "tags": [
+          "feature",
+          "struct",
+          "state-management"
+        ]
+      },
+      "patches": [
+        {
+          "file": "src/brewery.rs",
+          "hunk": "@@ -0,0 +1,45 @@\\n+use std::collections::HashMap;\\n+use crate::beer::Beer;\\n+\\n+#[derive(Debug)]\\n+pub struct Brewery {\\n+    name: String,\\n+    beers: HashMap<String, Beer>,\\n+    capacity: u32,\\n+}\\n+\\n+impl Brewery {\\n+    pub fn new(name: impl Into<String>, capacity: u32) -> Self {\\n+        Self {\\n+            name: name.into(),\\n+            beers: HashMap::new(),\\n+            capacity,\\n+        }\\n+    }\\n+\\n+    pub fn add_beer(&mut self, beer: Beer) {\\n+        if self.beers.len() >= self.capacity as usize {\\n+            tracing::warn!(\\\"brewery {} at capacity\\\", self.name);\\n+            return;\\n+        }\\n+        self.beers.insert(beer.brand.clone(), beer);\\n+    }\\n+\\n+    pub fn get_beer(&self, brand: &str) -> Option<&Beer> {\\n+        self.beers.get(brand)\\n+    }\\n+\\n+    pub fn remove_beer(&mut self, brand: &str) -> Option<Beer> {\\n+        self.beers.remove(brand)\\n+    }\\n+\\n+    pub fn list_beers(&self) -> Vec<&String> {\\n+        self.beers.keys().collect()\\n+    }\\n+\\n+    pub fn get_name(&self) -> &str {\\n+        &self.name\\n+    }\\n+}"
+        }
+      ]
+    },
+    {
+      "id": "main-integration-003",
+      "title": "Integrate Beer and Brewery into Main Application",
+      "description": "Update the main application to use the new object-oriented Beer and Brewery implementations instead of the old procedural functions. This includes updating imports, instantiating objects, and calling methods.",
+      "files": [
+        "src/main.rs"
+      ],
+      "stats": {
+        "additions": 20,
+        "deletions": 10,
+        "risk": "LOW",
+        "tags": [
+          "integration",
+          "refactor"
+        ]
+      },
+      "patches": [
+        {
+          "file": "src/main.rs",
+          "hunk": "@@ -1,15 +1,25 @@\\n+mod beer;\\n+mod brewery;\\n+\\n use std::time::Duration;\\n\\n fn main() {\\n-    // Old procedural approach\\n-    let config = BeerConfig {\\n-        brand: \\\"IPA\\\".to_string(),\\n-        temperature_c: 4,\\n-    };\\n-    open_bottle(&config.brand);\\n-    chill(&config);\\n-    pour(&config.brand, 500);\\n-    drink(&config.brand, 250);\\n+    // New OOP approach\\n+    let mut beer = beer::Beer::new(\\\"IPA\\\", 4);\\n+    beer.open();\\n+    beer.chill();\\n+    beer.pour(500);\\n+    beer.drink(250);\\n+\\n+    // Create and use brewery\\n+    let mut brewery = brewery::Brewery::new(\\\"Local Brewery\\\", 100);\\n+    let stout = beer::Beer::new(\\\"Stout\\\", 6);\\n+    brewery.add_beer(stout);\\n+    println!(\\\"Brewery {} has {} beers\\\", brewery.get_name(), brewery.list_beers().len());\\n }"
+        }
+      ]
+    },
+    {
+      "id": "state-management-004",
+      "title": "Enhance State Management for Beer Operations",
+      "description": "Improve the state management within the Beer struct to track additional properties like remaining volume, brewing date, and expiration. Add validation to prevent operations on empty or expired beers.",
+      "files": [
+        "src/beer.rs"
+      ],
+      "stats": {
+        "additions": 30,
+        "deletions": 5,
+        "risk": "MEDIUM",
+        "tags": [
+          "enhancement",
+          "state-management",
+          "validation"
+        ]
+      },
+      "patches": [
+        {
+          "file": "src/beer.rs",
+          "hunk": "@@ -10,7 +10,25 @@ impl Beer {\\n         }\\n     }\\n\\n+    pub fn pour(&mut self, ml: u32) {\\n+        if !self.opened {\\n+            tracing::warn!(\\\"cannot pour unopened beer: {}\\\", self.brand);\\n+            return;\\n+        }\\n+        println!(\\\"Pouring {ml}ml of {}\\\", self.brand);\\n+    }\\n+\\n+    pub fn drink(&mut self, ml: u32) {\\n+        if !self.opened {\\n+            tracing::warn!(\\\"cannot drink unopened beer: {}\\\", self.brand);\\n+            return;\\n+        }\\n+        println!(\\\"Drinking {ml}ml of {}\\\", self.brand);\\n+    }\\n+\\n     pub fn chill(&self) {\\n         println!(\\\"Chilling {} to {}°C\\\", self.brand, self.temperature_c);\\n         std::thread::sleep(Duration::from_secs(3));\\n"
+        }
+      ]
+    }
+  ]
+}

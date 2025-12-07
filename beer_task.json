@@ -1,0 +1,28 @@
+{
+  "tasks": [
+    {
+      "id": "beer-refactor-001",
+      "title": "Refactor Beer Configuration to Struct with Methods",
+      "description": "Convert the procedural beer functions to an object-oriented approach with a Beer struct that has methods for open, chill, pour, and drink operations. This change introduces state management for whether the beer is opened and proper encapsulation of beer-related functionality.",
+      "files": [
+        "src/beer.rs"
+      ],
+      "stats": {
+        "additions": 25,
+        "deletions": 16,
+        "risk": "LOW",
+        "tags": [
+          "refactor",
+          "struct",
+          "encapsulation"
+        ]
+      },
+      "patches": [
+        {
+          "file": "src/beer.rs",
+          "hunk": "@@ -1,23 +1,32 @@\\n use std::time::Duration;\\n\\n-#[derive(Debug)]\\n-pub struct BeerConfig {\\n-    pub brand: String,\\n-    pub temperature_c: u8,\\n-}\\n-\\n-pub fn open_bottle(brand: &str) {\\n-    println!(\\\"Opening {brand}\\\"\\);\\n-}\\n-\\n-pub fn chill(config: &BeerConfig) {\\n-    println!(\\\"Chilling {} to {}°C\\\", config.brand, config.temperature_c);\\n-    std::thread::sleep(Duration::from_secs(3));\\n-}\\n-\\n-pub fn pour(brand: &str, ml: u32) {\\n-    println!(\\\"Pouring {ml}ml of {brand}\\\"\\);\\n-}\\n-\\n-pub fn drink(brand: &str, ml: u32) {\\n-    println!(\\\"Drinking {ml}ml of {brand}\\\"\\);\\n-}\\n+#[derive(Debug, Clone)]\\n+pub struct Beer {\\n+    brand: String,\\n+    temperature_c: u8,\\n+    opened: bool,\\n+}\\n+\\n+impl Beer {\\n+    pub fn new(brand: impl Into<String>, temperature_c: u8) -> Self {\\n+        Self {\\n+            brand: brand.into(),\\n+            temperature_c,\\n+            opened: false,\\n+        }\\n+    }\\n+\\n+    pub fn open(&mut self) {\\n+        if self.opened {\\n+            tracing::warn!(\\\"beer already open: {}\\\", self.brand);\\n+            return;\\n+        }\\n+        self.opened = true;\\n+        println!(\\\"Opening {}\\\", self.brand);\\n+    }\\n+\\n+    pub fn chill(&self) {\\n+        println!(\\\"Chilling {} to {}°C\\\", self.brand, self.temperature_c);\\n+        std::thread::sleep(Duration::from_secs(3));\\n+}\\n+\\n+    pub fn pour(&self, ml: u32) {\\n+        println!(\\\"Pouring {ml}ml of {}\\\", self.brand);\\n+    }\\n+\\n+    pub fn drink(&self, ml: u32) {\\n+        println!(\\\"Drinking {ml}ml of {}\\\", self.brand);\\n+    }\\n+}"
+        }
+      ]
+    }
+  ]
+}

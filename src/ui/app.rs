@@ -13,29 +13,27 @@ use eframe::egui;
 use tokio::sync::mpsc;
 
 /// Which screen is active
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum AppView {
+    #[default]
     Generate,
     Review,
 }
 
-impl Default for AppView {
-    fn default() -> Self {
-        Self::Generate
-    }
-}
-
 /// Which agent is selected (matches original code)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SelectedAgent {
+    #[default]
     Codex,
     Gemini,
+    Qwen,
 }
 
-impl Default for SelectedAgent {
-    fn default() -> Self {
-        Self::Codex
-    }
+#[derive(PartialEq, Default)]
+pub enum GenTab {
+    #[default]
+    Diff,
+    Agent,
 }
 
 /// All app state in one struct
@@ -46,6 +44,7 @@ pub struct AppState {
 
     pub is_generating: bool,
     pub generation_error: Option<String>,
+    pub selected_tab: GenTab,
     pub selected_agent: SelectedAgent,
 
     pub diff_text: String,
@@ -107,15 +106,17 @@ impl LaReviewApp {
         let pr_repo = Arc::new(PullRequestRepository::new(conn.clone()));
 
         // Same defaults as original app
-        let mut state = AppState::default();
-        state.current_view = AppView::Generate;
-        state.selected_agent = SelectedAgent::Codex;
-        state.diff_text = String::new();
-        state.pr_id = "local-pr".to_string();
-        state.pr_title = "Local Review".to_string();
-        state.pr_repo = "local/repo".to_string();
-        state.pr_author = "me".to_string();
-        state.pr_branch = "main".to_string();
+        let state = AppState {
+            current_view: AppView::Generate,
+            selected_agent: SelectedAgent::Codex,
+            diff_text: String::new(),
+            pr_id: "local-pr".to_string(),
+            pr_title: "Local Review".to_string(),
+            pr_repo: "local/repo".to_string(),
+            pr_author: "me".to_string(),
+            pr_branch: "main".to_string(),
+            ..Default::default()
+        };
 
         let (gen_tx, gen_rx) = mpsc::channel(32);
 
