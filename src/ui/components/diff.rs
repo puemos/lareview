@@ -3,9 +3,9 @@
 //! Uses `unidiff` for parsing and `similar` for inline changes.
 
 use super::theme::AppTheme;
-use eframe::egui;
+use eframe::egui::{self, FontId, TextFormat, text::LayoutJob};
 use similar::{ChangeTag, TextDiff};
-use unidiff::{Hunk, PatchSet};
+use unidiff::{Hunk, PatchSet, Result as UnidiffResult};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum ChangeType {
@@ -32,6 +32,9 @@ struct FileDiff {
     additions: usize,
     deletions: usize,
 }
+
+const DIFF_FONT_SIZE: f32 = 12.0;
+const DIFF_HEADER_FONT_SIZE: f32 = 14.0;
 
 fn build_lines_for_hunk(hunk: &Hunk, out: &mut Vec<DiffLine>) {
     let lines = hunk.lines();
@@ -80,7 +83,7 @@ fn build_lines_for_hunk(hunk: &Hunk, out: &mut Vec<DiffLine>) {
         let has_mixed_op = diff
             .ops()
             .iter()
-            .any(|op| op.old_range().len() > 0 && op.new_range().len() > 0);
+            .any(|op| !op.old_range().is_empty() && !op.new_range().is_empty());
 
         if has_mixed_op {
             // Use TextDiff alignment inside the block
@@ -174,17 +177,14 @@ fn strip_git_prefix(path: &str) -> String {
         .to_string()
 }
 
-fn parse_diff_by_files(diff_text: &str) -> Vec<FileDiff> {
+fn parse_diff_by_files(diff_text: &str) -> UnidiffResult<Vec<FileDiff>> {
     let trimmed = diff_text.trim();
     if trimmed.is_empty() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
 
     let mut patch = PatchSet::new();
-    if let Err(err) = patch.parse(trimmed) {
-        eprintln!("failed to parse diff: {err}");
-        return Vec::new();
-    }
+    patch.parse(trimmed)?;
 
     let mut files_out = Vec::new();
 
@@ -204,7 +204,7 @@ fn parse_diff_by_files(diff_text: &str) -> Vec<FileDiff> {
         });
     }
 
-    files_out
+    Ok(files_out)
 }
 
 /// Build inline segments for left and right side from a pair of strings.
@@ -239,13 +239,11 @@ fn paint_inline_text(
     base_color: egui::Color32,
     accent_color: egui::Color32,
 ) {
-    use egui::{FontId, TextFormat, text::LayoutJob};
-
     let mut job = LayoutJob::default();
 
     for (text, highlight) in segments {
         let format = TextFormat {
-            font_id: FontId::monospace(12.0),
+            font_id: FontId::monospace(DIFF_FONT_SIZE),
             color: if *highlight { accent_color } else { base_color },
             ..Default::default()
         };
@@ -255,9 +253,19 @@ fn paint_inline_text(
     ui.label(job);
 }
 
-pub fn render_diff_editor(ui: &mut egui::Ui, code: &mut String, _language: &str) {
+pub fn render_diff_editor(ui: &mut egui::Ui, code: &str, _language: &str) {
     let theme = AppTheme::default();
-    let files = parse_diff_by_files(code);
+
+    let files = match parse_diff_by_files(code) {
+        Ok(files) => files,
+        Err(err) => {
+            ui.colored_label(
+                theme.diff_removed_text,
+                format!("Failed to parse diff: {err}"),
+            );
+            return;
+        }
+    };
 
     ui.group(|ui| {
         ui.horizontal(|ui| {
@@ -290,7 +298,10 @@ pub fn render_diff_editor(ui: &mut egui::Ui, code: &mut String, _language: &str)
                         let is_open = ui.data(|d| d.get_temp::<bool>(id).unwrap_or(true));
 
                         let arrow = if is_open { "▼" } else { "▶" };
-                        if ui.button(egui::RichText::new(arrow).size(12.0)).clicked() {
+                        if ui
+                            .button(egui::RichText::new(arrow).size(DIFF_FONT_SIZE))
+                            .clicked()
+                        {
                             ui.data_mut(|d| d.insert_temp(id, !is_open));
                         }
 
@@ -304,7 +315,7 @@ pub fn render_diff_editor(ui: &mut egui::Ui, code: &mut String, _language: &str)
                             egui::RichText::new(display_path)
                                 .strong()
                                 .color(theme.text_primary)
-                                .size(14.0),
+                                .size(DIFF_HEADER_FONT_SIZE),
                         );
 
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -312,14 +323,14 @@ pub fn render_diff_editor(ui: &mut egui::Ui, code: &mut String, _language: &str)
                                 ui.label(
                                     egui::RichText::new(format!("-{}", file.deletions))
                                         .color(theme.diff_removed_text)
-                                        .size(12.0),
+                                        .size(DIFF_FONT_SIZE),
                                 );
                             }
                             if file.additions > 0 {
                                 ui.label(
                                     egui::RichText::new(format!("+{}", file.additions))
                                         .color(theme.diff_added_text)
-                                        .size(12.0),
+                                        .size(DIFF_FONT_SIZE),
                                 );
                             }
                         });
@@ -336,7 +347,7 @@ pub fn render_diff_editor(ui: &mut egui::Ui, code: &mut String, _language: &str)
                                     egui::RichText::new("Before")
                                         .strong()
                                         .color(theme.text_primary)
-                                        .size(12.0),
+                                        .size(DIFF_FONT_SIZE),
                                 );
                                 ui.separator();
 
@@ -350,7 +361,7 @@ pub fn render_diff_editor(ui: &mut egui::Ui, code: &mut String, _language: &str)
                                     egui::RichText::new("After")
                                         .strong()
                                         .color(theme.text_primary)
-                                        .size(12.0),
+                                        .size(DIFF_FONT_SIZE),
                                 );
                                 ui.separator();
 
@@ -383,53 +394,55 @@ fn render_line_left(ui: &mut egui::Ui, line: &DiffLine, theme: &AppTheme) {
                 egui::RichText::new(format!("{:>4} ", num))
                     .color(theme.diff_line_num)
                     .monospace()
-                    .size(12.0),
+                    .size(DIFF_FONT_SIZE),
             );
         } else {
-            ui.label(egui::RichText::new("     ").monospace().size(12.0));
+            ui.label(
+                egui::RichText::new("     ")
+                    .monospace()
+                    .size(DIFF_FONT_SIZE),
+            );
         }
 
-        // Cell frame, even for insert-only rows so height stays consistent
+        // Cell frame, even for insert only rows so height stays consistent
         let frame = egui::Frame::default()
             .fill(bg_color)
             .inner_margin(egui::Margin::symmetric(2, 0));
 
-        frame.show(ui, |ui| {
-            match line.change_type {
-                ChangeType::Insert => {
-                    // Placeholder so the row has the same height
+        frame.show(ui, |ui| match line.change_type {
+            ChangeType::Insert => {
+                // Placeholder so the row has the same height
+                ui.label(
+                    egui::RichText::new(" ")
+                        .color(text_color)
+                        .monospace()
+                        .size(DIFF_FONT_SIZE),
+                );
+            }
+            _ => {
+                if let Some(content) = &line.old_content {
+                    if line.change_type == ChangeType::Replace {
+                        let (segments, _) = inline_segments(
+                            content,
+                            line.new_content.as_deref().unwrap_or_default(),
+                        );
+                        paint_inline_text(ui, &segments, theme.text_primary, text_color);
+                    } else {
+                        ui.label(
+                            egui::RichText::new(content)
+                                .color(text_color)
+                                .monospace()
+                                .size(DIFF_FONT_SIZE),
+                        );
+                    }
+                } else {
+                    // No content but keep the row height
                     ui.label(
                         egui::RichText::new(" ")
                             .color(text_color)
                             .monospace()
-                            .size(12.0),
+                            .size(DIFF_FONT_SIZE),
                     );
-                }
-                _ => {
-                    if let Some(content) = &line.old_content {
-                        if line.change_type == ChangeType::Replace {
-                            let (segments, _) = inline_segments(
-                                content,
-                                line.new_content.as_deref().unwrap_or_default(),
-                            );
-                            paint_inline_text(ui, &segments, theme.text_primary, text_color);
-                        } else {
-                            ui.label(
-                                egui::RichText::new(content)
-                                    .color(text_color)
-                                    .monospace()
-                                    .size(12.0),
-                            );
-                        }
-                    } else {
-                        // No content but keep the row height
-                        ui.label(
-                            egui::RichText::new(" ")
-                                .color(text_color)
-                                .monospace()
-                                .size(12.0),
-                        );
-                    }
                 }
             }
         });
@@ -450,10 +463,14 @@ fn render_line_right(ui: &mut egui::Ui, line: &DiffLine, theme: &AppTheme) {
                 egui::RichText::new(format!("{:>4} ", num))
                     .color(theme.diff_line_num)
                     .monospace()
-                    .size(12.0),
+                    .size(DIFF_FONT_SIZE),
             );
         } else {
-            ui.label(egui::RichText::new("     ").monospace().size(12.0));
+            ui.label(
+                egui::RichText::new("     ")
+                    .monospace()
+                    .size(DIFF_FONT_SIZE),
+            );
         }
 
         // Cell frame, always present
@@ -461,41 +478,39 @@ fn render_line_right(ui: &mut egui::Ui, line: &DiffLine, theme: &AppTheme) {
             .fill(bg_color)
             .inner_margin(egui::Margin::symmetric(2, 0));
 
-        frame.show(ui, |ui| {
-            match line.change_type {
-                ChangeType::Delete => {
-                    // Placeholder on the empty side
+        frame.show(ui, |ui| match line.change_type {
+            ChangeType::Delete => {
+                // Placeholder on the empty side
+                ui.label(
+                    egui::RichText::new(" ")
+                        .color(text_color)
+                        .monospace()
+                        .size(DIFF_FONT_SIZE),
+                );
+            }
+            _ => {
+                if let Some(content) = &line.new_content {
+                    if line.change_type == ChangeType::Replace {
+                        let (_, segments) = inline_segments(
+                            line.old_content.as_deref().unwrap_or_default(),
+                            content,
+                        );
+                        paint_inline_text(ui, &segments, theme.text_primary, text_color);
+                    } else {
+                        ui.label(
+                            egui::RichText::new(content)
+                                .color(text_color)
+                                .monospace()
+                                .size(DIFF_FONT_SIZE),
+                        );
+                    }
+                } else {
                     ui.label(
                         egui::RichText::new(" ")
                             .color(text_color)
                             .monospace()
-                            .size(12.0),
+                            .size(DIFF_FONT_SIZE),
                     );
-                }
-                _ => {
-                    if let Some(content) = &line.new_content {
-                        if line.change_type == ChangeType::Replace {
-                            let (_, segments) = inline_segments(
-                                line.old_content.as_deref().unwrap_or_default(),
-                                content,
-                            );
-                            paint_inline_text(ui, &segments, theme.text_primary, text_color);
-                        } else {
-                            ui.label(
-                                egui::RichText::new(content)
-                                    .color(text_color)
-                                    .monospace()
-                                    .size(12.0),
-                            );
-                        }
-                    } else {
-                        ui.label(
-                            egui::RichText::new(" ")
-                                .color(text_color)
-                                .monospace()
-                                .size(12.0),
-                        );
-                    }
                 }
             }
         });
