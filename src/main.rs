@@ -1,6 +1,7 @@
 mod acp;
 mod data;
 mod domain;
+mod prompts;
 mod ui;
 
 use eframe::egui;
