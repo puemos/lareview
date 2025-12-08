@@ -446,55 +446,104 @@ impl eframe::App for LaReviewApp {
 
         // Top panel with app title and navigation
         egui::TopBottomPanel::top("header").show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                ui.add_space(8.0); // Padding from the left
+            // Add a simple, subtle diagonal line background decoration
+            let rect = ui.available_rect_before_wrap();
+            ui.painter().with_clip_rect(rect).rect_filled(
+                rect,
+                egui::CornerRadius::ZERO,
+                MOCHA.base, // Use base background color
+            );
 
-                // App Title
-                ui.heading(
-                    egui::RichText::new("LA REVIEW")
-                        .strong()
-                        .color(MOCHA.subtext0)
-                        .size(16.0), // Smaller size for more subtle header
+            // Create a simple diagonal line pattern in the background to avoid rendering issues on hover
+            let line_spacing = 25.0; // More dense lines
+            let line_width = 0.4; // Thin, subtle lines
+            let color = MOCHA.surface0.linear_multiply(0.25); // Even more subtle
+
+            // Draw diagonal lines from top-left to bottom-right
+            let mut pos = rect.min.x - rect.max.y;
+            while pos < rect.max.x {
+                ui.painter().line_segment(
+                    [
+                        egui::Pos2::new(pos, rect.min.y),
+                        egui::Pos2::new(pos + (rect.max.y - rect.min.y), rect.max.y),
+                    ],
+                    egui::Stroke::new(line_width, color),
                 );
+                pos += line_spacing;
+            }
 
-                ui.add_space(16.0); // Space between title and navigation
+            // Draw diagonal lines from bottom-left to top-right for X pattern
+            let mut pos = rect.min.y;
+            while pos < rect.max.y {
+                ui.painter().line_segment(
+                    [
+                        egui::Pos2::new(rect.min.x, pos),
+                        egui::Pos2::new(rect.min.x + (rect.max.y - pos), rect.max.y),
+                    ],
+                    egui::Stroke::new(line_width, color),
+                );
+                pos += line_spacing;
+            }
 
-                // Navigation Buttons
-                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+            ui.add_space(12.0); // Left padding
+            ui.horizontal(|ui| {
+                // App Title with Space Odyssey 2001 inspired icon
+                ui.horizontal(|ui| {
+                    // Space Odyssey style icon using egui_phosphor
+                    ui.add(egui::Label::new(
+                        egui::RichText::new(egui_phosphor::regular::CIRCLE_HALF)
+                            .size(22.0) // Slightly smaller size
+                            .color(MOCHA.mauve), // Nice mauve color from the theme
+                    ));
+                    ui.add_space(4.0); // Reduced space between icon and text
+                    ui.heading(
+                        egui::RichText::new("LaReview")
+                            .strong()
+                            .color(MOCHA.text) // Changed to main text color for better contrast
+                            .size(18.0), // Slightly increased size for better visual balance
+                    );
+                });
+
+                ui.add_space(20.0); // Space from title to navigation
+
+                // Navigation Buttons - left aligned after logo
+                ui.horizontal(|ui| {
                     // Generate Button
                     let generate_response = ui.add(
                         egui::Button::new(egui::RichText::new("GENERATE").color(
                             if self.state.current_view == AppView::Generate {
-                                MOCHA.mauve
+                                MOCHA.mauve // Highlight active view
                             } else {
-                                MOCHA.subtext0
+                                MOCHA.subtext1 // Softer color for inactive
                             },
                         ))
-                        .frame(false), // Make it look like a text link
+                        .frame(false)
+                        .corner_radius(egui::CornerRadius::same(4)), // Subtle rounding with int value
                     );
                     if generate_response.clicked() {
                         self.switch_to_generate();
                     }
 
-                    ui.add_space(8.0); // Space between buttons
+                    ui.add_space(12.0); // Space between buttons
 
                     // Review Button
                     let review_response = ui.add(
                         egui::Button::new(egui::RichText::new("REVIEW").color(
                             if self.state.current_view == AppView::Review {
-                                MOCHA.mauve
+                                MOCHA.mauve // Highlight active view
                             } else {
-                                MOCHA.subtext0
+                                MOCHA.subtext1 // Softer color for inactive
                             },
                         ))
-                        .frame(false), // Make it look like a text link
+                        .frame(false)
+                        .corner_radius(egui::CornerRadius::same(4)), // Subtle rounding with int value
                     );
                     if review_response.clicked() {
                         self.switch_to_review();
                     }
                 });
             });
-            ui.add_space(4.0); // Padding at the bottom of the header
+            ui.add_space(8.0); // Bottom padding for better vertical spacing
         });
 
         // main content
