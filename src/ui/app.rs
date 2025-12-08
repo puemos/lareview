@@ -98,10 +98,7 @@ impl AppState {
             std::collections::HashMap::new();
 
         for task in tasks {
-            grouped
-                .entry(task.sub_flow.clone())
-                .or_insert_with(Vec::new)
-                .push(task);
+            grouped.entry(task.sub_flow.clone()).or_default().push(task);
         }
 
         grouped
@@ -157,6 +154,9 @@ impl LaReviewApp {
             .entry(FontFamily::Monospace)
             .or_default()
             .insert(0, "SpaceMono".to_owned());
+
+        egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+
         cc.egui_ctx.set_fonts(fonts);
 
         // Open database as before

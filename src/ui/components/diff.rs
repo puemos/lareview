@@ -1,27 +1,36 @@
-//! Split view diff display (GitHub style) with collapsible files.
-//!
-//! Uses `unidiff` for parsing and `similar` for inline changes.
+//! Unified diff display with syntax highlighting and collapsible files.
+//! Version targeting egui 0.33.
 
 use catppuccin_egui::MOCHA;
 use eframe::egui::{self, FontId, TextFormat, text::LayoutJob};
 use similar::{ChangeTag, TextDiff};
+use std::sync::Arc;
 use unidiff::{Hunk, PatchSet, Result as UnidiffResult};
+
+const DIFF_FONT_SIZE: f32 = 12.0;
+const HEADER_FONT_SIZE: f32 = 14.0;
+
+// Inline diff thresholds
+const MAX_INLINE_LEN: usize = 600;
+
+fn should_do_inline(old: &str, new: &str) -> bool {
+    old.len() <= MAX_INLINE_LEN && new.len() <= MAX_INLINE_LEN
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum ChangeType {
     Equal,
     Delete,
     Insert,
-    Replace,
 }
 
 #[derive(Debug, Clone)]
 struct DiffLine {
     old_line_num: Option<usize>,
     new_line_num: Option<usize>,
-    old_content: Option<String>,
-    new_content: Option<String>,
+    content: Arc<str>,
     change_type: ChangeType,
+    inline_segments: Option<Vec<(String, bool)>>, // (text, highlight)
 }
 
 #[derive(Debug, Clone)]
@@ -33,9 +42,45 @@ struct FileDiff {
     deletions: usize,
 }
 
-const DIFF_FONT_SIZE: f32 = 12.0;
-const DIFF_HEADER_FONT_SIZE: f32 = 14.0;
+#[derive(Default, Clone)]
+struct DiffState {
+    last_hash: u64,
+    files: Vec<FileDiff>,
+    parse_error: Option<String>,
+    rows: Vec<Row>,
+    row_height: f32,
+    collapsed: Vec<bool>, // Per-file collapse state
+}
 
+#[derive(Clone)]
+enum Row {
+    FileHeader { file_idx: usize },
+    DiffLine { file_idx: usize, line_idx: usize },
+}
+
+fn strip_git_prefix(path: &str) -> String {
+    path.trim_start_matches("a/")
+        .trim_start_matches("b/")
+        .to_string()
+}
+
+// Inline diff segmentation - returns segments for a single line
+fn inline_segments(old: &str, new: &str) -> Vec<(String, bool)> {
+    let diff = TextDiff::from_chars(old, new);
+    let mut segments = Vec::new();
+
+    for change in diff.iter_all_changes() {
+        let text = change.value().to_string();
+        match change.tag() {
+            ChangeTag::Equal => segments.push((text, false)),
+            ChangeTag::Delete | ChangeTag::Insert => segments.push((text, true)),
+        }
+    }
+
+    segments
+}
+
+// Build internal line representation - GitHub style
 fn build_lines_for_hunk(hunk: &Hunk, out: &mut Vec<DiffLine>) {
     let lines = hunk.lines();
     let mut i = 0usize;
@@ -45,19 +90,19 @@ fn build_lines_for_hunk(hunk: &Hunk, out: &mut Vec<DiffLine>) {
 
         // Context line
         if line.is_context() {
-            let text = line.value.clone();
+            let arc: Arc<str> = Arc::from(line.value.as_str());
             out.push(DiffLine {
                 old_line_num: line.source_line_no,
                 new_line_num: line.target_line_no,
-                old_content: Some(text.clone()),
-                new_content: Some(text),
+                content: arc,
                 change_type: ChangeType::Equal,
+                inline_segments: None,
             });
             i += 1;
             continue;
         }
 
-        // Start of a change region: removed lines followed by added lines
+        // Find the block of removals and additions
         let remove_start = i;
         let mut j = i;
 
@@ -73,110 +118,101 @@ fn build_lines_for_hunk(hunk: &Hunk, out: &mut Vec<DiffLine>) {
         let removed = &lines[remove_start..insert_start];
         let added = &lines[insert_start..j];
 
-        // Plain text slices for line level diff
-        let old_block: Vec<&str> = removed.iter().map(|l| l.value.as_str()).collect();
-        let new_block: Vec<&str> = added.iter().map(|l| l.value.as_str()).collect();
+        // GitHub-style: try to align similar lines
+        if !removed.is_empty() && !added.is_empty() && removed.len() == added.len() {
+            // When we have equal numbers, try to pair them up with inline diffs
+            let mut has_similar = false;
 
-        let diff = TextDiff::from_slices(&old_block, &new_block);
+            for (old_line, new_line) in removed.iter().zip(added.iter()) {
+                let old_text = old_line.value.as_str();
+                let new_text = new_line.value.as_str();
 
-        // Check if there is any op that has both old and new lines
-        let has_mixed_op = diff
-            .ops()
-            .iter()
-            .any(|op| !op.old_range().is_empty() && !op.new_range().is_empty());
+                // Check if lines are similar enough to show inline diff
+                let similarity = similar::TextDiff::from_chars(old_text, new_text).ratio();
 
-        if has_mixed_op {
-            // Use TextDiff alignment inside the block
-            for op in diff.ops() {
-                let old_range = op.old_range();
-                let new_range = op.new_range();
-
-                let left_len = old_range.len();
-                let right_len = new_range.len();
-                let max_len = std::cmp::max(left_len, right_len);
-
-                for k in 0..max_len {
-                    let left_line = if k < left_len {
-                        Some(&removed[old_range.start + k])
-                    } else {
-                        None
-                    };
-
-                    let right_line = if k < right_len {
-                        Some(&added[new_range.start + k])
-                    } else {
-                        None
-                    };
-
-                    let change_type = match (left_line, right_line) {
-                        (Some(l), Some(r)) => {
-                            if l.value == r.value {
-                                ChangeType::Equal
-                            } else {
-                                ChangeType::Replace
-                            }
-                        }
-                        (Some(_), None) => ChangeType::Delete,
-                        (None, Some(_)) => ChangeType::Insert,
-                        _ => unreachable!(),
-                    };
-
-                    out.push(DiffLine {
-                        old_line_num: left_line.and_then(|l| l.source_line_no),
-                        new_line_num: right_line.and_then(|r| r.target_line_no),
-                        old_content: left_line.map(|l| l.value.clone()),
-                        new_content: right_line.map(|r| r.value.clone()),
-                        change_type,
-                    });
+                if similarity > 0.3 {
+                    has_similar = true;
+                    break;
                 }
             }
-        } else {
-            // No overlap at all in this block
-            // Fall back to pairing by index so big struct edits line up row by row
-            let remove_count = removed.len();
-            let insert_count = added.len();
-            let row_count = std::cmp::max(remove_count, insert_count);
 
-            for k in 0..row_count {
-                let left_line = if k < remove_count {
-                    Some(&removed[k])
-                } else {
-                    None
-                };
-                let right_line = if k < insert_count {
-                    Some(&added[k])
-                } else {
-                    None
-                };
+            if has_similar {
+                // Pair them up with inline diffs
+                for (old_line, new_line) in removed.iter().zip(added.iter()) {
+                    let old_text = old_line.value.as_str();
+                    let new_text = new_line.value.as_str();
 
-                let change_type = match (left_line, right_line) {
-                    (Some(l), Some(r)) if l.value == r.value => ChangeType::Equal,
-                    (Some(_), Some(_)) => ChangeType::Replace,
-                    (Some(_), None) => ChangeType::Delete,
-                    (None, Some(_)) => ChangeType::Insert,
-                    (None, None) => unreachable!(),
-                };
+                    let similarity = similar::TextDiff::from_chars(old_text, new_text).ratio();
 
-                out.push(DiffLine {
-                    old_line_num: left_line.and_then(|l| l.source_line_no),
-                    new_line_num: right_line.and_then(|r| r.target_line_no),
-                    old_content: left_line.map(|l| l.value.clone()),
-                    new_content: right_line.map(|r| r.value.clone()),
-                    change_type,
-                });
+                    if similarity > 0.3 && should_do_inline(old_text, new_text) {
+                        // Show as deletion with inline diff
+                        out.push(DiffLine {
+                            old_line_num: old_line.source_line_no,
+                            new_line_num: None,
+                            content: Arc::from(old_text),
+                            change_type: ChangeType::Delete,
+                            inline_segments: Some(inline_segments(old_text, new_text)),
+                        });
+
+                        // Show as insertion with inline diff
+                        out.push(DiffLine {
+                            old_line_num: None,
+                            new_line_num: new_line.target_line_no,
+                            content: Arc::from(new_text),
+                            change_type: ChangeType::Insert,
+                            inline_segments: Some(inline_segments(new_text, old_text)),
+                        });
+                    } else {
+                        // Not similar enough, show as separate delete/insert
+                        out.push(DiffLine {
+                            old_line_num: old_line.source_line_no,
+                            new_line_num: None,
+                            content: Arc::from(old_text),
+                            change_type: ChangeType::Delete,
+                            inline_segments: None,
+                        });
+
+                        out.push(DiffLine {
+                            old_line_num: None,
+                            new_line_num: new_line.target_line_no,
+                            content: Arc::from(new_text),
+                            change_type: ChangeType::Insert,
+                            inline_segments: None,
+                        });
+                    }
+                }
+
+                i = j;
+                continue;
             }
+        }
+
+        // Fallback: show all deletions, then all insertions (GitHub style)
+        for old_line in removed {
+            out.push(DiffLine {
+                old_line_num: old_line.source_line_no,
+                new_line_num: None,
+                content: Arc::from(old_line.value.as_str()),
+                change_type: ChangeType::Delete,
+                inline_segments: None,
+            });
+        }
+
+        for new_line in added {
+            out.push(DiffLine {
+                old_line_num: None,
+                new_line_num: new_line.target_line_no,
+                content: Arc::from(new_line.value.as_str()),
+                change_type: ChangeType::Insert,
+                inline_segments: None,
+            });
         }
 
         i = j;
     }
 }
 
-fn strip_git_prefix(path: &str) -> String {
-    path.trim_start_matches("a/")
-        .trim_start_matches("b/")
-        .to_string()
-}
-
+// Parse whole diff
 fn parse_diff_by_files(diff_text: &str) -> UnidiffResult<Vec<FileDiff>> {
     let trimmed = diff_text.trim();
     if trimmed.is_empty() {
@@ -207,307 +243,326 @@ fn parse_diff_by_files(diff_text: &str) -> UnidiffResult<Vec<FileDiff>> {
     Ok(files_out)
 }
 
-type InlineSegments = (Vec<(String, bool)>, Vec<(String, bool)>);
+// Build virtual row list based on collapse state
+fn build_row_list(files: &[FileDiff], collapsed: &[bool], ui: &egui::Ui) -> (Vec<Row>, f32) {
+    let mut rows = Vec::new();
 
-/// Build inline segments for left and right side from a pair of strings.
-fn inline_segments(old: &str, new: &str) -> InlineSegments {
-    let diff = TextDiff::from_chars(old, new);
+    // Monospace height plus 2px padding for clean GitHub look
+    let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 2.0;
 
-    let mut left = Vec::new();
-    let mut right = Vec::new();
+    for (file_idx, file) in files.iter().enumerate() {
+        rows.push(Row::FileHeader { file_idx });
 
-    for change in diff.iter_all_changes() {
-        let text = change.value().to_string();
-        match change.tag() {
-            ChangeTag::Equal => {
-                left.push((text.clone(), false));
-                right.push((text, false));
-            }
-            ChangeTag::Delete => {
-                left.push((text, true));
-            }
-            ChangeTag::Insert => {
-                right.push((text, true));
+        if !collapsed[file_idx] {
+            for line_idx in 0..file.lines.len() {
+                rows.push(Row::DiffLine { file_idx, line_idx });
             }
         }
     }
 
-    (left, right)
+    (rows, row_height)
 }
 
-fn paint_inline_text(
-    ui: &mut egui::Ui,
+// Helper to append inline segments to a LayoutJob
+fn paint_inline_text_job(
+    job: &mut LayoutJob,
     segments: &[(String, bool)],
     base_color: egui::Color32,
-    accent_color: egui::Color32,
+    highlight_bg: egui::Color32,
 ) {
-    let mut job = LayoutJob::default();
-
     for (text, highlight) in segments {
-        let format = TextFormat {
+        let fmt = TextFormat {
             font_id: FontId::monospace(DIFF_FONT_SIZE),
-            color: if *highlight { accent_color } else { base_color },
+            color: base_color,
+            background: if *highlight {
+                highlight_bg
+            } else {
+                egui::Color32::TRANSPARENT
+            },
             ..Default::default()
         };
-        job.append(text, 0.0, format);
+        job.append(text, 0.0, fmt);
+    }
+}
+
+pub fn render_diff_editor(ui: &mut egui::Ui, diff_text: &str, _language: &str) {
+    let state_id = ui.id().with("diff_state");
+
+    let mut state = ui
+        .ctx()
+        .memory_mut(|mem| mem.data.get_persisted::<DiffState>(state_id))
+        .unwrap_or_default();
+
+    let new_hash = egui::util::hash(diff_text.as_bytes());
+
+    if state.last_hash != new_hash {
+        match parse_diff_by_files(diff_text) {
+            Ok(files) => {
+                let file_count = files.len();
+                state.files = files;
+                state.parse_error = None;
+                state.collapsed = vec![false; file_count];
+
+                let (rows, row_height) = build_row_list(&state.files, &state.collapsed, ui);
+                state.rows = rows;
+                state.row_height = row_height;
+            }
+            Err(err) => {
+                state.files.clear();
+                state.rows.clear();
+                state.parse_error = Some(format!("Failed to parse diff: {err}"));
+            }
+        }
+        state.last_hash = new_hash;
+        ui.ctx()
+            .memory_mut(|mem| mem.data.insert_persisted(state_id, state.clone()));
     }
 
-    ui.label(job);
-}
+    if let Some(err) = &state.parse_error {
+        let msg = format!("{} {}", egui_phosphor::regular::WARNING, err);
+        ui.colored_label(MOCHA.red, msg);
+        return;
+    }
 
-pub fn render_diff_editor(ui: &mut egui::Ui, code: &str, _language: &str) {
-    let files = match parse_diff_by_files(code) {
-        Ok(files) => files,
-        Err(err) => {
-            ui.colored_label(MOCHA.red, format!("Failed to parse diff: {err}"));
-            return;
-        }
-    };
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new("Diff").color(MOCHA.text));
+        ui.label(egui::RichText::new(format!(
+            "{} {} files",
+            egui_phosphor::regular::FILES,
+            state.files.len()
+        )))
+    });
 
-    ui.group(|ui| {
-        ui.horizontal(|ui| {
-            ui.label(egui::RichText::new("Diff").color(MOCHA.text));
-            ui.label(
-                egui::RichText::new(format!("({} files)", files.len()))
-                    .color(MOCHA.subtext1)
-                    .weak(),
-            );
+    ui.add_space(4.0);
+
+    let total_rows = state.rows.len();
+    let row_height = state.row_height;
+
+    egui::ScrollArea::vertical()
+        .id_salt("diff_scroll")
+        .auto_shrink([false; 2])
+        .show_rows(ui, row_height, total_rows, |ui, range| {
+            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+
+            for idx in range {
+                if idx >= state.rows.len() {
+                    break;
+                }
+
+                match state.rows[idx].clone() {
+                    Row::FileHeader { file_idx } => {
+                        render_file_header(ui, file_idx, &mut state, state_id);
+                    }
+                    Row::DiffLine { file_idx, line_idx } => {
+                        let file = &state.files[file_idx];
+                        let line = &file.lines[line_idx];
+                        render_unified_row(ui, line);
+                    }
+                }
+            }
         });
 
-        ui.add_space(4.0);
+    ui.ctx()
+        .memory_mut(|mem| mem.data.insert_persisted(state_id, state.clone()));
+}
 
-        if files.is_empty() {
+// Draw collapsible file header
+fn render_file_header(
+    ui: &mut egui::Ui,
+    file_idx: usize,
+    state: &mut DiffState,
+    state_id: egui::Id,
+) {
+    let file = &state.files[file_idx];
+
+    let is_open = !state.collapsed[file_idx];
+
+    // Pick the icons you want
+    let icon_closed = egui_phosphor::regular::PLUS;
+    let icon_open = egui_phosphor::regular::MINUS;
+    let icon = if is_open { icon_open } else { icon_closed };
+
+    let clicked = ui
+        .horizontal(|ui| {
+            let mut clicked_local = false;
+
+            let display_path = if file.new_path != "/dev/null" {
+                &file.new_path
+            } else {
+                &file.old_path
+            };
+
+            // Icon button
+            if ui
+                .button(
+                    egui::RichText::new(icon.to_string())
+                        .size(DIFF_FONT_SIZE)
+                        .color(MOCHA.text),
+                )
+                .clicked()
+            {
+                clicked_local = true;
+            }
+
+            // Path
             ui.label(
-                egui::RichText::new("No diff detected")
-                    .italics()
-                    .color(MOCHA.subtext1),
+                egui::RichText::new(display_path)
+                    .strong()
+                    .color(MOCHA.text)
+                    .size(HEADER_FONT_SIZE),
             );
-            return;
-        }
 
-        egui::ScrollArea::vertical()
-            .auto_shrink([false; 2])
-            .show(ui, |ui| {
-                for (idx, file) in files.iter().enumerate() {
-                    let id = egui::Id::new("file_diff").with(idx);
-
-                    let header_response = ui.horizontal(|ui| {
-                        let is_open = ui.data(|d| d.get_temp::<bool>(id).unwrap_or(true));
-
-                        let arrow = if is_open { "▼" } else { "▶" };
-                        if ui
-                            .button(egui::RichText::new(arrow).size(DIFF_FONT_SIZE))
-                            .clicked()
-                        {
-                            ui.data_mut(|d| d.insert_temp(id, !is_open));
-                        }
-
-                        let display_path = if file.new_path != "/dev/null" {
-                            &file.new_path
-                        } else {
-                            &file.old_path
-                        };
-
-                        ui.label(
-                            egui::RichText::new(display_path)
-                                .strong()
-                                .color(MOCHA.text)
-                                .size(DIFF_HEADER_FONT_SIZE),
-                        );
-
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if file.deletions > 0 {
-                                ui.label(
-                                    egui::RichText::new(format!("-{}", file.deletions))
-                                        .color(MOCHA.red)
-                                        .size(DIFF_FONT_SIZE),
-                                );
-                            }
-                            if file.additions > 0 {
-                                ui.label(
-                                    egui::RichText::new(format!("+{}", file.additions))
-                                        .color(MOCHA.green)
-                                        .size(DIFF_FONT_SIZE),
-                                );
-                            }
-                        });
-
-                        is_open
-                    });
-
-                    ui.separator();
-
-                    if header_response.inner {
-                        ui.columns(2, |columns| {
-                            columns[0].vertical(|ui| {
-                                ui.label(
-                                    egui::RichText::new("Before")
-                                        .strong()
-                                        .color(MOCHA.text)
-                                        .size(DIFF_FONT_SIZE),
-                                );
-                                ui.separator();
-
-                                for line in &file.lines {
-                                    render_line_left(ui, line);
-                                }
-                            });
-
-                            columns[1].vertical(|ui| {
-                                ui.label(
-                                    egui::RichText::new("After")
-                                        .strong()
-                                        .color(MOCHA.text)
-                                        .size(DIFF_FONT_SIZE),
-                                );
-                                ui.separator();
-
-                                for line in &file.lines {
-                                    render_line_right(ui, line);
-                                }
-                            });
-                        });
-                    }
-
-                    ui.add_space(8.0);
+            // Additions and deletions
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if file.deletions > 0 {
+                    ui.label(
+                        egui::RichText::new(format!("-{}", file.deletions))
+                            .color(MOCHA.red)
+                            .size(DIFF_FONT_SIZE),
+                    );
+                }
+                if file.additions > 0 {
+                    ui.label(
+                        egui::RichText::new(format!("+{}", file.additions))
+                            .color(MOCHA.green)
+                            .size(DIFF_FONT_SIZE),
+                    );
                 }
             });
-    });
+
+            clicked_local
+        })
+        .inner;
+
+    ui.add_space(2.0);
+    ui.separator();
+
+    if clicked {
+        state.collapsed[file_idx] = !state.collapsed[file_idx];
+
+        let (rows, row_height) = build_row_list(&state.files, &state.collapsed, ui);
+        state.rows = rows;
+        state.row_height = row_height;
+
+        // Clear scroll state so show_rows does not request stale indices
+        let scroll_id = ui.id().with("diff_scroll");
+        ui.ctx().memory_mut(|mem| {
+            mem.data.remove::<egui::scroll_area::State>(scroll_id);
+        });
+
+        ui.ctx()
+            .memory_mut(|mem| mem.data.insert_persisted(state_id, state.clone()));
+    }
 }
 
-fn render_line_left(ui: &mut egui::Ui, line: &DiffLine) {
-    // Color configuration. Insert uses transparent background.
-    let (bg_color, text_color) = match line.change_type {
-        ChangeType::Delete | ChangeType::Replace => (MOCHA.red.gamma_multiply(0.2), MOCHA.red),
-        ChangeType::Equal | ChangeType::Insert => (egui::Color32::TRANSPARENT, MOCHA.text),
+// Single unified diff line row - GitHub style
+fn render_unified_row(ui: &mut egui::Ui, line: &DiffLine) {
+    let (prefix, bg_color, text_color, line_num_bg) = match line.change_type {
+        ChangeType::Equal => (
+            " ",
+            egui::Color32::TRANSPARENT,
+            MOCHA.text,
+            egui::Color32::TRANSPARENT,
+        ),
+        ChangeType::Delete => (
+            "-",
+            MOCHA.red.gamma_multiply(0.15),
+            MOCHA.red,
+            MOCHA.red.gamma_multiply(0.25),
+        ),
+        ChangeType::Insert => (
+            "+",
+            MOCHA.green.gamma_multiply(0.15),
+            MOCHA.green,
+            MOCHA.green.gamma_multiply(0.25),
+        ),
     };
 
     ui.horizontal(|ui| {
-        // Line number column
-        if let Some(num) = line.old_line_num {
-            ui.label(
-                egui::RichText::new(format!("{:>4} ", num))
-                    .color(MOCHA.overlay0)
-                    .monospace()
-                    .size(DIFF_FONT_SIZE),
-            );
-        } else {
-            ui.label(
-                egui::RichText::new("     ")
-                    .monospace()
-                    .size(DIFF_FONT_SIZE),
-            );
-        }
+        ui.spacing_mut().item_spacing.x = 0.0;
 
-        // Cell frame, even for insert only rows so height stays consistent
-        let frame = egui::Frame::default()
-            .fill(bg_color)
-            .inner_margin(egui::Margin::symmetric(2, 0));
-
-        frame.show(ui, |ui| match line.change_type {
-            ChangeType::Insert => {
-                // Placeholder so the row has the same height
-                ui.label(
-                    egui::RichText::new(" ")
-                        .color(text_color)
-                        .monospace()
-                        .size(DIFF_FONT_SIZE),
-                );
-            }
-            _ => {
-                if let Some(content) = &line.old_content {
-                    if line.change_type == ChangeType::Replace {
-                        let (segments, _) = inline_segments(
-                            content,
-                            line.new_content.as_deref().unwrap_or_default(),
-                        );
-                        paint_inline_text(ui, &segments, MOCHA.text, text_color);
-                    } else {
-                        ui.label(
-                            egui::RichText::new(content)
-                                .color(text_color)
-                                .monospace()
-                                .size(DIFF_FONT_SIZE),
-                        );
+        // Line number section with darker background
+        egui::Frame::NONE
+            .fill(line_num_bg)
+            .inner_margin(egui::Margin::symmetric(4, 0))
+            .show(ui, |ui| {
+                let line_numbers = match line.change_type {
+                    ChangeType::Equal => match (line.old_line_num, line.new_line_num) {
+                        (Some(old), Some(new)) => format!("{:>4} {:>4}", old, new),
+                        _ => "         ".to_string(),
+                    },
+                    ChangeType::Delete => {
+                        if let Some(old) = line.old_line_num {
+                            format!("{:>4}     ", old)
+                        } else {
+                            "         ".to_string()
+                        }
                     }
+                    ChangeType::Insert => {
+                        if let Some(new) = line.new_line_num {
+                            format!("     {:>4}", new)
+                        } else {
+                            "         ".to_string()
+                        }
+                    }
+                };
+
+                ui.label(
+                    egui::RichText::new(line_numbers)
+                        .font(FontId::monospace(DIFF_FONT_SIZE))
+                        .color(MOCHA.overlay0),
+                );
+            });
+
+        // Content section
+        egui::Frame::NONE
+            .fill(bg_color)
+            .inner_margin(egui::Margin::symmetric(4, 0))
+            .show(ui, |ui| {
+                let mut job = LayoutJob::default();
+
+                // Add prefix
+                job.append(
+                    prefix,
+                    0.0,
+                    TextFormat {
+                        font_id: FontId::monospace(DIFF_FONT_SIZE),
+                        color: text_color,
+                        ..Default::default()
+                    },
+                );
+
+                job.append(
+                    " ",
+                    0.0,
+                    TextFormat {
+                        font_id: FontId::monospace(DIFF_FONT_SIZE),
+                        color: text_color,
+                        ..Default::default()
+                    },
+                );
+
+                // Add content with inline highlighting if available
+                if let Some(segments) = &line.inline_segments {
+                    let highlight_bg = match line.change_type {
+                        ChangeType::Delete => MOCHA.red.gamma_multiply(0.4),
+                        ChangeType::Insert => MOCHA.green.gamma_multiply(0.4),
+                        ChangeType::Equal => egui::Color32::TRANSPARENT,
+                    };
+                    paint_inline_text_job(&mut job, segments, text_color, highlight_bg);
                 } else {
-                    // No content but keep the row height
-                    ui.label(
-                        egui::RichText::new(" ")
-                            .color(text_color)
-                            .monospace()
-                            .size(DIFF_FONT_SIZE),
+                    job.append(
+                        line.content.as_ref(),
+                        0.0,
+                        TextFormat {
+                            font_id: FontId::monospace(DIFF_FONT_SIZE),
+                            color: text_color,
+                            ..Default::default()
+                        },
                     );
                 }
-            }
-        });
-    });
-}
 
-fn render_line_right(ui: &mut egui::Ui, line: &DiffLine) {
-    // Color configuration. Delete uses transparent background on the empty side.
-    let (bg_color, text_color) = match line.change_type {
-        ChangeType::Insert | ChangeType::Replace => (MOCHA.green.gamma_multiply(0.2), MOCHA.green),
-        ChangeType::Equal | ChangeType::Delete => (egui::Color32::TRANSPARENT, MOCHA.text),
-    };
-
-    ui.horizontal(|ui| {
-        // Line number column
-        if let Some(num) = line.new_line_num {
-            ui.label(
-                egui::RichText::new(format!("{:>4} ", num))
-                    .color(MOCHA.overlay0)
-                    .monospace()
-                    .size(DIFF_FONT_SIZE),
-            );
-        } else {
-            ui.label(
-                egui::RichText::new("     ")
-                    .monospace()
-                    .size(DIFF_FONT_SIZE),
-            );
-        }
-
-        // Cell frame, always present
-        let frame = egui::Frame::default()
-            .fill(bg_color)
-            .inner_margin(egui::Margin::symmetric(2, 0));
-
-        frame.show(ui, |ui| match line.change_type {
-            ChangeType::Delete => {
-                // Placeholder on the empty side
-                ui.label(
-                    egui::RichText::new(" ")
-                        .color(text_color)
-                        .monospace()
-                        .size(DIFF_FONT_SIZE),
-                );
-            }
-            _ => {
-                if let Some(content) = &line.new_content {
-                    if line.change_type == ChangeType::Replace {
-                        let (_, segments) = inline_segments(
-                            line.old_content.as_deref().unwrap_or_default(),
-                            content,
-                        );
-                        paint_inline_text(ui, &segments, MOCHA.text, text_color);
-                    } else {
-                        ui.label(
-                            egui::RichText::new(content)
-                                .color(text_color)
-                                .monospace()
-                                .size(DIFF_FONT_SIZE),
-                        );
-                    }
-                } else {
-                    ui.label(
-                        egui::RichText::new(" ")
-                            .color(text_color)
-                            .monospace()
-                            .size(DIFF_FONT_SIZE),
-                    );
-                }
-            }
-        });
+                ui.label(job);
+            });
     });
 }
