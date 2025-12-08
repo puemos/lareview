@@ -22,11 +22,18 @@ The project follows a modular structure:
 
 *   `src/main.rs`: The application entry point. It initializes the `tokio` runtime and the `eframe` GUI application.
 *   `src/ui/app.rs`: Contains the core application logic and state management (`LaReviewApp`, `AppState`). It defines the main UI structure and handles events.
-*   `src/ui/views/`: Implements the different screens of the application, such as the `generate_view` and `review_view`.
+*   `src/ui/views/`: Implements the different screens of the application, such as the `generate_view` and `review_view`. The `review_view` now includes a tree-based navigation system.
 *   `src/data/`: Manages data persistence. It includes a `db.rs` for SQLite connection handling and repositories (`TaskRepository`, `NoteRepository`, etc.) for data access.
-*   `src/domain/`: Defines the core data structures (structs) used throughout the application, like `PullRequest`, `ReviewTask`, and `Note`.
+*   `src/domain/`: Defines the core data structures (structs) used throughout the application, like `PullRequest`, `ReviewTask`, and `Note`. The `ReviewTask` struct now includes a `sub_flow` field.
 *   `src/acp/`: Contains logic for the Agent Client Protocol, suggesting communication with an external agent for tasks like generating reviews.
 *   `src/prompts/`: Includes `handlebars` templates, likely used to generate prompts for the AI agent.
+
+## UI Views
+
+LaReview has two main views:
+
+*   **GENERATE:** This view allows the user to paste a diff, select an AI agent, and generate a review plan.
+*   **REVIEW:** This view displays the review plan in a tree-based navigation system. The user can navigate through the plan, view task details, and add notes.
 
 ## Building and Running
 
@@ -65,6 +72,20 @@ cargo build
 To build and run the application in development mode:
 ```bash
 cargo run
+```
+
+### Database Management Scripts
+
+The project includes utility scripts for database management:
+
+1. **Seed Database** - Populate the database with sample data:
+```bash
+cargo run --bin seed_db
+```
+
+2. **Reset Database** - Clear all data from the database:
+```bash
+cargo run --bin reset_db
 ```
 
 ## Development Conventions
