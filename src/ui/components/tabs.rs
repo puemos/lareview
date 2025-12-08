@@ -42,15 +42,6 @@ where
                         .frame(false),
                 );
 
-                if is_active {
-                    let rect = response.rect;
-                    ui.painter().hline(
-                        rect.x_range(),
-                        rect.bottom(),
-                        egui::Stroke::new(2.0, MOCHA.mauve),
-                    );
-                }
-
                 if response.clicked() {
                     *current_tab = tab_value;
                 }

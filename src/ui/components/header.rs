@@ -1,29 +1,43 @@
 use catppuccin_egui::MOCHA;
 use eframe::egui;
 
-/// Common header component
-pub fn header(ui: &mut egui::Ui, title: &str) {
-    ui.heading(egui::RichText::new(title).size(20.0).color(MOCHA.text));
+pub fn header(ui: &mut egui::Ui, title: &str, action: Option<HeaderAction<'_>>) {
+    ui.horizontal(|ui| {
+        ui.heading(egui::RichText::new(title).size(20.0).color(MOCHA.text));
+
+        if let Some(action) = action {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if action_button(ui, action.label, action.enabled, action.color_if_enabled)
+                    .clicked()
+                {
+                    (action.on_click)();
+                }
+            });
+        }
+    });
 }
 
-/// Header with action button component
-pub fn header_with_action(
-    ui: &mut egui::Ui,
-    title: &str,
-    action_label: &str,
-    enabled: bool,
-    color_if_enabled: egui::Color32,
-    on_click: impl FnOnce(),
-) {
-    ui.horizontal(|ui| {
-        header(ui, title);
+pub struct HeaderAction<'a> {
+    pub label: &'a str,
+    pub enabled: bool,
+    pub color_if_enabled: egui::Color32,
+    pub on_click: Box<dyn FnOnce() + 'a>,
+}
 
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if action_button(ui, action_label, enabled, color_if_enabled).clicked() {
-                on_click();
-            }
-        });
-    });
+impl<'a> HeaderAction<'a> {
+    pub fn new(
+        label: &'a str,
+        enabled: bool,
+        color_if_enabled: egui::Color32,
+        on_click: impl FnOnce() + 'a,
+    ) -> Self {
+        Self {
+            label,
+            enabled,
+            color_if_enabled,
+            on_click: Box::new(on_click),
+        }
+    }
 }
 
 /// Common action button component
