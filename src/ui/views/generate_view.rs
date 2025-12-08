@@ -7,7 +7,7 @@ use tokio;
 use crate::acp::{GenerateTasksInput, generate_tasks_with_acp, list_agent_candidates};
 use crate::ui::app::{GenMsg, GenResultPayload, GenTab, LaReviewApp, SelectedAgent};
 use crate::ui::components::diff::render_diff_editor;
-use crate::ui::components::header::header_with_action;
+use crate::ui::components::header::{HeaderAction, header};
 use crate::ui::components::selection_chips::selection_chips;
 use crate::ui::components::status::{error_banner, status_label};
 use crate::ui::components::tabs::TabBar;
@@ -17,25 +17,36 @@ impl LaReviewApp {
         let mut trigger_generate = false;
 
         ui.vertical(|ui| {
-            ui.add_space(8.0);
+            let action_text = if self.state.is_generating {
+                format!("{} Generating...", egui_phosphor::regular::HOURGLASS_HIGH)
+            } else {
+                format!("{} Run", egui_phosphor::regular::PLAY)
+            };
 
             // Header
-            header_with_action(
+            header(
                 ui,
-                "╱ GENERATE TASKS",
-                if self.state.is_generating {
-                    "⏳ Generating..."
-                } else {
-                    "▶ RUN"
-                },
-                !self.state.diff_text.trim().is_empty() && !self.state.is_generating,
-                MOCHA.mauve,
-                || {
-                    trigger_generate = true;
-                },
+                "Generate",
+                Some(HeaderAction::new(
+                    action_text.as_str(),
+                    !self.state.diff_text.trim().is_empty() && !self.state.is_generating,
+                    MOCHA.mauve,
+                    || {
+                        trigger_generate = true;
+                    },
+                )),
             );
 
             ui.add_space(8.0);
+
+            // Tab bar
+            TabBar::new(&mut self.state.selected_tab)
+                .add("Diff", GenTab::Diff)
+                .add("Agent", GenTab::Agent)
+                .show(ui);
+
+            ui.add_space(6.0);
+            ui.separator();
 
             // Agent selection chips
             selection_chips(
@@ -70,14 +81,6 @@ impl LaReviewApp {
                 error_banner(ui, err);
             }
 
-            ui.add_space(8.0);
-            ui.separator();
-
-            // Tab bar
-            TabBar::new(&mut self.state.selected_tab)
-                .add("Diff", GenTab::Diff)
-                .add("Agent", GenTab::Agent)
-                .show(ui);
             ui.separator();
             ui.add_space(6.0);
 
@@ -98,6 +101,8 @@ impl LaReviewApp {
                             ui.code("git diff HEAD~1 > my_diff.txt");
                         });
 
+                        ui.add_space(10.0);
+
                         // Show a minimal text editor for pasting
                         egui::Frame::new()
                             .fill(MOCHA.crust)
@@ -110,7 +115,7 @@ impl LaReviewApp {
                                             .hint_text("Paste your git diff here...")
                                             .font(egui::TextStyle::Monospace)
                                             .desired_width(f32::INFINITY)
-                                            .desired_rows(1);
+                                            .desired_rows(10);
                                     ui.add(editor);
                                 });
                             });
