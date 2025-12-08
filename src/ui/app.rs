@@ -1,6 +1,5 @@
-#![allow(dead_code)]
-
-//! Main application state (egui version)
+//! Main application state and UI logic for the LaReview application
+//! This module contains the primary egui application state and UI implementation
 
 use std::sync::Arc;
 
@@ -43,54 +42,61 @@ pub enum GenTab {
 pub struct AppState {
     pub current_view: AppView,
     // Renamed tasks to all_tasks to hold all tasks regardless of PR
+    /// All review tasks fetched from the database, to be filtered by selected PR
     pub all_tasks: Vec<ReviewTask>,
 
+    /// Flag indicating if task generation is currently in progress
     pub is_generating: bool,
+    /// Error message from failed task generation, if any
     pub generation_error: Option<String>,
+    /// Currently selected tab in the generate view
     pub selected_tab: GenTab,
+    /// Currently selected agent for task generation
     pub selected_agent: SelectedAgent,
 
+    /// Current diff text in the generate view
     pub diff_text: String,
 
-    pub prs: Vec<PullRequest>,          // New field to hold all loaded PRs
-    pub selected_pr_id: Option<String>, // New field to track the currently selected PR ID
+    /// All pull requests loaded from the database
+    pub prs: Vec<PullRequest>,
+    /// ID of the currently selected pull request
+    pub selected_pr_id: Option<String>,
 
-    // Existing PR-related fields, these will be set based on selected_pr_id or current_pull_request
-    // These specific fields (pr_id, pr_title, etc.) will eventually be sourced from the selected_pr_id's corresponding PullRequest object.
+    /// Fields representing the current PR context
+    /// These fields are dynamically updated based on the selected PR
     pub pr_id: String,
     pub pr_title: String,
     pub pr_repo: String,
     pub pr_author: String,
     pub pr_branch: String,
 
+    /// ID of the currently selected review task
     pub selected_task_id: Option<String>,
 
+    /// Messages from the agent during task generation
     pub agent_messages: Vec<String>,
+    /// Thoughts from the agent during task generation
     pub agent_thoughts: Vec<String>,
+    /// Log messages from the agent during task generation
     pub agent_logs: Vec<String>,
 
+    /// Current note content for the selected task
     pub current_note: Option<String>,
+    /// Error message from review operations, if any
     pub review_error: Option<String>,
-    pub expanded_sub_flows: std::collections::BTreeSet<String>, // Track which sub-flows are expanded (maintains order)
 
+    /// Current full diff view state, if any
     pub full_diff: Option<FullDiffView>,
 }
 
 #[derive(Debug, Clone)]
-pub enum FullDiffSource {
-    Generate, // from Generate tab, state.diff_text
-    ReviewTask { task_id: String },
-}
-
-#[derive(Debug, Clone)]
 pub struct FullDiffView {
-    pub title: String,          // what to show in the window title
-    pub source: FullDiffSource, // who owns this diff logically
-    pub text: String,           // the unified diff itself
+    pub title: String,
+    pub text: String,
 }
 
 impl AppState {
-    // Getter for tasks, filtered by selected_pr_id
+    /// Get tasks filtered by the currently selected pull request ID
     pub fn tasks(&self) -> Vec<ReviewTask> {
         if let Some(selected_pr_id) = &self.selected_pr_id {
             self.all_tasks
@@ -106,7 +112,7 @@ impl AppState {
         }
     }
 
-    // Group tasks by sub-flows for the selected PR
+    /// Group tasks by sub-flows for the selected pull request
     pub fn tasks_by_sub_flow(&self) -> std::collections::HashMap<Option<String>, Vec<ReviewTask>> {
         let tasks = self.tasks();
         let mut grouped: std::collections::HashMap<Option<String>, Vec<ReviewTask>> =
@@ -134,19 +140,24 @@ pub enum GenMsg {
     Done(Result<GenResultPayload, String>),
 }
 
-/// Root egui application
+/// Root egui application for LaReview
 pub struct LaReviewApp {
+    /// Application state containing UI state, tasks, PRs, etc.
     pub state: AppState,
 
+    /// Repository for task operations
     pub task_repo: Arc<TaskRepository>,
-    #[allow(dead_code)]
+    /// Repository for note operations
     pub note_repo: Arc<NoteRepository>,
-    #[allow(dead_code)]
+    /// Repository for pull request operations
     pub pr_repo: Arc<PullRequestRepository>,
 
+    /// Database connection wrapper (kept to maintain connection during app lifetime)
     pub _db: Database,
 
+    /// Sender for async generation messages
     pub gen_tx: mpsc::Sender<GenMsg>,
+    /// Receiver for async generation messages
     pub gen_rx: mpsc::Receiver<GenMsg>,
 }
 
@@ -227,7 +238,7 @@ impl LaReviewApp {
         app
     }
 
-    /// Switch to review screen
+    /// Switch to review screen and load review data from database
     pub fn switch_to_review(&mut self) {
         self.state.current_view = AppView::Review;
         self.sync_review_from_db();
@@ -238,7 +249,7 @@ impl LaReviewApp {
         self.state.current_view = AppView::Generate;
     }
 
-    /// Build a PullRequest struct from current state
+    /// Build a PullRequest struct from current state or selected PR
     pub fn current_pull_request(&self) -> PullRequest {
         // If a PR is selected, use its details, otherwise use the local-pr defaults
         if let Some(selected_pr_id) = &self.state.selected_pr_id
@@ -364,31 +375,6 @@ impl LaReviewApp {
             }
         }
     }
-
-    /// Delete a review task and its associated notes
-    pub fn delete_review_task(&mut self, task_id: &crate::domain::TaskId) {
-        match self.task_repo.delete(task_id) {
-            Ok(_) => {
-                // Also delete notes associated with the task
-                if let Err(err) = self.note_repo.delete_by_task(task_id) {
-                    self.state.review_error =
-                        Some(format!("Failed to delete associated notes: {}", err));
-                    return;
-                }
-                // Remove from local state
-                self.state.all_tasks.retain(|task| &task.id != task_id); // Changed to all_tasks
-                // If the deleted task was selected, clear the selection
-                if self.state.selected_task_id.as_ref() == Some(task_id) {
-                    self.state.selected_task_id = None;
-                    self.state.current_note = None;
-                }
-                self.state.review_error = None; // Clear any previous error
-            }
-            Err(err) => {
-                self.state.review_error = Some(format!("Failed to delete task: {}", err));
-            }
-        }
-    }
 }
 
 /// Implement the egui application
@@ -455,9 +441,9 @@ impl eframe::App for LaReviewApp {
             );
 
             // Create a simple diagonal line pattern in the background to avoid rendering issues on hover
-            let line_spacing = 25.0; // More dense lines
-            let line_width = 0.4; // Thin, subtle lines
-            let color = MOCHA.surface0.linear_multiply(0.25); // Even more subtle
+            let line_spacing = 25.0;
+            let line_width = 0.4;
+            let color = MOCHA.surface0.linear_multiply(0.25);
 
             // Draw diagonal lines from top-left to bottom-right
             let mut pos = rect.min.x - rect.max.y;
@@ -492,15 +478,15 @@ impl eframe::App for LaReviewApp {
                     // Space Odyssey style icon using egui_phosphor
                     ui.add(egui::Label::new(
                         egui::RichText::new(egui_phosphor::regular::CIRCLE_HALF)
-                            .size(22.0) // Slightly smaller size
-                            .color(MOCHA.mauve), // Nice mauve color from the theme
+                            .size(22.0)
+                            .color(MOCHA.mauve),
                     ));
-                    ui.add_space(4.0); // Reduced space between icon and text
+                    ui.add_space(4.0);
                     ui.heading(
                         egui::RichText::new("LaReview")
                             .strong()
-                            .color(MOCHA.text) // Changed to main text color for better contrast
-                            .size(18.0), // Slightly increased size for better visual balance
+                            .color(MOCHA.text)
+                            .size(18.0),
                     );
                 });
 
@@ -518,7 +504,7 @@ impl eframe::App for LaReviewApp {
                             },
                         ))
                         .frame(false)
-                        .corner_radius(egui::CornerRadius::same(4)), // Subtle rounding with int value
+                        .corner_radius(egui::CornerRadius::same(4)),
                     );
                     if generate_response.clicked() {
                         self.switch_to_generate();
@@ -536,7 +522,7 @@ impl eframe::App for LaReviewApp {
                             },
                         ))
                         .frame(false)
-                        .corner_radius(egui::CornerRadius::same(4)), // Subtle rounding with int value
+                        .corner_radius(egui::CornerRadius::same(4)),
                     );
                     if review_response.clicked() {
                         self.switch_to_review();

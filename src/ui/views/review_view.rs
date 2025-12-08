@@ -1,4 +1,6 @@
-//! Review view (egui version) - Left-Right Tree Layout
+//! Review view UI for LaReview
+//! Displays generated review tasks in a left-right layout with a navigation tree
+//! on the left and task details on the right.
 use crate::ui::app::LaReviewApp;
 use crate::ui::components::header::header;
 use eframe::egui;
@@ -8,8 +10,8 @@ use crate::ui::components::diff::render_diff_editor;
 use crate::ui::components::status::error_banner;
 use catppuccin_egui::MOCHA;
 
-/// Combines multiple patch hunks into a single unified diff string
-/// Each patch.hunk is already a complete git diff for that file
+/// Combines multiple patch hunks into a single unified diff string for display
+/// Sorts patches by file path and joins them with proper formatting
 fn combine_patches_to_unified_diff(patches: &[crate::domain::Patch]) -> String {
     // Sort patches by file path for stable ordering
     let mut sorted_patches = patches.to_vec();
@@ -372,9 +374,6 @@ impl LaReviewApp {
                                             if matches!(action, crate::ui::components::DiffAction::OpenFullWindow) {
                                                 self.state.full_diff = Some(crate::ui::app::FullDiffView {
                                                     title: format!("Task diff - {}", task.title),
-                                                    source: crate::ui::app::FullDiffSource::ReviewTask {
-                                                        task_id: task.id.clone(),
-                                                    },
                                                     text: unified_diff.clone(),
                                                 });
                                             }

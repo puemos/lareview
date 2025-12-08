@@ -266,7 +266,7 @@ struct RawTask {
     #[serde(default)]
     patches: Vec<RawPatch>,
     #[serde(default)]
-    sub_flow: Option<String>, // Added field to support sub-flow organization
+    sub_flow: Option<String>,
 }
 
 #[derive(Deserialize, Default)]

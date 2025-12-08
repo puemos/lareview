@@ -1,4 +1,6 @@
-//! Generate view with a "2001: A Space Odyssey" inspired UI
+//! Generate view UI for LaReview
+//! Handles the task generation interface where users can input diffs
+//! and select AI agents to generate review tasks.
 
 use catppuccin_egui::MOCHA;
 use eframe::egui;
@@ -132,7 +134,6 @@ impl LaReviewApp {
                         if matches!(action, crate::ui::components::DiffAction::OpenFullWindow) {
                             self.state.full_diff = Some(crate::ui::app::FullDiffView {
                                 title: "Generate diff".to_string(),
-                                source: crate::ui::app::FullDiffSource::Generate,
                                 text: self.state.diff_text.clone(),
                             });
                         }

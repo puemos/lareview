@@ -1,8 +1,12 @@
+//! Prompt management system for LaReview
+//! Handles template-based prompt generation using Handlebars templates
+
 use handlebars::Handlebars;
 use once_cell::sync::Lazy;
 use serde_json::Value;
 use std::collections::HashMap;
 
+/// Static registry of available prompts
 static PROMPT_REGISTRY: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut m = HashMap::new();
     m.insert("generate_tasks", include_str!("generate_tasks.hbs"));
@@ -10,11 +14,8 @@ static PROMPT_REGISTRY: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(||
     m
 });
 
-/// Render a prompt by name using Handlebars.
-///
-/// Usage:
-///     render("generate_tasks", json!({"id": "123"}))
-///
+/// Render a prompt template by name with the provided context
+/// This function uses Handlebars templating to substitute variables in the prompt
 pub fn render(name: &str, ctx: &Value) -> anyhow::Result<String> {
     let template = PROMPT_REGISTRY
         .get(name)

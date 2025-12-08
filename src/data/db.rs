@@ -1,12 +1,12 @@
-#![allow(dead_code)]
-//! SQLite database setup and connection
+//! SQLite database setup and connection management for LaReview
+//! Handles database initialization, schema creation, and connection management.
 
 use anyhow::Result;
 use rusqlite::Connection;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-/// Database wrapper with connection pooling
+/// Database wrapper that manages SQLite connections
 pub struct Database {
     conn: Arc<Mutex<Connection>>,
     path: PathBuf,

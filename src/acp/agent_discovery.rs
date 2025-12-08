@@ -1,13 +1,18 @@
-#![allow(dead_code)]
-//! Agent discovery - detect available ACP agents
+//! Agent discovery module for LaReview
+//! Detects and manages available ACP (Agent Client Protocol) agents such as Codex, Qwen, and Gemini.
 
-/// Candidate ACP agent
+/// Information about a discoverable ACP agent
 #[derive(Debug, Clone)]
 pub struct AgentCandidate {
+    /// Unique identifier for the agent (e.g., "codex", "qwen", "gemini")
     pub id: String,
+    /// User-friendly display name for the agent
     pub label: String,
+    /// Command to execute the agent, if available
     pub command: Option<String>,
+    /// Arguments to pass to the agent command
     pub args: Vec<String>,
+    /// Whether the agent is available and can be executed
     pub available: bool,
 }
 
@@ -93,7 +98,8 @@ fn is_command_available(command: &str) -> bool {
     which::which(command).is_ok()
 }
 
-/// List all known agent candidates with availability status
+/// Get a list of all known ACP agent candidates with their availability status
+/// Includes built-in stub, Codex, Gemini, and Qwen agents
 pub fn list_agent_candidates() -> Vec<AgentCandidate> {
     let mut candidates = vec![AgentCandidate {
         id: "stub".to_string(),

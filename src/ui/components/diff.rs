@@ -1,5 +1,6 @@
-//! Unified diff display with syntax highlighting and collapsible files.
-//! Version targeting egui 0.33.
+//! Unified diff display component for LaReview
+//! Handles parsing, rendering, and interaction with git diffs in a unified format
+//! with syntax highlighting, inline diffs, and collapsible file sections.
 
 use catppuccin_egui::MOCHA;
 use eframe::egui::{self, FontId, TextFormat, text::LayoutJob};
@@ -7,9 +8,12 @@ use similar::{ChangeTag, TextDiff};
 use std::sync::Arc;
 use unidiff::{Hunk, PatchSet, Result as UnidiffResult};
 
+/// Possible actions that can be triggered from the diff viewer
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiffAction {
+    /// No action was triggered
     None,
+    /// Open the diff in full window view
     OpenFullWindow,
 }
 

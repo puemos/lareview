@@ -1,4 +1,6 @@
-//! Task generator - ACP client for generating review tasks
+//! Task generator module for LaReview
+//! Handles communication with ACP (Agent Client Protocol) agents to generate
+//! review tasks from git diffs using AI agents like Codex, Qwen, and Gemini.
 
 use crate::data::db::Database;
 use crate::data::repository::{PullRequestRepository, TaskRepository};
@@ -26,20 +28,25 @@ use tokio::process::Command;
 use tokio::runtime::Builder;
 use tokio::task::LocalSet;
 
-/// Input for task generation
+/// Input parameters for task generation
 pub struct GenerateTasksInput {
+    /// Pull request context for the task generation
     pub pull_request: PullRequest,
+    /// Git diff text to analyze and generate tasks for
     pub diff_text: String,
+    /// Command to execute the ACP agent
     pub agent_command: String,
+    /// Arguments to pass to the ACP agent command
     pub agent_args: Vec<String>,
+    /// Optional channel to send progress updates during generation
     pub progress_tx: Option<tokio::sync::mpsc::UnboundedSender<ProgressEvent>>,
-    /// Override for MCP server binary path (replaces TASK_MCP_SERVER_BIN)
+    /// Override for MCP server binary path
     pub mcp_server_binary: Option<PathBuf>,
-    /// Timeout in seconds for agent execution (replaces ACP_TIMEOUT_SECS)
+    /// Timeout in seconds for agent execution
     pub timeout_secs: Option<u64>,
-    /// Enable debug logging (replaces ACP_DEBUG)
+    /// Enable debug logging
     pub debug: bool,
-    /// Explicit database path for persistence (replaces LAREVIEW_DB_PATH for tests)
+    /// Explicit database path for persistence (useful for tests)
     pub db_path: Option<PathBuf>,
 }
 
@@ -52,11 +59,14 @@ pub struct GenerateTasksResult {
     pub logs: Vec<String>,
 }
 
-/// Streaming progress updates from the agent
+/// Different types of progress updates that can be streamed from the agent
 #[derive(Debug, Clone)]
 pub enum ProgressEvent {
+    /// Agent message (e.g., task description)
     Message { content: String, is_new: bool },
+    /// Agent thought during reasoning
     Thought { content: String, is_new: bool },
+    /// Log output from the agent process
     Log(String),
 }
 
@@ -275,7 +285,7 @@ struct RawTask {
     #[serde(default)]
     patches: Vec<RawPatch>,
     #[serde(default)]
-    sub_flow: Option<String>, // Added field to support sub-flow organization
+    sub_flow: Option<String>,
 }
 
 #[derive(serde::Deserialize, Default)]
@@ -308,7 +318,7 @@ fn normalize_tasks(pr_id: &PullRequestId, raw: Vec<RawTask>) -> Vec<ReviewTask> 
 
             ReviewTask {
                 id: t.id,
-                pr_id: pr_id.clone(), // Added pr_id
+                pr_id: pr_id.clone(),
                 title: t.title,
                 description: t.description,
                 files: t.files,
