@@ -105,30 +105,36 @@ impl LaReviewApp {
                     );
                     ui.add_space(4.0);
 
-                    // Show a text editor for pasting (always shown)
-                    egui::Frame::new()
-                        .fill(MOCHA.crust)
-                        .inner_margin(egui::Margin::same(4))
-                        .stroke(egui::Stroke::new(1.0, MOCHA.surface0))
-                        .show(ui, |ui| {
-                            egui::ScrollArea::vertical()
-                                .id_salt(ui.id().with("diff_input_scroll"))
-                                .show(ui, |ui| {
-                                    let editor =
-                                        egui::TextEdit::multiline(&mut self.state.diff_text)
-                                            .id_salt(ui.id().with("diff_input_editor"))
-                                            .hint_text("Paste your git diff here...\n\nExample:\n\ndiff --git a/src/main.rs b/src/main.rs\nindex abcdef1..1234567 100644\n--- a/src/main.rs\n+++ b/src/main.rs\n@@ -1,3 +1,4 @@\n fn main() {\n     println!(\"Hello, world!\");\n+    println!(\"New line added\");\n }")
-                                            .font(egui::TextStyle::Monospace)
-                                            .desired_width(f32::INFINITY)
-                                            .desired_rows(15);
-                                    ui.add(editor);
-                                });
-                        });
+                    // Show either a text editor for pasting or a formatted diff view
+                    if self.state.diff_text.is_empty() {
+                        // Show a text editor for pasting (when no diff is present)
+                        egui::Frame::new()
+                            .fill(MOCHA.crust)
+                            .inner_margin(egui::Margin::same(4))
+                            .stroke(egui::Stroke::new(1.0, MOCHA.surface0))
+                            .show(ui, |ui| {
+                                egui::ScrollArea::vertical()
+                                    .id_salt(ui.id().with("diff_input_scroll"))
+                                    .show(ui, |ui| {
+                                        let editor =
+                                            egui::TextEdit::multiline(&mut self.state.diff_text)
+                                                .id_salt(ui.id().with("diff_input_editor"))
+                                                .hint_text("Paste your git diff here...\n\nExample:\n\ndiff --git a/src/main.rs b/src/main.rs\nindex abcdef1..1234567 100644\n--- a/src/main.rs\n+++ b/src/main.rs\n@@ -1,3 +1,4 @@\n fn main() {\n     println!(\"Hello, world!\");\n+    println!(\"New line added\");\n }")
+                                                .font(egui::TextStyle::Monospace)
+                                                .desired_width(f32::INFINITY)
+                                                .desired_rows(15);
+                                        ui.add(editor);
+                                    });
+                            });
+                    } else {
+                        // Show formatted diff when content exists
+                        crate::ui::components::diff::render_diff_editor(ui, &self.state.diff_text, "diff");
+                    }
 
                     if !self.state.diff_text.is_empty() {
                         ui.add_space(4.0);
                         if ui
-                            .button(egui::RichText::new("🗑 Clear").color(MOCHA.red))
+                            .button(egui::RichText::new(format!("{} Clear", egui_phosphor::regular::TRASH_SIMPLE)).color(MOCHA.red))
                             .clicked()
                         {
                             self.state.diff_text.clear();

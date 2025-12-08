@@ -30,16 +30,18 @@ fn ensure_qwen_mcp_registered() {
     if let Ok(out) = check {
         let stdout = String::from_utf8_lossy(&out.stdout);
         if stdout.contains("lareview-tasks") {
-            return; // Already there, nothing to do
+            return;
         }
     }
 
-    // Not found, register it
+    // Register for Gemini MCP
     let _ = Command::new("qwen")
         .args([
             "mcp",
             "add",
-            &format!("stdio:lareview-tasks:{}:--task-mcp-server", exe_str),
+            "lareview-tasks",
+            &exe_str,
+            "--task-mcp-server",
         ])
         .status();
 }
