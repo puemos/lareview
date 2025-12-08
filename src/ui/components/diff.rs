@@ -266,7 +266,7 @@ pub fn render_diff_editor(ui: &mut egui::Ui, code: &str, _language: &str) {
 
     ui.group(|ui| {
         ui.horizontal(|ui| {
-            ui.heading(egui::RichText::new("📄 Diff").color(MOCHA.text));
+            ui.label(egui::RichText::new("Diff").color(MOCHA.text));
             ui.label(
                 egui::RichText::new(format!("({} files)", files.len()))
                     .color(MOCHA.subtext1)

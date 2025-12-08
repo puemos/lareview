@@ -10,7 +10,7 @@ pub type PullRequestId = String;
 pub type TaskId = String;
 
 /// Risk level for a task
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum RiskLevel {
     #[default]
@@ -75,6 +75,8 @@ pub struct ReviewTask {
     pub ai_generated: bool,
     #[serde(default)]
     pub status: TaskStatus,
+    #[serde(default)]
+    pub sub_flow: Option<String>, // Added field to support intent/sub-flow organization
 }
 
 /// Review note stored per task

@@ -265,6 +265,8 @@ struct RawTask {
     stats: Option<RawStats>,
     #[serde(default)]
     patches: Vec<RawPatch>,
+    #[serde(default)]
+    sub_flow: Option<String>, // Added field to support sub-flow organization
 }
 
 #[derive(Deserialize, Default)]
@@ -348,6 +350,7 @@ fn parse_tasks(args: Value) -> Result<Vec<ReviewTask>> {
                 diagram: None,
                 ai_generated: true,
                 status: TaskStatus::Pending,
+                sub_flow: task.sub_flow, // Use sub_flow from raw task
             }
         })
         .collect();

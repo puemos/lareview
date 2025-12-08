@@ -80,6 +80,7 @@ impl Database {
                 diagram TEXT,
                 ai_generated INTEGER DEFAULT 0,
                 status TEXT DEFAULT 'PENDING',
+                sub_flow TEXT,
                 FOREIGN KEY(pull_request_id) REFERENCES pull_requests(id)
             );
 
@@ -98,6 +99,10 @@ impl Database {
             );
             "#,
         )?;
+
+        // Try to add the sub_flow column - ignore error if it already exists
+        let _ = conn.execute("ALTER TABLE tasks ADD COLUMN sub_flow TEXT", []);
+
         Ok(())
     }
 

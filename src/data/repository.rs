@@ -100,8 +100,8 @@ impl TaskRepository {
 
         conn.execute(
             r#"
-            INSERT OR REPLACE INTO tasks (id, pull_request_id, title, description, files, stats, insight, patches, diagram, ai_generated, status)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+            INSERT OR REPLACE INTO tasks (id, pull_request_id, title, description, files, stats, insight, patches, diagram, ai_generated, status, sub_flow)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
             "#,
             (
                 &task.id,
@@ -115,6 +115,7 @@ impl TaskRepository {
                 &task.diagram,
                 task.ai_generated as i32,
                 &status_str,
+                &task.sub_flow,
             ),
         )?;
         Ok(())
@@ -123,7 +124,7 @@ impl TaskRepository {
     pub fn find_by_pr(&self, pr_id_filter: &PullRequestId) -> Result<Vec<ReviewTask>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, pull_request_id, title, description, files, stats, insight, patches, diagram, ai_generated, status FROM tasks WHERE pull_request_id = ?1",
+            "SELECT id, pull_request_id, title, description, files, stats, insight, patches, diagram, ai_generated, status, sub_flow FROM tasks WHERE pull_request_id = ?1",
         )?;
 
         let rows = stmt.query_map([pr_id_filter], |row| {
@@ -132,6 +133,7 @@ impl TaskRepository {
             let stats_json: String = row.get(5)?;
             let patches_json: Option<String> = row.get(7)?;
             let status_str: String = row.get(10)?;
+            let sub_flow: Option<String> = row.get(11)?;
 
             Ok((
                 row.get::<_, String>(0)?,
@@ -145,6 +147,7 @@ impl TaskRepository {
                 row.get::<_, Option<String>>(8)?,
                 row.get::<_, i32>(9)?,
                 status_str,
+                sub_flow,
             ))
         })?;
 
@@ -162,6 +165,7 @@ impl TaskRepository {
                 diagram,
                 ai_generated,
                 status_str,
+                sub_flow,
             ) = row?;
 
             let status = match status_str.as_str() {
@@ -184,6 +188,7 @@ impl TaskRepository {
                 diagram,
                 ai_generated: ai_generated != 0,
                 status,
+                sub_flow,
             });
         }
         Ok(tasks)
@@ -192,7 +197,7 @@ impl TaskRepository {
     pub fn find_all(&self) -> Result<Vec<ReviewTask>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, pull_request_id, title, description, files, stats, insight, patches, diagram, ai_generated, status FROM tasks",
+            "SELECT id, pull_request_id, title, description, files, stats, insight, patches, diagram, ai_generated, status, sub_flow FROM tasks",
         )?;
 
         let rows = stmt.query_map([], |row| {
@@ -201,6 +206,7 @@ impl TaskRepository {
             let stats_json: String = row.get(5)?;
             let patches_json: Option<String> = row.get(7)?;
             let status_str: String = row.get(10)?;
+            let sub_flow: Option<String> = row.get(11)?;
 
             Ok((
                 row.get::<_, String>(0)?,
@@ -214,6 +220,7 @@ impl TaskRepository {
                 row.get::<_, Option<String>>(8)?,
                 row.get::<_, i32>(9)?,
                 status_str,
+                sub_flow,
             ))
         })?;
 
@@ -231,6 +238,7 @@ impl TaskRepository {
                 diagram,
                 ai_generated,
                 status_str,
+                sub_flow,
             ) = row?;
 
             let status = match status_str.as_str() {
@@ -253,6 +261,7 @@ impl TaskRepository {
                 diagram,
                 ai_generated: ai_generated != 0,
                 status,
+                sub_flow,
             });
         }
         Ok(tasks)

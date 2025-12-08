@@ -71,6 +71,7 @@ pub struct AppState {
 
     pub current_note: Option<String>,
     pub review_error: Option<String>,
+    pub expanded_sub_flows: std::collections::BTreeSet<String>, // Track which sub-flows are expanded (maintains order)
 }
 
 impl AppState {
@@ -88,6 +89,22 @@ impl AppState {
             // In the future, this could be an empty vec or a specific "All PRs" view.
             self.all_tasks.clone()
         }
+    }
+
+    // Group tasks by sub-flows for the selected PR
+    pub fn tasks_by_sub_flow(&self) -> std::collections::HashMap<Option<String>, Vec<ReviewTask>> {
+        let tasks = self.tasks();
+        let mut grouped: std::collections::HashMap<Option<String>, Vec<ReviewTask>> =
+            std::collections::HashMap::new();
+
+        for task in tasks {
+            grouped
+                .entry(task.sub_flow.clone())
+                .or_insert_with(Vec::new)
+                .push(task);
+        }
+
+        grouped
     }
 }
 

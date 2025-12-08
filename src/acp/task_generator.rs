@@ -274,6 +274,8 @@ struct RawTask {
     stats: Option<RawStats>,
     #[serde(default)]
     patches: Vec<RawPatch>,
+    #[serde(default)]
+    sub_flow: Option<String>, // Added field to support sub-flow organization
 }
 
 #[derive(serde::Deserialize, Default)]
@@ -328,6 +330,7 @@ fn normalize_tasks(pr_id: &PullRequestId, raw: Vec<RawTask>) -> Vec<ReviewTask> 
                 diagram: None,
                 ai_generated: true,
                 status: crate::domain::TaskStatus::default(),
+                sub_flow: t.sub_flow, // Added sub_flow field
             }
         })
         .collect()

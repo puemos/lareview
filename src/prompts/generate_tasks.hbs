@@ -105,6 +105,11 @@ For each task, fill the following fields:
   - risk: "LOW", "MEDIUM", or "HIGH".
   - tags: A small set of descriptive tags.
 
+- sub_flow:
+  - Optional string that groups this task under a specific sub-flow name.
+  - Use this to organize related tasks into logical groups.
+  - Examples: "Authentication Flow", "Payment Processing", "User Profile Updates", "Security Measures"
+
 - patches:
   - A list of patch snippets that show the most relevant parts of the diff.
   - For each patch:
@@ -138,6 +143,7 @@ IMPORTANT MCP USAGE
         "risk": "LOW" | "MEDIUM" | "HIGH",
         "tags": ["string"]
       \}},
+      "sub_flow": "string",  // Optional: name of the sub-flow this task belongs to
       "patches": [
         \{{
           "file": "string",
