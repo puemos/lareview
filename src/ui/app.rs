@@ -30,7 +30,6 @@ pub enum SelectedAgent {
     Qwen,
 }
 
-
 /// All app state in one struct
 #[derive(Default)]
 pub struct AppState {
