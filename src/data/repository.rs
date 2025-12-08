@@ -391,6 +391,7 @@ mod tests {
             diagram: None,
             ai_generated: false,
             status: TaskStatus::Pending,
+            sub_flow: None,
         };
 
         repo.save(&task)?;
