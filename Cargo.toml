@@ -26,3 +26,4 @@ similar = "2.7.0"
 handlebars = "6.3.2"
 once_cell = "1.21.3"
 catppuccin-egui = { version = "5.7.0", default-features = false, features = ["egui33"] }
+egui-phosphor = "0.11.0"
