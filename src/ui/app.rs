@@ -30,12 +30,6 @@ pub enum SelectedAgent {
     Qwen,
 }
 
-#[derive(PartialEq, Default, Clone, Copy)]
-pub enum GenTab {
-    #[default]
-    Diff,
-    Agent,
-}
 
 /// All app state in one struct
 #[derive(Default)]
@@ -49,8 +43,6 @@ pub struct AppState {
     pub is_generating: bool,
     /// Error message from failed task generation, if any
     pub generation_error: Option<String>,
-    /// Currently selected tab in the generate view
-    pub selected_tab: GenTab,
     /// Currently selected agent for task generation
     pub selected_agent: SelectedAgent,
 
