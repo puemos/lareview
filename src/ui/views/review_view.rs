@@ -367,7 +367,17 @@ impl LaReviewApp {
                                         ui.label("No patches to review");
                                     } else {
                                         ui.push_id(("unified_diff", &task.id), |ui| {
-                                            render_diff_editor(ui, &unified_diff, "diff");
+                                            let action = render_diff_editor(ui, &unified_diff, "diff");
+
+                                            if matches!(action, crate::ui::components::DiffAction::OpenFullWindow) {
+                                                self.state.full_diff = Some(crate::ui::app::FullDiffView {
+                                                    title: format!("Task diff - {}", task.title),
+                                                    source: crate::ui::app::FullDiffSource::ReviewTask {
+                                                        task_id: task.id.clone(),
+                                                    },
+                                                    text: unified_diff.clone(),
+                                                });
+                                            }
                                         });
                                     }
 

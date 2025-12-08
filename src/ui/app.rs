@@ -72,6 +72,21 @@ pub struct AppState {
     pub current_note: Option<String>,
     pub review_error: Option<String>,
     pub expanded_sub_flows: std::collections::BTreeSet<String>, // Track which sub-flows are expanded (maintains order)
+
+    pub full_diff: Option<FullDiffView>,
+}
+
+#[derive(Debug, Clone)]
+pub enum FullDiffSource {
+    Generate, // from Generate tab, state.diff_text
+    ReviewTask { task_id: String },
+}
+
+#[derive(Debug, Clone)]
+pub struct FullDiffView {
+    pub title: String,          // what to show in the window title
+    pub source: FullDiffSource, // who owns this diff logically
+    pub text: String,           // the unified diff itself
 }
 
 impl AppState {
@@ -495,5 +510,45 @@ impl eframe::App for LaReviewApp {
                     }
                 });
         });
+
+        // Full diff overlay window
+        if let Some(full) = self.state.full_diff.clone() {
+            // Fill the root viewport
+            let viewport_rect = ctx.input(|i| i.viewport().inner_rect).unwrap_or_else(|| {
+                let rect = ctx.available_rect();
+                egui::Rect::from_min_size(egui::Pos2::new(0.0, 0.0), rect.size())
+            });
+
+            let mut open = true;
+
+            egui::Window::new(full.title.clone())
+                .open(&mut open)
+                .fixed_rect(viewport_rect)
+                .collapsible(false)
+                .resizable(false)
+                .title_bar(true)
+                .show(ctx, |ui| {
+                    ui.horizontal(|ui| {
+                        if ui
+                            .button(format!("{} Close", egui_phosphor::regular::ARROW_SQUARE_IN))
+                            .clicked()
+                        {
+                            // Mark for close
+                            self.state.full_diff = None;
+                        }
+                    });
+
+                    ui.separator();
+
+                    // The big diff area itself
+                    crate::ui::components::diff::render_diff_editor_full_view(
+                        ui, &full.text, "diff",
+                    );
+                });
+
+            if !open {
+                self.state.full_diff = None;
+            }
+        }
     }
 }

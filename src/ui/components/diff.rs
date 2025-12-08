@@ -7,6 +7,12 @@ use similar::{ChangeTag, TextDiff};
 use std::sync::Arc;
 use unidiff::{Hunk, PatchSet, Result as UnidiffResult};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiffAction {
+    None,
+    OpenFullWindow,
+}
+
 const DIFF_FONT_SIZE: f32 = 12.0;
 const HEADER_FONT_SIZE: f32 = 14.0;
 
@@ -285,7 +291,24 @@ fn paint_inline_text_job(
     }
 }
 
-pub fn render_diff_editor(ui: &mut egui::Ui, diff_text: &str, _language: &str) {
+pub fn render_diff_editor(ui: &mut egui::Ui, diff_text: &str, _language: &str) -> DiffAction {
+    render_diff_editor_with_options(ui, diff_text, _language, true)
+}
+
+pub fn render_diff_editor_full_view(
+    ui: &mut egui::Ui,
+    diff_text: &str,
+    _language: &str,
+) -> DiffAction {
+    render_diff_editor_with_options(ui, diff_text, _language, false)
+}
+
+fn render_diff_editor_with_options(
+    ui: &mut egui::Ui,
+    diff_text: &str,
+    _language: &str,
+    show_full_window_button: bool,
+) -> DiffAction {
     let state_id = ui.id().with("diff_state");
 
     let mut state = ui
@@ -321,16 +344,36 @@ pub fn render_diff_editor(ui: &mut egui::Ui, diff_text: &str, _language: &str) {
     if let Some(err) = &state.parse_error {
         let msg = format!("{} {}", egui_phosphor::regular::WARNING, err);
         ui.colored_label(MOCHA.red, msg);
-        return;
+        return DiffAction::None;
     }
+
+    let mut open_full = false;
 
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new("Diff").color(MOCHA.text));
+
         ui.label(egui::RichText::new(format!(
             "{} {} files",
             egui_phosphor::regular::FILES,
             state.files.len()
-        )))
+        )));
+
+        if show_full_window_button {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui
+                    .button(
+                        egui::RichText::new(format!(
+                            "{} Open",
+                            egui_phosphor::regular::ARROW_SQUARE_OUT
+                        ))
+                        .color(MOCHA.mauve),
+                    )
+                    .clicked()
+                {
+                    open_full = true;
+                }
+            });
+        }
     });
 
     ui.add_space(4.0);
@@ -364,6 +407,12 @@ pub fn render_diff_editor(ui: &mut egui::Ui, diff_text: &str, _language: &str) {
 
     ui.ctx()
         .memory_mut(|mem| mem.data.insert_persisted(state_id, state.clone()));
+
+    if open_full {
+        DiffAction::OpenFullWindow
+    } else {
+        DiffAction::None
+    }
 }
 
 // Draw collapsible file header

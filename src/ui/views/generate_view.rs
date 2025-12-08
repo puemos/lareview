@@ -127,7 +127,15 @@ impl LaReviewApp {
                             self.state.diff_text.clear();
                             self.state.generation_error = None;
                         }
-                        render_diff_editor(ui, &self.state.diff_text, "diff");
+                        let action = render_diff_editor(ui, &self.state.diff_text, "diff");
+
+                        if matches!(action, crate::ui::components::DiffAction::OpenFullWindow) {
+                            self.state.full_diff = Some(crate::ui::app::FullDiffView {
+                                title: "Generate diff".to_string(),
+                                source: crate::ui::app::FullDiffSource::Generate,
+                                text: self.state.diff_text.clone(),
+                            });
+                        }
                     }
                 }
 
