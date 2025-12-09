@@ -224,6 +224,21 @@ impl LaReviewApp {
             gen_rx,
         };
 
+        // Load the app logo texture once at startup
+        if let Ok(image_bytes) = std::fs::read("assets/icons/icon-256.png") {
+            if let Ok(image) = image::load_from_memory(&image_bytes) {
+                let size = [image.width() as usize, image.height() as usize];
+                let rgba = image.to_rgba8();
+                let pixels = rgba.as_raw();
+
+                let _logo_handle = cc.egui_ctx.load_texture(
+                    "app_logo",
+                    egui::ColorImage::from_rgba_unmultiplied(size, pixels),
+                    egui::TextureOptions::LINEAR,
+                );
+            }
+        }
+
         app.sync_review_from_db(); // Load tasks for the initial state
 
         app
@@ -464,15 +479,32 @@ impl eframe::App for LaReviewApp {
 
             ui.add_space(12.0); // Left padding
             ui.horizontal(|ui| {
-                // App Title with Space Odyssey 2001 inspired icon
+                // App Title with LaReview logo
                 ui.horizontal(|ui| {
-                    // Space Odyssey style icon using egui_phosphor
-                    ui.add(egui::Label::new(
-                        egui::RichText::new(egui_phosphor::regular::CIRCLE_HALF)
-                            .size(22.0)
-                            .color(MOCHA.mauve),
-                    ));
-                    ui.add_space(4.0);
+                    // Display the app logo
+                    match ui.ctx().try_load_texture("app_logo", egui::TextureOptions::LINEAR, Default::default()) {
+                        Ok(egui::load::TexturePoll::Ready { texture }) => {
+                            ui.image(texture);
+                        },
+                        Ok(egui::load::TexturePoll::Pending { .. }) => {
+                            // Texture is still loading, show placeholder
+                            ui.add(egui::Label::new(
+                                egui::RichText::new(egui_phosphor::regular::CIRCLE_HALF)
+                                    .size(22.0)
+                                    .color(MOCHA.mauve),
+                            ));
+                        },
+                        Err(_) => {
+                            // Texture failed to load, show fallback
+                            ui.add(egui::Label::new(
+                                egui::RichText::new(egui_phosphor::regular::CIRCLE_HALF)
+                                    .size(22.0)
+                                    .color(MOCHA.mauve),
+                            ));
+                        }
+                    }
+
+                    ui.add_space(8.0);
                     ui.heading(
                         egui::RichText::new("LaReview")
                             .strong()
@@ -554,6 +586,7 @@ impl eframe::App for LaReviewApp {
                 .resizable(false)
                 .title_bar(true)
                 .show(ctx, |ui| {
+                    ui.spacing_mut().window_margin = egui::Margin::symmetric(12, 8);
                     ui.horizontal(|ui| {
                         if ui
                             .button(format!("{} Close", egui_phosphor::regular::ARROW_SQUARE_IN))

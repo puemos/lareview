@@ -117,14 +117,14 @@ For each task, fill the following fields:
 
 PATCH VALIDITY RULES
 
-* Every patch must contain a valid unified diff that can be parsed by standard diff tools.
-* Each patch must begin with:
+* Every patch must contain a complete and valid unified diff that can be parsed by standard diff tools.
+* Each patch must include the full diff headers for the file:
 
   * diff --git a/<file> b/<file>
-  * --- a/<file>
-  * +++ b/<file>
-* Each hunk must begin with a correct line header of the form:
-  @@ -a,b +c,d @@
+  * --- a/<file> (where <file> is relative to repo root, like src/main.rs)
+  * +++ b/<file> (where <file> is relative to repo root, like src/main.rs)
+* After the headers, each hunk must begin with a correct line header of the form:
+  @@ -a,b +c,d @@ (where a=start line in old file, b=number of lines in old file, c=start line in new file, d=number of lines in new file)
 * The counts in the hunk header must exactly match the lines inside the hunk.
 * Old lines are those starting with space or minus.
 * New lines are those starting with space or plus.
@@ -132,6 +132,9 @@ PATCH VALIDITY RULES
   For example:
 
   ```
+  diff --git a/src/main.rs b/src/main.rs
+  --- a/src/main.rs
+  +++ b/src/main.rs
   @@ -30,0 +30,5 @@
   +fn new_function() {
   +    println!("hello");
@@ -141,6 +144,7 @@ PATCH VALIDITY RULES
 * Count the lines precisely and update the header to match.
 * If unsure, break the hunk into smaller ones where counting is easy.
 * Hunk ranges must be exact, not approximate. Stats may be approximate, hunks may not.
+* The hunk field in the patch should contain the complete diff for that file, including headers.
 
 SELF CHECK
 

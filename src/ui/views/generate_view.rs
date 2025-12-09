@@ -10,7 +10,7 @@ use crate::acp::{GenerateTasksInput, generate_tasks_with_acp, list_agent_candida
 use crate::ui::app::{GenMsg, GenResultPayload, LaReviewApp, SelectedAgent};
 use crate::ui::components::header::{HeaderAction, header};
 use crate::ui::components::selection_chips::selection_chips;
-use crate::ui::components::status::{error_banner, status_label};
+use crate::ui::components::status::error_banner;
 
 impl LaReviewApp {
     pub fn ui_generate(&mut self, ui: &mut egui::Ui) {
@@ -38,18 +38,6 @@ impl LaReviewApp {
             );
 
             ui.add_space(8.0);
-
-            // Status
-            let status_text = if self.state.is_generating {
-                "Analyzing diff with the selected agent..."
-            } else if self.state.diff_text.trim().is_empty() {
-                "Awaiting diff input."
-            } else if self.state.generation_error.is_some() {
-                "Last generation failed. See details below."
-            } else {
-                "Ready to generate tasks."
-            };
-            status_label(ui, status_text, MOCHA.subtext1);
 
             // Error banner
             if let Some(err) = &self.state.generation_error {
@@ -202,6 +190,37 @@ impl LaReviewApp {
 
                     ui.add_space(8.0);
 
+                    // Status section
+                    egui::Frame::group(ui.style())
+                        .inner_margin(egui::Margin::symmetric(10, 8))
+                        .show(ui, |ui| {
+                            ui.label(
+                                egui::RichText::new("STATUS")
+                                    .size(11.0)
+                                    .color(MOCHA.subtext0),
+                            );
+                            ui.add_space(6.0);
+                            ui.separator();
+
+                            // Status message
+                            let status_text = if self.state.is_generating {
+                                "Analyzing diff with the selected agent..."
+                            } else if self.state.diff_text.trim().is_empty() {
+                                "Awaiting diff input."
+                            } else if self.state.generation_error.is_some() {
+                                "Last generation failed. See details below."
+                            } else {
+                                "Ready to generate tasks."
+                            };
+                            ui.label(
+                                egui::RichText::new(status_text)
+                                    .color(MOCHA.subtext1)
+                                    .size(12.0),
+                            );
+                        });
+
+                    ui.add_space(8.0);
+
                     // Agent activity logs
                     egui::Frame::group(ui.style())
                         .inner_margin(egui::Margin::symmetric(10, 8))
@@ -218,18 +237,6 @@ impl LaReviewApp {
                                 .id_salt(ui.id().with("agent_activity_scroll"))
                                 .stick_to_bottom(true)
                                 .show(ui, |ui| {
-                                    let has_activity = !self.state.agent_logs.is_empty()
-                                        || !self.state.agent_messages.is_empty()
-                                        || !self.state.agent_thoughts.is_empty();
-
-                                    if self.state.is_generating && !has_activity {
-                                        ui.label(
-                                            egui::RichText::new("Waiting for agent output...")
-                                                .color(MOCHA.subtext1)
-                                                .size(12.0),
-                                        );
-                                    }
-
                                     for log in &self.state.agent_logs {
                                         ui.label(
                                             egui::RichText::new(log)
