@@ -225,18 +225,18 @@ impl LaReviewApp {
         };
 
         // Load the app logo texture once at startup
-        if let Ok(image_bytes) = std::fs::read("assets/icons/icon-256.png") {
-            if let Ok(image) = image::load_from_memory(&image_bytes) {
-                let size = [image.width() as usize, image.height() as usize];
-                let rgba = image.to_rgba8();
-                let pixels = rgba.as_raw();
+        if let Ok(image_bytes) = std::fs::read("assets/icons/icon-256.png")
+            && let Ok(image) = image::load_from_memory(&image_bytes)
+        {
+            let size = [image.width() as usize, image.height() as usize];
+            let rgba = image.to_rgba8();
+            let pixels = rgba.as_raw();
 
-                let _logo_handle = cc.egui_ctx.load_texture(
-                    "app_logo",
-                    egui::ColorImage::from_rgba_unmultiplied(size, pixels),
-                    egui::TextureOptions::LINEAR,
-                );
-            }
+            let _logo_handle = cc.egui_ctx.load_texture(
+                "app_logo",
+                egui::ColorImage::from_rgba_unmultiplied(size, pixels),
+                egui::TextureOptions::LINEAR,
+            );
         }
 
         app.sync_review_from_db(); // Load tasks for the initial state
@@ -482,10 +482,14 @@ impl eframe::App for LaReviewApp {
                 // App Title with LaReview logo
                 ui.horizontal(|ui| {
                     // Display the app logo
-                    match ui.ctx().try_load_texture("app_logo", egui::TextureOptions::LINEAR, Default::default()) {
+                    match ui.ctx().try_load_texture(
+                        "app_logo",
+                        egui::TextureOptions::LINEAR,
+                        Default::default(),
+                    ) {
                         Ok(egui::load::TexturePoll::Ready { texture }) => {
                             ui.image(texture);
-                        },
+                        }
                         Ok(egui::load::TexturePoll::Pending { .. }) => {
                             // Texture is still loading, show placeholder
                             ui.add(egui::Label::new(
@@ -493,7 +497,7 @@ impl eframe::App for LaReviewApp {
                                     .size(22.0)
                                     .color(MOCHA.mauve),
                             ));
-                        },
+                        }
                         Err(_) => {
                             // Texture failed to load, show fallback
                             ui.add(egui::Label::new(

@@ -216,12 +216,11 @@ impl LaReviewApp {
         );
         let resize_response = ui.interact(resize_rect, ui.id().with("resize"), egui::Sense::drag());
 
-        if resize_response.dragged() {
-            if let Some(pointer_pos) = ui.ctx().pointer_interact_pos() {
-                let new_width =
-                    (pointer_pos.x - left_rect.min.x).clamp(200.0, available_width * 0.6);
-                ui.memory_mut(|mem| mem.data.insert_temp(tree_width_id, new_width));
-            }
+        if resize_response.dragged()
+            && let Some(pointer_pos) = ui.ctx().pointer_interact_pos()
+        {
+            let new_width = (pointer_pos.x - left_rect.min.x).clamp(200.0, available_width * 0.6);
+            ui.memory_mut(|mem| mem.data.insert_temp(tree_width_id, new_width));
         }
 
         // Draw resize line
