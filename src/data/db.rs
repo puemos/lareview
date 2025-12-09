@@ -85,9 +85,12 @@ impl Database {
             );
 
             CREATE TABLE IF NOT EXISTS notes (
-                task_id TEXT PRIMARY KEY,
+                task_id TEXT,
+                file_path TEXT,
+                line_number INTEGER,
                 body TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (task_id, file_path, line_number)
             );
 
             CREATE TABLE IF NOT EXISTS diffs (

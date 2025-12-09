@@ -56,7 +56,7 @@ pub struct TaskStats {
 }
 
 /// A patch hunk representing changes to a specific file
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Patch {
     /// File path that the patch applies to
     pub file: String,
@@ -119,4 +119,10 @@ pub struct Note {
     pub body: String,
     /// Timestamp when the note was last updated
     pub updated_at: String,
+    /// Optional file path for line-specific comments
+    #[serde(default)]
+    pub file_path: Option<String>,
+    /// Optional line number for line-specific comments
+    #[serde(default)]
+    pub line_number: Option<u32>,
 }

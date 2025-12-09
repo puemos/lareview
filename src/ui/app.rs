@@ -73,17 +73,34 @@ pub struct AppState {
 
     /// Current note content for the selected task
     pub current_note: Option<String>,
+    /// Context for the currently active line note (when user clicks on a line to comment)
+    pub current_line_note: Option<LineNoteContext>,
     /// Error message from review operations, if any
     pub review_error: Option<String>,
 
     /// Current full diff view state, if any
     pub full_diff: Option<FullDiffView>,
+
+    /// Cache for unified diff string to prevent expensive re-parsing on every frame
+    pub cached_unified_diff: Option<(Vec<crate::domain::Patch>, String)>,
 }
 
 #[derive(Debug, Clone)]
 pub struct FullDiffView {
     pub title: String,
     pub text: String,
+}
+
+/// Context for tracking an active line note being created
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct LineNoteContext {
+    pub task_id: String,
+    pub file_idx: usize,
+    pub line_idx: usize,
+    pub line_number: usize,
+    pub file_path: String,  // New field to store the file path
+    pub note_text: String,  // The actual text being typed
 }
 
 impl AppState {
@@ -367,6 +384,8 @@ impl LaReviewApp {
             task_id: task_id.clone(),
             body: body.clone(),
             updated_at: timestamp,
+            file_path: None,
+            line_number: None,
         };
 
         let result = self.note_repo.save(&note);

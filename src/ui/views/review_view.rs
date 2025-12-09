@@ -3,7 +3,7 @@ use crate::ui::components::header::header;
 use eframe::egui;
 
 // diff editor helper
-use crate::ui::components::diff::render_diff_editor;
+use crate::ui::components::{DiffAction, LineContext};
 use crate::ui::components::status::error_banner;
 use catppuccin_egui::MOCHA;
 
@@ -430,14 +430,31 @@ impl LaReviewApp {
                 // 4. Diff Viewer
                 ui.label(egui::RichText::new("Changes").strong().size(16.0));
 
-                let cache_id = ui.id().with("unified_diff_cache").with(&task.id);
-                let unified_diff = ui.ctx().memory_mut(|mem| {
-                    mem.data
-                        .get_temp_mut_or_insert_with(cache_id, || {
-                            combine_patches_to_unified_diff(&task.patches)
-                        })
-                        .clone()
-                });
+                let unified_diff = match &self.state.cached_unified_diff {
+                    Some((cached_patches, diff_string)) if cached_patches == &task.patches => {
+                        // Cache Hit: Patches haven't changed, use the cached string
+                        diff_string.clone()
+                    }
+                    _ => {
+                        // Cache Miss: Recalculate and update cache
+                        let new_diff = combine_patches_to_unified_diff(&task.patches);
+
+                        // Update the cache with the new diff and the current patches as the key
+                        self.state.cached_unified_diff = Some((task.patches.clone(), new_diff.clone()));
+
+                        new_diff
+                    }
+                };
+
+                // ADDED: Determine if the current task has an active line note (for highlighting)
+                let active_line_context = self.state.current_line_note.as_ref()
+                    .filter(|ctx| ctx.task_id == task.id)
+                    .map(|ctx| LineContext { file_idx: ctx.file_idx, line_idx: ctx.line_idx });
+
+                // Determine which line has active comment input (for inline comment display)
+                let _active_comment_context = self.state.current_line_note.as_ref()
+                    .filter(|ctx| ctx.task_id == task.id)
+                    .map(|ctx| LineContext { file_idx: ctx.file_idx, line_idx: ctx.line_idx });
 
                 if task.patches.is_empty() {
                     ui.label(
@@ -451,18 +468,84 @@ impl LaReviewApp {
                         .corner_radius(4.0)
                         .show(ui, |ui| {
                             ui.set_min_height(300.0);
+
                             ui.push_id(("unified_diff", &task.id), |ui| {
-                                let action = render_diff_editor(ui, &unified_diff, "diff");
-                                if matches!(
-                                    action,
-                                    crate::ui::components::DiffAction::OpenFullWindow
-                                ) {
-                                    self.state.full_diff = Some(crate::ui::app::FullDiffView {
-                                        title: format!("Task diff - {}", task.title),
-                                        text: unified_diff.clone(),
-                                    });
+                                // RENDER DIFF WITH INLINE COMMENT FUNCTIONALITY
+                                let action = crate::ui::components::render_diff_editor_with_comment_callback(
+                                    ui,
+                                    &unified_diff,
+                                    "diff",
+                                    true,
+                                    active_line_context, // Use for highlighting
+                                    Some(&|_file_idx, _line_idx, _line_number| {
+                                        // Handle the click by returning an action
+                                        // The actual state change will be handled in the match block below
+                                    })
+                                );
+
+                                match action {
+                                    DiffAction::OpenFullWindow => {
+                                        self.state.full_diff = Some(crate::ui::app::FullDiffView {
+                                            title: format!("Task diff - {}", task.title),
+                                            text: unified_diff.clone(),
+                                        });
+                                    },
+                                    DiffAction::AddNote { file_idx, line_idx, line_number } => {
+                                        // Set the state for adding an inline note
+                                        // Get the file path for the clicked line
+                                        let file_path = if let Some(file) = task.patches.get(file_idx) {
+                                            file.file.clone()
+                                        } else {
+                                            "unknown".to_string()
+                                        };
+
+                                        self.state.current_line_note = Some(crate::ui::app::LineNoteContext {
+                                            task_id: task.id.clone(),
+                                            file_idx,
+                                            line_idx,
+                                            line_number,
+                                            file_path,
+                                            note_text: String::new(), // Load existing note if one exists
+                                        });
+
+                                        // OPTIONAL: Reset main note if starting a line note
+                                        self.state.current_note = None;
+                                    },
+                                    DiffAction::SaveNote { file_idx, line_idx: _, line_number, note_text } => {
+                                        // Handle saving the note
+                                        // Get the file path for the line
+                                        let file_path = if let Some(file) = task.patches.get(file_idx) {
+                                            file.file.clone()
+                                        } else {
+                                            "unknown".to_string()
+                                        };
+
+                                        // Save the line-specific note to the database
+                                        let note = crate::domain::Note {
+                                            task_id: task.id.clone(),
+                                            body: note_text,
+                                            updated_at: chrono::Utc::now().to_rfc3339(),
+                                            file_path: Some(file_path),
+                                            line_number: Some(line_number as u32),
+                                        };
+
+                                        if let Err(err) = self.note_repo.save(&note) {
+                                            self.state.review_error = Some(format!("Failed to save line note: {}", err));
+                                        } else {
+                                            self.state.review_error = None;
+                                        }
+
+                                        // Clear the active comment line after saving
+                                        self.state.current_line_note = None;
+                                    },
+                                    _ => {}
                                 }
                             });
+
+                            // We no longer show a modal window here - the comment input is now rendered inline in the diff component
+                            // The state is still used to track which line should have the active comment input
+
+                            // The inline comment input is now handled directly in the diff component
                         });
                 }
 
@@ -491,6 +574,7 @@ impl LaReviewApp {
                 ui.add_space(20.0);
             });
     }
+
 }
 
 // Helper for drawing badges

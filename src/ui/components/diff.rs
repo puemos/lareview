@@ -4,17 +4,33 @@
 
 use catppuccin_egui::MOCHA;
 use eframe::egui::{self, FontId, TextFormat, text::LayoutJob};
+use egui_phosphor::regular::CHAT_DOTS;
 use similar::{ChangeTag, TextDiff};
 use std::sync::Arc;
-use unidiff::{Hunk, PatchSet, Result as UnidiffResult};
+use unidiff::{Hunk, PatchSet, Result as UnidiffResult}; // Import the desired icon
 
 /// Possible actions that can be triggered from the diff viewer
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DiffAction {
     /// No action was triggered
     None,
     /// Open the diff in full window view
     OpenFullWindow,
+    /// A line was clicked for commenting.
+    /// Carries the 0-based index of the line in the FileDiff structure, and the
+    /// line number in the source file (old_line_num or new_line_num).
+    AddNote {
+        file_idx: usize,
+        line_idx: usize,
+        line_number: usize,
+    },
+    /// Save a note for a line
+    SaveNote {
+        file_idx: usize,
+        line_idx: usize,
+        line_number: usize,
+        note_text: String,
+    },
 }
 
 const DIFF_FONT_SIZE: f32 = 12.0;
@@ -22,6 +38,13 @@ const HEADER_FONT_SIZE: f32 = 14.0;
 
 // Inline diff thresholds
 const MAX_INLINE_LEN: usize = 600;
+
+// ADDED: New struct to pass context for note addition
+#[derive(Debug, Clone, Copy)]
+pub struct LineContext {
+    pub file_idx: usize,
+    pub line_idx: usize,
+}
 
 fn should_do_inline(old: &str, new: &str) -> bool {
     old.len() <= MAX_INLINE_LEN && new.len() <= MAX_INLINE_LEN
@@ -296,7 +319,7 @@ fn paint_inline_text_job(
 }
 
 pub fn render_diff_editor(ui: &mut egui::Ui, diff_text: &str, _language: &str) -> DiffAction {
-    render_diff_editor_with_options(ui, diff_text, _language, true)
+    render_diff_editor_with_options(ui, diff_text, _language, true, None, None)
 }
 
 pub fn render_diff_editor_full_view(
@@ -304,15 +327,38 @@ pub fn render_diff_editor_full_view(
     diff_text: &str,
     _language: &str,
 ) -> DiffAction {
-    render_diff_editor_with_options(ui, diff_text, _language, false)
+    render_diff_editor_with_options(ui, diff_text, _language, false, None, None)
 }
 
-fn render_diff_editor_with_options(
+pub fn render_diff_editor_with_comment_callback(
     ui: &mut egui::Ui,
     diff_text: &str,
     _language: &str,
     show_full_window_button: bool,
+    active_line: Option<LineContext>,
+    on_comment_requested: Option<&dyn Fn(usize, usize, usize)>,
 ) -> DiffAction {
+    render_diff_editor_with_options(
+        ui,
+        diff_text,
+        _language,
+        show_full_window_button,
+        active_line,
+        on_comment_requested,
+    )
+}
+
+pub fn render_diff_editor_with_options(
+    ui: &mut egui::Ui,
+    diff_text: &str,
+    _language: &str,
+    show_full_window_button: bool,
+    // ADDED: Optional context to highlight the line that is being commented on
+    active_line: Option<LineContext>,
+    // ADDED: Optional callback for when a comment is requested for a line
+    on_comment_requested: Option<&dyn Fn(usize, usize, usize)>, // file_idx, line_idx, line_number
+) -> DiffAction {
+    let mut action = DiffAction::None;
     let state_id = ui.id().with("diff_state");
 
     let mut state = ui
@@ -403,7 +449,26 @@ fn render_diff_editor_with_options(
                     Row::DiffLine { file_idx, line_idx } => {
                         let file = &state.files[file_idx];
                         let line = &file.lines[line_idx];
-                        render_unified_row(ui, line);
+
+                        // Check if this is the active line
+                        let is_active = active_line
+                            .map(|ctx| ctx.file_idx == file_idx && ctx.line_idx == line_idx)
+                            .unwrap_or(false);
+
+                        // Call the updated render function with the callbacks
+                        let line_action = render_unified_row(
+                            ui,
+                            line,
+                            LineContext { file_idx, line_idx },
+                            is_active,
+                            on_comment_requested,
+                            active_line, // This should be the active comment line
+                        );
+
+                        // Only update action if it's not None
+                        if let DiffAction::None = action {
+                            action = line_action;
+                        }
                     }
                 }
             }
@@ -412,10 +477,13 @@ fn render_diff_editor_with_options(
     ui.ctx()
         .memory_mut(|mem| mem.data.insert_persisted(state_id, state.clone()));
 
-    if open_full {
+    // Return the specific action if one was triggered
+    if let DiffAction::OpenFullWindow = action {
+        action
+    } else if open_full {
         DiffAction::OpenFullWindow
     } else {
-        DiffAction::None
+        action // Will be DiffAction::None or DiffAction::AddNote
     }
 }
 
@@ -509,8 +577,31 @@ fn render_file_header(
 }
 
 // Single unified diff line row - GitHub style
-fn render_unified_row(ui: &mut egui::Ui, line: &DiffLine) {
-    let (prefix, bg_color, text_color, line_num_bg) = match line.change_type {
+fn render_unified_row(
+    ui: &mut egui::Ui,
+    line: &DiffLine,
+    ctx: LineContext,
+    is_active: bool,
+    // Optional callback for when the comment button is clicked
+    on_comment_click: Option<&dyn Fn(usize, usize, usize)>, // file_idx, line_idx, line_number
+    // No longer used for controlling which note is open, but kept for API compatibility
+    _active_comment_line: Option<LineContext>,
+) -> DiffAction {
+    let mut action = DiffAction::None;
+
+    // Per-line flag that tells us if the comment editor is open for this line
+    let comment_open_id = ui.id().with(("comment_open", ctx.file_idx, ctx.line_idx));
+    let mut is_comment_active =
+        ui.memory(|mem| mem.data.get_temp::<bool>(comment_open_id).unwrap_or(false));
+
+    // Actual line number in the source file
+    let line_number = match line.change_type {
+        ChangeType::Equal | ChangeType::Delete => line.old_line_num,
+        ChangeType::Insert => line.new_line_num,
+    };
+
+    // Colors for this row
+    let (prefix, mut bg_color, text_color, mut line_num_bg) = match line.change_type {
         ChangeType::Equal => (
             " ",
             egui::Color32::TRANSPARENT,
@@ -531,91 +622,261 @@ fn render_unified_row(ui: &mut egui::Ui, line: &DiffLine) {
         ),
     };
 
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 0.0;
+    // Highlight whole line if it is "active" (selection etc)
+    if is_active {
+        let active_color = MOCHA.blue.gamma_multiply(0.2);
+        bg_color = active_color;
+        line_num_bg = active_color;
+    }
 
-        // Line number section with darker background
-        egui::Frame::NONE
-            .fill(line_num_bg)
-            .inner_margin(egui::Margin::symmetric(4, 0))
-            .show(ui, |ui| {
-                let line_numbers = match line.change_type {
-                    ChangeType::Equal => match (line.old_line_num, line.new_line_num) {
-                        (Some(old), Some(new)) => format!("{:>4} {:>4}", old, new),
-                        _ => "         ".to_string(),
-                    },
-                    ChangeType::Delete => {
-                        if let Some(old) = line.old_line_num {
-                            format!("{:>4}     ", old)
-                        } else {
-                            "         ".to_string()
-                        }
-                    }
-                    ChangeType::Insert => {
-                        if let Some(new) = line.new_line_num {
-                            format!("     {:>4}", new)
-                        } else {
-                            "         ".to_string()
-                        }
-                    }
-                };
+    // Main row
+    let main_response = egui::Frame::NONE
+        .fill(bg_color)
+        .show(ui, |ui| {
+            ui.spacing_mut().item_spacing.x = 0.0;
+            ui.set_width(ui.available_width());
 
-                ui.label(
-                    egui::RichText::new(line_numbers)
-                        .font(FontId::monospace(DIFF_FONT_SIZE))
-                        .color(MOCHA.overlay0),
-                );
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 0.0;
+
+                // Line numbers
+                let _line_numbers_frame = egui::Frame::NONE
+                    .fill(line_num_bg)
+                    .inner_margin(egui::Margin::symmetric(4, 0))
+                    .show(ui, |ui| {
+                        let line_numbers = match line.change_type {
+                            ChangeType::Equal => match (line.old_line_num, line.new_line_num) {
+                                (Some(old), Some(new)) => format!("{:>4} {:>4}", old, new),
+                                _ => "         ".to_string(),
+                            },
+                            ChangeType::Delete => {
+                                if let Some(old) = line.old_line_num {
+                                    format!("{:>4}     ", old)
+                                } else {
+                                    "         ".to_string()
+                                }
+                            }
+                            ChangeType::Insert => {
+                                if let Some(new) = line.new_line_num {
+                                    format!("     {:>4}", new)
+                                } else {
+                                    "         ".to_string()
+                                }
+                            }
+                        };
+
+                        ui.label(
+                            egui::RichText::new(line_numbers)
+                                .font(FontId::monospace(DIFF_FONT_SIZE))
+                                .color(MOCHA.overlay0),
+                        );
+                    });
+
+                // Code content
+                egui::Frame::NONE
+                    .fill(bg_color)
+                    .inner_margin(egui::Margin::symmetric(4, 0))
+                    .show(ui, |ui| {
+                        let mut job = LayoutJob::default();
+
+                        // Prefix (+/-/space)
+                        job.append(
+                            prefix,
+                            0.0,
+                            TextFormat {
+                                font_id: FontId::monospace(DIFF_FONT_SIZE),
+                                color: text_color,
+                                ..Default::default()
+                            },
+                        );
+                        job.append(
+                            " ",
+                            0.0,
+                            TextFormat {
+                                font_id: FontId::monospace(DIFF_FONT_SIZE),
+                                color: text_color,
+                                ..Default::default()
+                            },
+                        );
+
+                        // Inline content
+                        if let Some(segments) = &line.inline_segments {
+                            let highlight_bg = match line.change_type {
+                                ChangeType::Delete => MOCHA.red.gamma_multiply(0.4),
+                                ChangeType::Insert => MOCHA.green.gamma_multiply(0.4),
+                                ChangeType::Equal => egui::Color32::TRANSPARENT,
+                            };
+                            paint_inline_text_job(&mut job, segments, text_color, highlight_bg);
+                        } else {
+                            job.append(
+                                line.content.as_ref(),
+                                0.0,
+                                TextFormat {
+                                    font_id: FontId::monospace(DIFF_FONT_SIZE),
+                                    color: text_color,
+                                    ..Default::default()
+                                },
+                            );
+                        }
+
+                        ui.label(job);
+                    });
             });
+        })
+        .response;
 
-        // Content section
-        egui::Frame::NONE
-            .fill(bg_color)
-            .inner_margin(egui::Margin::symmetric(4, 0))
-            .show(ui, |ui| {
-                let mut job = LayoutJob::default();
+    // Cursor feedback for the whole row
+    if main_response.hovered() && line_number.is_some() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
 
-                // Add prefix
-                job.append(
-                    prefix,
-                    0.0,
-                    TextFormat {
-                        font_id: FontId::monospace(DIFF_FONT_SIZE),
-                        color: text_color,
-                        ..Default::default()
-                    },
-                );
+    let line_number_for_action = line_number;
+    let mut comment_button_rect: Option<egui::Rect> = None;
 
-                job.append(
-                    " ",
-                    0.0,
-                    TextFormat {
-                        font_id: FontId::monospace(DIFF_FONT_SIZE),
-                        color: text_color,
-                        ..Default::default()
-                    },
-                );
+    // Hover detection based on the actual row rect
+    let pointer_pos = ui.ctx().input(|i| i.pointer.hover_pos());
+    let is_line_hovered = pointer_pos.is_some_and(|p| main_response.rect.contains(p));
 
-                // Add content with inline highlighting if available
-                if let Some(segments) = &line.inline_segments {
-                    let highlight_bg = match line.change_type {
-                        ChangeType::Delete => MOCHA.red.gamma_multiply(0.4),
-                        ChangeType::Insert => MOCHA.green.gamma_multiply(0.4),
-                        ChangeType::Equal => egui::Color32::TRANSPARENT,
+    // Only show the button when:
+    // - we have a real line number
+    // - this line does not already have an open note
+    // - the pointer is over the row
+    let show_comment_button = line_number.is_some() && !is_comment_active && is_line_hovered;
+
+    if show_comment_button {
+        let row_rect = main_response.rect;
+
+        // Fixed visual size, independent of row height
+        let size: f32 = 18.0;
+        let button_size = egui::vec2(size, size);
+
+        // Left gutter offset
+        let offset_x: f32 = -4.0;
+
+        // Vertically center in the row, with tiny tweak for optical centering
+        let top_y = row_rect.center().y - size * 0.5 - 1.0;
+
+        let button_rect =
+            egui::Rect::from_min_size(egui::pos2(row_rect.left() + offset_x, top_y), button_size);
+
+        // Save for cursor logic later
+        comment_button_rect = Some(button_rect);
+
+        let painter = ui.painter();
+
+        // Background circle
+        painter.rect_filled(
+            button_rect,
+            size * 0.5, // full rounding
+            MOCHA.blue,
+        );
+
+        // Icon in the center
+        painter.text(
+            button_rect.center(),
+            egui::Align2::CENTER_CENTER,
+            CHAT_DOTS.to_string(),
+            FontId::proportional(size - 4.0),
+            MOCHA.base,
+        );
+
+        // Hover / click detection without affecting layout
+        let hovered_button = pointer_pos.is_some_and(|p| button_rect.contains(p));
+        let clicked = ui
+            .ctx()
+            .input(|i| hovered_button && i.pointer.button_clicked(egui::PointerButton::Primary));
+
+        if clicked {
+            ui.memory_mut(|mem| {
+                mem.data.insert_temp(comment_open_id, true);
+            });
+            is_comment_active = true;
+
+            if let Some(num) = line_number_for_action {
+                if let Some(callback) = on_comment_click {
+                    callback(ctx.file_idx, ctx.line_idx, num);
+                }
+                action = DiffAction::AddNote {
+                    file_idx: ctx.file_idx,
+                    line_idx: ctx.line_idx,
+                    line_number: num,
+                };
+            }
+        }
+    }
+
+    // Cursor feedback
+    if let Some(pos) = pointer_pos {
+        if let Some(btn_rect) = comment_button_rect {
+            if btn_rect.contains(pos) {
+                // pointer over the comment button
+                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+            } else if main_response.rect.contains(pos) {
+                // text selection cursor over the code line
+                ui.ctx().set_cursor_icon(egui::CursorIcon::Text);
+            }
+        } else if main_response.rect.contains(pos) {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::Text);
+        }
+    }
+
+    // Render the note editor under the line if it is open for this row
+    if is_comment_active {
+        ui.add_space(4.0);
+
+        let text_edit_id = ui.id().with(("comment_text", ctx.file_idx, ctx.line_idx));
+
+        let mut comment_text = ui.memory(|mem| {
+            mem.data
+                .get_temp::<String>(text_edit_id)
+                .unwrap_or_default()
+        });
+
+        let text_response = ui.add(
+            egui::TextEdit::multiline(&mut comment_text)
+                .id_salt(text_edit_id)
+                .hint_text("Enter your comment...")
+                .desired_rows(3)
+                .desired_width(ui.available_width()),
+        );
+
+        // Keep the current text in memory
+        ui.memory_mut(|mem| mem.data.insert_temp(text_edit_id, comment_text.clone()));
+
+        ui.horizontal(|ui| {
+            if ui.button("Save Comment").clicked() {
+                if let Some(line_num) = line_number {
+                    action = DiffAction::SaveNote {
+                        file_idx: ctx.file_idx,
+                        line_idx: ctx.line_idx,
+                        line_number: line_num,
+                        note_text: comment_text.clone(),
                     };
-                    paint_inline_text_job(&mut job, segments, text_color, highlight_bg);
-                } else {
-                    job.append(
-                        line.content.as_ref(),
-                        0.0,
-                        TextFormat {
-                            font_id: FontId::monospace(DIFF_FONT_SIZE),
-                            color: text_color,
-                            ..Default::default()
-                        },
-                    );
                 }
 
-                ui.label(job);
+                ui.memory_mut(|mem| {
+                    mem.data.remove::<String>(text_edit_id);
+                    mem.data.insert_temp(comment_open_id, false);
+                });
+                is_comment_active = false;
+            }
+
+            if ui.button("Cancel").clicked() {
+                ui.memory_mut(|mem| {
+                    mem.data.remove::<String>(text_edit_id);
+                    mem.data.insert_temp(comment_open_id, false);
+                });
+                is_comment_active = false;
+            }
+        });
+
+        // Optional: focus the editor the first time it is opened
+        if text_response.gained_focus() {
+            ui.ctx().memory_mut(|mem| {
+                mem.request_focus(text_response.id);
             });
-    });
+        }
+    }
+
+    action
 }
