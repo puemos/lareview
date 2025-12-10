@@ -9,7 +9,7 @@ pub fn selection_chips<T>(
     labels: &[&str],
     label_prefix: &str,
 ) where
-    T: PartialEq + Copy,
+    T: PartialEq + Clone,
 {
     ui.horizontal(|ui| {
         if !label_prefix.is_empty() {
@@ -32,7 +32,7 @@ pub fn selection_chips<T>(
                     .stroke(egui::Stroke::NONE);
 
                 if ui.add(chip).clicked() {
-                    *current_item = *item;
+                    *current_item = item.clone();
                 }
             }
         }

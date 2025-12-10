@@ -23,12 +23,19 @@ pub enum AppView {
 }
 
 /// Which agent is selected (matches original code)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum SelectedAgent {
-    #[default]
-    Codex,
-    Gemini,
-    Qwen,
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct SelectedAgent {
+    pub id: String,
+}
+
+impl SelectedAgent {
+    pub fn new(id: impl Into<String>) -> Self {
+        Self { id: id.into() }
+    }
+
+    pub fn from_str(id: &str) -> Self {
+        Self { id: id.to_string() }
+    }
 }
 
 /// All app state in one struct
@@ -218,7 +225,7 @@ impl LaReviewApp {
         // Initial state
         let mut state = AppState {
             current_view: AppView::Generate,
-            selected_agent: SelectedAgent::Codex,
+            selected_agent: SelectedAgent::new("codex"),
             diff_text: String::new(),
             pr_id: "local-pr".to_string(), // Default local PR
             pr_title: "Local Review".to_string(),
@@ -259,7 +266,7 @@ impl LaReviewApp {
         };
 
         // Load the app logo texture once at startup
-        if let Ok(image_bytes) = std::fs::read("assets/icons/icon-256.png")
+        if let Ok(image_bytes) = std::fs::read("assets/icons/icon-512.png")
             && let Ok(image) = image::load_from_memory(&image_bytes)
         {
             let size = [image.width() as usize, image.height() as usize];
@@ -498,8 +505,8 @@ impl eframe::App for LaReviewApp {
             );
 
             // Create a simple diagonal line pattern in the background to avoid rendering issues on hover
-            let line_spacing = 25.0;
-            let line_width = 0.4;
+            let line_spacing = 20.0;
+            let line_width = 0.5;
             let color = MOCHA.surface0.linear_multiply(0.25);
 
             // Draw diagonal lines from top-left to bottom-right

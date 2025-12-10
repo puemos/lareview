@@ -15,6 +15,7 @@ use crate::ui::components::status::error_banner;
 impl LaReviewApp {
     pub fn ui_generate(&mut self, ui: &mut egui::Ui) {
         let mut trigger_generate = false;
+        let mut trigger_reset = false;
 
         ui.vertical(|ui| {
             let action_text = if self.state.is_generating {
@@ -85,12 +86,41 @@ impl LaReviewApp {
                 .show(&mut left_ui, |ui| {
                     ui.spacing_mut().item_spacing = egui::vec2(4.0, 6.0);
 
-                    // Diff section header (like in review_view.rs)
-                    ui.heading(
-                        egui::RichText::new("GIT DIFF")
-                            .size(16.0)
-                            .color(MOCHA.text),
-                    );
+                    // Diff section header with action buttons
+                    ui.horizontal(|ui| {
+                        ui.heading(
+                            egui::RichText::new("GIT DIFF")
+                                .size(16.0)
+                                .color(MOCHA.text),
+                        );
+
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            // Show new button if currently generating
+                            if self.state.is_generating
+                                && ui
+                                    .button(
+                                        egui::RichText::new(format!("{} New", egui_phosphor::regular::PLUS))
+                                            .color(MOCHA.green)
+                                    )
+                                    .clicked()
+                            {
+                                trigger_reset = true;
+                            }
+
+                            // Show clear button if diff exists and not generating
+                            if !self.state.diff_text.is_empty() && !self.state.is_generating
+                                && ui
+                                    .button(
+                                        egui::RichText::new(format!("{} Clear", egui_phosphor::regular::TRASH_SIMPLE))
+                                            .color(MOCHA.red)
+                                    )
+                                    .clicked()
+                            {
+                                trigger_reset = true;
+                            }
+                        });
+                    });
+
                     ui.add_space(4.0);
 
                     // Show either a text editor for pasting or a formatted diff view
@@ -117,17 +147,6 @@ impl LaReviewApp {
                     } else {
                         // Show formatted diff when content exists
                         crate::ui::components::diff::render_diff_editor(ui, &self.state.diff_text, "diff");
-                    }
-
-                    if !self.state.diff_text.is_empty() {
-                        ui.add_space(4.0);
-                        if ui
-                            .button(egui::RichText::new(format!("{} Clear", egui_phosphor::regular::TRASH_SIMPLE)).color(MOCHA.red))
-                            .clicked()
-                        {
-                            self.state.diff_text.clear();
-                            self.state.generation_error = None;
-                        }
                     }
                 });
         }
@@ -175,16 +194,26 @@ impl LaReviewApp {
                     ui.heading(egui::RichText::new("AGENT").size(16.0).color(MOCHA.text));
                     ui.add_space(4.0);
 
-                    // Agent selection chips
+                    // Load available agents dynamically from the registry
+                    let candidates = crate::acp::list_agent_candidates();
+                    let available_agents: Vec<SelectedAgent> = candidates
+                        .iter()
+                        .filter(|c| c.available) // Only show available agents
+                        .map(|c| SelectedAgent::from_str(&c.id))
+                        .collect();
+
+                    let agent_labels: Vec<String> = candidates
+                        .iter()
+                        .filter(|c| c.available)
+                        .map(|c| c.id.to_uppercase())
+                        .collect();
+
+                    // Agent selection chips using dynamic agents
                     selection_chips(
                         ui,
                         &mut self.state.selected_agent,
-                        &[
-                            SelectedAgent::Codex,
-                            SelectedAgent::Gemini,
-                            SelectedAgent::Qwen,
-                        ],
-                        &["CODEX", "GEMINI", "QWEN"],
+                        &available_agents,
+                        &agent_labels.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
                         "AGENT:",
                     );
 
@@ -225,11 +254,40 @@ impl LaReviewApp {
                     egui::Frame::group(ui.style())
                         .inner_margin(egui::Margin::symmetric(10, 8))
                         .show(ui, |ui| {
-                            ui.label(
-                                egui::RichText::new("AGENT ACTIVITY")
-                                    .size(11.0)
-                                    .color(MOCHA.subtext0),
-                            );
+                            ui.horizontal(|ui| {
+                                ui.label(
+                                    egui::RichText::new("AGENT ACTIVITY")
+                                        .size(11.0)
+                                        .color(MOCHA.subtext0),
+                                );
+
+                                // Show clear logs button if there's content
+                                if !self.state.agent_logs.is_empty()
+                                    || !self.state.agent_messages.is_empty()
+                                    || !self.state.agent_thoughts.is_empty()
+                                {
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Center),
+                                        |ui| {
+                                            if ui
+                                                .small_button(
+                                                    egui::RichText::new(format!(
+                                                        "{} Clear",
+                                                        egui_phosphor::regular::X
+                                                    ))
+                                                    .color(MOCHA.overlay2),
+                                                )
+                                                .clicked()
+                                            {
+                                                self.state.agent_logs.clear();
+                                                self.state.agent_messages.clear();
+                                                self.state.agent_thoughts.clear();
+                                            }
+                                        },
+                                    );
+                                }
+                            });
+
                             ui.add_space(6.0);
                             ui.separator();
 
@@ -265,9 +323,24 @@ impl LaReviewApp {
                 });
         }
 
+        // Handle actions
+        if trigger_reset {
+            self.reset_generation_state();
+        }
+
         if trigger_generate {
             self.start_generation_async();
         }
+    }
+
+    /// Reset the generation state to start fresh
+    fn reset_generation_state(&mut self) {
+        self.state.diff_text.clear();
+        self.state.generation_error = None;
+        self.state.is_generating = false;
+        self.state.agent_messages.clear();
+        self.state.agent_thoughts.clear();
+        self.state.agent_logs.clear();
     }
 
     pub fn start_generation_async(&mut self) {
@@ -278,53 +351,45 @@ impl LaReviewApp {
 
         let pr = self.current_pull_request();
         let diff_text = self.state.diff_text.clone();
-        let agent = self.state.selected_agent;
+        let agent = self.state.selected_agent.clone();
 
-        let (agent_cmd, agent_args, start_log) = match agent {
-            SelectedAgent::Codex | SelectedAgent::Gemini | SelectedAgent::Qwen => {
-                let agent_id = match agent {
-                    SelectedAgent::Codex => "codex",
-                    SelectedAgent::Gemini => "gemini",
-                    SelectedAgent::Qwen => "qwen",
-                };
+        let agent_id = &agent.id;
 
-                let candidates = list_agent_candidates();
-                let candidate = candidates.into_iter().find(|c| c.id == agent_id);
+        let candidates = list_agent_candidates();
+        let candidate = candidates.into_iter().find(|c| c.id == agent_id.as_str());
 
-                let Some(candidate) = candidate else {
-                    self.state.is_generating = false;
-                    self.state.generation_error =
-                        Some(format!("Agent \"{}\" is not configured.", agent_id));
-                    return;
-                };
-
-                if !candidate.available {
-                    self.state.is_generating = false;
-                    self.state.generation_error = Some(format!(
-                        "{} is not available on PATH. Install it and restart (command: {} {}).",
-                        candidate.label,
-                        candidate
-                            .command
-                            .clone()
-                            .unwrap_or_else(|| agent_id.to_string()),
-                        candidate.args.join(" ")
-                    ));
-                    return;
-                }
-
-                let command = candidate.command.unwrap_or_else(|| agent_id.to_string());
-                let args = candidate.args;
-                let start_log = format!(
-                    "Invoking {} via `{}`",
-                    candidate.label,
-                    std::iter::once(command.clone())
-                        .chain(args.iter().cloned())
-                        .collect::<Vec<_>>()
-                        .join(" ")
-                );
-                (command, args, start_log)
-            }
+        let Some(candidate) = candidate else {
+            self.state.is_generating = false;
+            self.state.generation_error =
+                Some(format!("Agent \"{}\" is not configured.", agent_id));
+            return;
         };
+
+        if !candidate.available {
+            self.state.is_generating = false;
+            self.state.generation_error = Some(format!(
+                "{} is not available on PATH. Install it and restart (command: {} {}).",
+                candidate.label,
+                candidate
+                    .command
+                    .clone()
+                    .unwrap_or_else(|| agent_id.to_string()),
+                candidate.args.join(" ")
+            ));
+            return;
+        }
+
+        let command = candidate.command.unwrap_or_else(|| agent_id.to_string());
+        let args = candidate.args;
+        let start_log = format!(
+            "Invoking {} via `{}`",
+            candidate.label,
+            std::iter::once(command.clone())
+                .chain(args.iter().cloned())
+                .collect::<Vec<_>>()
+                .join(" ")
+        );
+        let (agent_cmd, agent_args, start_log) = (command, args, start_log);
 
         self.state.is_generating = true;
         self.state.generation_error = None;
