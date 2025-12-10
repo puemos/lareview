@@ -4,7 +4,7 @@
 
 use catppuccin_egui::MOCHA;
 use eframe::egui::{self, FontId, TextFormat, text::LayoutJob};
-use egui_phosphor::regular::CHAT_DOTS;
+use egui_phosphor::regular::PLUS;
 use similar::{ChangeTag, TextDiff};
 use std::sync::Arc;
 use unidiff::{Hunk, PatchSet, Result as UnidiffResult}; // Import the desired icon
@@ -775,8 +775,8 @@ fn render_unified_row(
         painter.text(
             button_rect.center(),
             egui::Align2::CENTER_CENTER,
-            CHAT_DOTS.to_string(),
-            FontId::proportional(size - 4.0),
+            PLUS.to_string(),
+            FontId::proportional(size - 2.0),
             MOCHA.base,
         );
 

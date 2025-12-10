@@ -325,7 +325,12 @@ impl NoteRepository {
 
     /// Find a specific line note by task, file, and line number
     #[allow(dead_code)]
-    pub fn find_line_note(&self, task_id: &TaskId, file_path: &str, line_number: u32) -> Result<Option<Note>> {
+    pub fn find_line_note(
+        &self,
+        task_id: &TaskId,
+        file_path: &str,
+        line_number: u32,
+    ) -> Result<Option<Note>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt =
             conn.prepare("SELECT task_id, file_path, line_number, body, updated_at FROM notes WHERE task_id = ?1 AND file_path = ?2 AND line_number = ?3")?;

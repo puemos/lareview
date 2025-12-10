@@ -19,6 +19,7 @@ pub enum AppView {
     #[default]
     Generate,
     Review,
+    Settings,
 }
 
 /// Which agent is selected (matches original code)
@@ -83,6 +84,11 @@ pub struct AppState {
 
     /// Cache for unified diff string to prevent expensive re-parsing on every frame
     pub cached_unified_diff: Option<(Vec<crate::domain::Patch>, String)>,
+
+    /// Output of the D2 installation command
+    pub d2_install_output: String,
+    /// Flag indicating if D2 installation is in progress
+    pub is_d2_installing: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -99,8 +105,8 @@ pub struct LineNoteContext {
     pub file_idx: usize,
     pub line_idx: usize,
     pub line_number: usize,
-    pub file_path: String,  // New field to store the file path
-    pub note_text: String,  // The actual text being typed
+    pub file_path: String, // New field to store the file path
+    pub note_text: String, // The actual text being typed
 }
 
 impl AppState {
@@ -167,6 +173,11 @@ pub struct LaReviewApp {
     pub gen_tx: mpsc::Sender<GenMsg>,
     /// Receiver for async generation messages
     pub gen_rx: mpsc::Receiver<GenMsg>,
+
+    /// Sender for D2 installation messages
+    pub d2_install_tx: mpsc::Sender<String>,
+    /// Receiver for D2 installation messages
+    pub d2_install_rx: mpsc::Receiver<String>,
 }
 
 impl LaReviewApp {
@@ -192,6 +203,9 @@ impl LaReviewApp {
         egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
 
         cc.egui_ctx.set_fonts(fonts);
+
+        // Install image loaders for SVG and other formats
+        egui_extras::install_image_loaders(&cc.egui_ctx);
 
         // Open database as before
         let db = Database::open().expect("db open");
@@ -230,6 +244,7 @@ impl LaReviewApp {
         }
 
         let (gen_tx, gen_rx) = mpsc::channel(32);
+        let (d2_install_tx, d2_install_rx) = mpsc::channel(32);
 
         let mut app = Self {
             state,
@@ -239,6 +254,8 @@ impl LaReviewApp {
             _db: db,
             gen_tx,
             gen_rx,
+            d2_install_tx,
+            d2_install_rx,
         };
 
         // Load the app logo texture once at startup
@@ -270,6 +287,11 @@ impl LaReviewApp {
     /// Switch to generate screen
     pub fn switch_to_generate(&mut self) {
         self.state.current_view = AppView::Generate;
+    }
+
+    /// Switch to settings screen
+    pub fn switch_to_settings(&mut self) {
+        self.state.current_view = AppView::Settings;
     }
 
     /// Build a PullRequest struct from current state or selected PR
@@ -408,6 +430,16 @@ impl eframe::App for LaReviewApp {
         // Set Catppuccin theme
         catppuccin_egui::set_theme(ctx, MOCHA);
 
+        // poll D2 installation messages
+        while let Ok(msg) = self.d2_install_rx.try_recv() {
+            if msg == "___INSTALL_COMPLETE___" {
+                self.state.is_d2_installing = false;
+            } else {
+                self.state.d2_install_output.push_str(&msg);
+                self.state.d2_install_output.push('\n');
+            }
+        }
+
         // poll async generation messages
         while let Ok(msg) = self.gen_rx.try_recv() {
             match msg {
@@ -527,7 +559,7 @@ impl eframe::App for LaReviewApp {
                         }
                     }
 
-                    ui.add_space(8.0);
+                    ui.add_space(2.0);
                     ui.heading(
                         egui::RichText::new("LaReview")
                             .strong()
@@ -573,6 +605,24 @@ impl eframe::App for LaReviewApp {
                     if review_response.clicked() {
                         self.switch_to_review();
                     }
+
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        // Settings Button
+                        let settings_response = ui.add(
+                            egui::Button::new(egui::RichText::new("SETTINGS").color(
+                                if self.state.current_view == AppView::Settings {
+                                    MOCHA.mauve // Highlight active view
+                                } else {
+                                    MOCHA.subtext1 // Softer color for inactive
+                                },
+                            ))
+                            .frame(false)
+                            .corner_radius(egui::CornerRadius::same(4)),
+                        );
+                        if settings_response.clicked() {
+                            self.switch_to_settings();
+                        }
+                    });
                 });
             });
             ui.add_space(8.0); // Bottom padding for better vertical spacing
@@ -588,6 +638,9 @@ impl eframe::App for LaReviewApp {
                     }
                     AppView::Review => {
                         self.ui_review(ui);
+                    }
+                    AppView::Settings => {
+                        self.ui_settings(ui);
                     }
                 });
         });

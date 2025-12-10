@@ -3,6 +3,7 @@
 
 mod acp;
 mod data;
+mod diagram;
 mod domain;
 mod prompts;
 mod ui;
