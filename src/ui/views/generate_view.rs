@@ -265,6 +265,7 @@ impl LaReviewApp {
                                 if !self.state.agent_logs.is_empty()
                                     || !self.state.agent_messages.is_empty()
                                     || !self.state.agent_thoughts.is_empty()
+                                    || !self.state.plans.is_empty()
                                 {
                                     ui.with_layout(
                                         egui::Layout::right_to_left(egui::Align::Center),
@@ -282,6 +283,7 @@ impl LaReviewApp {
                                                 self.state.agent_logs.clear();
                                                 self.state.agent_messages.clear();
                                                 self.state.agent_thoughts.clear();
+                                                self.state.plans.clear();
                                             }
                                         },
                                     );
@@ -295,6 +297,27 @@ impl LaReviewApp {
                                 .id_salt(ui.id().with("agent_activity_scroll"))
                                 .stick_to_bottom(true)
                                 .show(ui, |ui| {
+                                    if !self.state.plans.is_empty() {
+                                        ui.label(
+                                            egui::RichText::new("AGENT PLAN")
+                                                .color(MOCHA.lavender)
+                                                .strong(),
+                                        );
+                                        for plan in &self.state.plans {
+                                            for entry in &plan.entries {
+                                                ui.label(
+                                                    egui::RichText::new(format!(
+                                                        "- {}",
+                                                        entry.content
+                                                    ))
+                                                    .color(MOCHA.teal)
+                                                    .size(12.0),
+                                                );
+                                            }
+                                        }
+                                        ui.add_space(8.0);
+                                    }
+
                                     for log in &self.state.agent_logs {
                                         ui.label(
                                             egui::RichText::new(log)
@@ -341,6 +364,7 @@ impl LaReviewApp {
         self.state.agent_messages.clear();
         self.state.agent_thoughts.clear();
         self.state.agent_logs.clear();
+        self.state.plans.clear();
     }
 
     pub fn start_generation_async(&mut self) {
@@ -395,6 +419,7 @@ impl LaReviewApp {
         self.state.generation_error = None;
         self.state.agent_messages.clear();
         self.state.agent_thoughts.clear();
+        self.state.plans.clear();
         self.state.agent_logs = vec![start_log.clone()];
 
         let (progress_tx, mut progress_rx) = tokio::sync::mpsc::unbounded_channel();
@@ -429,7 +454,6 @@ impl LaReviewApp {
                                 let mut logs = res.logs;
                                 logs.insert(0, start_log.clone());
                                 GenMsg::Done(Ok(GenResultPayload {
-                                    tasks: res.tasks,
                                     messages: res.messages,
                                     thoughts: res.thoughts,
                                     logs,

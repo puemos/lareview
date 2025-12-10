@@ -72,13 +72,13 @@ impl TaskRepository {
         let conn = self.conn.lock().unwrap();
         let files_json = serde_json::to_string(&task.files)?;
         let stats_json = serde_json::to_string(&task.stats)?;
-        let patches_json = serde_json::to_string(&task.patches)?;
+        let diffs_json = serde_json::to_string(&task.diffs)?;
 
         let status_str = serde_json::to_string(&task.status)?.replace("\"", "");
 
         conn.execute(
             r#"
-            INSERT OR REPLACE INTO tasks (id, pull_request_id, title, description, files, stats, insight, patches, diagram, ai_generated, status, sub_flow)
+            INSERT OR REPLACE INTO tasks (id, pull_request_id, title, description, files, stats, insight, diffs, diagram, ai_generated, status, sub_flow)
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
             "#,
             (
@@ -89,7 +89,7 @@ impl TaskRepository {
                 &files_json,
                 &stats_json,
                 &task.insight,
-                &patches_json,
+                &diffs_json,
                 &task.diagram,
                 task.ai_generated as i32,
                 &status_str,
@@ -102,14 +102,14 @@ impl TaskRepository {
     pub fn find_all(&self) -> Result<Vec<ReviewTask>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, pull_request_id, title, description, files, stats, insight, patches, diagram, ai_generated, status, sub_flow FROM tasks",
+            "SELECT id, pull_request_id, title, description, files, stats, insight, diffs, diagram, ai_generated, status, sub_flow FROM tasks",
         )?;
 
         let rows = stmt.query_map([], |row| {
             let pr_id: String = row.get(1)?; // Retrieve pr_id
             let files_json: String = row.get(4)?;
             let stats_json: String = row.get(5)?;
-            let patches_json: Option<String> = row.get(7)?;
+            let diffs_json: Option<String> = row.get(7)?;
             let status_str: String = row.get(10)?;
             let sub_flow: Option<String> = row.get(11)?;
 
@@ -121,7 +121,7 @@ impl TaskRepository {
                 files_json,
                 stats_json,
                 row.get::<_, Option<String>>(6)?,
-                patches_json,
+                diffs_json,
                 row.get::<_, Option<String>>(8)?,
                 row.get::<_, i32>(9)?,
                 status_str,
@@ -139,7 +139,7 @@ impl TaskRepository {
                 files_json,
                 stats_json,
                 insight,
-                patches_json,
+                diffs_json,
                 diagram,
                 ai_generated,
                 status_str,
@@ -160,7 +160,7 @@ impl TaskRepository {
                 files: serde_json::from_str(&files_json).unwrap_or_default(),
                 stats: serde_json::from_str(&stats_json).unwrap_or_default(),
                 insight,
-                patches: patches_json
+                diffs: diffs_json
                     .map(|s| serde_json::from_str(&s).unwrap_or_default())
                     .unwrap_or_default(),
                 diagram,
@@ -176,14 +176,14 @@ impl TaskRepository {
     pub fn find_by_pr(&self, pr_id_filter: &PullRequestId) -> Result<Vec<ReviewTask>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, pull_request_id, title, description, files, stats, insight, patches, diagram, ai_generated, status, sub_flow FROM tasks WHERE pull_request_id = ?1",
+            "SELECT id, pull_request_id, title, description, files, stats, insight, diffs, diagram, ai_generated, status, sub_flow FROM tasks WHERE pull_request_id = ?1",
         )?;
 
         let rows = stmt.query_map([pr_id_filter], |row| {
             let pr_id: String = row.get(1)?; // Retrieve pr_id
             let files_json: String = row.get(4)?;
             let stats_json: String = row.get(5)?;
-            let patches_json: Option<String> = row.get(7)?;
+            let diffs_json: Option<String> = row.get(7)?;
             let status_str: String = row.get(10)?;
             let sub_flow: Option<String> = row.get(11)?;
 
@@ -195,7 +195,7 @@ impl TaskRepository {
                 files_json,
                 stats_json,
                 row.get::<_, Option<String>>(6)?,
-                patches_json,
+                diffs_json,
                 row.get::<_, Option<String>>(8)?,
                 row.get::<_, i32>(9)?,
                 status_str,
@@ -213,7 +213,7 @@ impl TaskRepository {
                 files_json,
                 stats_json,
                 insight,
-                patches_json,
+                diffs_json,
                 diagram,
                 ai_generated,
                 status_str,
@@ -234,7 +234,7 @@ impl TaskRepository {
                 files: serde_json::from_str(&files_json).unwrap_or_default(),
                 stats: serde_json::from_str(&stats_json).unwrap_or_default(),
                 insight,
-                patches: patches_json
+                diffs: diffs_json
                     .map(|s| serde_json::from_str(&s).unwrap_or_default())
                     .unwrap_or_default(),
                 diagram,
@@ -387,7 +387,7 @@ mod tests {
             description: "Desc".to_string(),
             files: vec![],
             stats: TaskStats::default(),
-            patches: vec![],
+            diffs: vec![],
             insight: None,
             diagram: None,
             ai_generated: false,

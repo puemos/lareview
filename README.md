@@ -40,7 +40,7 @@ The content view displays the details of the selected item in the navigation tre
 LaReview's new data model is designed to support this new workflow. It includes three main entities:
 
 *   **PullRequest:** Represents a pull request and contains information such as the title, description, and author.
-*   **ReviewTask:** Represents a single task in the review plan. It includes a description, AI insights, and a list of patches.
+*   **ReviewTask:** Represents a single task in the review plan. It includes a description, AI insights, and a list of diffs.
 *   **Note:** Allows you to add your own notes to a task.
 
 This new data model, combined with the new UI and the powerful AI agent, makes LaReview a truly unique and powerful tool for code review.

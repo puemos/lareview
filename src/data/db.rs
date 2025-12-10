@@ -76,7 +76,7 @@ impl Database {
                 files TEXT NOT NULL,
                 stats TEXT NOT NULL,
                 insight TEXT,
-                patches TEXT,
+                diffs TEXT,
                 diagram TEXT,
                 ai_generated INTEGER DEFAULT 0,
                 status TEXT DEFAULT 'PENDING',
@@ -99,6 +99,14 @@ impl Database {
                 hunks TEXT NOT NULL,
                 PRIMARY KEY (pull_request_id, file_path),
                 FOREIGN KEY(pull_request_id) REFERENCES pull_requests(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS plans (
+                pr_id TEXT NOT NULL,
+                plan_data TEXT NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (pr_id),
+                FOREIGN KEY(pr_id) REFERENCES pull_requests(id)
             );
             "#,
         )?;

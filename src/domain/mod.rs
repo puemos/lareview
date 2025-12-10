@@ -55,15 +55,6 @@ pub struct TaskStats {
     pub tags: Vec<String>,
 }
 
-/// A patch hunk representing changes to a specific file
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Patch {
-    /// File path that the patch applies to
-    pub file: String,
-    /// Unified diff hunk containing the actual changes
-    pub hunk: String,
-}
-
 /// Status of a review task
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "UPPERCASE")]
@@ -92,9 +83,9 @@ pub struct ReviewTask {
     pub files: Vec<String>,
     /// Statistical information about the changes
     pub stats: TaskStats,
-    /// Patch hunks showing the specific changes to review
+    /// Diff strings showing the specific changes to review
     #[serde(default)]
-    pub patches: Vec<Patch>,
+    pub diffs: Vec<String>,
     /// AI-generated insight about the task (optional)
     pub insight: Option<String>,
     /// Optional diagram describing the task context
@@ -108,6 +99,67 @@ pub struct ReviewTask {
     /// Optional sub-flow name this task belongs to for organizational purposes
     #[serde(default)]
     pub sub_flow: Option<String>,
+}
+
+/// Status of a plan entry
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum PlanStatus {
+    /// Plan entry has not been started yet
+    #[default]
+    #[serde(alias = "PENDING")]
+    Pending,
+    /// Plan entry is currently in progress
+    #[serde(alias = "INPROGRESS")]
+    #[serde(alias = "IN_PROGRESS")]
+    #[serde(alias = "inprogress")]
+    #[serde(alias = "in_progress")]
+    InProgress,
+    /// Plan entry has been completed
+    #[serde(alias = "COMPLETED")]
+    Completed,
+}
+
+/// Priority level of a plan entry
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum PlanPriority {
+    /// Low priority plan entry
+    #[serde(alias = "LOW")]
+    Low,
+    /// Medium priority plan entry
+    #[default]
+    #[serde(alias = "MEDIUM")]
+    Medium,
+    /// High priority plan entry
+    #[serde(alias = "HIGH")]
+    High,
+}
+
+/// A single entry in a plan
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanEntry {
+    /// Content/narrative description of the plan entry
+    pub content: String,
+    /// Priority level of the plan entry
+    #[serde(default)]
+    pub priority: PlanPriority,
+    /// Current status of the plan entry
+    #[serde(default)]
+    pub status: PlanStatus,
+    /// Optional metadata associated with the plan entry
+    #[serde(default)]
+    pub meta: Option<serde_json::Value>,
+}
+
+/// A plan containing multiple entries
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Plan {
+    /// List of plan entries
+    pub entries: Vec<PlanEntry>,
+    /// Optional metadata associated with the plan
+    #[serde(default)]
+    pub meta: Option<serde_json::Value>,
 }
 
 /// Review note stored per task

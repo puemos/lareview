@@ -23,16 +23,9 @@
             <stop offset="1" stop-color="#6B21D8" />
         </linearGradient>
 
-        <linearGradient
-            id="circle-bg-gradient"
-            x1="128"
-            y1="0"
-            x2="128"
-            y2="256"
-            gradientUnits="userSpaceOnUse"
-        >
-            <stop stop-color="#FFFFFF" stop-opacity="1" />
-            <stop offset="1" stop-color="#F0F0F5" stop-opacity="1" />
+        <linearGradient id="circle-bg-gradient" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#8a7dffe3" stop-opacity="1" />
+            <stop offset="1" stop-color="#837dbce3" stop-opacity="1" />
         </linearGradient>
 
         <filter id="dropShadow" x="-50%" y="-50%" width="200%" height="200%">
@@ -56,24 +49,13 @@
         </filter>
     </defs>
 
-    <mask
-        id="mask0"
-        mask-type="alpha"
-        maskUnits="userSpaceOnUse"
-        x="0"
-        y="0"
-        width="512"
-        height="512"
-    >
-        <use href="#squircle-path" fill="white" />
-    </mask>
 
 
     <g transform="translate(90, 90) scale(1.3)">
         <circle
             cx="128"
             cy="128"
-            r="120"
+            r="100"
             fill="url(#circle-bg-gradient)"
             filter="url(#dropShadow)"
         />

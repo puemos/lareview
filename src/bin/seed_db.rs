@@ -1,4 +1,5 @@
 use rusqlite::Connection;
+use serde_json;
 use std::fs;
 
 // Simple structs matching the database schema
@@ -22,7 +23,8 @@ struct ReviewTask {
     files: String, // JSON string
     stats: String, // JSON string
     insight: Option<String>,
-    patches: Option<String>, // JSON string
+    // JSON string: ["<unified diff>", "<unified diff>", ...]
+    diffs: Option<String>,
     diagram: Option<String>,
     ai_generated: bool,
     status: String,
@@ -137,21 +139,46 @@ avatars, roles, and JSON details in a more readable way.\n\
             files: r#"[
   "apps/web/modules/booking/logs/views/booking-logs-view.tsx",
   "apps/web/public/static/locales/en/common.json"
-]"#.to_string(),
+]"#
+            .to_string(),
             stats: r#"{"additions": 210, "deletions": 75, "risk": "MEDIUM", "tags": ["booking-logs", "react", "i18n", "ui"]}"#.to_string(),
             insight: Some("This UI is a primary debugging surface for support and customers. A small regression in how we format dates, JSON, or links will be very visible. Treat the JsonViewer as a mini log viewer and think about default collapsed behavior and performance on large payloads.".to_string()),
-            patches: Some(
-                r#"[
-  {
-    "file": "apps/web/modules/booking/logs/views/booking-logs-view.tsx",
-    "hunk": "diff --git a/apps/web/modules/booking/logs/views/booking-logs-view.tsx b/apps/web/modules/booking/logs/views/booking-logs-view.tsx\n--- a/apps/web/modules/booking/logs/views/booking-logs-view.tsx\n+++ b/apps/web/modules/booking/logs/views/booking-logs-view.tsx\n@@ -3,6 +3,7 @@\n \"use client\";\n \n+import Link from \"next/link\";\n import { useRouter } from \"next/navigation\";\n import { useState } from \"react\";\n import { useLocale } from \"@calcom/lib/hooks/useLocale\";\n@@ -12,6 +13,8 @@\n import { Button } from \"@calcom/ui/components/button\";\n import { Icon } from \"@calcom/ui/components/icon\";\n import { SkeletonText } from \"@calcom/ui/components/skeleton\";\n import { FilterSearchField, Select } from \"@calcom/ui/components/form\";\n+import { Avatar } from \"@calcom/ui/components/avatar\";\n+import ServerTrans from \"@calcom/lib/components/ServerTrans\";\n@@\n type AuditLog = {\n     id: string;\n     action: string;\n     type: string;\n     timestamp: string;\n     data: Record<string, unknown> | null;\n+    actionDisplayTitle: TranslationWithParams;\n+    displayFields?: Array<{ labelKey: string; valueKey: string }>;\n     actor: {\n         type: string;\n         displayName: string | null;\n+        displayEmail: string | null;\n+        displayAvatar: string | null;\n     };\n };\n@@\n+function ActionTitle({ actionDisplayTitle }: { actionDisplayTitle: TranslationWithParams }) {\n+    const { t } = useLocale();\n+\n+    if (actionDisplayTitle.components?.length) {\n+        return (\n+            <ServerTrans\n+                t={t}\n+                i18nKey={actionDisplayTitle.key}\n+                values={actionDisplayTitle.params}\n+                components={actionDisplayTitle.components.map((comp) =>\n+                    comp.type === \"link\" ? (\n+                        <Link\n+                            key={comp.href}\n+                            href={comp.href}\n+                            className=\"text-emphasis underline hover:no-underline\"\n+                        />\n+                    ) : (\n+                        <span key={comp.href} />\n+                    )\n+                )}\n+            />\n+        );\n+    }\n+\n+    return <>{t(actionDisplayTitle.key, actionDisplayTitle.params)}</>;\n+}\n"
-  },
-  {
-    "file": "apps/web/public/static/locales/en/common.json",
-    "hunk": "diff --git a/apps/web/public/static/locales/en/common.json b/apps/web/public/static/locales/en/common.json\n--- a/apps/web/public/static/locales/en/common.json\n+++ b/apps/web/public/static/locales/en/common.json\n@@ -4095,8 +4095,25 @@\n-  \"audit_action\": {\n-    \"created\": \"Created\"\n+  \"booking_audit_action\": {\n+    \"created\": \"Created\",\n+    \"cancelled\": \"Cancelled\",\n+    \"rescheduled\": \"Rescheduled {{oldDate}} -> <0>{{newDate}}</0>\",\n+    \"rescheduled_from\": \"Rescheduled <0>{{oldDate}}</0> -> {{newDate}}\",\n+    \"accepted\": \"Accepted\",\n+    \"reschedule_requested\": \"Reschedule Requested\",\n+    \"attendee_added\": \"Attendee Added\",\n+    \"host_no_show_updated\": \"Host No-Show Updated\",\n+    \"rejected\": \"Rejected\",\n+    \"attendee_removed\": \"Attendee Removed\",\n+    \"reassignment\": \"Reassignment\",\n+    \"booking_reassigned_to_host\": \"Booking reassigned to {{host}}\",\n+    \"location_changed\": \"Location Changed\",\n+    \"location_changed_from_to\": \"Location changed from {{fromLocation}} to {{toLocation}}\",\n+    \"attendee_no_show_updated\": \"Attendee No-Show Updated\",\n+    \"type\": \"Assignment Type\",\n+    \"assignmentType_manual\": \"Manual Assignment\",\n+    \"assignmentType_roundRobin\": \"Round Robin Assignment\"\n   },\n"
-  }
-]"#.trim().to_string(),
-            ),
+            diffs: Some(serde_json::to_string(&[
+                r#"diff --git a/apps/web/modules/booking/logs/views/booking-logs-view.tsx b/apps/web/modules/booking/logs/views/booking-logs-view.tsx
+--- a/apps/web/modules/booking/logs/views/booking-logs-view.tsx
++++ b/apps/web/modules/booking/logs/views/booking-logs-view.tsx
+@@ -0,0 +1,11 @@
++"use client";
++
++import Link from "next/link";
++import { Avatar } from "@calcom/ui/components/avatar";
++import ServerTrans from "@calcom/lib/components/ServerTrans";
++
++export function ActionTitle() {
++  return (
++    <span>Action title</span>
++  );
++}
+"#,
+                r#"diff --git a/apps/web/public/static/locales/en/common.json b/apps/web/public/static/locales/en/common.json
+--- a/apps/web/public/static/locales/en/common.json
++++ b/apps/web/public/static/locales/en/common.json
+@@ -0,0 +1,13 @@
++{
++  "booking_audit_action": {
++    "created": "Created",
++    "cancelled": "Cancelled",
++    "rescheduled": "Rescheduled {{oldDate}} -> <0>{{newDate}}</0>",
++    "rescheduled_from": "Rescheduled <0>{{oldDate}}</0> -> {{newDate}}",
++    "accepted": "Accepted",
++    "reassignment": "Reassignment",
++    "location_changed": "Location Changed",
++    "attendee_no_show_updated": "Attendee No-Show Updated",
++    "type": "Assignment Type"
++  }
++}
+"#,
+            ])?),
             diagram: Some(
                 r#"direction: right
 
@@ -213,25 +240,60 @@ WebApp -> Client: Render timeline"#.trim().to_string(),
   "packages/features/booking-audit/lib/actions/RejectedAuditActionService.ts",
   "packages/features/booking-audit/lib/common/changeSchemas.ts",
   "packages/features/booking-audit/lib/service/BookingAuditActionServiceRegistry.ts"
-]"#.to_string(),
+]"#
+            .to_string(),
             stats: r#"{"additions": 260, "deletions": 40, "risk": "HIGH", "tags": ["booking-audit", "typescript", "domain-model", "i18n"]}"#.to_string(),
             insight: Some("These action services define the contract between producers, consumers, and the booking logs UI. If the registry mapping or zod schemas drift, we will either drop logs or misrender titles. Review the registry as a single source of truth and think about how we would add a new action in the future without touching too many files.".to_string()),
-            patches: Some(
-                r#"[
-  {
-    "file": "packages/features/booking-audit/lib/actions/IAuditActionService.ts",
-    "hunk": "diff --git a/packages/features/booking-audit/lib/actions/IAuditActionService.ts b/packages/features/booking-audit/lib/actions/IAuditActionService.ts\n--- a/packages/features/booking-audit/lib/actions/IAuditActionService.ts\n+++ b/packages/features/booking-audit/lib/actions/IAuditActionService.ts\n@@ -64,11 +64,34 @@\n-    getDisplayJson?(storedData: { version: number; fields: z.infer<TStoredFieldsSchema> }): unknown;\n+    getDisplayJson?(params: { storedData: { version: number; fields: z.infer<TStoredFieldsSchema> }; userTimeZone: string }): unknown;\n@@\n-    getDisplayTitle(storedData: { version: number; fields: z.infer<TStoredFieldsSchema> }): Promise<TranslationWithParams>;\n+    getDisplayTitle(params: { storedData: { version: number; fields: z.infer<TStoredFieldsSchema> }; userTimeZone: string }): Promise<TranslationWithParams>;\n+\n+    getDisplayFields?(storedData: { version: number; fields: z.infer<TStoredFieldsSchema> }): Array<{\n+        labelKey: string;\n+        valueKey: string;\n+    }>;\n"
-  },
-  {
-    "file": "packages/features/booking-audit/lib/common/changeSchemas.ts",
-    "hunk": "diff --git a/packages/features/booking-audit/lib/common/changeSchemas.ts b/packages/features/booking-audit/lib/common/changeSchemas.ts\n--- a/packages/features/booking-audit/lib/common/changeSchemas.ts\n+++ b/packages/features/booking-audit/lib/common/changeSchemas.ts\n@@ -1,5 +1,6 @@\n import { z } from \"zod\";\n \n+import { BookingStatus } from \"@calcom/prisma/enums\";\n@@\n+export const BookingStatusChangeSchema = z.object({\n+    old: z.nativeEnum(BookingStatus).nullable(),\n+    new: z.nativeEnum(BookingStatus),\n+});\n"
-  },
-  {
-    "file": "packages/features/booking-audit/lib/service/BookingAuditActionServiceRegistry.ts",
-    "hunk": "diff --git a/packages/features/booking-audit/lib/service/BookingAuditActionServiceRegistry.ts b/packages/features/booking-audit/lib/service/BookingAuditActionServiceRegistry.ts\nnew file mode 100644\n--- /dev/null\n+++ b/packages/features/booking-audit/lib/service/BookingAuditActionServiceRegistry.ts\n@@ -0,0 +1,87 @@\n+import type { UserRepository } from \"@calcom/features/users/repositories/UserRepository\";\n+import type { IAuditActionService } from \"../actions/IAuditActionService\";\n+import type { BookingAuditAction } from \"../repository/IBookingAuditRepository\";\n+\n+import { CreatedAuditActionService, type CreatedAuditData } from \"../actions/CreatedAuditActionService\";\n+import { CancelledAuditActionService, type CancelledAuditData } from \"../actions/CancelledAuditActionService\";\n+import { RescheduledAuditActionService, type RescheduledAuditData } from \"../actions/RescheduledAuditActionService\";\n+import { AcceptedAuditActionService, type AcceptedAuditData } from \"../actions/AcceptedAuditActionService\";\n+import { RescheduleRequestedAuditActionService, type RescheduleRequestedAuditData } from \"../actions/RescheduleRequestedAuditActionService\";\n+import { AttendeeAddedAuditActionService, type AttendeeAddedAuditData } from \"../actions/AttendeeAddedAuditActionService\";\n+import { HostNoShowUpdatedAuditActionService, type HostNoShowUpdatedAuditData } from \"../actions/HostNoShowUpdatedAuditActionService\";\n+import { RejectedAuditActionService, type RejectedAuditData } from \"../actions/RejectedAuditActionService\";\n+import { AttendeeRemovedAuditActionService, type AttendeeRemovedAuditData } from \"../actions/AttendeeRemovedAuditActionService\";\n+import { ReassignmentAuditActionService, type ReassignmentAuditData } from \"../actions/ReassignmentAuditActionService\";\n+import { LocationChangedAuditActionService, type LocationChangedAuditData } from \"../actions/LocationChangedAuditActionService\";\n+import { AttendeeNoShowUpdatedAuditActionService, type AttendeeNoShowUpdatedAuditData } from \"../actions/AttendeeNoShowUpdatedAuditActionService\";\n+\n+export type AuditActionData =\n+    | CreatedAuditData\n+    | CancelledAuditData\n+    | RescheduledAuditData\n+    | AcceptedAuditData\n+    | RescheduleRequestedAuditData\n+    | AttendeeAddedAuditData\n+    | HostNoShowUpdatedAuditData\n+    | RejectedAuditData\n+    | AttendeeRemovedAuditData\n+    | ReassignmentAuditData\n+    | LocationChangedAuditData\n+    | AttendeeNoShowUpdatedAuditData;\n+\n+interface BookingAuditActionServiceRegistryDeps {\n+    userRepository: UserRepository;\n+}\n+\n+export class BookingAuditActionServiceRegistry {\n+    private readonly actionServices: Map<BookingAuditAction, IAuditActionService<any, any>>;\n+\n+    constructor(private deps: BookingAuditActionServiceRegistryDeps) {\n+        const services: Array<[BookingAuditAction, IAuditActionService<any, any>]> = [\n+            [\"CREATED\", new CreatedAuditActionService()],\n+            [\"CANCELLED\", new CancelledAuditActionService()],\n+            [\"RESCHEDULED\", new RescheduledAuditActionService()],\n+            [\"ACCEPTED\", new AcceptedAuditActionService()],\n+            [\"RESCHEDULE_REQUESTED\", new RescheduleRequestedAuditActionService()],\n+            [\"ATTENDEE_ADDED\", new AttendeeAddedAuditActionService()],\n+            [\"HOST_NO_SHOW_UPDATED\", new HostNoShowUpdatedAuditActionService()],\n+            [\"REJECTED\", new RejectedAuditActionService()],\n+            [\"ATTENDEE_REMOVED\", new AttendeeRemovedAuditActionService()],\n+            [\"REASSIGNMENT\", new ReassignmentAuditActionService(deps.userRepository)],\n+            [\"LOCATION_CHANGED\", new LocationChangedAuditActionService()],\n+            [\"ATTENDEE_NO_SHOW_UPDATED\", new AttendeeNoShowUpdatedAuditActionService()],\n+        ];\n+        this.actionServices = new Map(services);\n+    }\n+\n+    getActionService(action: BookingAuditAction): IAuditActionService<any, any> {\n+        const service = this.actionServices.get(action);\n+        if (!service) {\n+            throw new Error(`No action service found for: ${action}`);\n+        }\n+        return service;\n+    }\n+}\n"
-  }
-]"#.trim().to_string(),
-            ),
+            diffs: Some(serde_json::to_string(&[
+                r#"diff --git a/packages/features/booking-audit/lib/actions/IAuditActionService.ts b/packages/features/booking-audit/lib/actions/IAuditActionService.ts
+--- a/packages/features/booking-audit/lib/actions/IAuditActionService.ts
++++ b/packages/features/booking-audit/lib/actions/IAuditActionService.ts
+@@ -0,0 +1,11 @@
++import type { z } from "zod";
++
++export type TranslationWithParams = {
++  key: string;
++  params?: Record<string, unknown>;
++};
++
++export interface IAuditActionService<TStoredFieldsSchema extends z.ZodTypeAny> {
++  getDisplayTitle(params: { userTimeZone: string }): Promise<TranslationWithParams>;
++  getDisplayFields?(): Array<{ labelKey: string; valueKey: string }>;
++}
+"#,
+                r#"diff --git a/packages/features/booking-audit/lib/common/changeSchemas.ts b/packages/features/booking-audit/lib/common/changeSchemas.ts
+--- a/packages/features/booking-audit/lib/common/changeSchemas.ts
++++ b/packages/features/booking-audit/lib/common/changeSchemas.ts
+@@ -0,0 +1,6 @@
++import { z } from "zod";
++import { BookingStatus } from "@calcom/prisma/enums";
++
++export const BookingStatusChangeSchema = z.object({
++  old: z.nativeEnum(BookingStatus).nullable(),
++  new: z.nativeEnum(BookingStatus),
++});
+"#,
+                r#"diff --git a/packages/features/booking-audit/lib/service/BookingAuditActionServiceRegistry.ts b/packages/features/booking-audit/lib/service/BookingAuditActionServiceRegistry.ts
+new file mode 100644
+--- /dev/null
++++ b/packages/features/booking-audit/lib/service/BookingAuditActionServiceRegistry.ts
+@@ -0,0 +1,15 @@
++import type { IAuditActionService } from "../actions/IAuditActionService";
++
++export type BookingAuditAction =
++  | "CREATED"
++  | "CANCELLED"
++  | "RESCHEDULED";
++
++export class BookingAuditActionServiceRegistry {
++  private readonly actionServices: Map<BookingAuditAction, IAuditActionService<any>>;
++
++  constructor(services: Array<[BookingAuditAction, IAuditActionService<any>]>) {
++    this.actionServices = new Map(services);
++  }
++}
++"#,
+            ])?),
             diagram: Some(
                 r#"direction: right
 
@@ -292,21 +354,36 @@ Consumer -> Repo: Store versioned data"#.trim().to_string(),
   "packages/features/booking-audit/lib/service/BookingAuditProducerService.interface.ts",
   "packages/features/booking-audit/lib/types/bookingAuditTask.ts",
   "packages/features/tasker/tasker.ts"
-]"#.to_string(),
+]"#
+            .to_string(),
             stats: r#"{"additions": 310, "deletions": 120, "risk": "HIGH", "tags": ["tasker", "queue", "booking-audit", "typescript"]}"#.to_string(),
             insight: Some("This is a good place to think about failure modes. What happens if an action is added to the enum but not to the registry, or vice versa. What happens if a producer passes the wrong data shape. Consider logging, observability, and how we might backfill or replay audit tasks if something goes wrong.".to_string()),
-            patches: Some(
-                r#"[
-  {
-    "file": "packages/features/booking-audit/lib/types/bookingAuditTask.ts",
-    "hunk": "diff --git a/packages/features/booking-audit/lib/types/bookingAuditTask.ts b/packages/features/booking-audit/lib/types/bookingAuditTask.ts\n--- a/packages/features/booking-audit/lib/types/bookingAuditTask.ts\n+++ b/packages/features/booking-audit/lib/types/bookingAuditTask.ts\n@@ -1,29 +1,72 @@\n import { z } from \"zod\";\n@@\n-import {\n-    CreatedAuditActionService,\n-} from \"../actions/CreatedAuditActionService\";\n+import { CreatedAuditActionService } from \"../actions/CreatedAuditActionService\";\n+import { RescheduledAuditActionService } from \"../actions/RescheduledAuditActionService\";\n+import { AcceptedAuditActionService } from \"../actions/AcceptedAuditActionService\";\n+import { CancelledAuditActionService } from \"../actions/CancelledAuditActionService\";\n+import { RescheduleRequestedAuditActionService } from \"../actions/RescheduleRequestedAuditActionService\";\n+import { AttendeeAddedAuditActionService } from \"../actions/AttendeeAddedAuditActionService\";\n+import { HostNoShowUpdatedAuditActionService } from \"../actions/HostNoShowUpdatedAuditActionService\";\n+import { RejectedAuditActionService } from \"../actions/RejectedAuditActionService\";\n+import { AttendeeRemovedAuditActionService } from \"../actions/AttendeeRemovedAuditActionService\";\n+import { ReassignmentAuditActionService } from \"../actions/ReassignmentAuditActionService\";\n+import { LocationChangedAuditActionService } from \"../actions/LocationChangedAuditActionService\";\n+import { AttendeeNoShowUpdatedAuditActionService } from \"../actions/AttendeeNoShowUpdatedAuditActionService\";\n+\n+export const BookingAuditActionSchema = z.enum([\n+    \"CREATED\",\n+    \"RESCHEDULED\",\n+    \"ACCEPTED\",\n+    \"CANCELLED\",\n+    \"RESCHEDULE_REQUESTED\",\n+    \"ATTENDEE_ADDED\",\n+    \"HOST_NO_SHOW_UPDATED\",\n+    \"REJECTED\",\n+    \"ATTENDEE_REMOVED\",\n+    \"REASSIGNMENT\",\n+    \"LOCATION_CHANGED\",\n+    \"ATTENDEE_NO_SHOW_UPDATED\",\n+]);\n+\n+export type BookingAuditAction = z.infer<typeof BookingAuditActionSchema>;\n@@\n-export const BookingAuditTaskConsumerPayloadSchema = z.discriminatedUnion(\"action\", [\n-    baseSchema.merge(z.object({\n-        action: z.literal(CreatedAuditActionService.TYPE),\n-        data: CreatedAuditActionService.storedFieldsSchema,\n-    })),\n-]);\n-\n-export type BookingAuditTaskConsumerPayload = z.infer<typeof BookingAuditTaskConsumerPayloadSchema>;\n+export const BookingAuditTaskBaseSchema = z.object({\n+    bookingUid: z.string(),\n+    actor: ActorSchema,\n+    organizationId: z.number().nullable(),\n+    timestamp: z.number(),\n+    action: BookingAuditActionSchema,\n+    data: z.unknown(),\n+});\n+\n+export type BookingAuditTaskBasePayload = z.infer<typeof BookingAuditTaskBaseSchema>;\n"
-  },
-  {
-    "file": "packages/features/tasker/tasker.ts",
-    "hunk": "diff --git a/packages/features/tasker/tasker.ts b/packages/features/tasker/tasker.ts\n--- a/packages/features/tasker/tasker.ts\n+++ b/packages/features/tasker/tasker.ts\n@@ -1,7 +1,7 @@\n import type { z } from \"zod\";\n@@\n-import type { BookingAuditTaskConsumerPayload } from \"@calcom/features/booking-audit/lib/types/bookingAuditTask\";\n+import type { BookingAuditTaskBasePayload } from \"@calcom/features/booking-audit/lib/types/bookingAuditTask\";\n@@\n-  bookingAudit: BookingAuditTaskConsumerPayload;\n+  bookingAudit: BookingAuditTaskBasePayload;\n"
-  }
-]"#.trim().to_string(),
-            ),
+            diffs: Some(serde_json::to_string(&[
+                r#"diff --git a/packages/features/booking-audit/lib/types/bookingAuditTask.ts b/packages/features/booking-audit/lib/types/bookingAuditTask.ts
+--- a/packages/features/booking-audit/lib/types/bookingAuditTask.ts
++++ b/packages/features/booking-audit/lib/types/bookingAuditTask.ts
+@@ -0,0 +1,10 @@
++import { z } from "zod";
++
++export const BookingAuditActionSchema = z.enum([
++  "CREATED",
++  "RESCHEDULED",
++  "CANCELLED",
++]);
++
++export type BookingAuditAction = z.infer<typeof BookingAuditActionSchema>;
++"#,
+                r#"diff --git a/packages/features/tasker/tasker.ts b/packages/features/tasker/tasker.ts
+--- a/packages/features/tasker/tasker.ts
++++ b/packages/features/tasker/tasker.ts
+@@ -0,0 +1,6 @@
++import type { BookingAuditAction } from "@calcom/features/booking-audit/lib/types/bookingAuditTask";
++
++export type TaskPayloads = {
++  bookingAudit: { action: BookingAuditAction };
++};
++"#,
+            ])?),
             diagram: Some(
                 r#"direction: right
 
@@ -361,29 +438,50 @@ Consumer -> Repo: "insert audit row\nwith versioned data""#.trim().to_string(),
   "packages/features/booking-audit/lib/repository/PrismaBookingAuditRepository.ts",
   "packages/features/bookings/repositories/BookingRepository.ts",
   "packages/features/di/containers/BookingAuditViewerService.container.ts"
-]"#.to_string(),
+]"#
+            .to_string(),
             stats: r#"{"additions": 230, "deletions": 60, "risk": "MEDIUM", "tags": ["booking-audit", "viewer", "typescript"]}"#.to_string(),
             insight: Some("The viewer service is the bridge between storage and UI. The new 'rescheduled from' synthetic log is a good place to look for off-by-one style bugs or confusing ownership of bookingUid. Think about how this behaves for long reschedule chains and how we might test that in isolation.".to_string()),
-            patches: Some(
-                r#"[
-  {
-    "file": "packages/features/booking-audit/lib/service/BookingAuditViewerService.ts",
-    "hunk": "diff --git a/packages/features/booking-audit/lib/service/BookingAuditViewerService.ts b/packages/features/booking-audit/lib/service/BookingAuditViewerService.ts\n--- a/packages/features/booking-audit/lib/service/BookingAuditViewerService.ts\n+++ b/packages/features/booking-audit/lib/service/BookingAuditViewerService.ts\n@@ -1,14 +1,16 @@\n import type { UserRepository } from \"@calcom/features/users/repositories/UserRepository\";\n+import type { BookingRepository } from \"@calcom/features/bookings/repositories/BookingRepository\";\n \n-import { CreatedAuditActionService, type CreatedAuditDisplayData } from \"../actions/CreatedAuditActionService\";\n+import { BookingAuditActionServiceRegistry } from \"./BookingAuditActionServiceRegistry\";\n+import type { TranslationWithParams } from \"../actions/IAuditActionService\";\n+import { RescheduledAuditActionService } from \"../actions/RescheduledAuditActionService\";\n@@\n-interface BookingAuditViewerServiceDeps {\n-    bookingAuditRepository: IBookingAuditRepository;\n-    userRepository: UserRepository;\n-}\n+interface BookingAuditViewerServiceDeps {\n+    bookingAuditRepository: IBookingAuditRepository;\n+    userRepository: UserRepository;\n+    bookingRepository: BookingRepository;\n+}\n@@\n export class BookingAuditViewerService {\n-    private readonly createdActionService: CreatedAuditActionService;\n+    private readonly actionServiceRegistry: BookingAuditActionServiceRegistry;\n@@\n-    constructor(private readonly deps: BookingAuditViewerServiceDeps) {\n-        this.bookingAuditRepository = deps.bookingAuditRepository;\n-        this.userRepository = deps.userRepository;\n-\n-        this.createdActionService = new CreatedAuditActionService();\n-    }\n+    constructor(private readonly deps: BookingAuditViewerServiceDeps) {\n+        this.bookingAuditRepository = deps.bookingAuditRepository;\n+        this.userRepository = deps.userRepository;\n+        this.bookingRepository = deps.bookingRepository;\n+        this.rescheduledAuditActionService = new RescheduledAuditActionService();\n+\n+        this.actionServiceRegistry = new BookingAuditActionServiceRegistry({ userRepository: this.userRepository });\n+    }\n"
-  },
-  {
-    "file": "packages/features/booking-audit/lib/repository/IBookingAuditRepository.ts",
-    "hunk": "diff --git a/packages/features/booking-audit/lib/repository/IBookingAuditRepository.ts b/packages/features/booking-audit/lib/repository/IBookingAuditRepository.ts\n--- a/packages/features/booking-audit/lib/repository/IBookingAuditRepository.ts\n+++ b/packages/features/booking-audit/lib/repository/IBookingAuditRepository.ts\n@@ -55,4 +55,11 @@\n-    findAllForBooking(bookingUid: string): Promise<BookingAuditWithActor[]>;\n+    findAllForBooking(bookingUid: string): Promise<BookingAuditWithActor[]>;\n+\n+    findRescheduledLogsOfBooking(bookingUid: string): Promise<BookingAuditWithActor[]>;\n"
-  },
-  {
-    "file": "packages/features/bookings/repositories/BookingRepository.ts",
-    "hunk": "diff --git a/packages/features/bookings/repositories/BookingRepository.ts b/packages/features/bookings/repositories/BookingRepository.ts\n--- a/packages/features/bookings/repositories/BookingRepository.ts\n+++ b/packages/features/bookings/repositories/BookingRepository.ts\n@@ -321,7 +321,21 @@\n-export class BookingRepository {\n-  constructor(private prismaClient: PrismaClient) {}\n+export class BookingRepository {\n+  constructor(private prismaClient: PrismaClient) {}\n+\n+  async getFromRescheduleUid(bookingUid: string): Promise<string | null> {\n+    const booking = await this.prismaClient.booking.findUnique({\n+      where: { uid: bookingUid },\n+      select: { fromReschedule: true },\n+    });\n+    return booking?.fromReschedule ?? null;\n+  }\n"
-  },
-  {
-    "file": "packages/features/di/containers/BookingAuditViewerService.container.ts",
-    "hunk": "diff --git a/packages/features/di/containers/BookingAuditViewerService.container.ts b/packages/features/di/containers/BookingAuditViewerService.container.ts\nnew file mode 100644\n--- /dev/null\n+++ b/packages/features/di/containers/BookingAuditViewerService.container.ts\n@@ -0,0 +1,18 @@\n+import type { BookingAuditViewerService } from \"@calcom/features/booking-audit/lib/service/BookingAuditViewerService\";\n+import { BOOKING_AUDIT_DI_TOKENS } from \"@calcom/features/booking-audit/di/tokens\";\n+import { DI_TOKENS } from \"@calcom/features/di/tokens\";\n+import { prismaModule } from \"@calcom/features/di/modules/Prisma\";\n+import { moduleLoader as bookingAuditRepositoryModuleLoader } from \"@calcom/features/booking-audit/di/BookingAuditRepository.module\";\n+import { moduleLoader as bookingAuditViewerServiceModuleLoader } from \"@calcom/features/booking-audit/di/BookingAuditViewerService.module\";\n+\n+import { createContainer } from \"../di\";\n+\n+const container = createContainer();\n+container.load(DI_TOKENS.PRISMA_MODULE, prismaModule);\n+bookingAuditRepositoryModuleLoader.loadModule(container);\n+bookingAuditViewerServiceModuleLoader.loadModule(container);\n+\n+export function getBookingAuditViewerService() {\n+    return container.get<BookingAuditViewerService>(BOOKING_AUDIT_DI_TOKENS.BOOKING_AUDIT_VIEWER_SERVICE);\n+}\n+\n"
-  }
-]"#.trim().to_string(),
-            ),
+            diffs: Some(serde_json::to_string(&[
+                r#"diff --git a/packages/features/booking-audit/lib/service/BookingAuditViewerService.ts b/packages/features/booking-audit/lib/service/BookingAuditViewerService.ts
+--- a/packages/features/booking-audit/lib/service/BookingAuditViewerService.ts
++++ b/packages/features/booking-audit/lib/service/BookingAuditViewerService.ts
+@@ -0,0 +1,9 @@
++import type { BookingAuditActionServiceRegistry } from "./BookingAuditActionServiceRegistry";
++
++export class BookingAuditViewerService {
++  constructor(private readonly registry: BookingAuditActionServiceRegistry) {}
++
++  async getAuditLogsForBooking(bookingUid: string) {
++    return { bookingUid, logs: [] };
++  }
++}
+"#,
+                r#"diff --git a/packages/features/bookings/repositories/BookingRepository.ts b/packages/features/bookings/repositories/BookingRepository.ts
+--- a/packages/features/bookings/repositories/BookingRepository.ts
++++ b/packages/features/bookings/repositories/BookingRepository.ts
+@@ -0,0 +1,7 @@
++import type { PrismaClient } from "@prisma/client";
++
++export class BookingRepository {
++  constructor(private prismaClient: PrismaClient) {}
++
++  async getFromRescheduleUid(bookingUid: string): Promise<string | null> { return null; }
++}
+"#,
+                r#"diff --git a/packages/features/di/containers/BookingAuditViewerService.container.ts b/packages/features/di/containers/BookingAuditViewerService.container.ts
+new file mode 100644
+--- /dev/null
++++ b/packages/features/di/containers/BookingAuditViewerService.container.ts
+@@ -0,0 +1,6 @@
++import { BookingAuditViewerService } from "@calcom/features/booking-audit/lib/service/BookingAuditViewerService";
++
++export function getBookingAuditViewerService() {
++  // simplified container for sample
++  return new BookingAuditViewerService({} as any);
++}
+"#,
+            ])?),
             diagram: Some(
                 r#"direction: right
 
@@ -441,25 +539,48 @@ Viewer -> WebAPI: "enriched logs with\nactionDisplayTitle\ndata, displayFields""
   "packages/features/booking-audit/di/BookingAuditViewerService.module.ts",
   "packages/features/bookings/lib/types/actor.ts",
   "packages/features/bookings/repositories/BookingRepository.ts"
-]"#.to_string(),
+]"#
+            .to_string(),
             stats: r#"{"additions": 95, "deletions": 18, "risk": "LOW", "tags": ["di", "wiring", "booking-audit"]}"#.to_string(),
             insight: Some("These are the edges of the system. If a DI token or module wiring is wrong, audit logs will silently stop recording or viewing without obvious type errors. Treat this as a sanity check that the booking audit stack is reachable in real environments, not just in tests.".to_string()),
-            patches: Some(
-                r#"[
-  {
-    "file": "packages/features/booking-audit/di/BookingAuditTaskConsumer.module.ts",
-    "hunk": "diff --git a/packages/features/booking-audit/di/BookingAuditTaskConsumer.module.ts b/packages/features/booking-audit/di/BookingAuditTaskConsumer.module.ts\n--- a/packages/features/booking-audit/di/BookingAuditTaskConsumer.module.ts\n+++ b/packages/features/booking-audit/di/BookingAuditTaskConsumer.module.ts\n@@ -3,6 +3,7 @@\n import { moduleLoader as bookingAuditRepositoryModuleLoader } from \"@calcom/features/booking-audit/di/BookingAuditRepository.module\";\n import { moduleLoader as auditActorRepositoryModuleLoader } from \"@calcom/features/booking-audit/di/AuditActorRepository.module\";\n import { moduleLoader as featuresRepositoryModuleLoader } from \"@calcom/features/di/modules/Features\";\n+import { moduleLoader as userRepositoryModuleLoader } from \"@calcom/features/di/modules/User\";\n@@\n-    featuresRepository: featuresRepositoryModuleLoader,\n+    featuresRepository: featuresRepositoryModuleLoader,\n+    userRepository: userRepositoryModuleLoader,\n   },\n });\n"
-  },
-  {
-    "file": "packages/features/booking-audit/di/BookingAuditTaskerProducerService.module.ts",
-    "hunk": "diff --git a/packages/features/booking-audit/di/BookingAuditTaskerProducerService.module.ts b/packages/features/booking-audit/di/BookingAuditTaskerProducerService.module.ts\n--- a/packages/features/booking-audit/di/BookingAuditTaskerProducerService.module.ts\n+++ b/packages/features/booking-audit/di/BookingAuditTaskerProducerService.module.ts\n@@ -1,6 +1,7 @@\n import { BookingAuditTaskerProducerService } from \"@calcom/features/booking-audit/lib/service/BookingAuditTaskerProducerService\";\n import { BOOKING_AUDIT_DI_TOKENS } from \"@calcom/features/booking-audit/di/tokens\";\n import { moduleLoader as taskerModuleLoader } from \"@calcom/features/di/shared/services/tasker.service\";\n+import { moduleLoader as loggerModuleLoader } from \"@calcom/features/di/shared/services/logger.service\";\n@@\n   depsMap: {\n     tasker: taskerModuleLoader,\n+    log: loggerModuleLoader,\n   },\n });\n"
-  },
-  {
-    "file": "packages/features/bookings/lib/types/actor.ts",
-    "hunk": "diff --git a/packages/features/bookings/lib/types/actor.ts b/packages/features/bookings/lib/types/actor.ts\n--- a/packages/features/bookings/lib/types/actor.ts\n+++ b/packages/features/bookings/lib/types/actor.ts\n@@ -32,6 +32,7 @@\n export const ActorSchema = z.discriminatedUnion(\"identifiedBy\", [\n@@\n type UserActor = z.infer<typeof UserActorSchema>;\n type GuestActor = z.infer<typeof GuestActorSchema>;\n+type AttendeeActor = z.infer<typeof AttendeeActorSchema>;\n@@\n export function makeActorById(id: string): ActorById {\n@@\n }\n+\n+export function makeAttendeeActor(attendeeId: number): AttendeeActor {\n+  return {\n+    identifiedBy: \"attendee\",\n+    attendeeId,\n+  };\n+}\n"
-  }
-]"#.trim().to_string(),
-            ),
+            diffs: Some(serde_json::to_string(&[
+                r#"diff --git a/packages/features/booking-audit/di/BookingAuditTaskConsumer.module.ts b/packages/features/booking-audit/di/BookingAuditTaskConsumer.module.ts
+--- a/packages/features/booking-audit/di/BookingAuditTaskConsumer.module.ts
++++ b/packages/features/booking-audit/di/BookingAuditTaskConsumer.module.ts
+@@ -0,0 +1,6 @@
++import { moduleLoader as userRepositoryModuleLoader } from "@calcom/features/di/modules/User";
++
++export const moduleLoader = {
++  deps: {
++    userRepository: userRepositoryModuleLoader,
++  },
++};
+"#,
+                r#"diff --git a/packages/features/booking-audit/di/BookingAuditTaskerProducerService.module.ts b/packages/features/booking-audit/di/BookingAuditTaskerProducerService.module.ts
+--- a/packages/features/booking-audit/di/BookingAuditTaskerProducerService.module.ts
++++ b/packages/features/booking-audit/di/BookingAuditTaskerProducerService.module.ts
+@@ -0,0 +1,6 @@
++import { moduleLoader as taskerModuleLoader } from "@calcom/features/di/shared/services/tasker.service";
++import { moduleLoader as loggerModuleLoader } from "@calcom/features/di/shared/services/logger.service";
++
++export const moduleLoader = {
++  deps: { tasker: taskerModuleLoader, log: loggerModuleLoader },
++};
+"#,
+                r#"diff --git a/packages/features/bookings/lib/types/actor.ts b/packages/features/bookings/lib/types/actor.ts
+--- a/packages/features/bookings/lib/types/actor.ts
++++ b/packages/features/bookings/lib/types/actor.ts
+@@ -0,0 +1,8 @@
++import { z } from "zod";
++
++export const AttendeeActorSchema = z.object({
++  identifiedBy: z.literal("attendee"),
++  attendeeId: z.number(),
++});
++
++export type AttendeeActor = z.infer<typeof AttendeeActorSchema>;
+"#,
+            ])?),
             diagram: Some(
                 r#"direction: down
 
@@ -502,7 +623,7 @@ Container -> ViewerMod: "bind viewer deps:\naudit repo, user repo,\nbooking repo
     // Insert all tasks
     for task in tasks {
         conn.execute(
-            r#"INSERT OR REPLACE INTO tasks (id, pull_request_id, title, description, files, stats, insight, patches, diagram, ai_generated, status, sub_flow) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)"#,
+            r#"INSERT OR REPLACE INTO tasks (id, pull_request_id, title, description, files, stats, insight, diffs, diagram, ai_generated, status, sub_flow) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)"#,
             (
                 &task.id,
                 &task.pr_id,
@@ -511,7 +632,7 @@ Container -> ViewerMod: "bind viewer deps:\naudit repo, user repo,\nbooking repo
                 &task.files,
                 &task.stats,
                 &task.insight,
-                &task.patches,
+                &task.diffs,
                 &task.diagram,
                 if task.ai_generated { 1 } else { 0 },
                 &task.status,

@@ -4,7 +4,7 @@
 
 use crate::data::db::Database;
 use crate::data::repository::{PullRequestRepository, TaskRepository};
-use crate::domain::{Patch, PullRequest, PullRequestId, ReviewTask, RiskLevel, TaskStats};
+use crate::domain::{Plan, PlanEntry, PullRequest, ReviewTask};
 use crate::prompts;
 use agent_client_protocol::{
     Agent, ClientCapabilities, ClientSideConnection, ContentBlock, ExtNotification, ExtRequest,
@@ -53,7 +53,6 @@ pub struct GenerateTasksInput {
 /// Result of task generation
 #[derive(Debug)]
 pub struct GenerateTasksResult {
-    pub tasks: Vec<ReviewTask>,
     pub messages: Vec<String>,
     pub thoughts: Vec<String>,
     pub logs: Vec<String>,
@@ -75,6 +74,7 @@ struct LaReviewClient {
     messages: Arc<Mutex<Vec<String>>>,
     thoughts: Arc<Mutex<Vec<String>>>,
     tasks: Arc<Mutex<Option<Vec<ReviewTask>>>>,
+    plans: Arc<Mutex<Option<Vec<Plan>>>>,
     last_message_id: Arc<Mutex<Option<String>>>,
     last_thought_id: Arc<Mutex<Option<String>>>,
     progress: Option<tokio::sync::mpsc::UnboundedSender<ProgressEvent>>,
@@ -86,6 +86,7 @@ impl LaReviewClient {
             messages: Arc::new(Mutex::new(Vec::new())),
             thoughts: Arc::new(Mutex::new(Vec::new())),
             tasks: Arc::new(Mutex::new(None)),
+            plans: Arc::new(Mutex::new(None)),
             last_message_id: Arc::new(Mutex::new(None)),
             last_thought_id: Arc::new(Mutex::new(None)),
             progress,
@@ -97,6 +98,18 @@ impl LaReviewClient {
         // pr_id is not available in this context, so we can't call normalize_tasks properly
         // This method is likely not used in the main flow, so we'll just return false
         false
+    }
+
+    /// Attempt to parse and store plans from arbitrary JSON value.
+    fn store_plans_from_value(&self, value: serde_json::Value) -> bool {
+        if let Ok(plans) = serde_json::from_value::<Vec<Plan>>(value) {
+            if let Ok(mut plans_guard) = self.plans.lock() {
+                *plans_guard = Some(plans);
+            }
+            true
+        } else {
+            false
+        }
     }
 
     /// Handle task submission via extension payloads.
@@ -111,6 +124,15 @@ impl LaReviewClient {
         {
             return self.store_tasks_from_value(value);
         }
+
+        if matches!(
+            method,
+            "lareview/return_plans" | "return_plans" | "lareview/create_plans" | "create_plans"
+        ) && let Ok(value) = serde_json::from_str::<serde_json::Value>(params.get())
+        {
+            return self.store_plans_from_value(value);
+        }
+
         false
     }
 
@@ -238,9 +260,23 @@ impl agent_client_protocol::Client for LaReviewClient {
                             tx.send(ProgressEvent::Log("received tool call return_tasks".into()));
                     }
                 }
+                // Check title for tool name and extract plans from raw_input
+                else if (call.title.contains("return_plans") || call.title.contains("plan"))
+                    && let Some(ref input) = call.raw_input
+                {
+                    self.store_plans_from_value(input.clone());
+                    if let Some(tx) = &self.progress {
+                        let _ =
+                            tx.send(ProgressEvent::Log("received tool call return_plans".into()));
+                    }
+                }
                 // Also check raw_output for returned tasks
                 if let Some(ref output) = call.raw_output {
                     self.store_tasks_from_value(output.clone());
+                }
+                // Also check raw_output for returned plans
+                if let Some(ref output) = call.raw_output {
+                    self.store_plans_from_value(output.clone());
                 }
             }
             _ => {}
@@ -265,85 +301,6 @@ impl agent_client_protocol::Client for LaReviewClient {
         self.handle_extension_payload(&args.method, &args.params);
         Ok(())
     }
-}
-
-#[derive(serde::Deserialize)]
-struct TasksArg {
-    tasks: Vec<RawTask>,
-}
-
-#[derive(serde::Deserialize)]
-struct RawTask {
-    id: String,
-    title: String,
-    #[serde(default)]
-    description: String,
-    #[serde(default)]
-    files: Vec<String>,
-    #[serde(default)]
-    stats: Option<RawStats>,
-    #[serde(default)]
-    patches: Vec<RawPatch>,
-    #[serde(default)]
-    sub_flow: Option<String>,
-}
-
-#[derive(serde::Deserialize, Default)]
-struct RawStats {
-    #[serde(default)]
-    additions: u32,
-    #[serde(default)]
-    deletions: u32,
-    #[serde(default)]
-    risk: String,
-    #[serde(default)]
-    tags: Vec<String>,
-}
-
-#[derive(serde::Deserialize)]
-struct RawPatch {
-    file: String,
-    hunk: String,
-}
-
-fn normalize_tasks(pr_id: &PullRequestId, raw: Vec<RawTask>) -> Vec<ReviewTask> {
-    raw.into_iter()
-        .map(|t| {
-            let stats = t.stats.unwrap_or_default();
-            let risk = match stats.risk.to_uppercase().as_str() {
-                "HIGH" => RiskLevel::High,
-                "MEDIUM" | "MED" => RiskLevel::Medium,
-                _ => RiskLevel::Low,
-            };
-
-            ReviewTask {
-                id: t.id,
-                pr_id: pr_id.clone(),
-                title: t.title,
-                description: t.description,
-                files: t.files,
-                stats: TaskStats {
-                    additions: stats.additions,
-                    deletions: stats.deletions,
-                    risk,
-                    tags: stats.tags,
-                },
-                patches: t
-                    .patches
-                    .into_iter()
-                    .map(|p| Patch {
-                        file: p.file,
-                        hunk: p.hunk,
-                    })
-                    .collect(),
-                insight: None,
-                diagram: None,
-                ai_generated: true,
-                status: crate::domain::TaskStatus::default(),
-                sub_flow: t.sub_flow, // Added sub_flow field
-            }
-        })
-        .collect()
 }
 
 fn push_log(logs: &Arc<Mutex<Vec<String>>>, message: impl Into<String>, debug: bool) {
@@ -547,6 +504,25 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
                                     }
                                 }),
                             ),
+                            (
+                                "lareview-return-plans".into(),
+                                serde_json::json!({
+                                    "type": "extension",
+                                    "method": "lareview/return_plans",
+                                    "description": "Submit review plans back to the client as structured data",
+                                    "params": {
+                                        "plans": [{
+                                            "entries": [{
+                                                "content": "string",
+                                                "priority": "LOW|MEDIUM|HIGH",
+                                                "status": "PENDING|IN_PROGRESS|COMPLETED",
+                                                "meta": "object"
+                                            }],
+                                            "meta": "object"
+                                        }]
+                                    }
+                                }),
+                            ),
                         ])),
                 ),
         )
@@ -556,57 +532,20 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
 
     // Create session with MCP task server
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let tasks_out_path = std::env::temp_dir().join(format!(
-        "lareview_tasks_{}_{}.json",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis()
-    ));
-    let mcp_log_path = std::env::temp_dir().join(format!(
-        "lareview_tasks_log_{}_{}.log",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis()
-    ));
-    let pr_context_path = std::env::temp_dir().join(format!(
-        "lareview_pr_context_{}_{}.json",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis()
-    ));
-
-    // Write PR context to file
-    let pr_json = serde_json::to_string(&pull_request)?;
-    std::fs::write(&pr_context_path, pr_json)?;
 
     let current_exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("lareview"));
     let task_mcp_server_path =
         resolve_task_mcp_server_path(mcp_server_binary.as_ref(), &current_exe);
 
-    let mut mcp_args = vec!["--task-mcp-server".to_string()];
-    mcp_args.push("--tasks-out".to_string());
-    mcp_args.push(tasks_out_path.to_string_lossy().to_string());
-    mcp_args.push("--log-file".to_string());
-    mcp_args.push(mcp_log_path.to_string_lossy().to_string());
-    mcp_args.push("--pr-context".to_string());
-    mcp_args.push(pr_context_path.to_string_lossy().to_string());
+    let mcp_args = vec!["--task-mcp-server".to_string()];
 
     let mcp_servers = vec![McpServer::Stdio(
         McpServerStdio::new("lareview-tasks", task_mcp_server_path.clone()).args(mcp_args),
     )];
 
     log_fn(format!(
-        "new_session (mcp server: {} --task-mcp-server, out: {}, log: {}, pr: {})",
+        "new_session (mcp server: {} --task-mcp-server)",
         task_mcp_server_path.display(),
-        tasks_out_path.display(),
-        mcp_log_path.display(),
-        pr_context_path.display()
     ));
     let session = connection
         .new_session(NewSessionRequest::new(cwd).mcp_servers(mcp_servers))
@@ -643,38 +582,11 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
     let _ = io_handle.await;
 
     // Snapshot artifacts before reading tasks
-    let tasks_out_exists = tasks_out_path.exists();
-    let tasks_out_size = std::fs::metadata(&tasks_out_path)
-        .map(|m| m.len())
-        .unwrap_or(0);
-    let mcp_log_exists = mcp_log_path.exists();
-    let mcp_log_size = std::fs::metadata(&mcp_log_path)
-        .map(|m| m.len())
-        .unwrap_or(0);
 
     push_log(&logs, format!("Agent exit status: {}", status), debug);
-    push_log(
-        &logs,
-        format!(
-            "MCP artifacts: tasks_out_exists={} ({} bytes) {}, mcp_log_exists={} ({} bytes) {}",
-            tasks_out_exists,
-            tasks_out_size,
-            tasks_out_path.display(),
-            mcp_log_exists,
-            mcp_log_size,
-            mcp_log_path.display()
-        ),
-        debug,
-    );
 
     // Prefer tasks captured via MCP callbacks, fall back to file written by MCP server.
-    let mut final_tasks = tasks_capture.lock().unwrap().clone().unwrap_or_default();
-    if final_tasks.is_empty()
-        && let Ok(content) = std::fs::read_to_string(&tasks_out_path)
-        && let Ok(parsed) = serde_json::from_str::<TasksArg>(&content)
-    {
-        final_tasks = normalize_tasks(&pull_request.id, parsed.tasks); // Pass pr_id
-    }
+    let final_tasks = tasks_capture.lock().unwrap().clone().unwrap_or_default();
 
     // Collect output for return and for richer error contexts
     let final_messages = messages.lock().unwrap().clone();
@@ -712,65 +624,11 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
         .context(ctx_parts.join("\n\n")));
     }
 
-    persist_tasks_to_db(&pull_request, &final_tasks, &logs, debug, db_path.as_ref());
-
     Ok(GenerateTasksResult {
-        tasks: final_tasks,
         messages: final_messages,
         thoughts: final_thoughts,
         logs: final_logs,
     })
-}
-
-fn persist_tasks_to_db(
-    pr: &PullRequest,
-    tasks: &[ReviewTask],
-    logs: &Arc<Mutex<Vec<String>>>,
-    debug: bool,
-    db_path: Option<&PathBuf>,
-) {
-    let db_result = match db_path {
-        Some(path) => Database::open_at(path.clone()),
-        None => Database::open(),
-    };
-    match db_result {
-        Ok(db) => {
-            let conn = db.connection();
-            let pr_repo = PullRequestRepository::new(conn.clone());
-            let task_repo = TaskRepository::new(conn.clone());
-
-            if let Err(err) = pr_repo.save(pr) {
-                push_log(logs, format!("db: failed to save PR: {err}"), debug);
-                return;
-            }
-
-            for mut task in tasks.iter().cloned() {
-                // Ensure pr_id is set on the task before saving
-                task.pr_id = pr.id.clone();
-                if let Err(err) = task_repo.save(&task) {
-                    push_log(
-                        logs,
-                        format!("db: failed to save task {}: {err}", task.id),
-                        debug,
-                    );
-                }
-            }
-            push_log(
-                logs,
-                format!(
-                    "db: persisted {} tasks to sqlite at {}",
-                    tasks.len(),
-                    db.path().display()
-                ),
-                debug,
-            );
-        }
-        Err(err) => push_log(
-            logs,
-            format!("db: open failed, not persisting tasks: {err}"),
-            debug,
-        ),
-    }
 }
 
 #[cfg(test)]
@@ -940,7 +798,6 @@ mod real_acp_tests {
         let result = runtime.block_on(generate_tasks_with_acp(input));
         match &result {
             Ok(res) => {
-                eprintln!("tasks: {:#?}", res.tasks);
                 eprintln!("messages: {:#?}", res.messages);
                 eprintln!("thoughts: {:#?}", res.thoughts);
                 eprintln!("logs: {:#?}", res.logs);

@@ -374,7 +374,7 @@ pub fn render_diff_editor_with_options(
                 let file_count = files.len();
                 state.files = files;
                 state.parse_error = None;
-                state.collapsed = vec![false; file_count];
+                state.collapsed = vec![true; file_count];
 
                 let (rows, row_height) = build_row_list(&state.files, &state.collapsed, ui);
                 state.rows = rows;

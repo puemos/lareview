@@ -6,7 +6,7 @@ use std::sync::Arc;
 use crate::acp::ProgressEvent;
 use crate::data::db::Database;
 use crate::data::repository::{NoteRepository, PullRequestRepository, TaskRepository};
-use crate::domain::{Note, PullRequest, ReviewTask};
+use crate::domain::{Note, Plan, PullRequest, ReviewTask};
 
 use catppuccin_egui::MOCHA;
 use eframe::egui;
@@ -45,6 +45,9 @@ pub struct AppState {
     // Renamed tasks to all_tasks to hold all tasks regardless of PR
     /// All review tasks fetched from the database, to be filtered by selected PR
     pub all_tasks: Vec<ReviewTask>,
+
+    /// Plans from the agent during task generation
+    pub plans: Vec<Plan>,
 
     /// Flag indicating if task generation is currently in progress
     pub is_generating: bool,
@@ -90,7 +93,7 @@ pub struct AppState {
     pub full_diff: Option<FullDiffView>,
 
     /// Cache for unified diff string to prevent expensive re-parsing on every frame
-    pub cached_unified_diff: Option<(Vec<crate::domain::Patch>, String)>,
+    pub cached_unified_diff: Option<(Vec<String>, String)>,
 
     /// Output of the D2 installation command
     pub d2_install_output: String,
@@ -149,7 +152,6 @@ impl AppState {
 
 /// Payload we care about from ACP
 pub struct GenResultPayload {
-    pub tasks: Vec<ReviewTask>,
     pub messages: Vec<String>,
     pub thoughts: Vec<String>,
     pub logs: Vec<String>,
@@ -448,6 +450,7 @@ impl eframe::App for LaReviewApp {
         }
 
         // poll async generation messages
+        let mut agent_content_updated = false;
         while let Ok(msg) = self.gen_rx.try_recv() {
             match msg {
                 GenMsg::Progress(evt) => match evt {
@@ -457,6 +460,7 @@ impl eframe::App for LaReviewApp {
                         } else if let Some(latest) = self.state.agent_messages.last_mut() {
                             *latest = content;
                         }
+                        agent_content_updated = true;
                     }
                     ProgressEvent::Thought { content, is_new } => {
                         if is_new || self.state.agent_thoughts.is_empty() {
@@ -464,16 +468,17 @@ impl eframe::App for LaReviewApp {
                         } else if let Some(latest) = self.state.agent_thoughts.last_mut() {
                             *latest = content;
                         }
+                        agent_content_updated = true;
                     }
                     ProgressEvent::Log(log) => {
                         self.state.agent_logs.push(log);
+                        agent_content_updated = true;
                     }
                 },
                 GenMsg::Done(result) => {
                     self.state.is_generating = false;
                     match result {
                         Ok(payload) => {
-                            self.state.all_tasks = payload.tasks; // Changed to all_tasks
                             self.state.agent_messages = payload.messages;
                             self.state.agent_thoughts = payload.thoughts;
                             self.state.agent_logs = payload.logs;
@@ -490,8 +495,15 @@ impl eframe::App for LaReviewApp {
                             self.state.generation_error = Some(err);
                         }
                     }
+                    agent_content_updated = true;
                 }
             }
+        }
+
+        // Request repaint if agent content was updated OR if we're still generating
+        if agent_content_updated || self.state.is_generating {
+            // Use request_repaint_after for smoother updates without constant repainting
+            ctx.request_repaint_after(std::time::Duration::from_millis(100));
         }
 
         // Top panel with app title and navigation
@@ -662,27 +674,31 @@ impl eframe::App for LaReviewApp {
 
             let mut open = true;
 
+            let outer_padding = egui::vec2(12.0, 8.0);
+
             egui::Window::new(full.title.clone())
                 .open(&mut open)
-                .fixed_rect(viewport_rect)
+                // space between the window and the viewport edges
+                .fixed_rect(viewport_rect.shrink2(outer_padding))
+                // padding inside the window frame (affects separator, +102, etc.)
+                .frame(
+                    egui::Frame::window(&ctx.style()).inner_margin(egui::Margin::symmetric(12, 8)),
+                )
                 .collapsible(false)
                 .resizable(false)
                 .title_bar(true)
                 .show(ctx, |ui| {
-                    ui.spacing_mut().window_margin = egui::Margin::symmetric(12, 8);
                     ui.horizontal(|ui| {
                         if ui
                             .button(format!("{} Close", egui_phosphor::regular::ARROW_SQUARE_IN))
                             .clicked()
                         {
-                            // Mark for close
                             self.state.full_diff = None;
                         }
                     });
 
                     ui.separator();
 
-                    // The big diff area itself
                     crate::ui::components::diff::render_diff_editor_full_view(
                         ui, &full.text, "diff",
                     );

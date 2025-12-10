@@ -8,15 +8,16 @@
 
 use crate::data::db::Database;
 use crate::data::repository::{PullRequestRepository, TaskRepository};
-use crate::domain::{Patch, PullRequest, ReviewTask, RiskLevel, TaskStats, TaskStatus};
+use crate::domain::{PullRequest, ReviewTask, RiskLevel, TaskStats, TaskStatus};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use chrono::Utc;
+use chrono::{Local, Utc};
 use pmcp::error::TransportError;
 use pmcp::shared::{Transport, TransportMessage};
 use pmcp::{Server, ServerCapabilities, SimpleTool, ToolHandler};
 use serde::Deserialize;
 use serde_json::{Value, json};
+use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
@@ -46,25 +47,9 @@ impl ServerConfig {
 
         while i < args.len() {
             match args[i].as_str() {
-                "--tasks-out" => {
-                    if i + 1 < args.len() {
-                        config.tasks_out = Some(PathBuf::from(&args[i + 1]));
-                        i += 2;
-                    } else {
-                        i += 1;
-                    }
-                }
                 "--log-file" => {
                     if i + 1 < args.len() {
                         config.log_file = Some(PathBuf::from(&args[i + 1]));
-                        i += 2;
-                    } else {
-                        i += 1;
-                    }
-                }
-                "--pr-context" => {
-                    if i + 1 < args.len() {
-                        config.pr_context = Some(PathBuf::from(&args[i + 1]));
                         i += 2;
                     } else {
                         i += 1;
@@ -189,41 +174,79 @@ fn create_return_tasks_tool(config: Arc<ServerConfig>) -> impl ToolHandler {
             Ok(json!({ "status": "ok", "message": "Tasks received successfully" }))
         })
     })
-    .with_description("Submit review tasks back to the LaReview client. Call this tool with a JSON object containing a 'tasks' array. Each task should have: id (string), title (string), description (string), files (array of strings), stats (object with additions, deletions, risk level, tags), and patches (array of file/hunk objects).")
+    .with_description(
+        "Submit code review tasks for a pull request. This tool finalizes your analysis. \
+         Call it with a JSON payload containing a 'tasks' array where each task represents \
+         a logical sub-flow or review concern from the PR diff. Each task must include: \
+         id, title, description, files, stats (additions, deletions, risk, tags), and diffs. \
+         Optionally include sub_flow (grouping name) and diagram (D2 format for visualization)."
+    )
     .with_schema(json!({
         "type": "object",
         "properties": {
             "tasks": {
                 "type": "array",
-                "description": "Array of review tasks to return",
+                "description": "Array of review tasks. Each task represents one logical sub-flow or review concern. CRITICAL: All tasks together must cover 100% of the diff - do not skip any changes.",
                 "items": {
                     "type": "object",
                     "properties": {
-                        "id": { "type": "string", "description": "Unique identifier for the task" },
-                        "title": { "type": "string", "description": "Brief title describing the review task" },
-                        "description": { "type": "string", "description": "Detailed description of what needs to be reviewed" },
-                        "files": { "type": "array", "items": { "type": "string" }, "description": "List of file paths affected" },
+                        "id": {
+                            "type": "string",
+                            "description": "Short stable identifier for the task. Prefer descriptive IDs that include the sub-flow (e.g., 'auth-T1-missing-tests', 'payment-flow-T1-logic-check') or generic IDs like 'T1', 'T2'"
+                        },
+                        "title": {
+                            "type": "string",
+                            "description": "One-line summary of the review task in imperative mood (e.g., 'Verify authentication flow changes', 'Review database migration logic')"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "2-6 sentences explaining: (1) what this sub-flow does in the system, (2) what changed in this PR, (3) where it appears in the code, (4) why it matters (correctness/safety/performance), (5) what reviewers should verify"
+                        },
+                        "files": {
+                            "type": "array",
+                            "items": { "type": "string" },
+                            "description": "List of file paths that participate in this sub-flow. Include all relevant files, even if they span multiple directories. Paths should be relative to repo root (e.g., 'src/auth/login.rs', 'tests/auth_test.rs')"
+                        },
                         "stats": {
                             "type": "object",
+                            "description": "Statistics about the changes in this task. These can be approximate.",
                             "properties": {
-                                "additions": { "type": "integer", "description": "Number of lines added" },
-                                "deletions": { "type": "integer", "description": "Number of lines deleted" },
-                                "risk": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"], "description": "Risk level of the change" },
-                                "tags": { "type": "array", "items": { "type": "string" }, "description": "Tags for categorization" }
-                            }
-                        },
-                        "patches": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "file": { "type": "string" },
-                                    "hunk": { "type": "string" }
+                                "additions": {
+                                    "type": "integer",
+                                    "description": "Approximate number of lines added relevant to this task"
+                                },
+                                "deletions": {
+                                    "type": "integer",
+                                    "description": "Approximate number of lines deleted relevant to this task"
+                                },
+                                "risk": {
+                                    "type": "string",
+                                    "enum": ["LOW", "MEDIUM", "HIGH"],
+                                    "description": "Risk level: HIGH for dangerous changes (security, data loss, breaking changes), MEDIUM for complex logic or refactors, LOW for safe mechanical changes"
+                                },
+                                "tags": {
+                                    "type": "array",
+                                    "items": { "type": "string" },
+                                    "description": "Descriptive tags for categorization (e.g., 'security', 'performance', 'refactor', 'bug-fix', 'needs-tests', 'breaking-change')"
                                 }
-                            }
+                            },
+                            "required": ["additions", "deletions", "risk", "tags"]
+                        },
+                        "sub_flow": {
+                            "type": "string",
+                            "description": "Optional logical grouping name for this task. Use when multiple tasks belong to the same larger feature or concern (e.g., 'authentication-flow', 'data-migration', 'payment-processing'). Helps organize related tasks."
+                        },
+                        "diagram": {
+                            "type": "string",
+                            "description": "STRONGLY RECOMMENDED: D2 diagram visualizing the flow, sequence, architecture, or data model. Create diagrams for MEDIUM/HIGH risk tasks or when multiple components interact. Must be valid D2 syntax (e.g., 'Client -> API: Request\\nAPI -> DB: Query')"
+                        },
+                        "diffs": {
+                            "type": "array",
+                            "items": { "type": "string" },
+                            "description": "Array of complete unified diff strings showing the relevant changes for this task. CRITICAL: Each diff must be valid and parseable with full headers (diff --git a/file b/file, --- a/file, +++ b/file) and exact hunk headers (@@ -a,b +c,d @@) where line counts match precisely. Never approximate hunk ranges."
                         }
                     },
-                    "required": ["id", "title"]
+                    "required": ["id", "title", "description", "files", "stats", "diffs"]
                 }
             }
         },
@@ -264,7 +287,9 @@ struct RawTask {
     #[serde(default)]
     stats: Option<RawStats>,
     #[serde(default)]
-    patches: Vec<RawPatch>,
+    diffs: Vec<String>,
+    #[serde(default)]
+    diagram: Option<String>,
     #[serde(default)]
     sub_flow: Option<String>,
 }
@@ -279,12 +304,6 @@ struct RawStats {
     risk: String,
     #[serde(default)]
     tags: Vec<String>,
-}
-
-#[derive(Deserialize)]
-struct RawPatch {
-    file: String,
-    hunk: String,
 }
 
 fn persist_tasks_to_db(config: &ServerConfig, args: Value) -> Result<()> {
@@ -338,16 +357,9 @@ fn parse_tasks(args: Value) -> Result<Vec<ReviewTask>> {
                     risk,
                     tags: stats.tags,
                 },
-                patches: task
-                    .patches
-                    .into_iter()
-                    .map(|p| Patch {
-                        file: p.file,
-                        hunk: p.hunk,
-                    })
-                    .collect(),
+                diffs: task.diffs,
                 insight: None,
-                diagram: None,
+                diagram: task.diagram,
                 ai_generated: true,
                 status: TaskStatus::Pending,
                 sub_flow: task.sub_flow, // Use sub_flow from raw task
@@ -373,7 +385,7 @@ fn load_pull_request(config: &ServerConfig) -> PullRequest {
     // Return defaults if no context file or parsing failed
     PullRequest {
         id: "local-pr".to_string(),
-        title: "MCP Review".to_string(),
+        title: "Review".to_string(),
         description: None,
         repo: "unknown/repo".to_string(),
         author: "unknown".to_string(),
@@ -382,15 +394,22 @@ fn load_pull_request(config: &ServerConfig) -> PullRequest {
     }
 }
 
+/// Generate the default log file path with date
+fn default_log_path() -> PathBuf {
+    let date = Local::now().format("%Y-%m-%d").to_string();
+    let dir = PathBuf::from(".lareview/logs");
+    let _ = fs::create_dir_all(&dir);
+    dir.join(format!("mcp-{date}.log"))
+}
+
 /// Log a message to the configured log file, if any
-fn log_to_file(config: &ServerConfig, message: &str) {
-    if let Some(path) = &config.log_file {
-        let _ = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-            .and_then(|mut f| writeln!(f, "{message}"));
-    }
+fn log_to_file(_config: &ServerConfig, message: &str) {
+    let path = default_log_path();
+    let _ = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .and_then(|mut f| writeln!(f, "{message}"));
 }
 
 #[cfg(test)]
@@ -461,7 +480,7 @@ mod tests {
                 "title": "DB Task",
                 "description": "persist me",
                 "stats": { "risk": "HIGH" },
-                "patches": [{ "file": "src/lib.rs", "hunk": "@@ -1 +1 @@" }]
+                "diffs": ["@@ -1 +1 @@"]
             }]
         });
 

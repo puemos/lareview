@@ -7,28 +7,11 @@ use crate::ui::components::status::error_banner;
 use crate::ui::components::{DiffAction, LineContext};
 use catppuccin_egui::MOCHA;
 
-/// Combines multiple patch hunks into a single unified diff string
-/// (Kept from New, as it's more robust with header creation)
-fn combine_patches_to_unified_diff(patches: &[crate::domain::Patch]) -> String {
-    let mut sorted_patches = patches.to_vec();
-    sorted_patches.sort_by(|a, b| a.file.cmp(&b.file));
-
-    sorted_patches
-        .iter()
-        .map(|p| {
-            let hunk = p.hunk.trim();
-            if hunk.starts_with("diff --git") {
-                hunk.to_string()
-            } else {
-                format!(
-                    "diff --git a/{file} b/{file}\n--- a/{file}\n+++ b/{file}\n{hunk}",
-                    file = p.file,
-                    hunk = hunk
-                )
-            }
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
+/// Combines multiple diff strings into a single unified diff string
+fn combine_diffs_to_unified_diff(diffs: &[String]) -> String {
+    // For now, we just join the diff strings with newlines
+    // The Patch struct was removed, so diffs are just raw strings
+    diffs.join("\n")
 }
 
 impl LaReviewApp {
@@ -452,17 +435,17 @@ impl LaReviewApp {
                 ui.label(egui::RichText::new("Changes").strong().size(16.0));
 
                 let unified_diff = match &self.state.cached_unified_diff {
-                    Some((cached_patches, diff_string)) if cached_patches == &task.patches => {
-                        // Cache Hit: Patches haven't changed, use the cached string
+                    Some((cached_diffs, diff_string)) if cached_diffs == &task.diffs => {
+                        // Cache Hit: Diffs haven't changed, use the cached string
                         diff_string.clone()
                     }
                     _ => {
                         // Cache Miss: Recalculate and update cache
-                        let new_diff = combine_patches_to_unified_diff(&task.patches);
+                        let new_diff = combine_diffs_to_unified_diff(&task.diffs);
 
-                        // Update the cache with the new diff and the current patches as the key
+                        // Update the cache with the new diff and the current diffs as the key
                         self.state.cached_unified_diff =
-                            Some((task.patches.clone(), new_diff.clone()));
+                            Some((task.diffs.clone(), new_diff.clone()));
 
                         new_diff
                     }
@@ -490,7 +473,7 @@ impl LaReviewApp {
                         line_idx: ctx.line_idx,
                     });
 
-                if task.patches.is_empty() {
+                if task.diffs.is_empty() {
                     ui.label(
                         egui::RichText::new("No code changes in this task (metadata only?)")
                             .italics(),
@@ -533,8 +516,9 @@ impl LaReviewApp {
                                         // Set the state for adding an inline note
                                         // Get the file path for the clicked line
                                         let file_path =
-                                            if let Some(file) = task.patches.get(file_idx) {
-                                                file.file.clone()
+                                            if file_idx < task.diffs.len() {
+                                                // Since diffs are strings, we need to extract the file path from the diff string
+                                                extract_file_path_from_diff(&task.diffs[file_idx]).unwrap_or("unknown".to_string())
                                             } else {
                                                 "unknown".to_string()
                                             };
@@ -561,8 +545,8 @@ impl LaReviewApp {
                                         // Handle saving the note
                                         // Get the file path for the line
                                         let file_path =
-                                            if let Some(file) = task.patches.get(file_idx) {
-                                                file.file.clone()
+                                            if file_idx < task.diffs.len() {
+                                                extract_file_path_from_diff(&task.diffs[file_idx]).unwrap_or("unknown".to_string())
                                             } else {
                                                 "unknown".to_string()
                                             };
@@ -622,6 +606,24 @@ impl LaReviewApp {
                 ui.add_space(20.0);
             });
     }
+}
+
+// Extract file path from diff string
+fn extract_file_path_from_diff(diff: &str) -> Option<String> {
+    for line in diff.lines() {
+        if line.starts_with("diff --git ") {
+            // Extract file path from the diff line
+            // Format: "diff --git a/path/file b/path/file"
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 3 {
+                let file_part = parts[1]; // This is a/path/file
+                if file_part.starts_with("a/") {
+                    return Some(file_part[2..].to_string());
+                }
+            }
+        }
+    }
+    None
 }
 
 // Helper for drawing badges
