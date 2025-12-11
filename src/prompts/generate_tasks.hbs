@@ -62,18 +62,16 @@ Flows often span multiple files. Group related files together even if they're in
 
 
 <d2_diagram_guide>
-D2 is a simple diagram language. Use it to visualize flows:
+Use D2 to express diagrams in a compact text format. The goal is to turn ideas into visual flows without extra syntax. Follow these patterns when showing how to structure a diagram.
 
-**Simple sequence:**
-```
-Client -> API: Submit request
-API -> Database: Query data
-Database -> API: Return results
-API -> Client: Send response
-```
+<simple_flow_example>
+Client -> API: "Submit request"
+API -> Database: "Query data"
+Database -> API: "Return results"
+API -> Client: "Send response"
+</simple_flow_example>
 
-**Component architecture:**
-```
+<component_layout_example>
 Frontend: {
   shape: rectangle
   UI Components
@@ -87,21 +85,19 @@ Backend: {
 Database: {
   shape: cylinder
 }
-Frontend -> Backend: HTTP/REST
-Backend -> Database: SQL queries
-```
+Frontend -> Backend: "HTTP or REST"
+Backend -> Database: "SQL queries"
+</component_layout_example>
 
-**State machine:**
-```
+<state_transitions_example>
 direction: right
-Pending -> Processing: start()
-Processing -> Completed: finish()
-Processing -> Failed: error()
-Failed -> Pending: retry()
-```
+Pending -> Processing: "start()"
+Processing -> Completed: "finish()"
+Processing -> Failed: "error()"
+Failed -> Pending: "retry()
+</state_transitions_example>
 
-**Data model:**
-```
+<data_model_example>
 User: {
   shape: sql_table
   id: int
@@ -114,8 +110,10 @@ Order: {
   total: decimal
 }
 User.id -> Order.user_id
-```
+</data_model_example>
+
 </d2_diagram_guide>
+
 
 <process>
 Follow these steps:

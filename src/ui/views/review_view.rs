@@ -411,7 +411,7 @@ impl LaReviewApp {
                 ui.add_space(16.0);
 
                 // Diagram Viewer
-                if task.diagram.is_some() {
+                if task.diagram.as_ref().is_some_and(|d| !d.is_empty()) {
                     ui.label(egui::RichText::new("Diagram").strong().size(16.0));
                     egui::Frame::NONE
                         .stroke(egui::Stroke::new(1.0, MOCHA.surface1))
