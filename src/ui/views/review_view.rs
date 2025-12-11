@@ -515,13 +515,13 @@ impl LaReviewApp {
                                     } => {
                                         // Set the state for adding an inline note
                                         // Get the file path for the clicked line
-                                        let file_path =
-                                            if file_idx < task.diffs.len() {
-                                                // Since diffs are strings, we need to extract the file path from the diff string
-                                                extract_file_path_from_diff(&task.diffs[file_idx]).unwrap_or("unknown".to_string())
-                                            } else {
-                                                "unknown".to_string()
-                                            };
+                                        let file_path = if file_idx < task.diffs.len() {
+                                            // Since diffs are strings, we need to extract the file path from the diff string
+                                            extract_file_path_from_diff(&task.diffs[file_idx])
+                                                .unwrap_or("unknown".to_string())
+                                        } else {
+                                            "unknown".to_string()
+                                        };
 
                                         self.state.current_line_note =
                                             Some(crate::ui::app::LineNoteContext {
@@ -544,12 +544,12 @@ impl LaReviewApp {
                                     } => {
                                         // Handle saving the note
                                         // Get the file path for the line
-                                        let file_path =
-                                            if file_idx < task.diffs.len() {
-                                                extract_file_path_from_diff(&task.diffs[file_idx]).unwrap_or("unknown".to_string())
-                                            } else {
-                                                "unknown".to_string()
-                                            };
+                                        let file_path = if file_idx < task.diffs.len() {
+                                            extract_file_path_from_diff(&task.diffs[file_idx])
+                                                .unwrap_or("unknown".to_string())
+                                        } else {
+                                            "unknown".to_string()
+                                        };
 
                                         // Save the line-specific note to the database
                                         let note = crate::domain::Note {

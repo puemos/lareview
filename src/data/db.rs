@@ -9,7 +9,6 @@ use std::sync::{Arc, Mutex};
 /// Database wrapper that manages SQLite connections
 pub struct Database {
     conn: Arc<Mutex<Connection>>,
-    path: PathBuf,
 }
 
 impl Database {
@@ -29,7 +28,6 @@ impl Database {
         let conn = Connection::open(&path)?;
         let db = Self {
             conn: Arc::new(Mutex::new(conn)),
-            path: path.clone(),
         };
         db.init()?;
 
@@ -120,10 +118,5 @@ impl Database {
     /// Get a reference to the connection
     pub fn connection(&self) -> Arc<Mutex<Connection>> {
         self.conn.clone()
-    }
-
-    /// Path backing this database
-    pub fn path(&self) -> PathBuf {
-        self.path.clone()
     }
 }

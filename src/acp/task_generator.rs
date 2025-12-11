@@ -2,9 +2,7 @@
 //! Handles communication with ACP (Agent Client Protocol) agents to generate
 //! review tasks from git diffs using AI agents like Codex, Qwen, and Gemini.
 
-use crate::data::db::Database;
-use crate::data::repository::{PullRequestRepository, TaskRepository};
-use crate::domain::{Plan, PlanEntry, PullRequest, ReviewTask};
+use crate::domain::{Plan, PullRequest, ReviewTask};
 use crate::prompts;
 use agent_client_protocol::{
     Agent, ClientCapabilities, ClientSideConnection, ContentBlock, ExtNotification, ExtRequest,
@@ -46,8 +44,6 @@ pub struct GenerateTasksInput {
     pub timeout_secs: Option<u64>,
     /// Enable debug logging
     pub debug: bool,
-    /// Explicit database path for persistence (useful for tests)
-    pub db_path: Option<PathBuf>,
 }
 
 /// Result of task generation
@@ -383,8 +379,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
         mcp_server_binary,
         timeout_secs: _,
         debug,
-        db_path,
-    } = input;
+    }: GenerateTasksInput = input;
 
     let logs = Arc::new(Mutex::new(Vec::new()));
     let progress_tx = progress_tx;

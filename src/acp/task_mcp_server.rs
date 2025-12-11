@@ -155,14 +155,28 @@ fn create_return_tasks_tool(config: Arc<ServerConfig>) -> impl ToolHandler {
         Box::pin(async move {
             log_to_file(&config, "return_tasks called");
             let persist_args = args.clone();
+            let persist_args_for_log = persist_args.clone();
+
             let persist_config = config.clone();
-            let persist_result = tokio::task::spawn_blocking(move || persist_tasks_to_db(&persist_config, persist_args)).await;
+            let persist_result = tokio::task::spawn_blocking(move || {
+                persist_tasks_to_db(&persist_config, persist_args)
+            }).await;
 
             match persist_result {
-                Ok(Ok(())) => log_to_file(&config, "ReturnTasksTool persisted tasks to DB"),
-                Ok(Err(err)) => log_to_file(&config, &format!("ReturnTasksTool failed to persist tasks: {err}")),
-                Err(join_err) => log_to_file(&config, &format!("ReturnTasksTool task join error: {join_err}")),
+                Ok(Ok(())) => log_to_file(&config, &format!(
+                    "ReturnTasksTool persisted tasks to DB: {}",
+                    persist_args_for_log
+                )),
+                Ok(Err(err)) => log_to_file(&config, &format!(
+                    "ReturnTasksTool failed to persist tasks: {}",
+                    err
+                )),
+                Err(join_err) => log_to_file(&config, &format!(
+                    "ReturnTasksTool task join error: {}",
+                    join_err
+                )),
             }
+
 
             if let Some(path) = &config.tasks_out {
                 log_to_file(&config, &format!("ReturnTasksTool writing to {}", path.display()));

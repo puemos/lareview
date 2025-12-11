@@ -433,7 +433,6 @@ impl LaReviewApp {
             mcp_server_binary: None,
             timeout_secs: Some(500),
             debug: false,
-            db_path: None,
         };
 
         let gen_tx = self.gen_tx.clone();
