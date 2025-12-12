@@ -46,3 +46,20 @@ LaReview's new data model is designed to support this new workflow. It includes 
 *   **Note:** Allows you to add your own notes to a task.
 
 This new data model, combined with the new UI and the powerful AI agent, makes LaReview a truly unique and powerful tool for code review.
+
+## Development quickstart
+- Toolchain: nightly Rust with `rustfmt` and `clippy` components (edition 2024; see `rust-toolchain.toml`).
+- OS deps (Linux): `libxkbcommon-dev`, `libxkbcommon-x11-dev`.
+- Run the app: `cargo run`
+- Reset/seed sample data: `cargo run --bin reset_db`, `cargo run --bin seed_db`
+- Checks: `cargo fmt -- --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo test`
+- Supply chain: `cargo deny check` (used in scheduled CI) to catch license/advisory issues.
+- Docs index: [docs/README.md](docs/README.md)
+- Architecture overview: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- Development guide: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+
+## Project metadata
+- License: MIT (see `LICENSE`)
+- Code of Conduct: `CODE_OF_CONDUCT.md`
+- Contributing guide: `CONTRIBUTING.md`
+- Security policy: `SECURITY.md`
