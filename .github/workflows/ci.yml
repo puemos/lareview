@@ -36,7 +36,7 @@ jobs:
         run: cargo fmt -- --check
 
       - name: Lint
-        run: cargo clippy -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Run tests
         run: cargo test --verbose

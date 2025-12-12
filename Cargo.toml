@@ -2,6 +2,13 @@
 name = "lareview"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+description = "LaReview is a desktop code review companion that generates intent-driven review plans with AI."
+repository = "https://github.com/puemos/lareview"
+homepage = "https://github.com/puemos/lareview"
+readme = "README.md"
+keywords = ["code-review", "gui", "ai", "acp", "developer-tools"]
+categories = ["development-tools", "gui"]
 
 [dependencies]
 egui = "0.33.2"
