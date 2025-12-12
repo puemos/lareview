@@ -1,16 +1,18 @@
 //! Main application state and UI logic for the LaReview application
 //! This module contains the primary egui application state and UI implementation
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::acp::ProgressEvent;
 use crate::data::db::Database;
 use crate::data::repository::{NoteRepository, PullRequestRepository, TaskRepository};
-use crate::domain::{Note, Plan, PullRequest, ReviewTask};
+use crate::domain::{Note, PullRequest, ReviewTask, TaskId, TaskStatus};
 
 use catppuccin_egui::MOCHA;
 use eframe::egui;
 use eframe::egui::{FontData, FontDefinitions, FontFamily};
+use agent_client_protocol::{ContentBlock, ContentChunk, Meta, Plan, SessionUpdate};
 use tokio::sync::mpsc;
 
 /// Which screen is active
@@ -46,8 +48,12 @@ pub struct AppState {
     /// All review tasks fetched from the database, to be filtered by selected PR
     pub all_tasks: Vec<ReviewTask>,
 
-    /// Plans from the agent during task generation
-    pub plans: Vec<Plan>,
+    /// Canonical unified timeline of agent session updates.
+    pub agent_timeline: Vec<TimelineItem>,
+    /// In-memory index: stream key -> timeline item index.
+    pub agent_timeline_index: HashMap<String, usize>,
+    /// Monotonic counter for deterministic ordering at ingestion.
+    pub next_agent_timeline_seq: u64,
 
     /// Flag indicating if task generation is currently in progress
     pub is_generating: bool,
@@ -58,6 +64,9 @@ pub struct AppState {
 
     /// Current diff text in the generate view
     pub diff_text: String,
+
+    /// Latest agent-provided plan (if any)
+    pub latest_plan: Option<Plan>,
 
     /// All pull requests loaded from the database
     pub prs: Vec<PullRequest>,
@@ -74,13 +83,6 @@ pub struct AppState {
 
     /// ID of the currently selected review task
     pub selected_task_id: Option<String>,
-
-    /// Messages from the agent during task generation
-    pub agent_messages: Vec<String>,
-    /// Thoughts from the agent during task generation
-    pub agent_thoughts: Vec<String>,
-    /// Log messages from the agent during task generation
-    pub agent_logs: Vec<String>,
 
     /// Current note content for the selected task
     pub current_note: Option<String>,
@@ -120,6 +122,64 @@ pub struct LineNoteContext {
 }
 
 impl AppState {
+    pub fn reset_agent_timeline(&mut self) {
+        self.agent_timeline.clear();
+        self.agent_timeline_index.clear();
+        self.next_agent_timeline_seq = 0;
+        self.latest_plan = None;
+    }
+
+    pub fn ingest_progress(&mut self, evt: ProgressEvent) {
+        let seq = self.next_agent_timeline_seq;
+        self.next_agent_timeline_seq = self.next_agent_timeline_seq.saturating_add(1);
+
+        match evt {
+            ProgressEvent::LocalLog(line) => {
+                self.agent_timeline.push(TimelineItem {
+                    seq,
+                    stream_key: None,
+                    content: TimelineContent::LocalLog(line),
+                });
+            }
+            ProgressEvent::Update(ref boxed_update) => {
+                let update = &**boxed_update; // Dereference the box to get SessionUpdate
+                if let SessionUpdate::Plan(plan) = update {
+                    self.latest_plan = Some(plan.clone());
+                }
+
+                let key = stream_key_for_update(update);
+
+                if let Some(key) = key {
+                    if let Some(&idx) = self.agent_timeline_index.get(&key) {
+                        merge_update_in_place(&mut self.agent_timeline[idx], update);
+                        return;
+                    }
+                    let idx = self.agent_timeline.len();
+                    self.agent_timeline_index.insert(key.clone(), idx);
+                    self.agent_timeline.push(TimelineItem {
+                        seq,
+                        stream_key: Some(key),
+                        content: TimelineContent::Update(Box::new(update.clone())),
+                    });
+                    return;
+                }
+
+                // No stable key: attempt to merge with last contiguous chunk of same kind.
+                if let Some(last) = self.agent_timeline.last_mut()
+                    && can_merge_contiguous(last, update) {
+                    merge_update_in_place(last, update);
+                    return;
+                }
+
+                self.agent_timeline.push(TimelineItem {
+                    seq,
+                    stream_key: None,
+                    content: TimelineContent::Update(Box::new(update.clone())),
+                });
+            }
+        }
+    }
+
     /// Get tasks filtered by the currently selected pull request ID
     pub fn tasks(&self) -> Vec<ReviewTask> {
         if let Some(selected_pr_id) = &self.selected_pr_id {
@@ -150,7 +210,128 @@ impl AppState {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct TimelineItem {
+    #[allow(dead_code)]
+    pub seq: u64,
+    pub stream_key: Option<String>,
+    pub content: TimelineContent,
+}
+
+#[derive(Debug, Clone)]
+pub enum TimelineContent {
+    Update(Box<SessionUpdate>),
+    LocalLog(String),
+}
+
+fn stream_key_for_update(update: &SessionUpdate) -> Option<String> {
+    match update {
+        SessionUpdate::UserMessageChunk(chunk) => {
+            extract_chunk_id(chunk.meta.as_ref()).map(|id| format!("user_msg:{id}"))
+        }
+        SessionUpdate::AgentMessageChunk(chunk) => {
+            extract_chunk_id(chunk.meta.as_ref()).map(|id| format!("agent_msg:{id}"))
+        }
+        SessionUpdate::AgentThoughtChunk(chunk) => {
+            extract_chunk_id(chunk.meta.as_ref()).map(|id| format!("agent_thought:{id}"))
+        }
+        SessionUpdate::ToolCall(call) => Some(format!("tool:{}", call.tool_call_id)),
+        SessionUpdate::ToolCallUpdate(update) => Some(format!("tool:{}", update.tool_call_id)),
+        SessionUpdate::Plan(_) => Some("plan".to_string()),
+        _ => None,
+    }
+}
+
+fn extract_chunk_id(meta: Option<&Meta>) -> Option<String> {
+    meta.and_then(|meta| {
+        ["message_id", "messageId", "id"]
+            .iter()
+            .find_map(|key| meta.get(*key).and_then(|val| val.as_str()))
+            .map(|s| s.to_string())
+    })
+}
+
+fn can_merge_contiguous(existing: &TimelineItem, incoming: &SessionUpdate) -> bool {
+    if existing.stream_key.is_some() {
+        return false;
+    }
+    match (&existing.content, incoming) {
+        (TimelineContent::Update(boxed_update), SessionUpdate::AgentMessageChunk(_)) if matches!(**boxed_update, SessionUpdate::AgentMessageChunk(_)) => true,
+        (TimelineContent::Update(boxed_update), SessionUpdate::AgentThoughtChunk(_)) if matches!(**boxed_update, SessionUpdate::AgentThoughtChunk(_)) => true,
+        (TimelineContent::Update(boxed_update), SessionUpdate::UserMessageChunk(_)) if matches!(**boxed_update, SessionUpdate::UserMessageChunk(_)) => true,
+        _ => false,
+    }
+}
+
+fn merge_update_in_place(existing: &mut TimelineItem, incoming: &SessionUpdate) {
+    match (&mut existing.content, incoming) {
+        (TimelineContent::Update(boxed_update), SessionUpdate::AgentMessageChunk(next)) => {
+            if let SessionUpdate::AgentMessageChunk(prev) = &mut **boxed_update {
+                merge_content_chunk(prev, next);
+            } else {
+                existing.content = TimelineContent::Update(Box::new(incoming.clone()));
+            }
+        }
+        (TimelineContent::Update(boxed_update), SessionUpdate::AgentThoughtChunk(next)) => {
+            if let SessionUpdate::AgentThoughtChunk(prev) = &mut **boxed_update {
+                merge_content_chunk(prev, next);
+            } else {
+                existing.content = TimelineContent::Update(Box::new(incoming.clone()));
+            }
+        }
+        (TimelineContent::Update(boxed_update), SessionUpdate::UserMessageChunk(next)) => {
+            if let SessionUpdate::UserMessageChunk(prev) = &mut **boxed_update {
+                merge_content_chunk(prev, next);
+            } else {
+                existing.content = TimelineContent::Update(Box::new(incoming.clone()));
+            }
+        }
+        (TimelineContent::Update(boxed_update), SessionUpdate::ToolCallUpdate(update)) => {
+            if let SessionUpdate::ToolCall(call) = &mut **boxed_update {
+                call.update(update.fields.clone());
+            } else {
+                existing.content = TimelineContent::Update(Box::new(incoming.clone()));
+            }
+        }
+        (TimelineContent::Update(boxed_update), SessionUpdate::ToolCall(call)) => {
+            if let SessionUpdate::ToolCallUpdate(_existing_update) = &mut **boxed_update {
+                // Convert ToolCallUpdate to ToolCall
+                **boxed_update = SessionUpdate::ToolCall(call.clone());
+            } else if let SessionUpdate::ToolCall(existing_call) = &mut **boxed_update {
+                *existing_call = call.clone();
+            } else {
+                existing.content = TimelineContent::Update(Box::new(SessionUpdate::ToolCall(call.clone())));
+            }
+        }
+        (TimelineContent::Update(boxed_update), SessionUpdate::Plan(plan)) => {
+            if let SessionUpdate::Plan(existing_plan) = &mut **boxed_update {
+                *existing_plan = plan.clone();
+            } else {
+                existing.content = TimelineContent::Update(Box::new(SessionUpdate::Plan(plan.clone())));
+            }
+        }
+        (_, _) => {
+            existing.content = TimelineContent::Update(Box::new(incoming.clone()));
+        }
+    }
+}
+
+fn merge_content_chunk(existing: &mut ContentChunk, incoming: &ContentChunk) {
+    match (&mut existing.content, &incoming.content) {
+        (ContentBlock::Text(prev_text), ContentBlock::Text(next_text)) => {
+            prev_text.text.push_str(&next_text.text);
+        }
+        _ => {
+            existing.content = incoming.content.clone();
+        }
+    }
+    if existing.meta.is_none() {
+        existing.meta = incoming.meta.clone();
+    }
+}
+
 /// Payload we care about from ACP
+#[allow(dead_code)]
 pub struct GenResultPayload {
     pub messages: Vec<String>,
     pub thoughts: Vec<String>,
@@ -159,7 +340,7 @@ pub struct GenResultPayload {
 
 /// Messages coming back from the async generation task
 pub enum GenMsg {
-    Progress(ProgressEvent),
+    Progress(Box<ProgressEvent>),
     Done(Result<GenResultPayload, String>),
 }
 
@@ -381,14 +562,11 @@ impl LaReviewApp {
 
         // After loading/filtering, re-evaluate selected task and note
         let current_tasks = self.state.tasks(); // This calls the getter which filters
-        let next_task = self
+        self.state.selected_task_id = self
             .state
             .selected_task_id
             .clone()
-            .filter(|id| current_tasks.iter().any(|t| &t.id == id))
-            .or_else(|| current_tasks.first().map(|t| t.id.clone()));
-
-        self.state.selected_task_id = next_task;
+            .filter(|id| current_tasks.iter().any(|t| &t.id == id));
 
         if let Some(task_id) = &self.state.selected_task_id {
             if let Ok(Some(note)) = self.note_repo.find_by_task(task_id) {
@@ -401,6 +579,54 @@ impl LaReviewApp {
         }
 
         self.state.review_error = None;
+    }
+
+    pub fn set_task_status(&mut self, task_id: &TaskId, new_status: TaskStatus) {
+        if let Err(err) = self.task_repo.update_status(task_id, new_status) {
+            self.state.review_error = Some(format!("Failed to update task status: {}", err));
+            return;
+        }
+
+        self.state.selected_task_id = Some(task_id.clone());
+        self.state.review_error = None;
+        self.sync_review_from_db();
+    }
+
+    pub fn clean_done_tasks(&mut self) {
+        let Some(pr_id) = self.state.selected_pr_id.clone() else {
+            return;
+        };
+
+        let done_ids = match self.task_repo.find_done_ids_by_pr(&pr_id) {
+            Ok(ids) => ids,
+            Err(err) => {
+                self.state.review_error =
+                    Some(format!("Failed to list done tasks: {}", err));
+                return;
+            }
+        };
+
+        if done_ids.is_empty() {
+            return;
+        }
+
+        if let Err(err) = self.note_repo.delete_by_task_ids(&done_ids) {
+            self.state.review_error =
+                Some(format!("Failed to delete notes for done tasks: {}", err));
+            return;
+        }
+
+        if let Err(err) = self.task_repo.delete_by_ids(&done_ids) {
+            self.state.review_error =
+                Some(format!("Failed to delete done tasks: {}", err));
+            return;
+        }
+
+        self.state.review_error = None;
+        self.state.selected_task_id = None;
+        self.state.current_note = None;
+        self.state.current_line_note = None;
+        self.sync_review_from_db();
     }
 
     /// Save the current note for the selected task using real NoteRepository
@@ -453,36 +679,14 @@ impl eframe::App for LaReviewApp {
         let mut agent_content_updated = false;
         while let Ok(msg) = self.gen_rx.try_recv() {
             match msg {
-                GenMsg::Progress(evt) => match evt {
-                    ProgressEvent::Message { content, is_new } => {
-                        if is_new || self.state.agent_messages.is_empty() {
-                            self.state.agent_messages.push(content);
-                        } else if let Some(latest) = self.state.agent_messages.last_mut() {
-                            *latest = content;
-                        }
-                        agent_content_updated = true;
-                    }
-                    ProgressEvent::Thought { content, is_new } => {
-                        if is_new || self.state.agent_thoughts.is_empty() {
-                            self.state.agent_thoughts.push(content);
-                        } else if let Some(latest) = self.state.agent_thoughts.last_mut() {
-                            *latest = content;
-                        }
-                        agent_content_updated = true;
-                    }
-                    ProgressEvent::Log(log) => {
-                        self.state.agent_logs.push(log);
-                        agent_content_updated = true;
-                    }
-                },
+                GenMsg::Progress(evt) => {
+                    self.state.ingest_progress(*evt);
+                    agent_content_updated = true;
+                }
                 GenMsg::Done(result) => {
                     self.state.is_generating = false;
                     match result {
-                        Ok(payload) => {
-                            self.state.agent_messages = payload.messages;
-                            self.state.agent_thoughts = payload.thoughts;
-                            self.state.agent_logs = payload.logs;
-
+                        Ok(_payload) => {
                             if self.state.all_tasks.is_empty() {
                                 // Changed to all_tasks
                                 self.state.generation_error =

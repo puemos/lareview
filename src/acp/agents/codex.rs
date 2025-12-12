@@ -9,26 +9,17 @@ fn is_command_available(command: &str) -> bool {
 
 /// Build the Codex candidate, allowing overrides for binary/package.
 pub fn codex_candidate() -> AgentCandidate {
-    // Allow overrides for package/bin; do not inject partial MCP config via -c.
-    let package = std::env::var("CODEX_ACP_PACKAGE")
-        .unwrap_or_else(|_| "@zed-industries/codex-acp@latest".to_string());
-
-    if let Ok(bin_path) = std::env::var("CODEX_ACP_BIN") {
-        AgentCandidate {
-            id: "codex".to_string(),
-            label: "Codex (ACP)".to_string(),
-            command: Some(bin_path.clone()),
-            args: Vec::new(),
-            available: is_command_available(&bin_path),
-        }
-    } else {
-        AgentCandidate {
-            id: "codex".to_string(),
-            label: "Codex (ACP)".to_string(),
-            command: Some("npx".to_string()),
-            args: vec!["-y".to_string(), package],
-            available: is_command_available("npx"),
-        }
+    AgentCandidate {
+        id: "codex".to_string(),
+        label: "Codex (ACP)".to_string(),
+        command: Some("npx".to_string()),
+        args: vec![
+            "-y".to_string(),
+            "@zed-industries/codex-acp@latest".to_string(),
+            "-c".to_string(),
+            "model=\"gpt-5.1-codex\"".to_string(),
+        ],
+        available: is_command_available("npx"),
     }
 }
 

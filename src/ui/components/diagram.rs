@@ -92,7 +92,7 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<String>, is_dark_mode: bool) -
         let ctx = ui.ctx().clone();
 
         std::thread::spawn(move || {
-            let result = crate::diagram::d2::d2_to_svg(&trimmed_code, is_dark_mode);
+            let result = crate::ui::diagram::d2::d2_to_svg(&trimmed_code, is_dark_mode);
 
             let state = match result {
                 Ok(svg) => DiagramState::Ready(svg),

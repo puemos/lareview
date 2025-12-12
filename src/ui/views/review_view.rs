@@ -1,11 +1,20 @@
 use crate::ui::app::LaReviewApp;
-use crate::ui::components::header::header;
+use crate::ui::components::header::action_button;
 use eframe::egui;
 
 // diff editor helper
 use crate::ui::components::status::error_banner;
 use crate::ui::components::{DiffAction, LineContext};
 use catppuccin_egui::MOCHA;
+use egui_phosphor::regular as icons;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RightPaneState {
+    TaskSelected,
+    ReadyNoSelection,
+    NoTasks,
+    AllDone,
+}
 
 /// Combines multiple diff strings into a single unified diff string
 fn combine_diffs_to_unified_diff(diffs: &[String]) -> String {
@@ -16,8 +25,107 @@ fn combine_diffs_to_unified_diff(diffs: &[String]) -> String {
 
 impl LaReviewApp {
     pub fn ui_review(&mut self, ui: &mut egui::Ui) {
-        // 1. Top Global Header
-        header(ui, "Review", None);
+        // Prepare data upfront so the header can show progress/actions.
+        let tasks_by_sub_flow = self.state.tasks_by_sub_flow();
+        let display_order_tasks = tasks_in_display_order(&tasks_by_sub_flow);
+        let all_tasks = self.state.tasks();
+        let total_tasks = display_order_tasks.len();
+        let done_tasks = display_order_tasks
+            .iter()
+            .filter(|t| {
+                matches!(
+                    t.status,
+                    crate::domain::TaskStatus::Done | crate::domain::TaskStatus::Ignored
+                )
+            })
+            .count();
+        let open_tasks = display_order_tasks
+            .iter()
+            .filter(|t| {
+                matches!(
+                    t.status,
+                    crate::domain::TaskStatus::Pending | crate::domain::TaskStatus::InProgress
+                )
+            })
+            .count();
+
+        let progress = if total_tasks > 0 {
+            (done_tasks as f32) / (total_tasks as f32)
+        } else {
+            0.0
+        };
+
+        let has_done_tasks = display_order_tasks
+            .iter()
+            .any(|t| t.status == crate::domain::TaskStatus::Done);
+
+        let next_open_id = display_order_tasks
+            .iter()
+            .find(|t| t.status == crate::domain::TaskStatus::Pending)
+            .or_else(|| {
+                display_order_tasks
+                    .iter()
+                    .find(|t| t.status == crate::domain::TaskStatus::InProgress)
+            })
+            .map(|t| t.id.clone());
+
+        let mut trigger_clean_done = false;
+        let mut trigger_next_open = false;
+
+        // Top header (minimal, Linear-ish).
+        ui.horizontal(|ui| {
+            ui.heading(egui::RichText::new("Review").size(18.0).color(MOCHA.text));
+
+            if total_tasks > 0 {
+                ui.add_space(10.0);
+                badge(
+                    ui,
+                    &format!("{done_tasks}/{total_tasks} done"),
+                    MOCHA.surface0,
+                    MOCHA.subtext0,
+                );
+            }
+
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let resp = pill_action_button(
+                    ui,
+                    icons::TRASH_SIMPLE,
+                    "Clean done",
+                    has_done_tasks,
+                    MOCHA.red,
+                )
+                .on_hover_text("Remove DONE tasks (and their notes) for this PR");
+                if resp.clicked() {
+                    trigger_clean_done = true;
+                }
+
+                ui.add_space(8.0);
+
+                let next_enabled = next_open_id.is_some();
+                let resp = pill_action_button(
+                    ui,
+                    icons::ARROW_RIGHT,
+                    "Next open",
+                    next_enabled,
+                    MOCHA.mauve,
+                )
+                .on_hover_text("Jump to the next open task");
+                if resp.clicked() {
+                    trigger_next_open = true;
+                }
+            });
+        });
+        ui.add_space(6.0);
+
+        if trigger_clean_done {
+            self.clean_done_tasks();
+            return;
+        }
+
+        if trigger_next_open && let Some(id) = next_open_id.as_deref() {
+            self.select_task_by_id(&all_tasks, id);
+            return;
+        }
 
         // Error Banner
         if let Some(err) = &self.state.review_error {
@@ -27,20 +135,35 @@ impl LaReviewApp {
 
         ui.add_space(8.0);
 
-        // 2. Prepare Data
-        let tasks_by_sub_flow = self.state.tasks_by_sub_flow();
-        let all_tasks = self.state.tasks();
-        let total_tasks = all_tasks.len();
-        let reviewed_tasks = all_tasks
-            .iter()
-            .filter(|t| t.status == crate::domain::TaskStatus::Reviewed)
-            .count();
+        // 3. Default selection rule (meaningful auto-select only)
+        let selected_task_is_valid = self
+            .state
+            .selected_task_id
+            .as_ref()
+            .is_some_and(|id| display_order_tasks.iter().any(|t| &t.id == id));
 
-        let progress = if total_tasks > 0 {
-            (reviewed_tasks as f32) / (total_tasks as f32)
-        } else {
-            0.0
-        };
+        if display_order_tasks.is_empty() {
+            self.state.selected_task_id = None;
+            self.state.current_note = None;
+            self.state.current_line_note = None;
+        } else if !selected_task_is_valid {
+            if let Some(next_open) = display_order_tasks
+                .iter()
+                .find(|t| t.status == crate::domain::TaskStatus::Pending)
+                .or_else(|| {
+                    display_order_tasks
+                        .iter()
+                        .find(|t| t.status == crate::domain::TaskStatus::InProgress)
+                })
+            {
+                self.select_task(next_open);
+            } else {
+                // No pending tasks: show "All done" by default (do not auto-select done).
+                self.state.selected_task_id = None;
+                self.state.current_note = None;
+                self.state.current_line_note = None;
+            }
+        }
 
         // 3. Layout: Split View (Navigation Left | Content Right)
         let available_height = ui.available_height();
@@ -71,14 +194,40 @@ impl LaReviewApp {
             .fill(MOCHA.mantle) // Darker background for sidebar
             .inner_margin(egui::Margin::same(12))
             .show(&mut left_ui, |ui| {
-                // In ui_review, inside the left_ui frame:
+                if total_tasks == 0 {
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(60.0);
+                        ui.label(
+                            egui::RichText::new(egui_phosphor::regular::BOUNDING_BOX)
+                                .size(48.0)
+                                .color(MOCHA.surface2),
+                        );
+                        ui.add_space(12.0);
+                        ui.heading("No review tasks yet");
+                        ui.add_space(6.0);
+                        ui.label(
+                            egui::RichText::new(
+                                "Once tasks are generated, they will show up in the left panel.",
+                            )
+                            .color(MOCHA.subtext0),
+                        );
+                        ui.add_space(14.0);
+                        if action_button(ui, "Generate tasks", true, MOCHA.mauve).clicked() {
+                            self.switch_to_generate();
+                        }
+                    });
+                    return;
+                }
 
                 // PR Title: Make it bold and slightly larger than regular text
-                ui.label(
-                    egui::RichText::new(&self.state.pr_title)
-                        .size(15.0)
-                        .strong()
-                        .color(MOCHA.text),
+                ui.add(
+                    egui::Label::new(
+                        egui::RichText::new(&self.state.pr_title)
+                            .size(15.0)
+                            .strong()
+                            .color(MOCHA.text),
+                    )
+                    .wrap(),
                 );
 
                 ui.add_space(12.0);
@@ -87,7 +236,7 @@ impl LaReviewApp {
                 ui.horizontal(|ui| {
                     // Left: Progress Label
                     ui.label(
-                        egui::RichText::new(format!("{} / {} Tasks", reviewed_tasks, total_tasks))
+                        egui::RichText::new(format!("{} / {} Tasks", done_tasks, total_tasks))
                             .color(MOCHA.subtext1)
                             .size(12.0),
                     );
@@ -100,19 +249,28 @@ impl LaReviewApp {
                             .max()
                             .unwrap_or(crate::domain::RiskLevel::Low);
 
-                        let (risk_text, risk_bg, risk_fg) = match max_risk {
-                            crate::domain::RiskLevel::Low => {
-                                ("LOW RISK", MOCHA.green.gamma_multiply(0.2), MOCHA.green)
-                            }
-                            crate::domain::RiskLevel::Medium => {
-                                ("MED RISK", MOCHA.yellow.gamma_multiply(0.2), MOCHA.yellow)
-                            }
-                            crate::domain::RiskLevel::High => {
-                                ("HIGH RISK", MOCHA.red.gamma_multiply(0.2), MOCHA.red)
-                            }
+                        let (risk_icon, risk_text, risk_bg, risk_fg) = match max_risk {
+                            crate::domain::RiskLevel::Low => (
+                                icons::CARET_CIRCLE_DOWN,
+                                "Low risk",
+                                MOCHA.blue.gamma_multiply(0.2),
+                                MOCHA.blue,
+                            ),
+                            crate::domain::RiskLevel::Medium => (
+                                icons::CARET_CIRCLE_UP,
+                                "Med risk",
+                                MOCHA.yellow.gamma_multiply(0.2),
+                                MOCHA.yellow,
+                            ),
+                            crate::domain::RiskLevel::High => (
+                                icons::CARET_CIRCLE_DOUBLE_UP,
+                                "High risk",
+                                MOCHA.red.gamma_multiply(0.2),
+                                MOCHA.red,
+                            ),
                         };
                         // NOTE: The 'badge' helper is assumed to be defined at the end of the file.
-                        badge(ui, risk_text, risk_bg, risk_fg);
+                        badge(ui, &format!("{risk_icon} {risk_text}"), risk_bg, risk_fg);
                     });
                 });
 
@@ -140,7 +298,7 @@ impl LaReviewApp {
                 ui.separator();
                 ui.add_space(12.0);
 
-                // B. Navigation Tree (Sub-flows - The desired "tree layout" logic)
+                // B. Navigation Tree (Sub-flows)
                 egui::ScrollArea::vertical()
                     .id_salt("nav_tree_scroll")
                     .show(ui, |ui| {
@@ -157,7 +315,13 @@ impl LaReviewApp {
                             let title = sub_flow_name.as_deref().unwrap_or("Uncategorized");
                             let finished_count = tasks
                                 .iter()
-                                .filter(|t| t.status == crate::domain::TaskStatus::Reviewed)
+                                .filter(|t| {
+                                    matches!(
+                                        t.status,
+                                        crate::domain::TaskStatus::Done
+                                            | crate::domain::TaskStatus::Ignored
+                                    )
+                                })
                                 .count();
                             let total_tasks = tasks.len(); // <--- Get total count
                             let is_done = finished_count == total_tasks && !tasks.is_empty();
@@ -183,7 +347,20 @@ impl LaReviewApp {
                                 .default_open(true)
                                 .show(ui, |ui| {
                                     ui.spacing_mut().item_spacing = egui::vec2(0.0, 2.0);
-                                    for task in tasks {
+                                    let mut tasks_sorted: Vec<_> = tasks.iter().collect();
+                                    tasks_sorted.sort_by_key(|t| {
+                                        let is_closed = matches!(
+                                            t.status,
+                                            crate::domain::TaskStatus::Done
+                                                | crate::domain::TaskStatus::Ignored
+                                        );
+                                        (
+                                            is_closed,
+                                            std::cmp::Reverse(risk_rank(t.stats.risk)),
+                                            t.title.as_str(),
+                                        )
+                                    });
+                                    for task in tasks_sorted {
                                         self.render_nav_item(ui, task);
                                     }
                                 });
@@ -223,28 +400,143 @@ impl LaReviewApp {
             .fill(ui.style().visuals.window_fill)
             .inner_margin(egui::Margin::symmetric(24, 16))
             .show(&mut right_ui, |ui| {
-                if let Some(task_id) = &self.state.selected_task_id {
-                    if let Some(task) = all_tasks.iter().find(|t| &t.id == task_id) {
-                        self.render_task_detail(ui, task);
-                    }
+                let right_state = if display_order_tasks.is_empty() {
+                    RightPaneState::NoTasks
+                } else if self.state.selected_task_id.is_some() {
+                    RightPaneState::TaskSelected
+                } else if open_tasks == 0 {
+                    RightPaneState::AllDone
                 } else {
-                    // Empty State
-                    ui.vertical_centered(|ui| {
-                        ui.add_space(100.0);
-                        ui.label(
-                            egui::RichText::new(egui_phosphor::regular::LIST_CHECKS)
-                                .size(64.0)
-                                .color(MOCHA.surface2),
-                        );
-                        ui.add_space(16.0);
-                        ui.heading("Select a Task to Review");
-                        ui.label(
-                            egui::RichText::new(
-                                "Follow the sub-flows on the left to verify the intent.",
-                            )
-                            .color(MOCHA.subtext0),
-                        );
-                    });
+                    RightPaneState::ReadyNoSelection
+                };
+
+                // Empty states + detail
+                match right_state {
+                    RightPaneState::TaskSelected => {
+                        if let Some(task_id) = &self.state.selected_task_id
+                            && let Some(task) = all_tasks.iter().find(|t| &t.id == task_id) {
+                            self.render_task_detail(ui, task);
+                            return;
+                        }
+                        // Selection is missing from current list: fall back to Ready state.
+                        self.state.selected_task_id = None;
+                    }
+                    RightPaneState::NoTasks => {}
+                    RightPaneState::AllDone => {}
+                    RightPaneState::ReadyNoSelection => {}
+                }
+
+                // Track state transitions for focus behavior.
+                let pane_state_id = ui.id().with("right_pane_state");
+                let prev_state = ui
+                    .memory(|mem| mem.data.get_temp::<RightPaneState>(pane_state_id))
+                    .unwrap_or(RightPaneState::TaskSelected);
+                ui.memory_mut(|mem| mem.data.insert_temp(pane_state_id, right_state));
+
+                match right_state {
+                    RightPaneState::ReadyNoSelection => {
+                        let should_focus_primary =
+                            prev_state != RightPaneState::ReadyNoSelection
+                                && ui.ctx().memory(|mem| mem.focused().is_none());
+
+                        // Keyboard shortcuts (only in this state).
+                        let mut trigger_primary = false;
+                        let mut trigger_secondary = false;
+                        ui.ctx().input(|i| {
+                            if i.key_pressed(egui::Key::Enter) {
+                                if i.modifiers.shift {
+                                    trigger_secondary = true;
+                                } else {
+                                    trigger_primary = true;
+                                }
+                            }
+                        });
+
+                        ui.vertical_centered(|ui| {
+                            ui.add_space(80.0);
+                            ui.label(
+                                egui::RichText::new(egui_phosphor::regular::LIST_CHECKS)
+                                    .size(64.0)
+                                    .color(MOCHA.surface2),
+                            );
+                            ui.add_space(16.0);
+                            ui.heading("Ready to review");
+                            ui.add_space(6.0);
+                            ui.label(
+                                egui::RichText::new("Pick a task on the left, or jump in now.")
+                                    .color(MOCHA.subtext0),
+                            );
+                            ui.add_space(16.0);
+
+                            let primary_enabled = next_open_id.is_some();
+                            let primary_resp =
+                                pill_action_button(ui, icons::ARROW_RIGHT, "Next open", primary_enabled, MOCHA.mauve);
+                            if should_focus_primary {
+                                ui.memory_mut(|mem| mem.request_focus(primary_resp.id));
+                            }
+                            if (primary_resp.clicked() || trigger_primary)
+                                && let Some(id) = next_open_id.as_deref()
+                            {
+                                self.select_task_by_id(&all_tasks, id);
+                            }
+
+                            ui.add_space(12.0);
+                            ui.label(
+                                egui::RichText::new(
+                                    "Tip: Start with HIGH RISK to catch big issues early.",
+                                )
+                                .color(MOCHA.subtext0)
+                                .size(12.0),
+                            );
+                        });
+                    }
+                    RightPaneState::NoTasks => {
+                        ui.vertical_centered(|ui| {
+                            ui.add_space(80.0);
+                            ui.label(
+                                egui::RichText::new(egui_phosphor::regular::BOUNDING_BOX)
+                                    .size(64.0)
+                                    .color(MOCHA.surface2),
+                            );
+                            ui.add_space(16.0);
+                            ui.heading("No review tasks yet");
+                            ui.add_space(6.0);
+                            ui.label(
+                                egui::RichText::new(
+                                    "Once tasks are generated, they will show up in the left panel.",
+                                )
+                                .color(MOCHA.subtext0),
+                            );
+                            ui.add_space(16.0);
+                            if action_button(ui, "Generate tasks", true, MOCHA.mauve).clicked() {
+                                self.switch_to_generate();
+                            }
+                        });
+                    }
+                    RightPaneState::AllDone => {
+                        ui.vertical_centered(|ui| {
+                            ui.add_space(80.0);
+                            ui.label(
+                                egui::RichText::new(egui_phosphor::regular::CHECK_CIRCLE)
+                                    .size(64.0)
+                                    .color(MOCHA.green.gamma_multiply(0.8)),
+                            );
+                            ui.add_space(16.0);
+                            ui.heading("All done");
+                            ui.add_space(6.0);
+                            ui.label(
+                                egui::RichText::new(format!("You closed {} tasks.", done_tasks))
+                                    .color(MOCHA.subtext0),
+                            );
+                            ui.add_space(16.0);
+                            if action_button(ui, "Back to generate", true, MOCHA.mauve).clicked() {
+                                self.switch_to_generate();
+                            }
+                        });
+                    }
+                    RightPaneState::TaskSelected => {
+                        // handled above
+                    }
                 }
             });
     }
@@ -260,6 +552,28 @@ impl LaReviewApp {
             (egui::Color32::TRANSPARENT, MOCHA.subtext0)
         };
 
+        let (risk_icon, risk_color, risk_label) = match task.stats.risk {
+            crate::domain::RiskLevel::High => {
+                (icons::CARET_CIRCLE_DOUBLE_UP, MOCHA.red, "High risk")
+            }
+            crate::domain::RiskLevel::Medium => {
+                (icons::CARET_CIRCLE_UP, MOCHA.yellow, "Medium risk")
+            }
+            crate::domain::RiskLevel::Low => (icons::CARET_CIRCLE_DOWN, MOCHA.blue, "Low risk"),
+        };
+
+        let is_closed = matches!(
+            task.status,
+            crate::domain::TaskStatus::Done | crate::domain::TaskStatus::Ignored
+        );
+
+        let mut title_text = egui::RichText::new(&task.title)
+            .size(13.0)
+            .color(text_color);
+        if is_closed {
+            title_text = title_text.color(MOCHA.subtext0).strikethrough();
+        }
+
         let response = egui::Frame::NONE
             .fill(bg_color)
             .corner_radius(4.0)
@@ -267,31 +581,13 @@ impl LaReviewApp {
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
-                    // Risk Indicator Icon and Color
-                    let (icon, color) = match task.stats.risk {
-                        crate::domain::RiskLevel::Low => {
-                            (egui_phosphor::regular::CIRCLE, MOCHA.green)
-                        }
-                        crate::domain::RiskLevel::Medium => {
-                            (egui_phosphor::regular::CIRCLE_HALF, MOCHA.yellow)
-                        }
-                        crate::domain::RiskLevel::High => {
-                            (egui_phosphor::regular::CIRCLE_DASHED, MOCHA.red)
-                        }
-                    };
-                    ui.label(egui::RichText::new(icon).size(16.0).color(color));
+                    // Navigation: risk + crossed title (when closed)
+                    ui.label(egui::RichText::new(risk_icon).size(16.0).color(risk_color))
+                        .on_hover_text(risk_label);
 
                     ui.add_space(6.0);
 
-                    // Title
-                    ui.add(
-                        egui::Label::new(
-                            egui::RichText::new(&task.title)
-                                .color(text_color)
-                                .size(13.0),
-                        )
-                        .truncate(),
-                    );
+                    ui.add(egui::Label::new(title_text).wrap());
                 })
                 .response
             })
@@ -306,13 +602,24 @@ impl LaReviewApp {
         }
 
         if interact_response.clicked() {
-            self.state.selected_task_id = Some(task.id.clone());
-            // Load note logic
-            if let Ok(Some(note)) = self.note_repo.find_by_task(&task.id) {
-                self.state.current_note = Some(note.body);
-            } else {
-                self.state.current_note = Some(String::new());
-            }
+            self.select_task(task);
+        }
+    }
+
+    fn select_task(&mut self, task: &crate::domain::ReviewTask) {
+        self.state.selected_task_id = Some(task.id.clone());
+        self.state.current_line_note = None;
+
+        if let Ok(Some(note)) = self.note_repo.find_by_task(&task.id) {
+            self.state.current_note = Some(note.body);
+        } else {
+            self.state.current_note = Some(String::new());
+        }
+    }
+
+    fn select_task_by_id(&mut self, all_tasks: &[crate::domain::ReviewTask], task_id: &str) {
+        if let Some(task) = all_tasks.iter().find(|t| t.id == task_id) {
+            self.select_task(task);
         }
     }
 
@@ -322,47 +629,94 @@ impl LaReviewApp {
             .id_salt("detail_scroll")
             .show(ui, |ui| {
                 // 1. Task Header
-                ui.horizontal(|ui| {
-                    ui.heading(
+                ui.add(
+                    egui::Label::new(
                         egui::RichText::new(&task.title)
                             .size(24.0)
                             .color(MOCHA.text),
-                    );
-                });
+                    )
+                    .wrap(),
+                );
 
                 ui.add_space(8.0);
 
-                // 2. Metadata Badges
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing = egui::vec2(8.0, 0.0);
+                // 2. Metadata Badges (includes status actions)
+                let mut status_changed = false;
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing = egui::vec2(8.0, 6.0);
 
-                    // Status Badge
-                    let (status_text, status_bg, status_fg) = match task.status {
-                        crate::domain::TaskStatus::Reviewed => {
-                            ("REVIEWED", MOCHA.green, MOCHA.base)
-                        }
-                        crate::domain::TaskStatus::Ignored => {
-                            ("IGNORED", MOCHA.surface2, MOCHA.text)
-                        }
-                        crate::domain::TaskStatus::Pending => ("PENDING", MOCHA.yellow, MOCHA.base),
-                    };
-                    badge(ui, status_text, status_bg, status_fg);
+                    let to_do_resp = status_chip(
+                        ui,
+                        icons::CIRCLE,
+                        "To do",
+                        task.status == crate::domain::TaskStatus::Pending,
+                        MOCHA.mauve, // gray
+                    );
+                    if to_do_resp.clicked() && task.status != crate::domain::TaskStatus::Pending {
+                        self.set_task_status(&task.id, crate::domain::TaskStatus::Pending);
+                        status_changed = true;
+                    }
 
-                    // Risk Badge
-                    let (risk_text, risk_bg, risk_fg) = match task.stats.risk {
-                        crate::domain::RiskLevel::Low => {
-                            ("LOW RISK", MOCHA.green.gamma_multiply(0.2), MOCHA.green)
+                    let in_progress_resp = status_chip(
+                        ui,
+                        icons::CIRCLE_HALF,
+                        "In progress",
+                        task.status == crate::domain::TaskStatus::InProgress,
+                        MOCHA.blue,
+                    );
+                    if in_progress_resp.clicked()
+                        && task.status != crate::domain::TaskStatus::InProgress
+                    {
+                        self.set_task_status(&task.id, crate::domain::TaskStatus::InProgress);
+                        status_changed = true;
+                    }
+
+                    let done_resp = status_chip(
+                        ui,
+                        icons::CHECK_CIRCLE,
+                        "Done",
+                        task.status == crate::domain::TaskStatus::Done,
+                        MOCHA.green,
+                    );
+                    if done_resp.clicked() && task.status != crate::domain::TaskStatus::Done {
+                        self.set_task_status(&task.id, crate::domain::TaskStatus::Done);
+                        status_changed = true;
+                    }
+
+                    let ignored_resp = status_chip(
+                        ui,
+                        icons::X_CIRCLE,
+                        "Ignored",
+                        task.status == crate::domain::TaskStatus::Ignored,
+                        MOCHA.red,
+                    );
+                    if ignored_resp.clicked() && task.status != crate::domain::TaskStatus::Ignored {
+                        self.set_task_status(&task.id, crate::domain::TaskStatus::Ignored);
+                        status_changed = true;
+                    }
+
+                    pill_divider(ui);
+
+                    let (risk_icon, risk_fg, risk_text) = match task.stats.risk {
+                        crate::domain::RiskLevel::High => {
+                            (icons::CARET_CIRCLE_DOUBLE_UP, MOCHA.red, "High risk")
                         }
                         crate::domain::RiskLevel::Medium => {
-                            ("MED RISK", MOCHA.yellow.gamma_multiply(0.2), MOCHA.yellow)
+                            (icons::CARET_CIRCLE_UP, MOCHA.yellow, "Med risk")
                         }
-                        crate::domain::RiskLevel::High => {
-                            ("HIGH RISK", MOCHA.red.gamma_multiply(0.2), MOCHA.red)
+                        crate::domain::RiskLevel::Low => {
+                            (icons::CARET_CIRCLE_DOWN, MOCHA.blue, "Low risk")
                         }
                     };
-                    badge(ui, risk_text, risk_bg, risk_fg);
+                    badge(
+                        ui,
+                        &format!("{risk_icon} {risk_text}"),
+                        risk_fg.gamma_multiply(0.2),
+                        risk_fg,
+                    );
 
-                    // File/Line Stats
+                    pill_divider(ui);
+
                     let stats_text = format!(
                         "{} files |+{} -{} lines",
                         task.files.len(),
@@ -371,6 +725,10 @@ impl LaReviewApp {
                     );
                     badge(ui, &stats_text, MOCHA.surface0, MOCHA.subtext0);
                 });
+
+                if status_changed {
+                    return;
+                }
 
                 ui.add_space(16.0);
 
@@ -608,6 +966,47 @@ impl LaReviewApp {
     }
 }
 
+fn tasks_in_display_order(
+    tasks_by_sub_flow: &std::collections::HashMap<
+        Option<String>,
+        Vec<crate::domain::ReviewTask>,
+    >,
+) -> Vec<&crate::domain::ReviewTask> {
+    let mut sub_flows: Vec<_> = tasks_by_sub_flow.iter().collect();
+    sub_flows.sort_by(|(name_a, _), (name_b, _)| {
+        name_a
+            .as_deref()
+            .unwrap_or("ZZZ")
+            .cmp(name_b.as_deref().unwrap_or("ZZZ"))
+    });
+
+    let mut out = Vec::new();
+    for (_sub_flow_name, tasks) in sub_flows {
+        let mut tasks_sorted: Vec<_> = tasks.iter().collect();
+        tasks_sorted.sort_by_key(|t| {
+            let is_closed = matches!(
+                t.status,
+                crate::domain::TaskStatus::Done | crate::domain::TaskStatus::Ignored
+            );
+            (
+                is_closed,
+                std::cmp::Reverse(risk_rank(t.stats.risk)),
+                t.title.as_str(),
+            )
+        });
+        out.extend(tasks_sorted);
+    }
+    out
+}
+
+fn risk_rank(risk: crate::domain::RiskLevel) -> u8 {
+    match risk {
+        crate::domain::RiskLevel::High => 2,
+        crate::domain::RiskLevel::Medium => 1,
+        crate::domain::RiskLevel::Low => 0,
+    }
+}
+
 // Extract file path from diff string
 fn extract_file_path_from_diff(diff: &str) -> Option<String> {
     for line in diff.lines() {
@@ -617,8 +1016,8 @@ fn extract_file_path_from_diff(diff: &str) -> Option<String> {
             let parts: Vec<&str> = line.split_whitespace().collect();
             if parts.len() >= 3 {
                 let file_part = parts[1]; // This is a/path/file
-                if file_part.starts_with("a/") {
-                    return Some(file_part[2..].to_string());
+                if let Some(stripped) = file_part.strip_prefix("a/") {
+                    return Some(stripped.to_string());
                 }
             }
         }
@@ -626,13 +1025,88 @@ fn extract_file_path_from_diff(diff: &str) -> Option<String> {
     None
 }
 
+fn pill_divider(ui: &mut egui::Ui) {
+    ui.add_sized(
+        egui::vec2(6.0, 22.0),
+        egui::Separator::default().vertical(),
+    );
+}
+
+fn pill_action_button(
+    ui: &mut egui::Ui,
+    icon: &str,
+    label: &str,
+    enabled: bool,
+    tint: egui::Color32,
+) -> egui::Response {
+    let text = egui::RichText::new(format!("{icon} {label}"))
+        .size(12.0)
+        .color(if enabled { MOCHA.text } else { MOCHA.subtext0 });
+
+    let fill = if enabled {
+        MOCHA.surface0
+    } else {
+        MOCHA.mantle
+    };
+
+    let stroke = if enabled { tint } else { MOCHA.surface2 };
+
+    let old_padding = ui.spacing().button_padding;
+    ui.spacing_mut().button_padding = egui::vec2(8.0, 4.0);
+
+    let resp = ui.add_enabled(
+        enabled,
+        egui::Button::new(text)
+            .fill(fill)
+            .stroke(egui::Stroke::new(1.0, stroke))
+            .corner_radius(egui::CornerRadius::same(255))
+            .min_size(egui::vec2(0.0, 24.0)),
+    );
+
+    ui.spacing_mut().button_padding = old_padding;
+    resp
+}
+
+fn status_chip(
+    ui: &mut egui::Ui,
+    icon: &str,
+    label: &str,
+    selected: bool,
+    tint: egui::Color32,
+) -> egui::Response {
+    let (fill, stroke, fg) = if selected {
+        (tint.gamma_multiply(0.18), tint, tint)
+    } else {
+        (MOCHA.surface0, MOCHA.surface2, MOCHA.subtext0)
+    };
+
+    let text = egui::RichText::new(format!("{icon} {label}"))
+        .size(10.0)
+        .color(fg);
+
+    let old_padding = ui.spacing().button_padding;
+    ui.spacing_mut().button_padding = egui::vec2(8.0, 4.0);
+
+    let resp = ui.add(
+        egui::Button::new(text)
+            .fill(fill)
+            .stroke(egui::Stroke::new(1.0, stroke))
+            .corner_radius(egui::CornerRadius::same(255))
+            .min_size(egui::vec2(0.0, 22.0)),
+    );
+
+    ui.spacing_mut().button_padding = old_padding;
+    resp
+}
+
 // Helper for drawing badges
 fn badge(ui: &mut egui::Ui, text: &str, bg: egui::Color32, fg: egui::Color32) {
     egui::Frame::NONE
         .fill(bg)
-        .corner_radius(4.0)
+        .stroke(egui::Stroke::new(1.0, MOCHA.surface2))
+        .corner_radius(egui::CornerRadius::same(255))
         .inner_margin(egui::Margin::symmetric(8, 4))
         .show(ui, |ui| {
-            ui.label(egui::RichText::new(text).size(10.0).strong().color(fg));
+            ui.label(egui::RichText::new(text).size(10.0).color(fg));
         });
 }

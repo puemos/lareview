@@ -35,6 +35,8 @@ The navigation tree displays a hierarchical view of the review plan, with the In
 
 The content view displays the details of the selected item in the navigation tree. This can be the Intent, a Sub-flow, or a Task. For a Task, you'll see the description, AI insights, and a unified diff viewer that shows all the changes related to that task.
 
+Tasks can be marked as **To Do**, **In Progress**, **Done**, or **Ignored** from the task detail pane. The progress bar and sub-flow counts reflect completion. Use **Clean done** in the Review header to remove completed tasks (and their notes) for the current PR.
+
 ### Data Model
 
 LaReview's new data model is designed to support this new workflow. It includes three main entities:

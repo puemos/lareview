@@ -59,12 +59,22 @@ pub struct TaskStats {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum TaskStatus {
-    /// Task has not been reviewed yet
+    /// Task has not been started yet
     #[default]
+    #[serde(alias = "PENDING")]
     Pending,
-    /// Task has been reviewed and addressed
-    Reviewed,
+    /// Task is currently being worked on
+    #[serde(alias = "INPROGRESS")]
+    #[serde(alias = "IN_PROGRESS")]
+    #[serde(alias = "inprogress")]
+    #[serde(alias = "in_progress")]
+    InProgress,
+    /// Task has been completed
+    #[serde(alias = "REVIEWED")]
+    #[serde(alias = "COMPLETED")]
+    Done,
     /// Task has been reviewed but was determined to be ignorable
+    #[serde(alias = "IGNORED")]
     Ignored,
 }
 
@@ -102,6 +112,7 @@ pub struct ReviewTask {
 }
 
 /// Status of a plan entry
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum PlanStatus {
@@ -121,6 +132,7 @@ pub enum PlanStatus {
 }
 
 /// Priority level of a plan entry
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum PlanPriority {
@@ -137,6 +149,7 @@ pub enum PlanPriority {
 }
 
 /// A single entry in a plan
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlanEntry {
     /// Content/narrative description of the plan entry
@@ -153,6 +166,7 @@ pub struct PlanEntry {
 }
 
 /// A plan containing multiple entries
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Plan {
     /// List of plan entries

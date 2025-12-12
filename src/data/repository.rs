@@ -68,6 +68,15 @@ impl TaskRepository {
         Self { conn }
     }
 
+    fn parse_task_status(status_str: &str) -> TaskStatus {
+        match status_str {
+            "DONE" | "REVIEWED" | "COMPLETED" => TaskStatus::Done,
+            "INPROGRESS" | "IN_PROGRESS" => TaskStatus::InProgress,
+            "IGNORED" => TaskStatus::Ignored,
+            _ => TaskStatus::Pending,
+        }
+    }
+
     pub fn save(&self, task: &ReviewTask) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let files_json = serde_json::to_string(&task.files)?;
@@ -97,6 +106,38 @@ impl TaskRepository {
             ),
         )?;
         Ok(())
+    }
+
+    pub fn update_status(&self, task_id: &TaskId, new_status: TaskStatus) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let status_str = serde_json::to_string(&new_status)?.replace("\"", "");
+        conn.execute(
+            "UPDATE tasks SET status = ?1 WHERE id = ?2",
+            (&status_str, task_id),
+        )?;
+        Ok(())
+    }
+
+    pub fn find_done_ids_by_pr(&self, pr_id: &PullRequestId) -> Result<Vec<TaskId>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id FROM tasks WHERE pull_request_id = ?1 AND status IN ('DONE','REVIEWED','COMPLETED')",
+        )?;
+        let rows = stmt.query_map([pr_id], |row| row.get::<_, String>(0))?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    pub fn delete_by_ids(&self, task_ids: &[TaskId]) -> Result<usize> {
+        if task_ids.is_empty() {
+            return Ok(0);
+        }
+        let conn = self.conn.lock().unwrap();
+        let placeholders = std::iter::repeat_n("?", task_ids.len())
+            .collect::<Vec<_>>()
+            .join(",");
+        let sql = format!("DELETE FROM tasks WHERE id IN ({})", placeholders);
+        let affected = conn.execute(&sql, rusqlite::params_from_iter(task_ids.iter()))?;
+        Ok(affected)
     }
 
     pub fn find_all(&self) -> Result<Vec<ReviewTask>> {
@@ -146,11 +187,7 @@ impl TaskRepository {
                 sub_flow,
             ) = row?;
 
-            let status = match status_str.as_str() {
-                "REVIEWED" => TaskStatus::Reviewed,
-                "IGNORED" => TaskStatus::Ignored,
-                _ => TaskStatus::Pending,
-            };
+            let status = Self::parse_task_status(status_str.as_str());
 
             tasks.push(ReviewTask {
                 id,
@@ -220,11 +257,7 @@ impl TaskRepository {
                 sub_flow,
             ) = row?;
 
-            let status = match status_str.as_str() {
-                "REVIEWED" => TaskStatus::Reviewed,
-                "IGNORED" => TaskStatus::Ignored,
-                _ => TaskStatus::Pending,
-            };
+            let status = Self::parse_task_status(status_str.as_str());
 
             tasks.push(ReviewTask {
                 id,
@@ -270,6 +303,20 @@ impl NoteRepository {
             ],
         )?;
         Ok(())
+    }
+
+    pub fn delete_by_task(&self, task_id: &TaskId) -> Result<usize> {
+        let conn = self.conn.lock().unwrap();
+        let affected = conn.execute("DELETE FROM notes WHERE task_id = ?1", [task_id])?;
+        Ok(affected)
+    }
+
+    pub fn delete_by_task_ids(&self, task_ids: &[TaskId]) -> Result<usize> {
+        let mut affected_total = 0usize;
+        for id in task_ids {
+            affected_total += self.delete_by_task(id)?;
+        }
+        Ok(affected_total)
     }
 
     pub fn find_by_task(&self, task_id: &TaskId) -> Result<Option<Note>> {
@@ -403,13 +450,13 @@ mod tests {
         assert_eq!(all_tasks[0].status, TaskStatus::Pending);
 
         // Update task status by recreating and saving
-        task.status = TaskStatus::Reviewed;
+        task.status = TaskStatus::Done;
         repo.save(&task)?;
 
         // Verify updated status
         let all_tasks = repo.find_all()?;
         assert_eq!(all_tasks.len(), 1);
-        assert_eq!(all_tasks[0].status, TaskStatus::Reviewed);
+        assert_eq!(all_tasks[0].status, TaskStatus::Done);
 
         Ok(())
     }

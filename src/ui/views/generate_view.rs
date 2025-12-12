@@ -7,10 +7,14 @@ use eframe::egui;
 use tokio;
 
 use crate::acp::{GenerateTasksInput, generate_tasks_with_acp, list_agent_candidates};
-use crate::ui::app::{GenMsg, GenResultPayload, LaReviewApp, SelectedAgent};
+use crate::ui::app::{
+    GenMsg, GenResultPayload, LaReviewApp, SelectedAgent, TimelineContent, TimelineItem,
+};
 use crate::ui::components::header::{HeaderAction, header};
 use crate::ui::components::selection_chips::selection_chips;
 use crate::ui::components::status::error_banner;
+use agent_client_protocol::{ContentBlock, Plan, PlanEntryStatus, SessionUpdate, ToolCallStatus};
+use serde_json;
 
 impl LaReviewApp {
     pub fn ui_generate(&mut self, ui: &mut egui::Ui) {
@@ -250,6 +254,11 @@ impl LaReviewApp {
 
                     ui.add_space(8.0);
 
+                    if let Some(plan) = &self.state.latest_plan {
+                        render_plan_panel(ui, plan);
+                        ui.add_space(8.0);
+                    }
+
                     // Agent activity logs
                     egui::Frame::group(ui.style())
                         .inner_margin(egui::Margin::symmetric(10, 8))
@@ -262,10 +271,7 @@ impl LaReviewApp {
                                 );
 
                                 // Show clear logs button if there's content
-                                if !self.state.agent_logs.is_empty()
-                                    || !self.state.agent_messages.is_empty()
-                                    || !self.state.agent_thoughts.is_empty()
-                                    || !self.state.plans.is_empty()
+                                if !self.state.agent_timeline.is_empty()
                                 {
                                     ui.with_layout(
                                         egui::Layout::right_to_left(egui::Align::Center),
@@ -280,10 +286,7 @@ impl LaReviewApp {
                                                 )
                                                 .clicked()
                                             {
-                                                self.state.agent_logs.clear();
-                                                self.state.agent_messages.clear();
-                                                self.state.agent_thoughts.clear();
-                                                self.state.plans.clear();
+                                                self.state.reset_agent_timeline();
                                             }
                                         },
                                     );
@@ -297,49 +300,8 @@ impl LaReviewApp {
                                 .id_salt(ui.id().with("agent_activity_scroll"))
                                 .stick_to_bottom(true)
                                 .show(ui, |ui| {
-                                    if !self.state.plans.is_empty() {
-                                        ui.label(
-                                            egui::RichText::new("AGENT PLAN")
-                                                .color(MOCHA.lavender)
-                                                .strong(),
-                                        );
-                                        for plan in &self.state.plans {
-                                            for entry in &plan.entries {
-                                                ui.label(
-                                                    egui::RichText::new(format!(
-                                                        "- {}",
-                                                        entry.content
-                                                    ))
-                                                    .color(MOCHA.teal)
-                                                    .size(12.0),
-                                                );
-                                            }
-                                        }
-                                        ui.add_space(8.0);
-                                    }
-
-                                    for log in &self.state.agent_logs {
-                                        ui.label(
-                                            egui::RichText::new(log)
-                                                .color(MOCHA.subtext0)
-                                                .monospace()
-                                                .size(12.0),
-                                        );
-                                    }
-
-                                    for msg in &self.state.agent_messages {
-                                        ui.label(
-                                            egui::RichText::new(msg).color(MOCHA.text).size(12.0),
-                                        );
-                                    }
-
-                                    for thought in &self.state.agent_thoughts {
-                                        ui.label(
-                                            egui::RichText::new(thought)
-                                                .color(MOCHA.sky)
-                                                .size(12.0)
-                                                .italics(),
-                                        );
+                                    for item in &self.state.agent_timeline {
+                                        render_timeline_item(ui, item);
                                     }
                                 });
                         });
@@ -361,10 +323,7 @@ impl LaReviewApp {
         self.state.diff_text.clear();
         self.state.generation_error = None;
         self.state.is_generating = false;
-        self.state.agent_messages.clear();
-        self.state.agent_thoughts.clear();
-        self.state.agent_logs.clear();
-        self.state.plans.clear();
+        self.state.reset_agent_timeline();
     }
 
     pub fn start_generation_async(&mut self) {
@@ -417,16 +376,15 @@ impl LaReviewApp {
 
         self.state.is_generating = true;
         self.state.generation_error = None;
-        self.state.agent_messages.clear();
-        self.state.agent_thoughts.clear();
-        self.state.plans.clear();
-        self.state.agent_logs = vec![start_log.clone()];
+        self.state.reset_agent_timeline();
+        self.state.ingest_progress(crate::acp::ProgressEvent::LocalLog(start_log.clone()));
 
         let (progress_tx, mut progress_rx) = tokio::sync::mpsc::unbounded_channel();
 
         let input = GenerateTasksInput {
             pull_request: pr,
             diff_text,
+            repo_root: None,
             agent_command: agent_cmd,
             agent_args,
             progress_tx: Some(progress_tx),
@@ -444,7 +402,7 @@ impl LaReviewApp {
                 tokio::select! {
                     evt = progress_rx.recv() => {
                         if let Some(evt) = evt {
-                            let _ = gen_tx.send(GenMsg::Progress(evt)).await;
+                            let _ = gen_tx.send(GenMsg::Progress(Box::new(evt))).await;
                         }
                     }
                     res = &mut result_fut => {
@@ -470,4 +428,325 @@ impl LaReviewApp {
             }
         });
     }
+}
+
+fn render_timeline_item(ui: &mut egui::Ui, item: &TimelineItem) {
+    match &item.content {
+        TimelineContent::LocalLog(line) => {
+            ui.label(
+                egui::RichText::new(line)
+                    .color(MOCHA.subtext0)
+                    .monospace()
+                    .size(12.0),
+            );
+        }
+        TimelineContent::Update(update) => {
+            render_session_update(ui, update);
+        }
+    }
+}
+
+fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
+    match update {
+        SessionUpdate::UserMessageChunk(chunk) | SessionUpdate::AgentMessageChunk(chunk) => {
+            render_content_chunk(ui, chunk, MOCHA.text, false);
+        }
+        SessionUpdate::AgentThoughtChunk(chunk) => {
+            render_content_chunk(ui, chunk, MOCHA.sky, true);
+        }
+        SessionUpdate::ToolCall(call) => {
+            let status_color = match call.status {
+                ToolCallStatus::Pending => MOCHA.overlay2,
+                ToolCallStatus::InProgress => MOCHA.yellow,
+                ToolCallStatus::Completed => MOCHA.green,
+                ToolCallStatus::Failed => MOCHA.red,
+                _ => MOCHA.overlay2,
+            };
+            let status_label = match call.status {
+                ToolCallStatus::Pending => "pending",
+                ToolCallStatus::InProgress => "in progress",
+                ToolCallStatus::Completed => "completed",
+                ToolCallStatus::Failed => "failed",
+                _ => "",
+            };
+            let header_text = egui::RichText::new(format!("{} ({})", call.title, status_label))
+                .color(status_color)
+                .size(12.0);
+
+            egui::CollapsingHeader::new(header_text)
+                .id_salt(("tool_call", call.tool_call_id.clone()))
+                .default_open(matches!(
+                    call.status,
+                    ToolCallStatus::Pending | ToolCallStatus::InProgress
+                ))
+                .show(ui, |ui| {
+                    ui.spacing_mut().item_spacing = egui::vec2(4.0, 4.0);
+
+                    if let Some(kind) = (!matches!(call.kind, agent_client_protocol::ToolKind::Other))
+                        .then_some(call.kind)
+                    {
+                        ui.label(
+                            egui::RichText::new(format!("kind: {kind:?}"))
+                                .color(MOCHA.subtext0)
+                                .size(11.0),
+                        );
+                    }
+
+                    if let Some(input) = &call.raw_input {
+                        render_json_block(
+                            ui,
+                            ("tool_json", call.tool_call_id.clone(), "input"),
+                            "input",
+                            input,
+                        );
+                    }
+                    if let Some(output) = &call.raw_output {
+                        render_json_block(
+                            ui,
+                            ("tool_json", call.tool_call_id.clone(), "output"),
+                            "output",
+                            output,
+                        );
+                    }
+                });
+        }
+        SessionUpdate::ToolCallUpdate(update) => {
+            let status = update.fields.status.unwrap_or(ToolCallStatus::Pending);
+            let status_color = match status {
+                ToolCallStatus::Pending => MOCHA.overlay2,
+                ToolCallStatus::InProgress => MOCHA.yellow,
+                ToolCallStatus::Completed => MOCHA.green,
+                ToolCallStatus::Failed => MOCHA.red,
+                _ => MOCHA.overlay2,
+            };
+            let title = update
+                .fields
+                .title
+                .as_deref()
+                .unwrap_or("tool update");
+            ui.label(
+                egui::RichText::new(format!("{title} ({status:?})"))
+                    .color(status_color)
+                    .size(12.0),
+            );
+        }
+        SessionUpdate::Plan(plan) => {
+            render_plan_timeline_item(ui, plan);
+        }
+        SessionUpdate::AvailableCommandsUpdate(_) => {
+            ui.label(
+                egui::RichText::new("Available commands updated")
+                    .color(MOCHA.subtext0)
+                    .size(12.0),
+            );
+        }
+        SessionUpdate::CurrentModeUpdate(mode) => {
+            ui.label(
+                egui::RichText::new(format!("Mode: {}", mode.current_mode_id))
+                    .color(MOCHA.subtext0)
+                    .size(12.0),
+            );
+        }
+        _ => {
+            ui.label(
+                egui::RichText::new(format!("{update:?}"))
+                    .color(MOCHA.subtext0)
+                    .monospace()
+                    .size(11.0),
+            );
+        }
+    }
+}
+
+fn render_plan_panel(ui: &mut egui::Ui, plan: &Plan) {
+    if plan.entries.is_empty() {
+        return;
+    }
+
+    egui::Frame::group(ui.style())
+        .inner_margin(egui::Margin::symmetric(10, 8))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new(format!(
+                        "{} PLAN",
+                        egui_phosphor::regular::LIST_CHECKS
+                    ))
+                    .size(11.0)
+                    .color(MOCHA.subtext0),
+                );
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let total = plan.entries.len();
+                    let completed = plan
+                        .entries
+                        .iter()
+                        .filter(|e| matches!(&e.status, PlanEntryStatus::Completed))
+                        .count();
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "{} {completed}/{total}",
+                            egui_phosphor::regular::CHECK_CIRCLE
+                        ))
+                        .size(11.0)
+                        .color(MOCHA.overlay2),
+                    );
+                });
+            });
+
+            ui.add_space(6.0);
+            ui.separator();
+            ui.add_space(4.0);
+
+            render_plan_entries(ui, plan, /*dense=*/ false);
+        });
+}
+
+fn render_plan_timeline_item(ui: &mut egui::Ui, plan: &Plan) {
+    if plan.entries.is_empty() {
+        ui.label(
+            egui::RichText::new(format!(
+                "{} Plan updated",
+                egui_phosphor::regular::LIST_CHECKS
+            ))
+            .color(MOCHA.subtext0)
+            .size(12.0),
+        );
+        return;
+    }
+
+    let total = plan.entries.len();
+    let completed = plan
+        .entries
+        .iter()
+        .filter(|e| matches!(&e.status, PlanEntryStatus::Completed))
+        .count();
+
+    let default_open = plan
+        .entries
+        .iter()
+        .any(|e| matches!(&e.status, PlanEntryStatus::InProgress | PlanEntryStatus::Pending));
+
+    let header = egui::RichText::new(format!(
+        "{} Plan ({completed}/{total})",
+        egui_phosphor::regular::LIST_CHECKS
+    ))
+    .color(MOCHA.subtext0)
+    .size(12.0);
+
+    egui::CollapsingHeader::new(header)
+        .id_salt(("plan", "timeline"))
+        .default_open(default_open)
+        .show(ui, |ui| {
+            ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
+            render_plan_entries(ui, plan, /*dense=*/ true);
+        });
+}
+
+fn render_plan_entries(ui: &mut egui::Ui, plan: &Plan, dense: bool) {
+    for (idx, entry) in plan.entries.iter().enumerate() {
+        let status = entry.status.clone();
+        let (icon, color, label) = plan_entry_style(status.clone());
+
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing = egui::vec2(8.0, 0.0);
+
+            ui.label(egui::RichText::new(icon).size(14.0).color(color));
+
+            let text_color = match status {
+                PlanEntryStatus::Completed => MOCHA.subtext1,
+                PlanEntryStatus::InProgress => MOCHA.text,
+                PlanEntryStatus::Pending => MOCHA.text,
+                _ => MOCHA.text,
+            };
+
+            ui.add(
+                egui::Label::new(
+                    egui::RichText::new(&entry.content)
+                        .color(text_color)
+                        .size(if dense { 12.0 } else { 12.5 }),
+                )
+                .wrap(),
+            );
+
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.label(
+                    egui::RichText::new(label)
+                        .size(10.5)
+                        .color(MOCHA.overlay2),
+                );
+            });
+        });
+
+        if !dense && idx + 1 < plan.entries.len() {
+            ui.add_space(2.0);
+        }
+    }
+}
+
+fn plan_entry_style(status: PlanEntryStatus) -> (&'static str, egui::Color32, &'static str) {
+    match status {
+        PlanEntryStatus::Completed => (egui_phosphor::regular::CHECK_CIRCLE, MOCHA.green, "done"),
+        PlanEntryStatus::InProgress => (egui_phosphor::regular::CIRCLE_DASHED, MOCHA.yellow, "doing"),
+        PlanEntryStatus::Pending => (egui_phosphor::regular::CIRCLE, MOCHA.overlay1, "todo"),
+        _ => (egui_phosphor::regular::CIRCLE, MOCHA.overlay1, "unknown"),
+    }
+}
+
+fn render_content_chunk(
+    ui: &mut egui::Ui,
+    chunk: &agent_client_protocol::ContentChunk,
+    color: egui::Color32,
+    italics: bool,
+) {
+    match &chunk.content {
+        ContentBlock::Text(text) => {
+            let mut rt = egui::RichText::new(&text.text).color(color).size(12.0);
+            if italics {
+                rt = rt.italics();
+            }
+            ui.label(rt);
+        }
+        other => {
+            let mut rt = egui::RichText::new(format!("{other:?}"))
+                .color(color)
+                .monospace()
+                .size(11.0);
+            if italics {
+                rt = rt.italics();
+            }
+            ui.label(rt);
+        }
+    }
+}
+
+fn render_json_block<S: std::hash::Hash + Clone>(
+    ui: &mut egui::Ui,
+    id_salt: S,
+    label: &str,
+    value: &serde_json::Value,
+) {
+    ui.add_space(2.0);
+    ui.label(
+        egui::RichText::new(label.to_uppercase())
+            .color(MOCHA.subtext0)
+            .size(11.0)
+            .strong(),
+    );
+    let pretty =
+        serde_json::to_string_pretty(value).unwrap_or_else(|_| value.to_string());
+    let mut text = pretty;
+    egui::ScrollArea::vertical()
+        .id_salt(("json_scroll", id_salt.clone()))
+        .max_height(160.0)
+        .show(ui, |ui| {
+            ui.add(
+                egui::TextEdit::multiline(&mut text)
+                    .id_salt(("json_text", id_salt.clone()))
+                    .font(egui::FontId::monospace(11.0))
+                    .desired_rows(6)
+                    .desired_width(ui.available_width())
+                    .interactive(false),
+            );
+        });
 }

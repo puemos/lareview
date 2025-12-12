@@ -1,5 +1,4 @@
 use rusqlite::Connection;
-use serde_json;
 use std::fs;
 
 // Simple structs matching the database schema

@@ -2,4 +2,5 @@
 
 pub mod app;
 pub mod components;
+pub mod diagram;
 pub mod views;

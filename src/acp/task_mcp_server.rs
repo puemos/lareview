@@ -17,6 +17,7 @@ use pmcp::shared::{Transport, TransportMessage};
 use pmcp::{Server, ServerCapabilities, SimpleTool, ToolHandler};
 use serde::Deserialize;
 use serde_json::{Value, json};
+use std::collections::HashSet;
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -42,14 +43,49 @@ impl ServerConfig {
     /// Parse server configuration from command-line arguments
     pub fn from_args() -> Self {
         let mut config = ServerConfig::default();
+
+        if let Ok(path) = std::env::var("TASK_MCP_OUT") {
+            config.tasks_out = Some(PathBuf::from(path));
+        }
+        if let Ok(path) = std::env::var("TASK_MCP_PR_CONTEXT") {
+            config.pr_context = Some(PathBuf::from(path));
+        }
+        if let Ok(path) = std::env::var("LAREVIEW_DB_PATH") {
+            config.db_path = Some(PathBuf::from(path));
+        }
+
         let args: Vec<String> = std::env::args().collect();
         let mut i = 0;
 
         while i < args.len() {
             match args[i].as_str() {
+                "--tasks-out" => {
+                    if i + 1 < args.len() {
+                        config.tasks_out = Some(PathBuf::from(&args[i + 1]));
+                        i += 2;
+                    } else {
+                        i += 1;
+                    }
+                }
                 "--log-file" => {
                     if i + 1 < args.len() {
                         config.log_file = Some(PathBuf::from(&args[i + 1]));
+                        i += 2;
+                    } else {
+                        i += 1;
+                    }
+                }
+                "--pr-context" => {
+                    if i + 1 < args.len() {
+                        config.pr_context = Some(PathBuf::from(&args[i + 1]));
+                        i += 2;
+                    } else {
+                        i += 1;
+                    }
+                }
+                "--db-path" => {
+                    if i + 1 < args.len() {
+                        config.db_path = Some(PathBuf::from(&args[i + 1]));
                         i += 2;
                     } else {
                         i += 1;
@@ -163,18 +199,28 @@ fn create_return_tasks_tool(config: Arc<ServerConfig>) -> impl ToolHandler {
             }).await;
 
             match persist_result {
-                Ok(Ok(())) => log_to_file(&config, &format!(
-                    "ReturnTasksTool persisted tasks to DB: {}",
-                    persist_args_for_log
-                )),
-                Ok(Err(err)) => log_to_file(&config, &format!(
-                    "ReturnTasksTool failed to persist tasks: {}",
-                    err
-                )),
-                Err(join_err) => log_to_file(&config, &format!(
-                    "ReturnTasksTool task join error: {}",
-                    join_err
-                )),
+                Ok(Ok(())) => log_to_file(
+                    &config,
+                    &format!("ReturnTasksTool persisted tasks to DB: {}", persist_args_for_log),
+                ),
+                Ok(Err(err)) => {
+                    log_to_file(
+                        &config,
+                        &format!("ReturnTasksTool failed to persist tasks: {}", err),
+                    );
+                    return Err(pmcp::Error::Validation(format!(
+                        "invalid return_tasks payload: {err}"
+                    )));
+                }
+                Err(join_err) => {
+                    log_to_file(
+                        &config,
+                        &format!("ReturnTasksTool task join error: {}", join_err),
+                    );
+                    return Err(pmcp::Error::Internal(format!(
+                        "return_tasks persistence join error: {join_err}"
+                    )));
+                }
             }
 
 
@@ -192,7 +238,8 @@ fn create_return_tasks_tool(config: Arc<ServerConfig>) -> impl ToolHandler {
         "Submit code review tasks for a pull request. This tool finalizes your analysis. \
          Call it with a JSON payload containing a 'tasks' array where each task represents \
          a logical sub-flow or review concern from the PR diff. Each task must include: \
-         id, title, description, files, stats (additions, deletions, risk, tags), and diffs. \
+         id, title, description, stats (risk, tags), and diffs. \
+         The server computes files and line additions/deletions from the provided diffs. \
          Optionally include sub_flow (grouping name) and diagram (D2 format for visualization)."
     )
     .with_schema(json!({
@@ -216,23 +263,10 @@ fn create_return_tasks_tool(config: Arc<ServerConfig>) -> impl ToolHandler {
                             "type": "string",
                             "description": "2-6 sentences explaining: (1) what this sub-flow does in the system, (2) what changed in this PR, (3) where it appears in the code, (4) why it matters (correctness/safety/performance), (5) what reviewers should verify"
                         },
-                        "files": {
-                            "type": "array",
-                            "items": { "type": "string" },
-                            "description": "List of file paths that participate in this sub-flow. Include all relevant files, even if they span multiple directories. Paths should be relative to repo root (e.g., 'src/auth/login.rs', 'tests/auth_test.rs')"
-                        },
                         "stats": {
                             "type": "object",
-                            "description": "Statistics about the changes in this task. These can be approximate.",
+                            "description": "Risk and tags for this task. Additions, deletions, and files are computed from diffs.",
                             "properties": {
-                                "additions": {
-                                    "type": "integer",
-                                    "description": "Approximate number of lines added relevant to this task"
-                                },
-                                "deletions": {
-                                    "type": "integer",
-                                    "description": "Approximate number of lines deleted relevant to this task"
-                                },
                                 "risk": {
                                     "type": "string",
                                     "enum": ["LOW", "MEDIUM", "HIGH"],
@@ -244,7 +278,7 @@ fn create_return_tasks_tool(config: Arc<ServerConfig>) -> impl ToolHandler {
                                     "description": "Descriptive tags for categorization (e.g., 'security', 'performance', 'refactor', 'bug-fix', 'needs-tests', 'breaking-change')"
                                 }
                             },
-                            "required": ["additions", "deletions", "risk", "tags"]
+                            "required": ["risk", "tags"]
                         },
                         "sub_flow": {
                             "type": "string",
@@ -260,7 +294,7 @@ fn create_return_tasks_tool(config: Arc<ServerConfig>) -> impl ToolHandler {
                             "description": "Array of complete unified diff strings showing the relevant changes for this task. CRITICAL: Each diff must be valid and parseable with full headers (diff --git a/file b/file, --- a/file, +++ b/file) and exact hunk headers (@@ -a,b +c,d @@) where line counts match precisely. Never approximate hunk ranges."
                         }
                     },
-                    "required": ["id", "title", "description", "files", "stats", "diffs"]
+                    "required": ["id", "title", "description", "stats", "diffs"]
                 }
             }
         },
@@ -297,8 +331,6 @@ struct RawTask {
     #[serde(default)]
     description: String,
     #[serde(default)]
-    files: Vec<String>,
-    #[serde(default)]
     stats: Option<RawStats>,
     #[serde(default)]
     diffs: Vec<String>,
@@ -311,13 +343,63 @@ struct RawTask {
 #[derive(Deserialize, Default)]
 struct RawStats {
     #[serde(default)]
-    additions: u32,
-    #[serde(default)]
-    deletions: u32,
-    #[serde(default)]
     risk: String,
     #[serde(default)]
     tags: Vec<String>,
+}
+
+fn normalize_task_path(path: &str) -> String {
+    path.trim()
+        .trim_start_matches("./")
+        .trim_start_matches("a/")
+        .trim_start_matches("b/")
+        .to_string()
+}
+
+fn extract_files_from_diffs(diffs: &[String]) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut files = Vec::new();
+    for diff in diffs {
+        for line in diff.lines() {
+            if let Some(rest) = line.strip_prefix("diff --git ") {
+                let mut parts = rest.split_whitespace();
+                let a_path = parts.next().unwrap_or("");
+                let b_path = parts.next().unwrap_or("");
+                let candidate = if !b_path.is_empty()
+                    && b_path != "b/dev/null"
+                    && b_path != "/dev/null"
+                {
+                    normalize_task_path(b_path)
+                } else {
+                    normalize_task_path(a_path)
+                };
+                if !candidate.is_empty() && candidate != "dev/null"
+                    && seen.insert(candidate.clone()) {
+                    files.push(candidate);
+                }
+            }
+        }
+    }
+    files
+}
+
+fn count_line_changes(diffs: &[String]) -> (u32, u32) {
+    let mut additions = 0u32;
+    let mut deletions = 0u32;
+    for diff in diffs {
+        for line in diff.lines() {
+            if line.starts_with("+++") || line.starts_with("---") || line.starts_with("diff --git")
+            {
+                continue;
+            }
+            if line.starts_with('+') {
+                additions += 1;
+            } else if line.starts_with('-') {
+                deletions += 1;
+            }
+        }
+    }
+    (additions, deletions)
 }
 
 fn persist_tasks_to_db(config: &ServerConfig, args: Value) -> Result<()> {
@@ -346,8 +428,48 @@ fn persist_tasks_to_db(config: &ServerConfig, args: Value) -> Result<()> {
     Ok(())
 }
 
-fn parse_tasks(args: Value) -> Result<Vec<ReviewTask>> {
-    let payload: TasksPayload = serde_json::from_value(args)?;
+fn normalize_tasks_payload(args: Value) -> Result<Value> {
+    let mut current = args;
+
+    // Unwrap stringified JSON or embedded JSON blocks.
+    if let Some(s) = current.as_str() {
+        if let Ok(v) = serde_json::from_str::<Value>(s) {
+            current = v;
+        } else if s.contains("\"tasks\"")
+            && let Some(tasks_pos) = s.find("\"tasks\"") {
+            let start = s[..tasks_pos].rfind('{');
+            let end = s.rfind('}');
+            if let (Some(start), Some(end)) = (start, end)
+                && let Ok(v) = serde_json::from_str::<Value>(&s[start..=end]) {
+                current = v;
+            }
+        }
+    }
+
+    if current.get("tasks").is_some() {
+        return Ok(current);
+    }
+
+    if let Some(params) = current.get("params")
+        && params.get("tasks").is_some() {
+        return Ok(params.clone());
+    }
+
+    if let Some(arguments) = current.get("arguments")
+        && arguments.get("tasks").is_some() {
+        return Ok(arguments.clone());
+    }
+
+    if current.is_array() {
+        return Ok(json!({ "tasks": current }));
+    }
+
+    Err(anyhow::anyhow!("missing field `tasks`"))
+}
+
+pub(crate) fn parse_tasks(args: Value) -> Result<Vec<ReviewTask>> {
+    let normalized = normalize_tasks_payload(args)?;
+    let payload: TasksPayload = serde_json::from_value(normalized)?;
     let tasks = payload
         .tasks
         .into_iter()
@@ -359,15 +481,18 @@ fn parse_tasks(args: Value) -> Result<Vec<ReviewTask>> {
                 _ => RiskLevel::Low,
             };
 
+            let computed_files = extract_files_from_diffs(&task.diffs);
+            let (additions, deletions) = count_line_changes(&task.diffs);
+
             ReviewTask {
                 id: task.id,
                 pr_id: String::new(), // Will be set in persist_tasks_to_db
                 title: task.title,
                 description: task.description,
-                files: task.files,
+                files: computed_files,
                 stats: TaskStats {
-                    additions: stats.additions,
-                    deletions: stats.deletions,
+                    additions,
+                    deletions,
                     risk,
                     tags: stats.tags,
                 },
