@@ -22,6 +22,16 @@ pub enum RiskLevel {
     High,
 }
 
+impl RiskLevel {
+    pub fn rank(self) -> u8 {
+        match self {
+            Self::Low => 0,
+            Self::Medium => 1,
+            Self::High => 2,
+        }
+    }
+}
+
 /// A pull request to be reviewed
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PullRequest {
@@ -76,6 +86,12 @@ pub enum TaskStatus {
     /// Task has been reviewed but was determined to be ignorable
     #[serde(alias = "IGNORED")]
     Ignored,
+}
+
+impl TaskStatus {
+    pub fn is_closed(self) -> bool {
+        matches!(self, Self::Done | Self::Ignored)
+    }
 }
 
 /// A review task spanning one or more files

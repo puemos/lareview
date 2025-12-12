@@ -1,9 +1,9 @@
 //! Main entry point for the LaReview application
 //! Initializes the egui application framework and sets up the Tokio runtime.
 
-mod acp;
-mod data;
+mod application;
 mod domain;
+mod infra;
 mod prompts;
 mod ui;
 
@@ -39,7 +39,7 @@ fn main() -> Result<(), eframe::Error> {
         // Run the MCP server instead of the UI
         let rt = RUNTIME.get().unwrap();
         rt.block_on(async {
-            if let Err(e) = acp::run_task_mcp_server().await {
+            if let Err(e) = infra::acp::run_task_mcp_server().await {
                 eprintln!("MCP server error: {e}");
                 std::process::exit(1);
             }

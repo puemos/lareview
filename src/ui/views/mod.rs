@@ -1,5 +1,5 @@
 //! Views module
 
-pub mod generate_view;
-pub mod review_view;
+pub mod generate;
+pub mod review;
 pub mod settings_view;

@@ -1,0 +1,342 @@
+use super::client::LaReviewClient;
+use super::prompt::{build_client_capabilities, build_prompt};
+use super::validation::validate_tasks_payload;
+use agent_client_protocol::{
+    Agent, ClientSideConnection, ContentBlock, Implementation, InitializeRequest, McpServer,
+    McpServerStdio, NewSessionRequest, PromptRequest, ProtocolVersion, TextContent,
+};
+use anyhow::{Context as _, Result};
+use futures::future::LocalBoxFuture;
+use std::path::{Path, PathBuf};
+use std::process::Stdio;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::process::Command;
+use tokio::runtime::Builder;
+use tokio::task::LocalSet;
+
+use super::{GenerateTasksInput, GenerateTasksResult, ProgressEvent};
+
+fn push_log(logs: &Arc<Mutex<Vec<String>>>, message: impl Into<String>, debug: bool) {
+    let msg = message.into();
+    if let Ok(mut guard) = logs.lock() {
+        guard.push(msg.clone());
+    }
+    if debug {
+        eprintln!("[acp] {msg}");
+    }
+}
+
+/// Resolve the binary to launch for the MCP task server, preferring explicit overrides.
+pub(super) fn resolve_task_mcp_server_path(
+    override_path: Option<&PathBuf>,
+    current_exe: &Path,
+) -> PathBuf {
+    if let Some(path) = override_path {
+        return path.clone();
+    }
+    if let Some(path) = option_env!("CARGO_BIN_EXE_lareview") {
+        return PathBuf::from(path);
+    }
+    current_exe.to_path_buf()
+}
+
+/// Run ACP task generation on a dedicated Tokio runtime so GPUI stays responsive.
+pub async fn generate_tasks_with_acp(input: GenerateTasksInput) -> Result<GenerateTasksResult> {
+    let (sender, receiver) = futures::channel::oneshot::channel();
+    let timeout_secs = input.timeout_secs.unwrap_or(5000);
+
+    thread::spawn(move || {
+        let runtime = Builder::new_current_thread().enable_all().build();
+        let result = match runtime {
+            Ok(rt) => {
+                let local = LocalSet::new();
+                local.block_on(&rt, async move {
+                    tokio::time::timeout(
+                        Duration::from_secs(timeout_secs),
+                        generate_tasks_with_acp_inner(input),
+                    )
+                    .await
+                    .map_err(|_| {
+                        anyhow::anyhow!(format!("Agent timed out after {timeout_secs}s"))
+                    })?
+                })
+            }
+            Err(e) => Err(e.into()),
+        };
+
+        let _ = sender.send(result);
+    });
+
+    receiver
+        .await
+        .unwrap_or_else(|_| Err(anyhow::anyhow!("ACP worker thread unexpectedly closed")))
+}
+
+/// Generate review tasks using ACP agent (runs inside Tokio runtime).
+async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<GenerateTasksResult> {
+    let GenerateTasksInput {
+        pull_request,
+        diff_text,
+        repo_root,
+        agent_command,
+        agent_args,
+        progress_tx,
+        mcp_server_binary,
+        timeout_secs: _,
+        debug,
+    }: GenerateTasksInput = input;
+
+    let logs = Arc::new(Mutex::new(Vec::new()));
+    let progress_tx = progress_tx;
+
+    let has_repo_access = repo_root.is_some();
+
+    // Spawn agent process
+    let progress_tx_for_log = progress_tx.clone();
+    let log_fn = |msg: String| {
+        push_log(&logs, &msg, debug);
+        if let Some(tx) = &progress_tx_for_log {
+            let _ = tx.send(ProgressEvent::LocalLog(msg));
+        }
+    };
+
+    log_fn(format!("spawn: {} {}", agent_command, agent_args.join(" ")));
+
+    let mut child = Command::new(&agent_command)
+        .args(&agent_args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .with_context(|| {
+            format!(
+                "Failed to spawn agent process: {} {}",
+                agent_command,
+                agent_args.join(" ")
+            )
+        })?;
+
+    log_fn(format!("spawned pid: {}", child.id().unwrap_or(0)));
+
+    let stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| anyhow::anyhow!("Failed to get stdin"))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| anyhow::anyhow!("Failed to get stdout"))?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| anyhow::anyhow!("Failed to get stderr"))?;
+
+    let logs_clone = logs.clone();
+    let progress_tx_for_stderr = progress_tx.clone();
+    tokio::spawn(async move {
+        let reader = BufReader::new(stderr);
+        let mut lines = reader.lines();
+        while let Ok(Some(line)) = lines.next_line().await {
+            let msg = format!("stderr: {line}");
+            push_log(&logs_clone, &msg, debug);
+            if let Some(tx) = &progress_tx_for_stderr {
+                let _ = tx.send(ProgressEvent::LocalLog(msg));
+            }
+        }
+    });
+
+    // Create client and connection
+    let client = LaReviewClient::new(
+        progress_tx.clone(),
+        pull_request.id.clone(),
+        repo_root.clone(),
+    );
+    let messages = client.messages.clone();
+    let thoughts = client.thoughts.clone();
+    let tasks_capture = client.tasks.clone();
+    let raw_tasks_capture = client.raw_tasks_payload.clone();
+
+    // Convert tokio streams for ACP
+    use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
+    let stdin_compat = stdin.compat_write();
+    let stdout_compat = stdout.compat();
+
+    let spawn_fn = |fut: LocalBoxFuture<'static, ()>| {
+        tokio::task::spawn_local(fut);
+    };
+
+    let (connection, io_future) =
+        ClientSideConnection::new(client, stdin_compat, stdout_compat, spawn_fn);
+
+    // Spawn IO task
+    let io_handle = tokio::task::spawn_local(async move {
+        let _ = io_future.await;
+    });
+
+    // Initialize connection
+    push_log(&logs, "initialize", debug);
+    connection
+        .initialize(
+            InitializeRequest::new(ProtocolVersion::V1)
+                .client_info(Implementation::new("lareview", "0.1.0"))
+                .client_capabilities(build_client_capabilities(has_repo_access)),
+        )
+        .await
+        .with_context(|| "ACP initialize failed")?;
+    push_log(&logs, "initialize ok", debug);
+
+    // Create session with MCP task server
+    let temp_cwd = if has_repo_access {
+        None
+    } else {
+        Some(tempfile::tempdir().context("create temp working directory")?)
+    };
+    let cwd = match &repo_root {
+        Some(root) => root.clone(),
+        None => temp_cwd
+            .as_ref()
+            .expect("temp_cwd present when no repo access")
+            .path()
+            .to_path_buf(),
+    };
+
+    let current_exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("lareview"));
+    let task_mcp_server_path =
+        resolve_task_mcp_server_path(mcp_server_binary.as_ref(), &current_exe);
+
+    let pr_context_file =
+        tempfile::NamedTempFile::new().context("create PR context file for MCP server")?;
+    std::fs::write(
+        pr_context_file.path(),
+        serde_json::to_string(&pull_request).context("serialize PR context")?,
+    )
+    .context("write PR context file")?;
+
+    let mut mcp_args = vec![
+        "--task-mcp-server".to_string(),
+        "--pr-context".to_string(),
+        pr_context_file.path().to_string_lossy().to_string(),
+    ];
+    if let Ok(db_path) = std::env::var("LAREVIEW_DB_PATH") {
+        mcp_args.push("--db-path".to_string());
+        mcp_args.push(db_path);
+    }
+
+    let mcp_servers = vec![McpServer::Stdio(
+        McpServerStdio::new("lareview-tasks", task_mcp_server_path.clone()).args(mcp_args),
+    )];
+
+    log_fn(format!(
+        "new_session (mcp server: {} --task-mcp-server --pr-context ...)",
+        task_mcp_server_path.display(),
+    ));
+    let session = connection
+        .new_session(NewSessionRequest::new(cwd).mcp_servers(mcp_servers))
+        .await
+        .with_context(|| "ACP new_session failed")?;
+    push_log(&logs, "new_session ok", debug);
+
+    // Send prompt
+    let prompt_text = build_prompt(&pull_request, &diff_text, repo_root.as_ref());
+    push_log(&logs, "prompt", debug);
+    let _result = connection
+        .prompt(PromptRequest::new(
+            session.session_id,
+            vec![ContentBlock::Text(TextContent::new(prompt_text))],
+        ))
+        .await
+        .with_context(|| "ACP prompt failed")?;
+    push_log(&logs, "prompt ok", debug);
+
+    // Wait for the agent to finish naturally. If tasks are captured, we allow a short
+    // grace period and then terminate to avoid hanging the UI on agents that don't exit.
+    let status = loop {
+        let tasks_ready = tasks_capture
+            .lock()
+            .unwrap()
+            .as_ref()
+            .is_some_and(|t| !t.is_empty());
+
+        if tasks_ready {
+            let wait_res = tokio::time::timeout(Duration::from_secs(2), child.wait()).await;
+            break match wait_res {
+                Ok(res) => res?,
+                Err(_) => {
+                    push_log(
+                        &logs,
+                        "tasks captured but agent still running; sending kill",
+                        debug,
+                    );
+                    let _ = child.start_kill();
+                    child.wait().await?
+                }
+            };
+        }
+
+        tokio::select! {
+            res = child.wait() => {
+                break res?;
+            }
+            _ = tokio::time::sleep(Duration::from_millis(200)) => {}
+        }
+    };
+    // Wait for IO loop to flush pending notifications
+    let _ = io_handle.await;
+
+    push_log(&logs, format!("Agent exit status: {}", status), debug);
+
+    // Prefer tasks captured via MCP callbacks, fall back to file written by MCP server.
+    let final_tasks = tasks_capture.lock().unwrap().clone().unwrap_or_default();
+
+    // Collect output for return and for richer error contexts
+    let final_messages = messages.lock().unwrap().clone();
+    let final_thoughts = thoughts.lock().unwrap().clone();
+
+    if final_tasks.is_empty() {
+        let final_logs = logs.lock().unwrap().clone();
+        let ctx_logs = if final_logs.is_empty() {
+            "ACP invocation produced no stderr or phase logs".to_string()
+        } else {
+            format!("ACP invocation logs:\n{}", final_logs.join("\n"))
+        };
+        let ctx_messages = if final_messages.is_empty() {
+            String::new()
+        } else {
+            format!("Agent messages:\n{}", final_messages.join("\n"))
+        };
+        let ctx_thoughts = if final_thoughts.is_empty() {
+            String::new()
+        } else {
+            format!("Agent thoughts:\n{}", final_thoughts.join("\n"))
+        };
+
+        let mut ctx_parts = vec![ctx_logs];
+        if !ctx_messages.is_empty() {
+            ctx_parts.push(ctx_messages);
+        }
+        if !ctx_thoughts.is_empty() {
+            ctx_parts.push(ctx_thoughts);
+        }
+
+        return Err(anyhow::anyhow!(
+            "Agent completed but did not call MCP tool return_tasks (no tasks captured)"
+        )
+        .context(ctx_parts.join("\n\n")));
+    }
+
+    let raw_payload = raw_tasks_capture.lock().unwrap().clone();
+    let warnings = validate_tasks_payload(&final_tasks, raw_payload.as_ref(), &diff_text)?;
+    for warning in warnings {
+        push_log(&logs, format!("validation warning: {warning}"), debug);
+    }
+
+    let final_logs = logs.lock().unwrap().clone();
+    Ok(GenerateTasksResult {
+        messages: final_messages,
+        thoughts: final_thoughts,
+        logs: final_logs,
+    })
+}
