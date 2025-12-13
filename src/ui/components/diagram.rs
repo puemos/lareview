@@ -1,23 +1,43 @@
-use egui::{Id, Image, Rect, Ui, load::Bytes};
-use regex::Regex;
+use egui::{
+    Id, Image, Rect, TextureOptions, Ui,
+    load::{Bytes, SizeHint, SizedTexture, TexturePoll},
+};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::sync::mpsc::{Receiver, channel};
 use std::sync::{Arc, Mutex};
 use twox_hash::XxHash64;
 
+type DiagramKey = u64;
+
+const SVG_RASTER_SIZE: u32 = 2048;
+
+#[derive(Clone)]
+struct DiagramSvg {
+    image_id: String,
+    bytes: Bytes,
+}
+
+#[derive(Clone, Copy)]
+struct CachedTexture {
+    id: egui::TextureId,
+    size: egui::Vec2,
+}
+
 #[derive(Clone)]
 enum DiagramState {
     Loading,
-    Ready(String),
+    SvgReady(DiagramSvg),
+    TextureReady(CachedTexture),
     Error(String),
 }
 
 /// Internal state stored in egui memory for diagram management
 #[derive(Clone)]
 struct DiagramMemory {
-    cache: HashMap<String, DiagramState>,
+    cache: HashMap<DiagramKey, DiagramState>,
     scene_rect: Rect,
+    last_key: Option<DiagramKey>,
     is_expanded: bool,
 }
 
@@ -26,6 +46,7 @@ impl Default for DiagramMemory {
         Self {
             cache: HashMap::new(),
             scene_rect: Rect::NOTHING,
+            last_key: None,
             is_expanded: false,
         }
     }
@@ -33,7 +54,7 @@ impl Default for DiagramMemory {
 
 // Global storage for receivers (can't be stored in egui memory due to Clone/Sync requirements)
 lazy_static::lazy_static! {
-    static ref DIAGRAM_RECEIVERS: Arc<Mutex<HashMap<String, Receiver<DiagramState>>>> =
+    static ref DIAGRAM_RECEIVERS: Arc<Mutex<HashMap<DiagramKey, Receiver<DiagramState>>>> =
         Arc::new(Mutex::new(HashMap::new()));
 }
 
@@ -47,13 +68,6 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<String>, is_dark_mode: bool) -
 
     // Generate stable ID for memory storage
     let memory_id = Id::new("d2_diagram_memory");
-
-    // Load memory from egui
-    let mut memory = ui.ctx().memory_mut(|mem| {
-        mem.data
-            .get_temp::<DiagramMemory>(memory_id)
-            .unwrap_or_default()
-    });
 
     let Some(d2_code) = diagram else {
         ui.centered_and_justified(|ui| {
@@ -70,59 +84,120 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<String>, is_dark_mode: bool) -
         return false;
     }
 
-    // Cache key is code + theme
-    let cache_key = format!("{}_{}", trimmed_code, is_dark_mode);
+    let diagram_key = diagram_key(trimmed_code, is_dark_mode);
 
-    // Check if we need to start generation
-    if !memory.cache.contains_key(&cache_key) {
-        memory
-            .cache
-            .insert(cache_key.clone(), DiagramState::Loading);
+    let (mut state, is_expanded, mut scene_rect) = ui.ctx().memory_mut(|mem| {
+        let memory = mem.data.get_temp_mut_or_default::<DiagramMemory>(memory_id);
 
-        // Create channel for receiving result
-        let (tx, rx) = channel();
-
-        // Store receiver in global storage
-        if let Ok(mut receivers) = DIAGRAM_RECEIVERS.lock() {
-            receivers.insert(cache_key.clone(), rx);
+        if memory.last_key != Some(diagram_key) {
+            memory.scene_rect = Rect::NOTHING;
+            memory.last_key = Some(diagram_key);
         }
 
-        // Spawn background task to generate SVG
-        let trimmed_code = trimmed_code.to_string();
-        let ctx = ui.ctx().clone();
+        // Check if we need to start generation
+        if let std::collections::hash_map::Entry::Vacant(entry) = memory.cache.entry(diagram_key) {
+            entry.insert(DiagramState::Loading);
 
-        std::thread::spawn(move || {
-            let result = crate::ui::diagram::d2::d2_to_svg(&trimmed_code, is_dark_mode);
+            // Create channel for receiving result
+            let (tx, rx) = channel();
 
-            let state = match result {
-                Ok(svg) => DiagramState::Ready(svg),
-                Err(e) => DiagramState::Error(e),
-            };
+            // Store receiver in global storage
+            if let Ok(mut receivers) = DIAGRAM_RECEIVERS.lock() {
+                receivers.insert(diagram_key, rx);
+            }
 
-            // Send result through channel
-            let _ = tx.send(state);
+            // Spawn background task to generate SVG
+            let trimmed_code = trimmed_code.to_string();
+            let ctx = ui.ctx().clone();
+            let diagram_key_for_thread = diagram_key;
 
-            // Request repaint
-            ctx.request_repaint();
-        });
-    }
+            std::thread::spawn(move || {
+                let result = crate::ui::diagram::d2::d2_to_svg(&trimmed_code, is_dark_mode);
 
-    // Check if generation completed in background
-    if matches!(memory.cache.get(&cache_key), Some(DiagramState::Loading))
-        && let Ok(mut receivers) = DIAGRAM_RECEIVERS.lock()
-        && let Some(rx) = receivers.get(&cache_key)
-    {
-        // Try to receive result without blocking
-        if let Ok(completed_state) = rx.try_recv() {
-            memory.cache.insert(cache_key.clone(), completed_state);
-            receivers.remove(&cache_key);
+                let state = match result {
+                    Ok(svg) => DiagramState::SvgReady(DiagramSvg {
+                        image_id: image_id_for_key(diagram_key_for_thread),
+                        bytes: Bytes::from(svg.into_bytes()),
+                    }),
+                    Err(e) => DiagramState::Error(e),
+                };
+
+                // Send result through channel
+                let _ = tx.send(state);
+
+                // Request repaint
+                ctx.request_repaint();
+            });
+        }
+
+        // Check if generation completed in background
+        if matches!(memory.cache.get(&diagram_key), Some(DiagramState::Loading))
+            && let Ok(mut receivers) = DIAGRAM_RECEIVERS.lock()
+            && let Some(rx) = receivers.get(&diagram_key)
+        {
+            // Try to receive result without blocking
+            if let Ok(completed_state) = rx.try_recv() {
+                memory.cache.insert(diagram_key, completed_state);
+                receivers.remove(&diagram_key);
+            }
+        }
+
+        (
+            memory
+                .cache
+                .get(&diagram_key)
+                .cloned()
+                .unwrap_or(DiagramState::Loading),
+            memory.is_expanded,
+            memory.scene_rect,
+        )
+    });
+
+    if let DiagramState::SvgReady(svg) = &state {
+        ui.ctx()
+            .include_bytes(svg.image_id.clone(), svg.bytes.clone());
+        let load = ui.ctx().try_load_texture(
+            svg.image_id.as_str(),
+            TextureOptions::LINEAR,
+            SizeHint::Size {
+                width: SVG_RASTER_SIZE,
+                height: SVG_RASTER_SIZE,
+                maintain_aspect_ratio: true,
+            },
+        );
+
+        match load {
+            Ok(TexturePoll::Ready { texture }) => {
+                let cached_texture = CachedTexture {
+                    id: texture.id,
+                    size: texture.size,
+                };
+                ui.ctx().memory_mut(|mem| {
+                    let memory = mem.data.get_temp_mut_or_default::<DiagramMemory>(memory_id);
+                    memory
+                        .cache
+                        .insert(diagram_key, DiagramState::TextureReady(cached_texture));
+                });
+                state = DiagramState::TextureReady(cached_texture);
+            }
+            Ok(TexturePoll::Pending { .. }) => {
+                ui.ctx().request_repaint();
+            }
+            Err(e) => {
+                ui.ctx().memory_mut(|mem| {
+                    let memory = mem.data.get_temp_mut_or_default::<DiagramMemory>(memory_id);
+                    memory
+                        .cache
+                        .insert(diagram_key, DiagramState::Error(e.to_string()));
+                });
+                state = DiagramState::Error(e.to_string());
+            }
         }
     }
-
-    let state = memory.cache.get(&cache_key).unwrap().clone();
 
     // If expanded, show in full-screen overlay
-    if memory.is_expanded {
+    let mut next_is_expanded = is_expanded;
+    if is_expanded {
         let viewport_rect = ui
             .ctx()
             .input(|i| i.viewport().inner_rect)
@@ -142,19 +217,18 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<String>, is_dark_mode: bool) -
                         .button(format!("{} Close", egui_phosphor::regular::X))
                         .clicked()
                     {
-                        memory.is_expanded = false;
+                        next_is_expanded = false;
                     }
-                    ui.label("Use mouse wheel to zoom, drag to pan");
+                    ui.label("Scroll to zoom, drag to pan");
                 });
 
                 ui.separator();
 
-                render_diagram_content(
+                let _ = render_diagram(
                     ui,
                     &state,
-                    &cache_key,
                     trimmed_code,
-                    &mut memory.scene_rect,
+                    &mut scene_rect,
                     &mut go_to_settings,
                 );
             });
@@ -167,52 +241,43 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<String>, is_dark_mode: bool) -
             .show(ui, |ui| {
                 ui.set_max_size(desired_size);
 
-                // Show expand button
-                ui.horizontal(|ui| {
-                    if ui
-                        .button(format!("{} Expand", egui_phosphor::regular::ARROWS_OUT))
-                        .clicked()
-                    {
-                        memory.is_expanded = true;
-                    }
-                    ui.label(
-                        egui::RichText::new("Click expand to zoom and pan")
-                            .weak()
-                            .italics(),
-                    );
-                });
-
-                ui.add_space(8.0);
-
-                // Render static preview (no interaction)
-                render_diagram_preview(
+                let diagram_response = render_diagram(
                     ui,
                     &state,
-                    &cache_key,
                     trimmed_code,
-                    desired_size,
+                    &mut scene_rect,
                     &mut go_to_settings,
                 );
+                if let Some(resp) = diagram_response
+                    && resp.clicked()
+                {
+                    next_is_expanded = true;
+                }
             });
     }
 
-    // Save memory back to egui
+    if next_is_expanded != is_expanded {
+        ui.ctx().memory_mut(|mem| {
+            let memory = mem.data.get_temp_mut_or_default::<DiagramMemory>(memory_id);
+            memory.is_expanded = next_is_expanded;
+        });
+    }
+
     ui.ctx().memory_mut(|mem| {
-        mem.data.insert_temp(memory_id, memory);
+        let memory = mem.data.get_temp_mut_or_default::<DiagramMemory>(memory_id);
+        memory.scene_rect = scene_rect;
     });
 
     go_to_settings
 }
 
-/// Render the interactive diagram content (used in expanded view)
-fn render_diagram_content(
+fn render_diagram(
     ui: &mut Ui,
     state: &DiagramState,
-    cache_key: &str,
     trimmed_code: &str,
     scene_rect: &mut Rect,
     go_to_settings: &mut bool,
-) {
+) -> Option<egui::Response> {
     match state {
         DiagramState::Loading => {
             ui.centered_and_justified(|ui| {
@@ -223,110 +288,61 @@ fn render_diagram_content(
                 });
             });
             ui.ctx().request_repaint();
+            None
         }
-        DiagramState::Ready(svg_code) => {
-            let original_image_size = extract_svg_size(svg_code);
+        DiagramState::SvgReady(_) => {
+            ui.centered_and_justified(|ui| {
+                ui.vertical_centered(|ui| {
+                    ui.spinner();
+                    ui.add_space(8.0);
+                    ui.label("Preparing diagram...");
+                });
+            });
+            ui.ctx().request_repaint();
+            None
+        }
+        DiagramState::TextureReady(texture) => {
+            let input_used_for_pan_or_zoom = ui
+                .ctx()
+                .input(|i| i.smooth_scroll_delta != egui::Vec2::ZERO || i.zoom_delta() != 1.0);
 
-            // Initialize scene_rect if it's invalid
-            if !scene_rect.is_positive() {
-                *scene_rect = Rect::from_min_size(egui::pos2(0.0, 0.0), original_image_size);
+            let inner = egui::Scene::new()
+                .zoom_range(0.1..=8.0)
+                .max_inner_size(egui::Vec2::splat(10_000.0))
+                .show(ui, scene_rect, |ui| {
+                    ui.add(
+                        Image::from_texture(SizedTexture::new(texture.id, texture.size))
+                            .fit_to_exact_size(texture.size),
+                    );
+                });
+
+            // `Scene` uses scroll input for pan/zoom; clear it so any parent `ScrollArea` won't also scroll.
+            if inner.response.contains_pointer() && input_used_for_pan_or_zoom {
+                ui.ctx().input_mut(|input| {
+                    input.smooth_scroll_delta = egui::Vec2::ZERO;
+                    input.raw_scroll_delta = egui::Vec2::ZERO;
+                });
             }
 
-            let image_id = generate_image_id(cache_key);
-            let image_bytes = Bytes::from(svg_code.as_bytes().to_vec());
-
-            // Use Scene for zoomable/pannable view
-            egui::Scene::new()
-                .zoom_range(0.1..=5.0)
-                .show(ui, scene_rect, |ui| {
-                    let image_widget = Image::from_bytes(image_id, image_bytes)
-                        .fit_to_exact_size(original_image_size);
-
-                    ui.add(image_widget);
-                });
+            Some(inner.response)
         }
         DiagramState::Error(e) => {
             render_error(ui, e, trimmed_code, go_to_settings);
+            None
         }
     }
 }
 
-/// Render the static preview (used in inline view)
-fn render_diagram_preview(
-    ui: &mut Ui,
-    state: &DiagramState,
-    cache_key: &str,
-    trimmed_code: &str,
-    desired_size: egui::Vec2,
-    go_to_settings: &mut bool,
-) {
-    match state {
-        DiagramState::Loading => {
-            ui.centered_and_justified(|ui| {
-                ui.vertical_centered(|ui| {
-                    ui.spinner();
-                    ui.add_space(8.0);
-                    ui.label("Generating diagram...");
-                });
-            });
-            ui.ctx().request_repaint();
-        }
-        DiagramState::Ready(svg_code) => {
-            let original_image_size = extract_svg_size(svg_code);
-
-            // Scale to fit available space while maintaining aspect ratio
-            let scale = (desired_size.x / original_image_size.x)
-                .min(desired_size.y / original_image_size.y)
-                .min(1.0);
-            let preview_size = original_image_size * scale;
-
-            let image_id = generate_image_id(cache_key);
-            let image_bytes = Bytes::from(svg_code.as_bytes().to_vec());
-
-            ui.vertical_centered(|ui| {
-                let image_widget =
-                    Image::from_bytes(image_id, image_bytes).fit_to_exact_size(preview_size);
-
-                ui.add(image_widget);
-            });
-        }
-        DiagramState::Error(e) => {
-            render_error(ui, e, trimmed_code, go_to_settings);
-        }
-    }
-}
-
-/// Extract SVG viewBox size
-fn extract_svg_size(svg_code: &str) -> egui::Vec2 {
-    lazy_static::lazy_static! {
-        static ref VIEWBOX_REGEX: Regex = Regex::new(
-            r#"viewBox=["']\s*(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*["']"#
-        ).unwrap();
-    }
-
-    let mut size = egui::vec2(500.0, 500.0);
-
-    if let Some(caps) = VIEWBOX_REGEX.captures(svg_code)
-        && let (Some(width_str), Some(height_str)) = (caps.get(3), caps.get(4))
-        && let (Ok(width), Ok(height)) = (
-            width_str.as_str().parse::<f32>(),
-            height_str.as_str().parse::<f32>(),
-        )
-        && width > 0.0
-        && height > 0.0
-    {
-        size = egui::vec2(width, height);
-    }
-
-    size
+fn diagram_key(code: &str, is_dark_mode: bool) -> DiagramKey {
+    let mut hasher = XxHash64::with_seed(0);
+    code.hash(&mut hasher);
+    is_dark_mode.hash(&mut hasher);
+    hasher.finish()
 }
 
 /// Generate stable image ID
-fn generate_image_id(cache_key: &str) -> String {
-    let mut hasher = XxHash64::with_seed(0);
-    cache_key.hash(&mut hasher);
-    let hash_value = hasher.finish();
-    format!("bytes://d2_diagram_{:x}.svg", hash_value)
+fn image_id_for_key(diagram_key: DiagramKey) -> String {
+    format!("bytes://d2_diagram_{:x}.svg", diagram_key)
 }
 
 /// Render error state
