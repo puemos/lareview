@@ -5,7 +5,10 @@ mod command;
 mod reducer;
 mod runtime;
 
-pub use action::{Action, AsyncAction, GenerateAction};
+pub use action::{
+    Action, AsyncAction, GenerateAction, NavigationAction, ReviewAction, SettingsAction,
+};
+pub use command::ReviewDataRefreshReason;
 
 use super::LaReviewApp;
 

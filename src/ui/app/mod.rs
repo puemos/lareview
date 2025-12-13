@@ -20,4 +20,6 @@ pub use root::LaReviewApp;
 pub use state::{FullDiffView, LineNoteContext, SelectedAgent};
 pub use timeline::{TimelineContent, TimelineItem};
 
-pub(crate) use store::{Action, AsyncAction, GenerateAction};
+pub(crate) use store::{
+    Action, AsyncAction, GenerateAction, NavigationAction, ReviewAction, SettingsAction,
+};

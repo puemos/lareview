@@ -140,6 +140,35 @@ async fn permission_allows_return_tasks_even_without_repo_access() {
 }
 
 #[tokio::test(flavor = "current_thread")]
+async fn permission_allows_tasks_payload_embedded_in_title() {
+    let client = super::client::LaReviewClient::new(None, "pr-1", None);
+    let fields = agent_client_protocol::ToolCallUpdateFields::new()
+        .kind(agent_client_protocol::ToolKind::Other)
+        .title(r#"{"tasks":[{"id":"T1","title":"Example","description":"","files":[],"stats":{"additions":0,"deletions":0,"risk":"LOW","tags":[]},"patches":[]}]}"#);
+    let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
+    let options = vec![agent_client_protocol::PermissionOption::new(
+        "allow",
+        "Allow",
+        agent_client_protocol::PermissionOptionKind::AllowOnce,
+    )];
+    let req = agent_client_protocol::RequestPermissionRequest::new(
+        agent_client_protocol::SessionId::new("s1"),
+        tool_call,
+        options,
+    );
+    let resp =
+        <super::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
+            &client, req,
+        )
+        .await
+        .unwrap();
+    assert!(matches!(
+        resp.outcome,
+        agent_client_protocol::RequestPermissionOutcome::Selected(_)
+    ));
+}
+
+#[tokio::test(flavor = "current_thread")]
 async fn permission_allows_safe_read_under_repo_root() {
     let root = tempfile::tempdir().expect("root");
     let src_dir = root.path().join("src");

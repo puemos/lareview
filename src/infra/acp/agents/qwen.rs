@@ -10,7 +10,7 @@ fn is_command_available(command: &str) -> bool {
 pub fn qwen_candidate() -> AgentCandidate {
     AgentCandidate {
         id: "qwen".to_string(),
-        label: "Qwen Code (ACP)".to_string(),
+        label: "Qwen Code".to_string(),
         command: Some("qwen".to_string()),
         args: vec!["--experimental-acp".to_string()],
         available: is_command_available("qwen"),
@@ -26,7 +26,7 @@ impl super::super::agent_trait::AcpAgent for QwenAgent {
     }
 
     fn display_name(&self) -> &'static str {
-        "Qwen Code (ACP)"
+        "Qwen Code"
     }
 
     fn candidate(&self) -> AgentCandidate {

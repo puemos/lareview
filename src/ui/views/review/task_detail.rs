@@ -1,5 +1,5 @@
 use crate::infra::diff::{combine_diffs_to_unified_diff, extract_file_path_from_diff};
-use crate::ui::app::LaReviewApp;
+use crate::ui::app::{Action, FullDiffView, LaReviewApp, LineNoteContext, ReviewAction};
 use crate::ui::components::badge::badge;
 use crate::ui::components::pills::pill_divider;
 use crate::ui::components::task_status_chip::task_status_chip;
@@ -251,38 +251,35 @@ impl LaReviewApp {
 
                                 match action {
                                     DiffAction::OpenFullWindow => {
-                                        self.state.full_diff = Some(crate::ui::app::FullDiffView {
-                                            title: format!("Task diff - {}", task.title),
-                                            text: unified_diff.clone(),
-                                        });
+                                        self.dispatch(Action::Review(ReviewAction::OpenFullDiff(
+                                            FullDiffView {
+                                                title: format!("Task diff - {}", task.title),
+                                                text: unified_diff.clone(),
+                                            },
+                                        )));
                                     }
                                     DiffAction::AddNote {
                                         file_idx,
                                         line_idx,
                                         line_number,
                                     } => {
-                                        // Set the state for adding an inline note
-                                        // Get the file path for the clicked line
                                         let file_path = if file_idx < task.diffs.len() {
-                                            // Since diffs are strings, we need to extract the file path from the diff string
                                             extract_file_path_from_diff(&task.diffs[file_idx])
                                                 .unwrap_or("unknown".to_string())
                                         } else {
                                             "unknown".to_string()
                                         };
 
-                                        self.state.current_line_note =
-                                            Some(crate::ui::app::LineNoteContext {
+                                        self.dispatch(Action::Review(ReviewAction::StartLineNote(
+                                            LineNoteContext {
                                                 task_id: task.id.clone(),
                                                 file_idx,
                                                 line_idx,
                                                 line_number,
                                                 file_path,
-                                                note_text: String::new(), // Load existing note if one exists
-                                            });
-
-                                        // OPTIONAL: Reset main note if starting a line note
-                                        self.state.current_note = None;
+                                                note_text: String::new(),
+                                            },
+                                        )));
                                     }
                                     DiffAction::SaveNote {
                                         file_idx,
@@ -290,8 +287,6 @@ impl LaReviewApp {
                                         line_number,
                                         note_text,
                                     } => {
-                                        // Handle saving the note
-                                        // Get the file path for the line
                                         let file_path = if file_idx < task.diffs.len() {
                                             extract_file_path_from_diff(&task.diffs[file_idx])
                                                 .unwrap_or("unknown".to_string())
@@ -299,24 +294,12 @@ impl LaReviewApp {
                                             "unknown".to_string()
                                         };
 
-                                        // Save the line-specific note to the database
-                                        let note = crate::domain::Note {
+                                        self.dispatch(Action::Review(ReviewAction::SaveLineNote {
                                             task_id: task.id.clone(),
+                                            file_path,
+                                            line_number: line_number as u32,
                                             body: note_text,
-                                            updated_at: chrono::Utc::now().to_rfc3339(),
-                                            file_path: Some(file_path),
-                                            line_number: Some(line_number as u32),
-                                        };
-
-                                        if let Err(err) = self.note_repo.save(&note) {
-                                            self.state.review_error =
-                                                Some(format!("Failed to save line note: {}", err));
-                                        } else {
-                                            self.state.review_error = None;
-                                        }
-
-                                        // Clear the active comment line after saving
-                                        self.state.current_line_note = None;
+                                        }));
                                     }
                                     _ => {}
                                 }
@@ -336,17 +319,26 @@ impl LaReviewApp {
                     .id_salt("notes_header")
                     .default_open(true)
                     .show(ui, |ui| {
-                        if let Some(note_text) = &mut self.state.current_note {
-                            ui.add(
-                                egui::TextEdit::multiline(note_text)
+                        if self.state.selected_task_id.is_some() {
+                            let mut note_text = self.state.current_note.clone().unwrap_or_default();
+
+                            let response = ui.add(
+                                egui::TextEdit::multiline(&mut note_text)
                                     .id_salt(ui.id().with(("task_note", &task.id)))
                                     .hint_text("Add your review notes here...")
                                     .desired_rows(4)
                                     .desired_width(f32::INFINITY),
                             );
+
+                            if response.changed() {
+                                self.dispatch(Action::Review(ReviewAction::SetCurrentNoteText(
+                                    note_text.clone(),
+                                )));
+                            }
+
                             ui.add_space(4.0);
                             if ui.button("Save Note").clicked() {
-                                self.save_current_note();
+                                self.dispatch(Action::Review(ReviewAction::SaveCurrentNote));
                             }
                         }
                     });

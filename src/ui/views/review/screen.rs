@@ -3,7 +3,7 @@
 use crate::application::review::ordering::{
     sub_flows_in_display_order, tasks_in_display_order, tasks_in_sub_flow_display_order,
 };
-use crate::ui::app::LaReviewApp;
+use crate::ui::app::{Action, LaReviewApp, ReviewAction};
 use crate::ui::components::header::action_button;
 use crate::ui::components::status::error_banner;
 use crate::ui::components::{badge::badge, pills::pill_action_button};
@@ -82,34 +82,36 @@ impl LaReviewApp {
                 );
             }
 
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let resp = pill_action_button(
-                    ui,
-                    icons::TRASH_SIMPLE,
-                    "Clean done",
-                    has_done_tasks,
-                    MOCHA.red,
-                )
-                .on_hover_text("Remove DONE tasks (and their notes) for this PR");
-                if resp.clicked() {
-                    trigger_clean_done = true;
-                }
+            if total_tasks > 0 {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let resp = pill_action_button(
+                        ui,
+                        icons::TRASH_SIMPLE,
+                        "Clean done",
+                        has_done_tasks,
+                        MOCHA.red,
+                    )
+                    .on_hover_text("Remove DONE tasks (and their notes) for this PR");
+                    if resp.clicked() {
+                        trigger_clean_done = true;
+                    }
 
-                ui.add_space(8.0);
+                    ui.add_space(8.0);
 
-                let next_enabled = next_open_id.is_some();
-                let resp = pill_action_button(
-                    ui,
-                    icons::ARROW_RIGHT,
-                    "Next open",
-                    next_enabled,
-                    MOCHA.mauve,
-                )
-                .on_hover_text("Jump to the next open task");
-                if resp.clicked() {
-                    trigger_next_open = true;
-                }
-            });
+                    let next_enabled = next_open_id.is_some();
+                    let resp = pill_action_button(
+                        ui,
+                        icons::ARROW_RIGHT,
+                        "Next open",
+                        next_enabled,
+                        MOCHA.mauve,
+                    )
+                    .on_hover_text("Jump to the next open task");
+                    if resp.clicked() {
+                        trigger_next_open = true;
+                    }
+                });
+            }
         });
         ui.add_space(6.0);
 
@@ -139,9 +141,12 @@ impl LaReviewApp {
             .is_some_and(|id| display_order_tasks.iter().any(|t| &t.id == id));
 
         if display_order_tasks.is_empty() {
-            self.state.selected_task_id = None;
-            self.state.current_note = None;
-            self.state.current_line_note = None;
+            if self.state.selected_task_id.is_some()
+                || self.state.current_note.is_some()
+                || self.state.current_line_note.is_some()
+            {
+                self.dispatch(Action::Review(ReviewAction::ClearSelection));
+            }
         } else if !selected_task_is_valid {
             if let Some(next_open) = display_order_tasks
                 .iter()
@@ -155,10 +160,45 @@ impl LaReviewApp {
                 self.select_task(next_open);
             } else {
                 // No pending tasks: show "All done" by default (do not auto-select done).
-                self.state.selected_task_id = None;
-                self.state.current_note = None;
-                self.state.current_line_note = None;
+                if self.state.selected_task_id.is_some()
+                    || self.state.current_note.is_some()
+                    || self.state.current_line_note.is_some()
+                {
+                    self.dispatch(Action::Review(ReviewAction::ClearSelection));
+                }
             }
+        }
+
+        if display_order_tasks.is_empty() {
+            let available = ui.available_size();
+            ui.allocate_ui_with_layout(
+                available,
+                egui::Layout::centered_and_justified(egui::Direction::TopDown),
+                |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.heading("No review tasks yet");
+                        ui.add_space(6.0);
+                        ui.label(
+                            egui::RichText::new(
+                                "Generate tasks from your diff to start reviewing.",
+                            )
+                            .color(MOCHA.subtext0),
+                        );
+                        ui.add_space(16.0);
+                        let cta = egui::Button::new(
+                            egui::RichText::new("Generate tasks")
+                                .size(15.0)
+                                .color(MOCHA.mauve),
+                        )
+                        .fill(egui::Color32::TRANSPARENT)
+                        .stroke(egui::Stroke::NONE);
+                        if ui.add(cta).clicked() {
+                            self.switch_to_generate();
+                        }
+                    });
+                },
+            );
+            return;
         }
 
         // 3. Layout: Split View (Navigation Left | Content Right)
@@ -386,7 +426,7 @@ impl LaReviewApp {
                             return;
                         }
                         // Selection is missing from current list: fall back to Ready state.
-                        self.state.selected_task_id = None;
+                        self.dispatch(Action::Review(ReviewAction::ClearSelection));
                     }
                     RightPaneState::NoTasks => {}
                     RightPaneState::AllDone => {}

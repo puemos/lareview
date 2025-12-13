@@ -1,6 +1,6 @@
 use eframe::egui;
 
-use super::LaReviewApp;
+use super::{Action, LaReviewApp, ReviewAction};
 
 impl LaReviewApp {
     pub(super) fn render_full_diff_overlay(&mut self, ctx: &egui::Context) {
@@ -29,7 +29,7 @@ impl LaReviewApp {
                         .button(format!("{} Close", egui_phosphor::regular::ARROW_SQUARE_IN))
                         .clicked()
                     {
-                        self.state.full_diff = None;
+                        self.dispatch(Action::Review(ReviewAction::CloseFullDiff));
                     }
                 });
 
@@ -39,7 +39,7 @@ impl LaReviewApp {
             });
 
         if !open {
-            self.state.full_diff = None;
+            self.dispatch(Action::Review(ReviewAction::CloseFullDiff));
         }
     }
 }

@@ -1,4 +1,4 @@
-use crate::ui::app::{LaReviewApp, SelectedAgent};
+use crate::ui::app::{Action, GenerateAction, LaReviewApp, SelectedAgent};
 use crate::ui::components::header::{HeaderAction, header};
 use crate::ui::components::selection_chips::selection_chips;
 use crate::ui::components::status::error_banner;
@@ -197,13 +197,24 @@ impl LaReviewApp {
                         .map(|c| c.label.clone())
                         .collect();
 
-                    selection_chips(
-                        ui,
-                        &mut self.state.selected_agent,
-                        &available_agents,
-                        &agent_labels.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
-                        "AGENT:",
-                    );
+                    let mut selected_agent = self.state.selected_agent.clone();
+                    egui::ScrollArea::vertical()
+                        .max_height(72.0)
+                        .id_salt(ui.id().with("agent_chips_scroll"))
+                        .show(ui, |ui| {
+                            selection_chips(
+                                ui,
+                                &mut selected_agent,
+                                &available_agents,
+                                &agent_labels.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
+                                "",
+                            );
+                        });
+                    if selected_agent != self.state.selected_agent {
+                        self.dispatch(Action::Generate(GenerateAction::SelectAgent(
+                            selected_agent,
+                        )));
+                    }
 
                     ui.add_space(8.0);
 
@@ -265,7 +276,9 @@ impl LaReviewApp {
                                                 )
                                                 .clicked()
                                             {
-                                                self.state.reset_agent_timeline();
+                                                self.dispatch(Action::Generate(
+                                                    GenerateAction::ClearTimeline,
+                                                ));
                                             }
                                         },
                                     );

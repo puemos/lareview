@@ -1,4 +1,4 @@
-use crate::ui::app::LaReviewApp;
+use crate::ui::app::{Action, LaReviewApp, SettingsAction};
 use catppuccin_egui::MOCHA;
 use eframe::egui;
 
@@ -21,10 +21,18 @@ impl LaReviewApp {
                     MOCHA.yellow,
                     "Warning: running these commands executes a remote install script. Prefer installing D2 manually or review the script before running.",
                 );
-                ui.checkbox(
-                    &mut self.state.allow_d2_install,
-                    "I understand and want to run these commands from LaReview",
-                );
+                let mut allow_install = self.state.allow_d2_install;
+                if ui
+                    .checkbox(
+                        &mut allow_install,
+                        "I understand and want to run these commands from LaReview",
+                    )
+                    .changed()
+                {
+                    self.dispatch(Action::Settings(SettingsAction::SetAllowD2Install(
+                        allow_install,
+                    )));
+                }
                 ui.separator();
 
                 let d2_installed = which::which("d2").is_ok();
@@ -36,50 +44,9 @@ impl LaReviewApp {
                             .add_enabled(can_run, egui::Button::new("Uninstall D2"))
                             .clicked()
                         {
-                            self.state.is_d2_installing = true;
-                            self.state.d2_install_output.clear();
-
-                            let d2_install_tx = self.d2_install_tx.clone();
-                            let command_str = uninstall_cmd.to_string();
-
-                            crate::RUNTIME.get().unwrap().spawn(async move {
-                                let mut child = tokio::process::Command::new("sh")
-                                    .arg("-c")
-                                    .arg(command_str)
-                                    .stdout(std::process::Stdio::piped())
-                                    .stderr(std::process::Stdio::piped())
-                                    .spawn()
-                                    .expect("Failed to spawn D2 uninstallation process");
-
-                                let stdout = child.stdout.take().unwrap();
-                                let stderr = child.stderr.take().unwrap();
-
-                                use tokio::io::AsyncBufReadExt;
-                                let mut stdout_reader = tokio::io::BufReader::new(stdout).lines();
-                                let mut stderr_reader = tokio::io::BufReader::new(stderr).lines();
-
-                                loop {
-                                    tokio::select! {
-                                        line = stdout_reader.next_line() => {
-                                            if let Ok(Some(line)) = line {
-                                                let _ = d2_install_tx.send(line).await;
-                                            } else {
-                                                break;
-                                            }
-                                        },
-                                        line = stderr_reader.next_line() => {
-                                            if let Ok(Some(line)) = line {
-                                                let _ = d2_install_tx.send(line).await;
-                                            } else {
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                                let _ = d2_install_tx
-                                    .send("___INSTALL_COMPLETE___".to_string())
-                                    .await;
-                            });
+                            self.dispatch(Action::Settings(
+                                SettingsAction::RequestD2Uninstall,
+                            ));
                         }
 
                         if ui.button("Copy uninstall command").clicked() {
@@ -94,50 +61,7 @@ impl LaReviewApp {
                             .add_enabled(can_run, egui::Button::new("Install D2"))
                             .clicked()
                         {
-                            self.state.is_d2_installing = true;
-                            self.state.d2_install_output.clear();
-
-                            let d2_install_tx = self.d2_install_tx.clone();
-                            let command_str = install_cmd.to_string();
-
-                            crate::RUNTIME.get().unwrap().spawn(async move {
-                                let mut child = tokio::process::Command::new("sh")
-                                    .arg("-c")
-                                    .arg(command_str)
-                                    .stdout(std::process::Stdio::piped())
-                                    .stderr(std::process::Stdio::piped())
-                                    .spawn()
-                                    .expect("Failed to spawn D2 installation process");
-
-                                let stdout = child.stdout.take().unwrap();
-                                let stderr = child.stderr.take().unwrap();
-
-                                use tokio::io::AsyncBufReadExt;
-                                let mut stdout_reader = tokio::io::BufReader::new(stdout).lines();
-                                let mut stderr_reader = tokio::io::BufReader::new(stderr).lines();
-
-                                loop {
-                                    tokio::select! {
-                                        line = stdout_reader.next_line() => {
-                                            if let Ok(Some(line)) = line {
-                                                let _ = d2_install_tx.send(line).await;
-                                            } else {
-                                                break;
-                                            }
-                                        },
-                                        line = stderr_reader.next_line() => {
-                                            if let Ok(Some(line)) = line {
-                                                let _ = d2_install_tx.send(line).await;
-                                            } else {
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                                let _ = d2_install_tx
-                                    .send("___INSTALL_COMPLETE___".to_string())
-                                    .await;
-                            });
+                            self.dispatch(Action::Settings(SettingsAction::RequestD2Install));
                         }
 
                         if ui.button("Copy install command").clicked() {

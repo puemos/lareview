@@ -1,15 +1,10 @@
-use crate::ui::app::LaReviewApp;
+use crate::ui::app::{Action, LaReviewApp, ReviewAction};
 
 impl LaReviewApp {
     pub(super) fn select_task(&mut self, task: &crate::domain::ReviewTask) {
-        self.state.selected_task_id = Some(task.id.clone());
-        self.state.current_line_note = None;
-
-        if let Ok(Some(note)) = self.note_repo.find_by_task(&task.id) {
-            self.state.current_note = Some(note.body);
-        } else {
-            self.state.current_note = Some(String::new());
-        }
+        self.dispatch(Action::Review(ReviewAction::SelectTask {
+            task_id: task.id.clone(),
+        }));
     }
 
     pub(super) fn select_task_by_id(
@@ -17,8 +12,10 @@ impl LaReviewApp {
         all_tasks: &[crate::domain::ReviewTask],
         task_id: &str,
     ) {
-        if let Some(task) = all_tasks.iter().find(|t| t.id == task_id) {
-            self.select_task(task);
+        if all_tasks.iter().any(|t| t.id == task_id) {
+            self.dispatch(Action::Review(ReviewAction::SelectTaskById {
+                task_id: task_id.to_string(),
+            }));
         }
     }
 }

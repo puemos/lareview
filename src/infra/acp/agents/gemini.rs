@@ -11,7 +11,7 @@ fn is_command_available(command: &str) -> bool {
 pub fn gemini_candidate() -> AgentCandidate {
     AgentCandidate {
         id: "gemini".to_string(),
-        label: "Gemini (ACP)".to_string(),
+        label: "Gemini".to_string(),
         command: Some("gemini".to_string()),
         args: vec!["--experimental-acp".to_string()],
         available: is_command_available("gemini"),
@@ -27,7 +27,7 @@ impl super::super::agent_trait::AcpAgent for GeminiAgent {
     }
 
     fn display_name(&self) -> &'static str {
-        "Gemini (ACP)"
+        "Gemini"
     }
 
     fn candidate(&self) -> AgentCandidate {

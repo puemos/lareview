@@ -11,7 +11,7 @@ pub fn selection_chips<T>(
 ) where
     T: PartialEq + Clone,
 {
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         if !label_prefix.is_empty() {
             ui.label(label_prefix);
         }

@@ -26,6 +26,30 @@ pub(super) struct LaReviewClient {
 }
 
 impl LaReviewClient {
+    fn parse_return_payload_from_str(payload: &str) -> Option<serde_json::Value> {
+        serde_json::from_str::<serde_json::Value>(payload)
+            .ok()
+            .filter(|value| value.get("tasks").is_some() || value.get("plans").is_some())
+    }
+
+    fn looks_like_return_tool(
+        &self,
+        tool_title: &str,
+        raw_input: &Option<serde_json::Value>,
+    ) -> bool {
+        if tool_title.contains("return_tasks") || tool_title.contains("return_plans") {
+            return true;
+        }
+
+        if let Some(input) = raw_input {
+            if input.get("tasks").is_some() || input.get("plans").is_some() {
+                return true;
+            }
+        }
+
+        Self::parse_return_payload_from_str(tool_title).is_some()
+    }
+
     pub(super) fn new(
         progress: Option<tokio::sync::mpsc::UnboundedSender<ProgressEvent>>,
         pr_id: impl Into<String>,
@@ -170,8 +194,7 @@ impl agent_client_protocol::Client for LaReviewClient {
         let tool_title = args.tool_call.fields.title.clone().unwrap_or_default();
 
         let raw_input = &args.tool_call.fields.raw_input;
-        let is_return_tool =
-            tool_title.contains("return_tasks") || tool_title.contains("return_plans");
+        let is_return_tool = self.looks_like_return_tool(&tool_title, raw_input);
         let allow_option = if is_return_tool {
             args.options.iter().find(|opt| {
                 matches!(
@@ -248,7 +271,7 @@ impl agent_client_protocol::Client for LaReviewClient {
                     );
                 }
 
-                let is_task_tool = call.title.contains("return_tasks")
+                let is_task_tool = self.looks_like_return_tool(&call.title, &call.raw_input)
                     || call.title.contains("create_review_tasks");
 
                 if is_task_tool {
@@ -257,6 +280,11 @@ impl agent_client_protocol::Client for LaReviewClient {
                     }
                     if let Some(ref output) = call.raw_output {
                         self.store_tasks_from_value(output.clone());
+                    }
+                    if call.raw_input.is_none() && call.raw_output.is_none() {
+                        if let Some(value) = Self::parse_return_payload_from_str(&call.title) {
+                            self.store_tasks_from_value(value);
+                        }
                     }
                 }
             }

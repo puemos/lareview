@@ -34,7 +34,7 @@ LaReview is moving toward a reducer-style UI architecture so behavior is determi
 
 Current state:
 - The **Generate flow** is wired through this pattern (`src/ui/app/store/`).
-- Other screens still mutate state more directly and can be migrated incrementally.
+- Review and settings screens now dispatch actions through reducers + commands instead of mutating state directly.
 
 ## Dependency rules (intent)
 - `domain` depends on nothing internal.
@@ -59,4 +59,3 @@ If you’re unsure where something goes:
 - App shell + store: `src/ui/app/` (init/header/polling/overlay/update + `store/`)
 - Generate screen (UI): `src/ui/views/generate/` (screen/plan/timeline)
 - Review screen (UI): `src/ui/views/review/` (screen/nav/selection/task_detail)
-

@@ -1,9 +1,9 @@
-use super::command::Command;
+use super::action::{Action, AsyncAction, ReviewDataPayload};
+use super::command::{Command, D2Command};
 use crate::infra::acp::{GenerateTasksInput, generate_tasks_with_acp, list_agent_candidates};
 use crate::ui::app::{GenMsg, GenResultPayload};
 
 use super::super::LaReviewApp;
-use super::super::state::AppView;
 
 pub fn run(app: &mut LaReviewApp, command: Command) {
     match command {
@@ -12,7 +12,17 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
             diff_text,
             selected_agent_id,
         } => start_generation(app, *pull_request, diff_text, selected_agent_id),
-        Command::SyncReviewAfterGeneration => sync_review_after_generation(app),
+        Command::RefreshReviewData { reason } => refresh_review_data(app, reason),
+        Command::LoadTaskNote { task_id } => load_task_note(app, task_id),
+        Command::UpdateTaskStatus { task_id, status } => update_task_status(app, task_id, status),
+        Command::CleanDoneTasks { pr_id } => clean_done_tasks(app, pr_id),
+        Command::SaveNote {
+            task_id,
+            body,
+            file_path,
+            line_number,
+        } => save_note(app, task_id, body, file_path, line_number),
+        Command::RunD2 { command } => run_d2_command(app, command),
     }
 }
 
@@ -106,14 +116,163 @@ fn start_generation(
     });
 }
 
-fn sync_review_after_generation(app: &mut LaReviewApp) {
-    app.sync_review_from_db();
-    let has_tasks_for_selected_pr = !app.state.tasks().is_empty();
-    if has_tasks_for_selected_pr {
-        app.state.current_view = AppView::Review;
-        app.state.generation_error = None;
-    } else {
-        app.state.current_view = AppView::Generate;
-        app.state.generation_error = Some("No tasks generated".to_string());
+fn refresh_review_data(app: &mut LaReviewApp, reason: super::command::ReviewDataRefreshReason) {
+    let result = (|| -> Result<ReviewDataPayload, String> {
+        let prs = app
+            .pr_repo
+            .list_all()
+            .map_err(|e| format!("Failed to load pull requests: {e}"))?;
+        let tasks = app
+            .task_repo
+            .find_all()
+            .map_err(|e| format!("Failed to load tasks: {e}"))?;
+        Ok(ReviewDataPayload { prs, tasks })
+    })();
+
+    app.dispatch(Action::Async(AsyncAction::ReviewDataLoaded {
+        reason,
+        result,
+    }));
+}
+
+fn load_task_note(app: &mut LaReviewApp, task_id: crate::domain::TaskId) {
+    let result = app
+        .note_repo
+        .find_by_task(&task_id)
+        .map(|opt| opt.map(|n| n.body))
+        .map_err(|e| format!("Failed to load note: {e}"));
+
+    match result {
+        Ok(note) => {
+            app.dispatch(Action::Async(AsyncAction::TaskNoteLoaded { task_id, note }));
+        }
+        Err(err) => {
+            app.dispatch(Action::Async(AsyncAction::TaskNoteLoaded {
+                task_id: task_id.clone(),
+                note: None,
+            }));
+            app.dispatch(Action::Async(AsyncAction::NoteSaved(Err(err))));
+        }
     }
+}
+
+fn update_task_status(
+    app: &mut LaReviewApp,
+    task_id: crate::domain::TaskId,
+    status: crate::domain::TaskStatus,
+) {
+    let result = app
+        .task_repo
+        .update_status(&task_id, status)
+        .map_err(|e| format!("Failed to update task status: {e}"));
+
+    app.dispatch(Action::Async(AsyncAction::TaskStatusSaved(result)));
+}
+
+fn clean_done_tasks(app: &mut LaReviewApp, pr_id: Option<String>) {
+    let Some(pr_id) = pr_id else {
+        app.dispatch(Action::Async(AsyncAction::DoneTasksCleaned(Err(
+            "No pull request selected".into(),
+        ))));
+        return;
+    };
+
+    let done_ids = match app.task_repo.find_done_ids_by_pr(&pr_id) {
+        Ok(ids) => ids,
+        Err(err) => {
+            app.dispatch(Action::Async(AsyncAction::DoneTasksCleaned(Err(format!(
+                "Failed to list done tasks: {err}"
+            )))));
+            return;
+        }
+    };
+
+    if done_ids.is_empty() {
+        return;
+    }
+
+    let result = (|| -> Result<(), String> {
+        app.note_repo
+            .delete_by_task_ids(&done_ids)
+            .map_err(|e| format!("Failed to delete notes for done tasks: {e}"))?;
+
+        app.task_repo
+            .delete_by_ids(&done_ids)
+            .map_err(|e| format!("Failed to delete done tasks: {e}"))?;
+
+        Ok(())
+    })();
+
+    app.dispatch(Action::Async(AsyncAction::DoneTasksCleaned(result)));
+}
+
+fn save_note(
+    app: &mut LaReviewApp,
+    task_id: crate::domain::TaskId,
+    body: String,
+    file_path: Option<String>,
+    line_number: Option<u32>,
+) {
+    let note = crate::domain::Note {
+        task_id,
+        body,
+        updated_at: chrono::Utc::now().to_rfc3339(),
+        file_path,
+        line_number,
+    };
+
+    let result = app
+        .note_repo
+        .save(&note)
+        .map_err(|e| format!("Failed to save note: {e}"));
+
+    app.dispatch(Action::Async(AsyncAction::NoteSaved(result)));
+}
+
+fn run_d2_command(app: &mut LaReviewApp, command: D2Command) {
+    let command_str = match command {
+        D2Command::Install => "curl -fsSL https://d2lang.com/install.sh | sh -s --",
+        D2Command::Uninstall => "curl -fsSL https://d2lang.com/install.sh | sh -s -- --uninstall",
+    }
+    .to_string();
+
+    let d2_install_tx = app.d2_install_tx.clone();
+
+    crate::RUNTIME.get().unwrap().spawn(async move {
+        let mut child = tokio::process::Command::new("sh")
+            .arg("-c")
+            .arg(command_str)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .expect("Failed to spawn D2 process");
+
+        let stdout = child.stdout.take().unwrap();
+        let stderr = child.stderr.take().unwrap();
+
+        use tokio::io::AsyncBufReadExt;
+        let mut stdout_reader = tokio::io::BufReader::new(stdout).lines();
+        let mut stderr_reader = tokio::io::BufReader::new(stderr).lines();
+
+        loop {
+            tokio::select! {
+                line = stdout_reader.next_line() => {
+                    match line {
+                        Ok(Some(line)) => { let _ = d2_install_tx.send(line).await; }
+                        _ => break,
+                    }
+                }
+                line = stderr_reader.next_line() => {
+                    match line {
+                        Ok(Some(line)) => { let _ = d2_install_tx.send(line).await; }
+                        _ => break,
+                    }
+                }
+            }
+        }
+
+        let _ = d2_install_tx
+            .send("___INSTALL_COMPLETE___".to_string())
+            .await;
+    });
 }
