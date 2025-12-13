@@ -5,3 +5,5 @@
 pub mod acp;
 pub mod db;
 pub mod diff;
+pub mod github;
+pub mod hash;

@@ -1,6 +1,6 @@
 use super::config::ServerConfig;
 use super::logging::log_to_file;
-use super::persistence::persist_tasks_to_db;
+use super::persistence::persist_review_to_db;
 use pmcp::{SimpleTool, ToolHandler};
 use serde_json::{Value, json};
 use std::sync::Arc;
@@ -16,7 +16,7 @@ pub(super) fn create_return_tasks_tool(config: Arc<ServerConfig>) -> impl ToolHa
 
             let persist_config = config.clone();
             let persist_result = tokio::task::spawn_blocking(move || {
-                persist_tasks_to_db(&persist_config, persist_args)
+                persist_review_to_db(&persist_config, persist_args)
             })
             .await;
 
@@ -65,6 +65,86 @@ pub(super) fn create_return_tasks_tool(config: Arc<ServerConfig>) -> impl ToolHa
          Optionally include sub_flow (grouping name) and diagram (D2 format for visualization).",
     )
     .with_schema(task_schema())
+}
+
+/// Create the return_review tool with proper description and schema.
+pub(super) fn create_return_review_tool(config: Arc<ServerConfig>) -> impl ToolHandler {
+    SimpleTool::new("return_review", move |args: Value, _extra| {
+        let config = config.clone();
+        Box::pin(async move {
+            log_to_file(&config, "return_review called");
+            let persist_args = args.clone();
+            let persist_args_for_log = persist_args.clone();
+
+            let persist_config = config.clone();
+            let persist_result = tokio::task::spawn_blocking(move || {
+                persist_review_to_db(&persist_config, persist_args)
+            })
+            .await;
+
+            match persist_result {
+                Ok(Ok(())) => log_to_file(
+                    &config,
+                    &format!(
+                        "ReturnReviewTool persisted review+tasks to DB: {persist_args_for_log}"
+                    ),
+                ),
+                Ok(Err(err)) => {
+                    log_to_file(
+                        &config,
+                        &format!("ReturnReviewTool failed to persist review+tasks: {err}"),
+                    );
+                    return Err(pmcp::Error::Validation(format!(
+                        "invalid return_review payload: {err}"
+                    )));
+                }
+                Err(join_err) => {
+                    log_to_file(
+                        &config,
+                        &format!("ReturnReviewTool task join error: {join_err}"),
+                    );
+                    return Err(pmcp::Error::Internal(format!(
+                        "return_review persistence join error: {join_err}"
+                    )));
+                }
+            }
+
+            if let Some(path) = &config.tasks_out {
+                log_to_file(
+                    &config,
+                    &format!("ReturnReviewTool writing to {}", path.display()),
+                );
+                let _ = std::fs::write(path, args.to_string());
+                log_to_file(&config, "ReturnReviewTool write complete");
+            }
+
+            Ok(json!({ "status": "ok", "message": "Review received successfully" }))
+        })
+    })
+    .with_description(
+        "Submit the complete review output: an agent-generated review title/summary plus a set \
+         of intent-driven review tasks that together cover 100% of the provided diff. Call this \
+         tool once at the end of your analysis.",
+    )
+    .with_schema(review_schema())
+}
+
+fn review_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "title": {
+                "type": "string",
+                "description": "Agent-generated review title. For GitHub PRs, this may match or improve the PR title."
+            },
+            "summary": {
+                "type": "string",
+                "description": "Optional short executive summary of the change and primary risks."
+            },
+            "tasks": task_schema()["properties"]["tasks"].clone()
+        },
+        "required": ["title", "tasks"]
+    })
 }
 
 fn task_schema() -> Value {

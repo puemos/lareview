@@ -3,6 +3,7 @@
 //! This module contains the primary egui application state, async message plumbing, and the root
 //! `eframe::App` implementation.
 
+mod generate_input;
 mod header;
 mod init;
 mod messages;
@@ -15,7 +16,7 @@ mod store;
 mod timeline;
 mod update;
 
-pub use messages::{GenMsg, GenResultPayload};
+pub use messages::{GenMsg, GenResultPayload, GhMsg, GhStatusPayload};
 pub use root::LaReviewApp;
 pub use state::{FullDiffView, LineNoteContext, SelectedAgent};
 pub use timeline::{TimelineContent, TimelineItem};

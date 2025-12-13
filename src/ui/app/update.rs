@@ -8,6 +8,7 @@ impl eframe::App for LaReviewApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         catppuccin_egui::set_theme(ctx, MOCHA);
 
+        self.poll_gh_messages();
         self.poll_d2_install_messages();
         let agent_content_updated = self.poll_generation_messages();
 

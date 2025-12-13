@@ -35,6 +35,9 @@ fn reduce_generate(state: &mut AppState, action: GenerateAction) -> Vec<Command>
     match action {
         GenerateAction::Reset => {
             state.diff_text.clear();
+            state.generate_preview = None;
+            state.is_preview_fetching = false;
+            state.last_preview_input_ref = None;
             state.generation_error = None;
             state.is_generating = false;
             state.reset_agent_timeline();
@@ -43,18 +46,40 @@ fn reduce_generate(state: &mut AppState, action: GenerateAction) -> Vec<Command>
         }
         GenerateAction::RunRequested => {
             if state.diff_text.trim().is_empty() {
-                state.generation_error = Some("Please paste a git diff first".into());
+                state.generation_error =
+                    Some("Please paste a diff or GitHub PR reference first".into());
                 return Vec::new();
             }
 
             state.generation_error = None;
             state.is_generating = true;
             state.reset_agent_timeline();
-            vec![Command::StartGeneration {
-                pull_request: Box::new(pull_request_from_state(state)),
-                diff_text: state.diff_text.clone(),
+            state.generate_preview = None;
+            vec![Command::ResolveGenerateInput {
+                input_text: state.diff_text.clone(),
                 selected_agent_id: state.selected_agent.id.clone(),
             }]
+        }
+        GenerateAction::FetchPrContext(input_ref) => {
+            let input_ref = input_ref.trim().to_string();
+            if input_ref.is_empty() {
+                return Vec::new();
+            }
+            if state.is_preview_fetching {
+                return Vec::new();
+            }
+            if state.last_preview_input_ref.as_deref() == Some(input_ref.as_str())
+                && state.generate_preview.is_some()
+            {
+                return Vec::new();
+            }
+
+            state.is_preview_fetching = true;
+            state.last_preview_input_ref = Some(input_ref.clone());
+            state.generation_error = None;
+            state.generate_preview = None;
+
+            vec![Command::FetchPrContextPreview { input_ref }]
         }
         GenerateAction::SelectAgent(agent) => {
             state.selected_agent = agent;
@@ -70,6 +95,53 @@ fn reduce_generate(state: &mut AppState, action: GenerateAction) -> Vec<Command>
 fn reduce_review(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
     match action {
         ReviewAction::RefreshFromDb { reason } => vec![Command::RefreshReviewData { reason }],
+        ReviewAction::RefreshGitHubReview => {
+            let Some(review_id) = state.selected_review_id.clone() else {
+                return Vec::new();
+            };
+            let Some(review) = state.reviews.iter().find(|r| r.id == review_id) else {
+                return Vec::new();
+            };
+            if !matches!(review.source, crate::domain::ReviewSource::GitHubPr { .. }) {
+                state.review_error = Some("Selected review is not a GitHub PR".into());
+                return Vec::new();
+            }
+
+            state.review_error = None;
+            state.generation_error = None;
+            state.is_generating = true;
+            state.reset_agent_timeline();
+            state.generate_preview = None;
+            state.current_view = AppView::Generate;
+
+            vec![Command::RefreshGitHubReview {
+                review_id,
+                selected_agent_id: state.selected_agent.id.clone(),
+            }]
+        }
+        ReviewAction::SelectReview { review_id } => {
+            state.selected_review_id = Some(review_id.clone());
+            state.selected_run_id = state
+                .reviews
+                .iter()
+                .find(|r| r.id == review_id)
+                .and_then(|r| r.active_run_id.clone());
+
+            state.selected_task_id = None;
+            state.current_note = None;
+            state.current_line_note = None;
+            state.cached_unified_diff = None;
+
+            select_default_task_for_current_run(state)
+        }
+        ReviewAction::SelectRun { run_id } => {
+            state.selected_run_id = Some(run_id);
+            state.selected_task_id = None;
+            state.current_note = None;
+            state.current_line_note = None;
+            state.cached_unified_diff = None;
+            select_default_task_for_current_run(state)
+        }
         ReviewAction::SelectTask { task_id } => select_task(state, task_id),
         ReviewAction::SelectTaskById { task_id } => {
             if state.tasks().iter().any(|t| t.id == task_id) {
@@ -92,7 +164,7 @@ fn reduce_review(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
         ReviewAction::CleanDoneTasks => {
             state.review_error = None;
             vec![Command::CleanDoneTasks {
-                pr_id: state.selected_pr_id.clone(),
+                run_id: state.selected_run_id.clone(),
             }]
         }
         ReviewAction::SaveCurrentNote => {
@@ -149,6 +221,14 @@ fn reduce_settings(state: &mut AppState, action: SettingsAction) -> Vec<Command>
             state.allow_d2_install = allow;
             Vec::new()
         }
+        SettingsAction::CheckGitHubStatus => {
+            if state.is_gh_status_checking {
+                return Vec::new();
+            }
+            state.is_gh_status_checking = true;
+            state.gh_status_error = None;
+            vec![Command::CheckGitHubStatus]
+        }
         SettingsAction::RequestD2Install => {
             if !state.allow_d2_install || state.is_d2_installing {
                 return Vec::new();
@@ -174,7 +254,21 @@ fn reduce_settings(state: &mut AppState, action: SettingsAction) -> Vec<Command>
 
 fn reduce_async(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
     match action {
-        AsyncAction::GenerationMessage(msg) => reduce_generation_msg(state, msg),
+        AsyncAction::GenerationMessage(msg) => reduce_generation_msg(state, *msg),
+        AsyncAction::GhStatusLoaded(result) => {
+            state.is_gh_status_checking = false;
+            match result {
+                Ok(status) => {
+                    state.gh_status = Some(status);
+                    state.gh_status_error = None;
+                }
+                Err(err) => {
+                    state.gh_status = None;
+                    state.gh_status_error = Some(err);
+                }
+            }
+            Vec::new()
+        }
         AsyncAction::ReviewDataLoaded { reason, result } => match result {
             Ok(payload) => {
                 let commands = apply_review_data(state, payload);
@@ -250,6 +344,39 @@ fn reduce_async(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
 
 fn reduce_generation_msg(state: &mut AppState, msg: GenMsg) -> Vec<Command> {
     match msg {
+        GenMsg::PreviewResolved { input_ref, result } => {
+            state.is_preview_fetching = false;
+            if state.diff_text.trim() != input_ref.trim() {
+                return Vec::new();
+            }
+            match result {
+                Ok(preview) => {
+                    state.generate_preview = Some(preview);
+                    state.generation_error = None;
+                }
+                Err(err) => {
+                    state.generate_preview = None;
+                    state.generation_error = Some(err);
+                }
+            }
+            Vec::new()
+        }
+        GenMsg::InputResolved(result) => match *result {
+            Ok(payload) => {
+                state.generate_preview = Some(payload.preview);
+                state.selected_review_id = Some(payload.run_context.review_id.clone());
+                state.selected_run_id = Some(payload.run_context.run_id.clone());
+                vec![Command::StartGeneration {
+                    run_context: Box::new(payload.run_context),
+                    selected_agent_id: state.selected_agent.id.clone(),
+                }]
+            }
+            Err(err) => {
+                state.is_generating = false;
+                state.generation_error = Some(err);
+                Vec::new()
+            }
+        },
         GenMsg::Progress(evt) => {
             state.ingest_progress(*evt);
             Vec::new()
@@ -271,35 +398,41 @@ fn reduce_generation_msg(state: &mut AppState, msg: GenMsg) -> Vec<Command> {
 }
 
 fn apply_review_data(state: &mut AppState, payload: ReviewDataPayload) -> Vec<Command> {
-    state.prs = payload.prs;
+    state.reviews = payload.reviews;
+    state.runs = payload.runs;
     state.all_tasks = payload.tasks;
     state.review_error = None;
     state.cached_unified_diff = None;
 
-    if let Some(selected) = &state.selected_pr_id
-        && !state.prs.iter().any(|p| &p.id == selected)
+    if let Some(selected) = &state.selected_review_id
+        && !state.reviews.iter().any(|r| &r.id == selected)
     {
-        state.selected_pr_id = None;
+        state.selected_review_id = None;
     }
 
-    if state.selected_pr_id.is_none() {
-        state.selected_pr_id = state.prs.first().map(|p| p.id.clone());
+    if state.selected_review_id.is_none() {
+        state.selected_review_id = state.reviews.first().map(|r| r.id.clone());
     }
 
-    if let Some(selected_pr_id) = &state.selected_pr_id {
-        if let Some(pr) = state.prs.iter().find(|p| &p.id == selected_pr_id) {
-            state.pr_id = pr.id.clone();
-            state.pr_title = pr.title.clone();
-            state.pr_repo = pr.repo.clone();
-            state.pr_author = pr.author.clone();
-            state.pr_branch = pr.branch.clone();
+    if let Some(selected_review_id) = &state.selected_review_id {
+        let default_run_id = state
+            .reviews
+            .iter()
+            .find(|r| &r.id == selected_review_id)
+            .and_then(|r| r.active_run_id.clone());
+
+        let run_in_review = state.selected_run_id.as_ref().is_some_and(|run_id| {
+            state
+                .runs
+                .iter()
+                .any(|run| &run.id == run_id && &run.review_id == selected_review_id)
+        });
+
+        if !run_in_review {
+            state.selected_run_id = default_run_id;
         }
     } else {
-        state.pr_id = "local-pr".to_string();
-        state.pr_title = "Local Review".to_string();
-        state.pr_repo = "local/repo".to_string();
-        state.pr_author = "me".to_string();
-        state.pr_branch = "main".to_string();
+        state.selected_run_id = None;
     }
 
     let current_tasks = state.tasks();
@@ -341,33 +474,33 @@ fn select_task(state: &mut AppState, task_id: TaskId) -> Vec<Command> {
     vec![Command::LoadTaskNote { task_id }]
 }
 
-fn pull_request_from_state(state: &AppState) -> crate::domain::PullRequest {
-    if let Some(selected_pr_id) = &state.selected_pr_id
-        && let Some(pr) = state.prs.iter().find(|p| &p.id == selected_pr_id)
-    {
-        return pr.clone();
-    }
-    crate::domain::PullRequest {
-        id: state.pr_id.clone(),
-        title: state.pr_title.clone(),
-        repo: state.pr_repo.clone(),
-        author: state.pr_author.clone(),
-        branch: state.pr_branch.clone(),
-        description: None,
-        created_at: String::new(),
-    }
+fn select_default_task_for_current_run(state: &mut AppState) -> Vec<Command> {
+    let current_tasks = state.tasks();
+    let Some(next_open) = current_tasks
+        .iter()
+        .find(|t| matches!(t.status, TaskStatus::Pending | TaskStatus::InProgress))
+    else {
+        return Vec::new();
+    };
+
+    state.selected_task_id = Some(next_open.id.clone());
+    state.current_line_note = None;
+    state.current_note = Some(String::new());
+    vec![Command::LoadTaskNote {
+        task_id: next_open.id.clone(),
+    }]
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{PullRequest, ReviewTask, TaskStats, TaskStatus};
+    use crate::domain::{ReviewTask, TaskStats, TaskStatus};
     use crate::ui::app::{GenMsg, GenResultPayload, SelectedAgent};
 
-    fn pending_task(id: &str, pr_id: &str) -> ReviewTask {
+    fn pending_task(id: &str, run_id: &str) -> ReviewTask {
         ReviewTask {
             id: id.to_string(),
-            pr_id: pr_id.to_string(),
+            run_id: run_id.to_string(),
             title: "Task".into(),
             description: "Desc".into(),
             files: vec![],
@@ -395,10 +528,10 @@ mod tests {
         assert!(
             matches!(
                 commands.as_slice(),
-                [Command::StartGeneration { selected_agent_id, .. }]
+                [Command::ResolveGenerateInput { selected_agent_id, .. }]
                 if selected_agent_id == "agent-1"
             ),
-            "expected StartGeneration command"
+            "expected ResolveGenerateInput command"
         );
     }
 
@@ -411,13 +544,13 @@ mod tests {
 
         let commands = reduce(
             &mut state,
-            Action::Async(AsyncAction::GenerationMessage(GenMsg::Done(Ok(
+            Action::Async(AsyncAction::GenerationMessage(Box::new(GenMsg::Done(Ok(
                 GenResultPayload {
                     messages: vec![],
                     thoughts: vec![],
                     logs: vec![],
                 },
-            )))),
+            ))))),
         );
 
         assert!(!state.is_generating);
@@ -434,16 +567,18 @@ mod tests {
 
     #[test]
     fn review_data_load_selects_first_pending() {
-        let pr = PullRequest {
-            id: "pr1".into(),
-            title: "PR".into(),
-            description: None,
-            repo: "r".into(),
-            author: "a".into(),
-            branch: "b".into(),
+        let review = crate::domain::Review {
+            id: "rev1".into(),
+            title: "Review".into(),
+            summary: None,
+            source: crate::domain::ReviewSource::DiffPaste {
+                diff_hash: "h".into(),
+            },
+            active_run_id: Some("run1".into()),
             created_at: "now".into(),
+            updated_at: "now".into(),
         };
-        let task = pending_task("t1", "pr1");
+        let task = pending_task("t1", "run1");
         let mut state = AppState::default();
 
         let commands = reduce(
@@ -451,14 +586,15 @@ mod tests {
             Action::Async(AsyncAction::ReviewDataLoaded {
                 reason: ReviewDataRefreshReason::Manual,
                 result: Ok(ReviewDataPayload {
-                    prs: vec![pr.clone()],
+                    reviews: vec![review.clone()],
+                    runs: vec![],
                     tasks: vec![task.clone()],
                 }),
             }),
         );
 
-        assert_eq!(state.pr_id, pr.id);
-        assert_eq!(state.pr_title, pr.title);
+        assert_eq!(state.selected_review_id.as_deref(), Some("rev1"));
+        assert_eq!(state.selected_run_id.as_deref(), Some("run1"));
         assert_eq!(state.selected_task_id.as_deref(), Some("t1"));
         assert!(
             matches!(
@@ -547,7 +683,7 @@ mod tests {
     #[test]
     fn clean_done_tasks_enqueues_command() {
         let mut state = AppState {
-            selected_pr_id: Some("pr1".into()),
+            selected_run_id: Some("run1".into()),
             ..Default::default()
         };
 
@@ -556,29 +692,30 @@ mod tests {
         assert!(
             matches!(
                 commands.as_slice(),
-                [Command::CleanDoneTasks { pr_id }]
-                if pr_id.as_deref() == Some("pr1")
+                [Command::CleanDoneTasks { run_id }]
+                if run_id.as_deref() == Some("run1")
             ),
             "expected clean-done command"
         );
     }
 
     #[test]
-    fn review_data_loaded_without_prs_defaults_to_local() {
+    fn review_data_loaded_without_reviews_keeps_selection_empty() {
         let mut state = AppState::default();
         let commands = reduce(
             &mut state,
             Action::Async(AsyncAction::ReviewDataLoaded {
                 reason: ReviewDataRefreshReason::Manual,
                 result: Ok(ReviewDataPayload {
-                    prs: vec![],
+                    reviews: vec![],
+                    runs: vec![],
                     tasks: vec![],
                 }),
             }),
         );
 
-        assert_eq!(state.pr_id, "local-pr");
-        assert!(state.selected_pr_id.is_none());
+        assert!(state.selected_review_id.is_none());
+        assert!(state.selected_run_id.is_none());
         assert!(commands.is_empty(), "no note load without tasks");
     }
 
@@ -594,7 +731,8 @@ mod tests {
             Action::Async(AsyncAction::ReviewDataLoaded {
                 reason: ReviewDataRefreshReason::AfterGeneration,
                 result: Ok(ReviewDataPayload {
-                    prs: vec![],
+                    reviews: vec![],
+                    runs: vec![],
                     tasks: vec![],
                 }),
             }),

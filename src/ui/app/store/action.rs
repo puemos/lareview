@@ -22,6 +22,7 @@ pub enum NavigationAction {
 pub enum GenerateAction {
     Reset,
     RunRequested,
+    FetchPrContext(String),
     SelectAgent(SelectedAgent),
     ClearTimeline,
 }
@@ -31,6 +32,13 @@ pub enum ReviewAction {
     RefreshFromDb {
         reason: ReviewDataRefreshReason,
     },
+    SelectReview {
+        review_id: String,
+    },
+    SelectRun {
+        run_id: String,
+    },
+    RefreshGitHubReview,
     SelectTask {
         task_id: String,
     },
@@ -61,11 +69,13 @@ pub enum SettingsAction {
     SetAllowD2Install(bool),
     RequestD2Install,
     RequestD2Uninstall,
+    CheckGitHubStatus,
 }
 
 #[derive(Debug)]
 pub enum AsyncAction {
-    GenerationMessage(GenMsg),
+    GenerationMessage(Box<GenMsg>),
+    GhStatusLoaded(Result<crate::ui::app::GhStatusPayload, String>),
     ReviewDataLoaded {
         reason: ReviewDataRefreshReason,
         result: Result<ReviewDataPayload, String>,
@@ -83,6 +93,7 @@ pub enum AsyncAction {
 
 #[derive(Debug)]
 pub struct ReviewDataPayload {
-    pub prs: Vec<crate::domain::PullRequest>,
+    pub reviews: Vec<crate::domain::Review>,
+    pub runs: Vec<crate::domain::ReviewRun>,
     pub tasks: Vec<crate::domain::ReviewTask>,
 }

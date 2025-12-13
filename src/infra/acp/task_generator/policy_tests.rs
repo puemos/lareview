@@ -1,21 +1,25 @@
-use crate::domain::{PullRequest, ReviewTask};
+use crate::domain::ReviewSource;
+use crate::infra::acp::RunContext;
 
-fn sample_pr() -> PullRequest {
-    PullRequest {
-        id: "pr-1".into(),
-        title: "Test".into(),
-        description: None,
-        repo: "example/repo".into(),
-        author: "tester".into(),
-        branch: "main".into(),
-        created_at: String::new(),
+fn sample_run(diff_text: &str) -> RunContext {
+    let diff_hash = format!("{:016x}", crate::infra::hash::hash64(diff_text));
+    RunContext {
+        review_id: "review-1".into(),
+        run_id: "run-1".into(),
+        agent_id: "agent-1".into(),
+        input_ref: "input".into(),
+        diff_text: diff_text.to_string(),
+        diff_hash: diff_hash.clone(),
+        source: ReviewSource::DiffPaste { diff_hash },
+        initial_title: None,
+        created_at: Some(chrono::Utc::now().to_rfc3339()),
     }
 }
 
-fn sample_task(id: &str, files: &[&str]) -> ReviewTask {
-    ReviewTask {
+fn sample_task(id: &str, files: &[&str]) -> crate::domain::ReviewTask {
+    crate::domain::ReviewTask {
         id: id.into(),
-        pr_id: "pr-1".into(),
+        run_id: "run-1".into(),
         title: id.into(),
         description: String::new(),
         files: files.iter().map(|f| f.to_string()).collect(),
@@ -36,20 +40,20 @@ fn sample_task(id: &str, files: &[&str]) -> ReviewTask {
 
 #[test]
 fn prompt_renders_no_repo_access_block() {
-    let pr = sample_pr();
     let diff = "diff --git a/src/a.rs b/src/a.rs\n--- a/src/a.rs\n+++ b/src/a.rs\n";
-    let prompt = super::prompt::build_prompt(&pr, diff, None);
+    let run = sample_run(diff);
+    let prompt = super::prompt::build_prompt(&run, None);
     assert!(prompt.contains("You do NOT have repository access."));
-    assert!(prompt.contains("Do NOT call any tools except `return_tasks`."));
+    assert!(prompt.contains("Do NOT call any tools except `return_review`."));
     assert!(!prompt.contains("You have READ-ONLY access"));
 }
 
 #[test]
 fn prompt_renders_repo_access_block() {
-    let pr = sample_pr();
     let diff = "diff --git a/src/a.rs b/src/a.rs\n--- a/src/a.rs\n+++ b/src/a.rs\n";
+    let run = sample_run(diff);
     let root = std::path::PathBuf::from("/tmp/repo-root");
-    let prompt = super::prompt::build_prompt(&pr, diff, Some(&root));
+    let prompt = super::prompt::build_prompt(&run, Some(&root));
     assert!(prompt.contains("You have READ-ONLY access"));
     assert!(prompt.contains(&root.display().to_string()));
     assert!(prompt.contains("Allowed tools:"));
@@ -74,7 +78,7 @@ fn capabilities_readonly_fs_with_repo() {
 
 #[tokio::test(flavor = "current_thread")]
 async fn permission_cancelled_without_repo_access() {
-    let client = super::client::LaReviewClient::new(None, "pr-1", None);
+    let client = super::client::LaReviewClient::new(None, "run-1", None);
     let fields = agent_client_protocol::ToolCallUpdateFields::new()
         .kind(agent_client_protocol::ToolKind::Read)
         .title("fs/read_text_file")
@@ -111,7 +115,7 @@ async fn permission_cancelled_without_repo_access() {
 
 #[tokio::test(flavor = "current_thread")]
 async fn permission_allows_return_tasks_even_without_repo_access() {
-    let client = super::client::LaReviewClient::new(None, "pr-1", None);
+    let client = super::client::LaReviewClient::new(None, "run-1", None);
     let fields = agent_client_protocol::ToolCallUpdateFields::new()
         .kind(agent_client_protocol::ToolKind::Other)
         .title("return_tasks")
@@ -141,7 +145,7 @@ async fn permission_allows_return_tasks_even_without_repo_access() {
 
 #[tokio::test(flavor = "current_thread")]
 async fn permission_allows_tasks_payload_embedded_in_title() {
-    let client = super::client::LaReviewClient::new(None, "pr-1", None);
+    let client = super::client::LaReviewClient::new(None, "run-1", None);
     let fields = agent_client_protocol::ToolCallUpdateFields::new()
         .kind(agent_client_protocol::ToolKind::Other)
         .title(r#"{"tasks":[{"id":"T1","title":"Example","description":"","files":[],"stats":{"additions":0,"deletions":0,"risk":"LOW","tags":[]},"patches":[]}]}"#);
@@ -175,7 +179,7 @@ async fn permission_allows_safe_read_under_repo_root() {
     std::fs::create_dir_all(&src_dir).expect("mkdir");
     std::fs::write(src_dir.join("a.rs"), "hi").expect("write");
 
-    let client = super::client::LaReviewClient::new(None, "pr-1", Some(root.path().to_path_buf()));
+    let client = super::client::LaReviewClient::new(None, "run-1", Some(root.path().to_path_buf()));
     let fields = agent_client_protocol::ToolCallUpdateFields::new()
         .kind(agent_client_protocol::ToolKind::Read)
         .title("fs/read_text_file")
@@ -208,7 +212,7 @@ async fn permission_denies_read_outside_repo_root() {
     let root = tempfile::tempdir().expect("root");
     std::fs::write(root.path().join("inside.rs"), "hi").expect("write");
 
-    let client = super::client::LaReviewClient::new(None, "pr-1", Some(root.path().to_path_buf()));
+    let client = super::client::LaReviewClient::new(None, "run-1", Some(root.path().to_path_buf()));
     let fields = agent_client_protocol::ToolCallUpdateFields::new()
         .kind(agent_client_protocol::ToolKind::Read)
         .title("fs/read_text_file")
@@ -239,7 +243,7 @@ async fn permission_denies_read_outside_repo_root() {
 #[tokio::test(flavor = "current_thread")]
 async fn permission_denies_execute_even_with_repo_access() {
     let root = tempfile::tempdir().expect("root");
-    let client = super::client::LaReviewClient::new(None, "pr-1", Some(root.path().to_path_buf()));
+    let client = super::client::LaReviewClient::new(None, "run-1", Some(root.path().to_path_buf()));
     let fields = agent_client_protocol::ToolCallUpdateFields::new()
         .kind(agent_client_protocol::ToolKind::Execute)
         .title("terminal/exec")

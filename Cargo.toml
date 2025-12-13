@@ -45,3 +45,4 @@ lazy_static = "1.4"
 twox-hash = "1.6"
 roxmltree = "0.19"
 glam = "0.30.9"
+uuid = { version = "1", features = ["v4"] }

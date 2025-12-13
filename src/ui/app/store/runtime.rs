@@ -2,20 +2,30 @@ use super::action::{Action, AsyncAction, ReviewDataPayload};
 use super::command::{Command, D2Command};
 use crate::infra::acp::{GenerateTasksInput, generate_tasks_with_acp, list_agent_candidates};
 use crate::ui::app::{GenMsg, GenResultPayload};
+use crate::ui::app::{GhMsg, GhStatusPayload};
 
 use super::super::LaReviewApp;
 
 pub fn run(app: &mut LaReviewApp, command: Command) {
     match command {
-        Command::StartGeneration {
-            pull_request,
-            diff_text,
+        Command::ResolveGenerateInput {
+            input_text,
             selected_agent_id,
-        } => start_generation(app, *pull_request, diff_text, selected_agent_id),
+        } => resolve_generate_input(app, input_text, selected_agent_id),
+        Command::FetchPrContextPreview { input_ref } => fetch_pr_context_preview(app, input_ref),
+        Command::CheckGitHubStatus => check_github_status(app),
+        Command::RefreshGitHubReview {
+            review_id,
+            selected_agent_id,
+        } => refresh_github_review(app, review_id, selected_agent_id),
+        Command::StartGeneration {
+            run_context,
+            selected_agent_id,
+        } => start_generation(app, *run_context, selected_agent_id),
         Command::RefreshReviewData { reason } => refresh_review_data(app, reason),
         Command::LoadTaskNote { task_id } => load_task_note(app, task_id),
         Command::UpdateTaskStatus { task_id, status } => update_task_status(app, task_id, status),
-        Command::CleanDoneTasks { pr_id } => clean_done_tasks(app, pr_id),
+        Command::CleanDoneTasks { run_id } => clean_done_tasks(app, run_id),
         Command::SaveNote {
             task_id,
             body,
@@ -26,10 +36,116 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
     }
 }
 
+fn resolve_generate_input(app: &mut LaReviewApp, input_text: String, selected_agent_id: String) {
+    let gen_tx = app.gen_tx.clone();
+
+    tokio::spawn(async move {
+        let result =
+            crate::ui::app::generate_input::resolve_generate_input(input_text, selected_agent_id)
+                .await
+                .map_err(|e| e.to_string());
+
+        let _ = gen_tx
+            .send(crate::ui::app::GenMsg::InputResolved(Box::new(result)))
+            .await;
+    });
+}
+
+fn fetch_pr_context_preview(app: &mut LaReviewApp, input_ref: String) {
+    let gen_tx = app.gen_tx.clone();
+
+    tokio::spawn(async move {
+        let result = crate::ui::app::generate_input::resolve_pr_preview(input_ref.clone())
+            .await
+            .map_err(|e| e.to_string());
+
+        let _ = gen_tx
+            .send(crate::ui::app::GenMsg::PreviewResolved { input_ref, result })
+            .await;
+    });
+}
+
+fn refresh_github_review(app: &mut LaReviewApp, review_id: String, selected_agent_id: String) {
+    let Some(review) = app
+        .state
+        .reviews
+        .iter()
+        .find(|r| r.id == review_id)
+        .cloned()
+    else {
+        let _ = app
+            .gen_tx
+            .try_send(crate::ui::app::GenMsg::InputResolved(Box::new(Err(
+                "Selected review not found".into(),
+            ))));
+        return;
+    };
+
+    let gen_tx = app.gen_tx.clone();
+
+    tokio::spawn(async move {
+        let result =
+            crate::ui::app::generate_input::resolve_github_refresh(&review, selected_agent_id)
+                .await
+                .map_err(|e| e.to_string());
+
+        let _ = gen_tx
+            .send(crate::ui::app::GenMsg::InputResolved(Box::new(result)))
+            .await;
+    });
+}
+
+fn check_github_status(app: &mut LaReviewApp) {
+    let gh_tx = app.gh_tx.clone();
+
+    tokio::spawn(async move {
+        let result: Result<GhStatusPayload, String> = async {
+            let gh_path = which::which("gh").map_err(|_| "gh is not installed".to_string())?;
+
+            let auth = tokio::process::Command::new("gh")
+                .args(["auth", "status", "--hostname", "github.com"])
+                .output()
+                .await
+                .map_err(|e| format!("Failed to run `gh auth status`: {e}"))?;
+
+            if !auth.status.success() {
+                let stderr = String::from_utf8_lossy(&auth.stderr).trim().to_string();
+                return Err(if stderr.is_empty() {
+                    "Not authenticated. Run: gh auth login".to_string()
+                } else {
+                    format!("Not authenticated. gh: {stderr}")
+                });
+            }
+
+            let whoami = tokio::process::Command::new("gh")
+                .args(["api", "user", "-q", ".login"])
+                .output()
+                .await
+                .map_err(|e| format!("Failed to run `gh api user`: {e}"))?;
+
+            let login = if whoami.status.success() {
+                String::from_utf8(whoami.stdout)
+                    .ok()
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+            } else {
+                None
+            };
+
+            Ok(GhStatusPayload {
+                gh_path: gh_path.display().to_string(),
+                login,
+            })
+        }
+        .await;
+
+        let _ = gh_tx.send(GhMsg::Done(result)).await;
+    });
+}
+
 fn start_generation(
     app: &mut LaReviewApp,
-    pull_request: crate::domain::PullRequest,
-    diff_text: String,
+    run_context: crate::infra::acp::RunContext,
     selected_agent_id: String,
 ) {
     let candidates: Vec<_> = list_agent_candidates()
@@ -71,8 +187,7 @@ fn start_generation(
     );
 
     let input = GenerateTasksInput {
-        pull_request,
-        diff_text,
+        run_context,
         repo_root: None,
         agent_command,
         agent_args: candidate.args,
@@ -118,15 +233,23 @@ fn start_generation(
 
 fn refresh_review_data(app: &mut LaReviewApp, reason: super::command::ReviewDataRefreshReason) {
     let result = (|| -> Result<ReviewDataPayload, String> {
-        let prs = app
-            .pr_repo
+        let reviews = app
+            .review_repo
             .list_all()
-            .map_err(|e| format!("Failed to load pull requests: {e}"))?;
+            .map_err(|e| format!("Failed to load reviews: {e}"))?;
+        let runs = app
+            .run_repo
+            .list_all()
+            .map_err(|e| format!("Failed to load review runs: {e}"))?;
         let tasks = app
             .task_repo
             .find_all()
             .map_err(|e| format!("Failed to load tasks: {e}"))?;
-        Ok(ReviewDataPayload { prs, tasks })
+        Ok(ReviewDataPayload {
+            reviews,
+            runs,
+            tasks,
+        })
     })();
 
     app.dispatch(Action::Async(AsyncAction::ReviewDataLoaded {
@@ -169,15 +292,15 @@ fn update_task_status(
     app.dispatch(Action::Async(AsyncAction::TaskStatusSaved(result)));
 }
 
-fn clean_done_tasks(app: &mut LaReviewApp, pr_id: Option<String>) {
-    let Some(pr_id) = pr_id else {
+fn clean_done_tasks(app: &mut LaReviewApp, run_id: Option<String>) {
+    let Some(run_id) = run_id else {
         app.dispatch(Action::Async(AsyncAction::DoneTasksCleaned(Err(
-            "No pull request selected".into(),
+            "No review run selected".into(),
         ))));
         return;
     };
 
-    let done_ids = match app.task_repo.find_done_ids_by_pr(&pr_id) {
+    let done_ids = match app.task_repo.find_done_ids_by_run(&run_id) {
         Ok(ids) => ids,
         Err(err) => {
             app.dispatch(Action::Async(AsyncAction::DoneTasksCleaned(Err(format!(

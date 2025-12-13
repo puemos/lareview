@@ -8,11 +8,13 @@ mod config;
 mod logging;
 mod parsing;
 mod persistence;
+mod run_context;
 mod tool;
 mod transport;
 
 pub use config::ServerConfig;
 pub(crate) use parsing::parse_tasks;
+pub use run_context::RunContext;
 
 use std::sync::Arc;
 
@@ -27,6 +29,10 @@ pub async fn run_task_mcp_server() -> pmcp::Result<()> {
         .name("lareview-tasks")
         .version("0.1.0")
         .capabilities(ServerCapabilities::default())
+        .tool(
+            "return_review",
+            tool::create_return_review_tool(config.clone()),
+        )
         .tool(
             "return_tasks",
             tool::create_return_tasks_tool(config.clone()),

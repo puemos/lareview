@@ -20,7 +20,7 @@ pub(super) struct LaReviewClient {
     last_message_id: Arc<Mutex<Option<String>>>,
     last_thought_id: Arc<Mutex<Option<String>>>,
     progress: Option<tokio::sync::mpsc::UnboundedSender<ProgressEvent>>,
-    pr_id: String,
+    run_id: String,
     has_repo_access: bool,
     repo_root: Option<PathBuf>,
 }
@@ -52,7 +52,7 @@ impl LaReviewClient {
 
     pub(super) fn new(
         progress: Option<tokio::sync::mpsc::UnboundedSender<ProgressEvent>>,
-        pr_id: impl Into<String>,
+        run_id: impl Into<String>,
         repo_root: Option<PathBuf>,
     ) -> Self {
         let has_repo_access = repo_root.is_some();
@@ -64,7 +64,7 @@ impl LaReviewClient {
             last_message_id: Arc::new(Mutex::new(None)),
             last_thought_id: Arc::new(Mutex::new(None)),
             progress,
-            pr_id: pr_id.into(),
+            run_id: run_id.into(),
             has_repo_access,
             repo_root,
         }
@@ -76,7 +76,7 @@ impl LaReviewClient {
         match parsed {
             Ok(mut tasks) => {
                 for task in &mut tasks {
-                    task.pr_id = self.pr_id.clone();
+                    task.run_id = self.run_id.clone();
                 }
                 if let Ok(mut guard) = self.tasks.lock() {
                     *guard = Some(tasks);

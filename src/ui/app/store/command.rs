@@ -1,4 +1,5 @@
-use crate::domain::{PullRequest, TaskId, TaskStatus};
+use crate::domain::{TaskId, TaskStatus};
+use crate::infra::acp::RunContext;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReviewDataRefreshReason {
@@ -17,9 +18,20 @@ pub enum D2Command {
 
 #[derive(Debug, Clone)]
 pub enum Command {
+    ResolveGenerateInput {
+        input_text: String,
+        selected_agent_id: String,
+    },
+    FetchPrContextPreview {
+        input_ref: String,
+    },
+    CheckGitHubStatus,
+    RefreshGitHubReview {
+        review_id: String,
+        selected_agent_id: String,
+    },
     StartGeneration {
-        pull_request: Box<PullRequest>,
-        diff_text: String,
+        run_context: Box<RunContext>,
         selected_agent_id: String,
     },
     RefreshReviewData {
@@ -33,7 +45,7 @@ pub enum Command {
         status: TaskStatus,
     },
     CleanDoneTasks {
-        pr_id: Option<String>,
+        run_id: Option<String>,
     },
     SaveNote {
         task_id: TaskId,

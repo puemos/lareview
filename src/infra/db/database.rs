@@ -54,63 +54,75 @@ impl Database {
     /// Initialize database schema
     fn init(&self) -> Result<()> {
         let conn = self.conn.lock().unwrap();
-        conn.execute_batch(
-            r#"
-            CREATE TABLE IF NOT EXISTS pull_requests (
-                id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                description TEXT,
-                repo TEXT NOT NULL,
-                author TEXT NOT NULL,
-                branch TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            );
+        const SCHEMA_VERSION: i32 = 2;
 
-            CREATE TABLE IF NOT EXISTS tasks (
-                id TEXT PRIMARY KEY,
-                pull_request_id TEXT NOT NULL,
-                title TEXT NOT NULL,
-                description TEXT NOT NULL,
-                files TEXT NOT NULL,
-                stats TEXT NOT NULL,
-                insight TEXT,
-                diffs TEXT,
-                diagram TEXT,
-                ai_generated INTEGER DEFAULT 0,
-                status TEXT DEFAULT 'PENDING',
-                sub_flow TEXT,
-                FOREIGN KEY(pull_request_id) REFERENCES pull_requests(id)
-            );
+        conn.execute_batch("PRAGMA foreign_keys = ON;")?;
 
-            CREATE TABLE IF NOT EXISTS notes (
-                task_id TEXT,
-                file_path TEXT,
-                line_number INTEGER,
-                body TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                PRIMARY KEY (task_id, file_path, line_number)
-            );
+        let existing_version: i32 =
+            conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
 
-            CREATE TABLE IF NOT EXISTS diffs (
-                pull_request_id TEXT NOT NULL,
-                file_path TEXT NOT NULL,
-                hunks TEXT NOT NULL,
-                PRIMARY KEY (pull_request_id, file_path),
-                FOREIGN KEY(pull_request_id) REFERENCES pull_requests(id)
-            );
+        if existing_version != SCHEMA_VERSION {
+            // Unreleased app: reset schema to the current Review-centric model.
+            conn.execute_batch(
+                r#"
+                DROP TABLE IF EXISTS diffs;
+                DROP TABLE IF EXISTS plans;
+                DROP TABLE IF EXISTS tasks;
+                DROP TABLE IF EXISTS notes;
+                DROP TABLE IF EXISTS review_runs;
+                DROP TABLE IF EXISTS reviews;
+                DROP TABLE IF EXISTS pull_requests;
 
-            CREATE TABLE IF NOT EXISTS plans (
-                pr_id TEXT NOT NULL,
-                plan_data TEXT NOT NULL,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (pr_id),
-                FOREIGN KEY(pr_id) REFERENCES pull_requests(id)
-            );
-            "#,
-        )?;
+                CREATE TABLE reviews (
+                    id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    summary TEXT,
+                    source_json TEXT NOT NULL,
+                    active_run_id TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
 
-        // Try to add the sub_flow column - ignore error if it already exists
-        let _ = conn.execute("ALTER TABLE tasks ADD COLUMN sub_flow TEXT", []);
+                CREATE TABLE review_runs (
+                    id TEXT PRIMARY KEY,
+                    review_id TEXT NOT NULL,
+                    agent_id TEXT NOT NULL,
+                    input_ref TEXT NOT NULL,
+                    diff_text TEXT NOT NULL,
+                    diff_hash TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY(review_id) REFERENCES reviews(id) ON DELETE CASCADE
+                );
+
+                CREATE TABLE tasks (
+                    id TEXT PRIMARY KEY,
+                    run_id TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    description TEXT NOT NULL,
+                    files TEXT NOT NULL,
+                    stats TEXT NOT NULL,
+                    insight TEXT,
+                    diffs TEXT,
+                    diagram TEXT,
+                    ai_generated INTEGER DEFAULT 0,
+                    status TEXT DEFAULT 'PENDING',
+                    sub_flow TEXT,
+                    FOREIGN KEY(run_id) REFERENCES review_runs(id) ON DELETE CASCADE
+                );
+
+                CREATE TABLE notes (
+                    task_id TEXT,
+                    file_path TEXT,
+                    line_number INTEGER,
+                    body TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY (task_id, file_path, line_number)
+                );
+                "#,
+            )?;
+
+            conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+        }
 
         Ok(())
     }

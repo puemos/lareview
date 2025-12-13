@@ -78,8 +78,7 @@ pub async fn generate_tasks_with_acp(input: GenerateTasksInput) -> Result<Genera
 /// Generate review tasks using ACP agent (runs inside Tokio runtime).
 async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<GenerateTasksResult> {
     let GenerateTasksInput {
-        pull_request,
-        diff_text,
+        run_context,
         repo_root,
         agent_command,
         agent_args,
@@ -151,7 +150,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
     // Create client and connection
     let client = LaReviewClient::new(
         progress_tx.clone(),
-        pull_request.id.clone(),
+        run_context.run_id.clone(),
         repo_root.clone(),
     );
     let messages = client.messages.clone();
@@ -208,12 +207,12 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
         resolve_task_mcp_server_path(mcp_server_binary.as_ref(), &current_exe);
 
     let pr_context_file =
-        tempfile::NamedTempFile::new().context("create PR context file for MCP server")?;
+        tempfile::NamedTempFile::new().context("create run context file for MCP server")?;
     std::fs::write(
         pr_context_file.path(),
-        serde_json::to_string(&pull_request).context("serialize PR context")?,
+        serde_json::to_string(&run_context).context("serialize run context")?,
     )
-    .context("write PR context file")?;
+    .context("write run context file")?;
 
     let mut mcp_args = vec![
         "--task-mcp-server".to_string(),
@@ -240,7 +239,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
     push_log(&logs, "new_session ok", debug);
 
     // Send prompt
-    let prompt_text = build_prompt(&pull_request, &diff_text, repo_root.as_ref());
+    let prompt_text = build_prompt(&run_context, repo_root.as_ref());
     push_log(&logs, "prompt", debug);
     let prompt_result = connection
         .prompt(PromptRequest::new(
@@ -344,7 +343,8 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
     }
 
     let raw_payload = raw_tasks_capture.lock().unwrap().clone();
-    let warnings = validate_tasks_payload(&final_tasks, raw_payload.as_ref(), &diff_text)?;
+    let warnings =
+        validate_tasks_payload(&final_tasks, raw_payload.as_ref(), &run_context.diff_text)?;
     for warning in warnings {
         push_log(&logs, format!("validation warning: {warning}"), debug);
     }

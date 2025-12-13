@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use agent_client_protocol::{Plan, SessionUpdate};
 
-use crate::domain::{PullRequest, ReviewTask};
+use crate::domain::{Review, ReviewRunId, ReviewTask};
 use crate::infra::acp::ProgressEvent;
 
 use super::timeline::{TimelineContent, TimelineItem};
@@ -51,18 +51,20 @@ pub struct AppState {
     pub selected_agent: SelectedAgent,
 
     pub diff_text: String,
+    pub generate_preview: Option<GeneratePreview>,
+    pub is_preview_fetching: bool,
+    pub last_preview_input_ref: Option<String>,
+    pub gh_status: Option<crate::ui::app::GhStatusPayload>,
+    pub gh_status_error: Option<String>,
+    pub is_gh_status_checking: bool,
 
     /// Latest agent-provided plan (if any).
     pub latest_plan: Option<Plan>,
 
-    pub prs: Vec<PullRequest>,
-    pub selected_pr_id: Option<String>,
-
-    pub pr_id: String,
-    pub pr_title: String,
-    pub pr_repo: String,
-    pub pr_author: String,
-    pub pr_branch: String,
+    pub reviews: Vec<Review>,
+    pub runs: Vec<crate::domain::ReviewRun>,
+    pub selected_review_id: Option<String>,
+    pub selected_run_id: Option<ReviewRunId>,
 
     pub selected_task_id: Option<String>,
 
@@ -77,6 +79,18 @@ pub struct AppState {
     pub d2_install_output: String,
     pub is_d2_installing: bool,
     pub allow_d2_install: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct GeneratePreview {
+    pub diff_text: String,
+    pub github: Option<GitHubPreview>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitHubPreview {
+    pub pr: crate::infra::github::GitHubPrRef,
+    pub meta: crate::infra::github::GitHubPrMetadata,
 }
 
 #[derive(Debug, Clone)]
@@ -160,15 +174,14 @@ impl AppState {
     }
 
     pub fn tasks(&self) -> Vec<ReviewTask> {
-        if let Some(selected_pr_id) = &self.selected_pr_id {
-            self.all_tasks
-                .iter()
-                .filter(|task| task.pr_id == *selected_pr_id)
-                .cloned()
-                .collect()
-        } else {
-            self.all_tasks.clone()
-        }
+        let Some(selected_run_id) = self.selected_run_id.as_ref() else {
+            return self.all_tasks.clone();
+        };
+        self.all_tasks
+            .iter()
+            .filter(|task| &task.run_id == selected_run_id)
+            .cloned()
+            .collect()
     }
 
     pub fn tasks_by_sub_flow(&self) -> std::collections::HashMap<Option<String>, Vec<ReviewTask>> {

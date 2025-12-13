@@ -140,7 +140,7 @@ pub(crate) fn parse_tasks(args: Value) -> Result<Vec<ReviewTask>> {
 
             ReviewTask {
                 id: task.id,
-                pr_id: String::new(), // set in persistence
+                run_id: String::new(), // set in persistence
                 title: task.title,
                 description: task.description,
                 files: computed_files,

@@ -72,6 +72,73 @@ impl LaReviewApp {
         ui.horizontal(|ui| {
             ui.heading(egui::RichText::new("Review").size(18.0).color(MOCHA.text));
 
+            if !self.state.reviews.is_empty() {
+                ui.add_space(10.0);
+                let current_id = self.state.selected_review_id.clone();
+                let current_label = current_id
+                    .as_ref()
+                    .and_then(|id| self.state.reviews.iter().find(|r| &r.id == id))
+                    .map(|r| r.title.clone())
+                    .unwrap_or_else(|| "Select review…".to_string());
+
+                egui::ComboBox::from_id_salt("review_select")
+                    .selected_text(current_label)
+                    .show_ui(ui, |ui| {
+                        let mut next_review_id: Option<String> = None;
+                        for review in &self.state.reviews {
+                            let selected = current_id.as_deref() == Some(&review.id);
+                            if ui.selectable_label(selected, &review.title).clicked() {
+                                next_review_id = Some(review.id.clone());
+                            }
+                        }
+
+                        if let Some(review_id) = next_review_id {
+                            self.dispatch(Action::Review(ReviewAction::SelectReview { review_id }));
+                        }
+                    });
+            }
+
+            if let Some(selected_review_id) = self.state.selected_review_id.clone() {
+                let runs_for_review: Vec<(String, String)> = self
+                    .state
+                    .runs
+                    .iter()
+                    .filter(|run| run.review_id == selected_review_id)
+                    .map(|run| {
+                        let short = run.id.chars().take(8).collect::<String>();
+                        (run.id.clone(), format!("{short}… ({})", run.agent_id))
+                    })
+                    .collect();
+
+                if !runs_for_review.is_empty() {
+                    ui.add_space(10.0);
+                    let current_run_id = self.state.selected_run_id.clone();
+                    let current_run_label = current_run_id
+                        .as_ref()
+                        .and_then(|id| runs_for_review.iter().find(|(run_id, _)| run_id == id))
+                        .map(|(run_id, _)| {
+                            format!("Run {}…", run_id.chars().take(8).collect::<String>())
+                        })
+                        .unwrap_or_else(|| "Select run…".to_string());
+
+                    let mut next_run_id: Option<String> = None;
+                    egui::ComboBox::from_id_salt("run_select")
+                        .selected_text(current_run_label)
+                        .show_ui(ui, |ui| {
+                            for (run_id, label) in &runs_for_review {
+                                let selected = current_run_id.as_deref() == Some(run_id.as_str());
+                                if ui.selectable_label(selected, label).clicked() {
+                                    next_run_id = Some(run_id.clone());
+                                }
+                            }
+                        });
+
+                    if let Some(run_id) = next_run_id {
+                        self.dispatch(Action::Review(ReviewAction::SelectRun { run_id }));
+                    }
+                }
+            }
+
             if total_tasks > 0 {
                 ui.add_space(10.0);
                 badge(
@@ -207,10 +274,11 @@ impl LaReviewApp {
         // Memory for resizable width
         let tree_width_id = ui.id().with("tree_panel_width");
         let available_width = ui.available_width();
-        let tree_width = ui
+        let saved_tree_width = ui
             .memory(|mem| mem.data.get_temp::<f32>(tree_width_id))
-            .unwrap_or(300.0) // Slightly wider default for the Intent panel
-            .clamp(200.0, available_width * 0.4);
+            .unwrap_or(300.0); // Slightly wider default for the Intent panel
+        let tree_width =
+            crate::ui::layout::clamp_width(saved_tree_width, 200.0, available_width * 0.4);
 
         let (left_rect, right_rect) = {
             let available = ui.available_rect_before_wrap();
@@ -255,10 +323,20 @@ impl LaReviewApp {
                     return;
                 }
 
-                // PR Title: Make it bold and slightly larger than regular text
+                let selected_review = self
+                    .state
+                    .selected_review_id
+                    .as_ref()
+                    .and_then(|id| self.state.reviews.iter().find(|r| &r.id == id));
+
+                let review_title = selected_review
+                    .map(|r| r.title.as_str())
+                    .unwrap_or("Review");
+
+                // Review Title: Make it bold and slightly larger than regular text
                 ui.add(
                     egui::Label::new(
-                        egui::RichText::new(&self.state.pr_title)
+                        egui::RichText::new(review_title)
                             .size(15.0)
                             .strong()
                             .color(MOCHA.text),
@@ -323,12 +401,27 @@ impl LaReviewApp {
 
                 ui.add_space(8.0);
 
-                // PR Author Metadata
-                ui.label(
-                    egui::RichText::new(format!("Author: {}", self.state.pr_author))
-                        .size(11.0)
-                        .color(MOCHA.overlay1),
-                );
+                // Review Source Metadata
+                if let Some(review) = selected_review {
+                    let source_text = match &review.source {
+                        crate::domain::ReviewSource::DiffPaste { .. } => {
+                            "Source: pasted diff".to_string()
+                        }
+                        crate::domain::ReviewSource::GitHubPr {
+                            owner,
+                            repo,
+                            number,
+                            ..
+                        } => {
+                            format!("Source: GitHub {owner}/{repo}#{number}")
+                        }
+                    };
+                    ui.label(
+                        egui::RichText::new(source_text)
+                            .size(11.0)
+                            .color(MOCHA.overlay1),
+                    );
+                }
 
                 ui.add_space(12.0);
                 ui.separator();
@@ -386,7 +479,11 @@ impl LaReviewApp {
         if resize_response.dragged()
             && let Some(pointer_pos) = ui.ctx().pointer_interact_pos()
         {
-            let new_width = (pointer_pos.x - left_rect.min.x).clamp(200.0, available_width * 0.6);
+            let new_width = crate::ui::layout::clamp_width(
+                pointer_pos.x - left_rect.min.x,
+                200.0,
+                available_width * 0.6,
+            );
             ui.memory_mut(|mem| mem.data.insert_temp(tree_width_id, new_width));
         }
 

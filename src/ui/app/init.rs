@@ -4,7 +4,9 @@ use eframe::egui;
 use eframe::egui::{FontData, FontDefinitions, FontFamily};
 use tokio::sync::mpsc;
 
-use crate::infra::db::{Database, NoteRepository, PullRequestRepository, TaskRepository};
+use crate::infra::db::{
+    Database, NoteRepository, ReviewRepository, ReviewRunRepository, TaskRepository,
+};
 
 use super::LaReviewApp;
 use super::state::{AppState, AppView, SelectedAgent};
@@ -40,45 +42,41 @@ impl LaReviewApp {
         let conn = db.connection();
         let task_repo = Arc::new(TaskRepository::new(conn.clone()));
         let note_repo = Arc::new(NoteRepository::new(conn.clone()));
-        let pr_repo = Arc::new(PullRequestRepository::new(conn.clone()));
+        let review_repo = Arc::new(ReviewRepository::new(conn.clone()));
+        let run_repo = Arc::new(ReviewRunRepository::new(conn.clone()));
 
         let mut state = AppState {
             current_view: AppView::Generate,
             selected_agent: SelectedAgent::new("codex"),
             diff_text: String::new(),
-            pr_id: "local-pr".to_string(),
-            pr_title: "Local Review".to_string(),
-            pr_repo: "local/repo".to_string(),
-            pr_author: "me".to_string(),
-            pr_branch: "main".to_string(),
             ..Default::default()
         };
 
-        if let Ok(prs) = pr_repo.list_all() {
-            state.prs = prs;
-            if let Some(first_pr) = state.prs.first() {
-                state.selected_pr_id = Some(first_pr.id.clone());
-                state.pr_id = first_pr.id.clone();
-                state.pr_title = first_pr.title.clone();
-                state.pr_repo = first_pr.repo.clone();
-                state.pr_author = first_pr.author.clone();
-                state.pr_branch = first_pr.branch.clone();
+        if let Ok(reviews) = review_repo.list_all() {
+            state.reviews = reviews;
+            if let Some(first) = state.reviews.first() {
+                state.selected_review_id = Some(first.id.clone());
+                state.selected_run_id = first.active_run_id.clone();
             }
         } else {
-            state.review_error = Some("Failed to load pull requests".to_string());
+            state.review_error = Some("Failed to load reviews".to_string());
         }
 
         let (gen_tx, gen_rx) = mpsc::channel(32);
+        let (gh_tx, gh_rx) = mpsc::channel(8);
         let (d2_install_tx, d2_install_rx) = mpsc::channel(32);
 
         let mut app = Self {
             state,
             task_repo,
             note_repo,
-            pr_repo,
+            review_repo,
+            run_repo,
             _db: db,
             gen_tx,
             gen_rx,
+            gh_tx,
+            gh_rx,
             d2_install_tx,
             d2_install_rx,
         };

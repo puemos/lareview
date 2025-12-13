@@ -1,13 +1,15 @@
 //! Repository implementations for data access in LaReview.
 //!
-//! Provides database operations for pull requests, tasks, and notes.
+//! Provides database operations for reviews, runs, tasks, and notes.
 
 mod note;
-mod pull_request;
+mod review;
+mod review_run;
 mod task;
 
 pub use note::NoteRepository;
-pub use pull_request::PullRequestRepository;
+pub use review::ReviewRepository;
+pub use review_run::ReviewRunRepository;
 pub use task::TaskRepository;
 
 use rusqlite::Connection;

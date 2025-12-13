@@ -1,5 +1,5 @@
 use super::DbConn;
-use crate::domain::{PullRequestId, ReviewTask, TaskId, TaskStatus};
+use crate::domain::{ReviewRunId, ReviewTask, TaskId, TaskStatus};
 use anyhow::Result;
 
 /// Repository for task operations.
@@ -31,12 +31,12 @@ impl TaskRepository {
 
         conn.execute(
             r#"
-            INSERT OR REPLACE INTO tasks (id, pull_request_id, title, description, files, stats, insight, diffs, diagram, ai_generated, status, sub_flow)
+            INSERT OR REPLACE INTO tasks (id, run_id, title, description, files, stats, insight, diffs, diagram, ai_generated, status, sub_flow)
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
             "#,
             (
                 &task.id,
-                &task.pr_id,
+                &task.run_id,
                 &task.title,
                 &task.description,
                 &files_json,
@@ -62,12 +62,12 @@ impl TaskRepository {
         Ok(())
     }
 
-    pub fn find_done_ids_by_pr(&self, pr_id: &PullRequestId) -> Result<Vec<TaskId>> {
+    pub fn find_done_ids_by_run(&self, run_id: &ReviewRunId) -> Result<Vec<TaskId>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id FROM tasks WHERE pull_request_id = ?1 AND status IN ('DONE','REVIEWED','COMPLETED')",
+            "SELECT id FROM tasks WHERE run_id = ?1 AND status IN ('DONE','REVIEWED','COMPLETED')",
         )?;
-        let rows = stmt.query_map([pr_id], |row| row.get::<_, String>(0))?;
+        let rows = stmt.query_map([run_id], |row| row.get::<_, String>(0))?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
@@ -87,11 +87,11 @@ impl TaskRepository {
     pub fn find_all(&self) -> Result<Vec<ReviewTask>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, pull_request_id, title, description, files, stats, insight, diffs, diagram, ai_generated, status, sub_flow FROM tasks",
+            "SELECT id, run_id, title, description, files, stats, insight, diffs, diagram, ai_generated, status, sub_flow FROM tasks",
         )?;
 
         let rows = stmt.query_map([], |row| {
-            let pr_id: String = row.get(1)?;
+            let run_id: String = row.get(1)?;
             let files_json: String = row.get(4)?;
             let stats_json: String = row.get(5)?;
             let diffs_json: Option<String> = row.get(7)?;
@@ -100,7 +100,7 @@ impl TaskRepository {
 
             Ok((
                 row.get::<_, String>(0)?,
-                pr_id,
+                run_id,
                 row.get::<_, String>(2)?,
                 row.get::<_, String>(3)?,
                 files_json,
@@ -118,7 +118,7 @@ impl TaskRepository {
         for row in rows {
             let (
                 id,
-                pr_id,
+                run_id,
                 title,
                 description,
                 files_json,
@@ -135,7 +135,7 @@ impl TaskRepository {
 
             tasks.push(ReviewTask {
                 id,
-                pr_id,
+                run_id,
                 title,
                 description,
                 files: serde_json::from_str(&files_json).unwrap_or_default(),
@@ -154,14 +154,14 @@ impl TaskRepository {
     }
 
     #[allow(dead_code)] // Used by ACP modules; invoked indirectly.
-    pub fn find_by_pr(&self, pr_id_filter: &PullRequestId) -> Result<Vec<ReviewTask>> {
+    pub fn find_by_run(&self, run_id_filter: &ReviewRunId) -> Result<Vec<ReviewTask>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, pull_request_id, title, description, files, stats, insight, diffs, diagram, ai_generated, status, sub_flow FROM tasks WHERE pull_request_id = ?1",
+            "SELECT id, run_id, title, description, files, stats, insight, diffs, diagram, ai_generated, status, sub_flow FROM tasks WHERE run_id = ?1",
         )?;
 
-        let rows = stmt.query_map([pr_id_filter], |row| {
-            let pr_id: String = row.get(1)?;
+        let rows = stmt.query_map([run_id_filter], |row| {
+            let run_id: String = row.get(1)?;
             let files_json: String = row.get(4)?;
             let stats_json: String = row.get(5)?;
             let diffs_json: Option<String> = row.get(7)?;
@@ -170,7 +170,7 @@ impl TaskRepository {
 
             Ok((
                 row.get::<_, String>(0)?,
-                pr_id,
+                run_id,
                 row.get::<_, String>(2)?,
                 row.get::<_, String>(3)?,
                 files_json,
@@ -188,7 +188,7 @@ impl TaskRepository {
         for row in rows {
             let (
                 id,
-                pr_id,
+                run_id,
                 title,
                 description,
                 files_json,
@@ -205,7 +205,7 @@ impl TaskRepository {
 
             tasks.push(ReviewTask {
                 id,
-                pr_id,
+                run_id,
                 title,
                 description,
                 files: serde_json::from_str(&files_json).unwrap_or_default(),

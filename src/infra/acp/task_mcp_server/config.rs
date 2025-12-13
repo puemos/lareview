@@ -7,8 +7,8 @@ pub struct ServerConfig {
     pub tasks_out: Option<PathBuf>,
     /// Optional path for debug log file.
     pub log_file: Option<PathBuf>,
-    /// Optional path to PR context JSON file.
-    pub pr_context: Option<PathBuf>,
+    /// Optional path to review/run context JSON file.
+    pub run_context: Option<PathBuf>,
     /// Optional explicit database path (for tests).
     pub db_path: Option<PathBuf>,
 }
@@ -21,8 +21,8 @@ impl ServerConfig {
         if let Ok(path) = std::env::var("TASK_MCP_OUT") {
             config.tasks_out = Some(PathBuf::from(path));
         }
-        if let Ok(path) = std::env::var("TASK_MCP_PR_CONTEXT") {
-            config.pr_context = Some(PathBuf::from(path));
+        if let Ok(path) = std::env::var("TASK_MCP_RUN_CONTEXT") {
+            config.run_context = Some(PathBuf::from(path));
         }
         if let Ok(path) = std::env::var("LAREVIEW_DB_PATH") {
             config.db_path = Some(PathBuf::from(path));
@@ -51,7 +51,7 @@ impl ServerConfig {
                 }
                 "--pr-context" => {
                     if i + 1 < args.len() {
-                        config.pr_context = Some(PathBuf::from(&args[i + 1]));
+                        config.run_context = Some(PathBuf::from(&args[i + 1]));
                         i += 2;
                     } else {
                         i += 1;

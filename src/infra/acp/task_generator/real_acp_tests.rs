@@ -1,5 +1,5 @@
 use super::*;
-use crate::domain::PullRequest;
+use crate::domain::ReviewSource;
 use crate::infra::db::{Database, TaskRepository};
 
 fn set_env(key: &str, val: &str) -> Option<String> {
@@ -90,21 +90,23 @@ fn test_real_codex_acp_integration() {
 +}
 "#;
 
-    let pr = PullRequest {
-        id: "test-pr".into(),
-        title: "Test PR".into(),
-        repo: "example/repo".into(),
-        author: "tester".into(),
-        branch: "main".into(),
-        description: None,
-        created_at: String::new(),
+    let diff_hash = format!("{:016x}", crate::infra::hash::hash64(diff));
+    let run_context = crate::infra::acp::RunContext {
+        review_id: "test-review".into(),
+        run_id: "test-run".into(),
+        agent_id: "codex".into(),
+        input_ref: "diff".into(),
+        diff_text: diff.to_string(),
+        diff_hash: diff_hash.clone(),
+        source: ReviewSource::DiffPaste { diff_hash },
+        initial_title: Some("Test PR".into()),
+        created_at: Some(chrono::Utc::now().to_rfc3339()),
     };
 
     let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
 
     let input = GenerateTasksInput {
-        pull_request: pr,
-        diff_text: diff.to_string(),
+        run_context,
         repo_root: None,
         agent_command: "npx".into(),
         agent_args: vec![
@@ -179,21 +181,23 @@ fn test_real_codex_acp_persist() -> anyhow::Result<()> {
 +}
 "#;
 
-    let pr = PullRequest {
-        id: "test-pr".into(),
-        title: "Test PR".into(),
-        repo: "example/repo".into(),
-        author: "tester".into(),
-        branch: "main".into(),
-        description: None,
-        created_at: String::new(),
+    let diff_hash = format!("{:016x}", crate::infra::hash::hash64(diff));
+    let run_context = crate::infra::acp::RunContext {
+        review_id: "test-review".into(),
+        run_id: "test-run".into(),
+        agent_id: "codex".into(),
+        input_ref: "diff".into(),
+        diff_text: diff.to_string(),
+        diff_hash: diff_hash.clone(),
+        source: ReviewSource::DiffPaste { diff_hash },
+        initial_title: Some("Test PR".into()),
+        created_at: Some(chrono::Utc::now().to_rfc3339()),
     };
 
     let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
 
     let input = GenerateTasksInput {
-        pull_request: pr.clone(),
-        diff_text: diff.to_string(),
+        run_context: run_context.clone(),
         repo_root: None,
         agent_command: "npx".into(),
         agent_args: vec![
@@ -223,7 +227,7 @@ fn test_real_codex_acp_persist() -> anyhow::Result<()> {
     // Verify persisted tasks are present in SQLite
     let db = Database::open_at(db_path.clone())?;
     let repo = TaskRepository::new(db.connection());
-    let tasks = repo.find_by_pr(&pr.id)?;
+    let tasks = repo.find_by_run(&run_context.run_id)?;
     assert!(
         !tasks.is_empty(),
         "expected tasks persisted, got none; logs: {:?}",

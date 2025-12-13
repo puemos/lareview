@@ -1,13 +1,11 @@
-use crate::domain::PullRequest;
+use crate::infra::acp::task_mcp_server::RunContext;
 use agent_client_protocol::SessionUpdate;
 use std::path::PathBuf;
 
 /// Input parameters for task generation.
 pub struct GenerateTasksInput {
-    /// Pull request context for the task generation.
-    pub pull_request: PullRequest,
-    /// Git diff text to analyze and generate tasks for.
-    pub diff_text: String,
+    /// Review/run context for the task generation (also persisted by the MCP server).
+    pub run_context: RunContext,
     /// Optional repository root for read-only context.
     ///
     /// When this is None, the agent must operate diff-only without filesystem or terminal access.

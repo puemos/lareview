@@ -12,7 +12,7 @@ async fn test_return_tasks_tool_writes_file() {
     let config = Arc::new(ServerConfig {
         tasks_out: Some(out_path.clone()),
         log_file: None,
-        pr_context: None,
+        run_context: None,
         db_path: Some(db_path),
     });
 
@@ -37,23 +37,25 @@ async fn test_return_tasks_tool_writes_file() {
 async fn test_return_tasks_tool_persists_to_db() {
     let tmp_dir = tempfile::tempdir().expect("tempdir");
     let db_path = tmp_dir.path().join("db.sqlite");
-    let pr_context_path = tmp_dir.path().join("pr.json");
+    let run_context_path = tmp_dir.path().join("run.json");
 
-    let pr_context = serde_json::json!({
-        "id": "pr-db",
-        "title": "Test PR",
-        "description": null,
-        "repo": "test/repo",
-        "author": "tester",
-        "branch": "main",
+    let run_context = serde_json::json!({
+        "review_id": "rev-db",
+        "run_id": "run-db",
+        "agent_id": "agent-1",
+        "input_ref": "diff",
+        "diff_text": "diff --git a/src/a.rs b/src/a.rs\n--- a/src/a.rs\n+++ b/src/a.rs\n",
+        "diff_hash": "h",
+        "source": { "type": "diff_paste", "diff_hash": "h" },
+        "initial_title": "Test Review",
         "created_at": "2024-01-01T00:00:00Z"
     });
-    std::fs::write(&pr_context_path, pr_context.to_string()).expect("write PR context");
+    std::fs::write(&run_context_path, run_context.to_string()).expect("write run context");
 
     let config = Arc::new(ServerConfig {
         tasks_out: None,
         log_file: None,
-        pr_context: Some(pr_context_path),
+        run_context: Some(run_context_path),
         db_path: Some(db_path.clone()),
     });
 
@@ -80,7 +82,9 @@ async fn test_return_tasks_tool_persists_to_db() {
 
     let db = crate::infra::db::Database::open_at(db_path.clone()).expect("open db");
     let repo = crate::infra::db::TaskRepository::new(db.connection());
-    let tasks = repo.find_by_pr(&"pr-db".to_string()).expect("tasks for pr");
+    let tasks = repo
+        .find_by_run(&"run-db".to_string())
+        .expect("tasks for run");
     assert_eq!(tasks.len(), 1);
     assert_eq!(tasks[0].id, "task-123");
     assert_eq!(tasks[0].title, "DB Task");

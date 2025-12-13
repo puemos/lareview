@@ -4,7 +4,10 @@
 use serde::{Deserialize, Serialize};
 
 /// Unique identifier for a pull request
-pub type PullRequestId = String;
+pub type ReviewId = String;
+
+/// Unique identifier for a review generation run
+pub type ReviewRunId = String;
 
 /// Unique identifier for a review task
 pub type TaskId = String;
@@ -32,22 +35,64 @@ impl RiskLevel {
     }
 }
 
-/// A pull request to be reviewed
+/// Source for a review.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ReviewSource {
+    /// Review is based purely on a pasted diff.
+    DiffPaste {
+        /// Hash of the unified diff used for the run that created this review.
+        diff_hash: String,
+    },
+    /// Review is derived from a GitHub pull request fetched locally via `gh`.
+    GitHubPr {
+        owner: String,
+        repo: String,
+        number: u32,
+        #[serde(default)]
+        url: Option<String>,
+        #[serde(default)]
+        head_sha: Option<String>,
+        #[serde(default)]
+        base_sha: Option<String>,
+    },
+}
+
+/// A review to be generated and tracked in the app.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PullRequest {
-    /// Unique identifier for the pull request
-    pub id: PullRequestId,
-    /// Title of the pull request
+pub struct Review {
+    /// Unique identifier for the review.
+    pub id: ReviewId,
+    /// Agent-generated title (GitHub PR title may be used as initial title).
     pub title: String,
-    /// Optional description of the pull request
-    pub description: Option<String>,
-    /// Repository name in "owner/repo" format
-    pub repo: String,
-    /// Author of the pull request
-    pub author: String,
-    /// Branch name of the pull request
-    pub branch: String,
-    /// Creation timestamp in RFC3339 format
+    /// Optional agent-generated summary of the review.
+    pub summary: Option<String>,
+    /// Where this review came from (diff paste or GitHub PR).
+    pub source: ReviewSource,
+    /// Latest run ID currently shown in the Review UI.
+    pub active_run_id: Option<ReviewRunId>,
+    /// Creation timestamp in RFC3339 format.
+    pub created_at: String,
+    /// Update timestamp in RFC3339 format.
+    pub updated_at: String,
+}
+
+/// A single generation run for a review (diff + agent output).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewRun {
+    /// Unique identifier for the run.
+    pub id: ReviewRunId,
+    /// Parent review.
+    pub review_id: ReviewId,
+    /// Agent id used for this run.
+    pub agent_id: String,
+    /// Raw user input reference (diff paste text or PR URL/ID).
+    pub input_ref: String,
+    /// Canonical unified diff used for this run.
+    pub diff_text: String,
+    /// Hash of `diff_text` for quick change checks/dedupe.
+    pub diff_hash: String,
+    /// Creation timestamp in RFC3339 format.
     pub created_at: String,
 }
 
@@ -99,8 +144,8 @@ impl TaskStatus {
 pub struct ReviewTask {
     /// Unique identifier for the task
     pub id: TaskId,
-    /// ID of the pull request this task belongs to
-    pub pr_id: PullRequestId,
+    /// ID of the review run this task belongs to
+    pub run_id: ReviewRunId,
     /// Title of the review task
     pub title: String,
     /// Detailed description of the review task
