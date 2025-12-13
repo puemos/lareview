@@ -41,10 +41,10 @@ impl LaReviewClient {
             return true;
         }
 
-        if let Some(input) = raw_input {
-            if input.get("tasks").is_some() || input.get("plans").is_some() {
-                return true;
-            }
+        if let Some(input) = raw_input
+            && (input.get("tasks").is_some() || input.get("plans").is_some())
+        {
+            return true;
         }
 
         Self::parse_return_payload_from_str(tool_title).is_some()
@@ -281,10 +281,11 @@ impl agent_client_protocol::Client for LaReviewClient {
                     if let Some(ref output) = call.raw_output {
                         self.store_tasks_from_value(output.clone());
                     }
-                    if call.raw_input.is_none() && call.raw_output.is_none() {
-                        if let Some(value) = Self::parse_return_payload_from_str(&call.title) {
-                            self.store_tasks_from_value(value);
-                        }
+                    if call.raw_input.is_none()
+                        && call.raw_output.is_none()
+                        && let Some(value) = Self::parse_return_payload_from_str(&call.title)
+                    {
+                        self.store_tasks_from_value(value);
                     }
                 }
             }
