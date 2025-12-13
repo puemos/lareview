@@ -1,23 +1,24 @@
-use catppuccin_egui::MOCHA;
 use eframe::egui;
 
 use super::LaReviewApp;
 use super::state::AppView;
 use crate::ui::spacing;
+use crate::ui::theme;
 
 impl LaReviewApp {
     pub(super) fn render_header(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("header").show(ctx, |ui| {
+            let theme = theme::current_theme();
             let rect = ui.available_rect_before_wrap();
             ui.painter().with_clip_rect(rect).rect_filled(
                 rect,
                 egui::CornerRadius::ZERO,
-                MOCHA.base,
+                theme.bg_primary,
             );
 
             let line_spacing = 20.0; // Keep original value to avoid type issue
             let line_width = 0.5;
-            let color = MOCHA.surface0.linear_multiply(0.25);
+            let color = theme.bg_secondary.linear_multiply(0.25);
 
             let mut pos = rect.min.x - rect.max.y;
             while pos < rect.max.x {
@@ -58,7 +59,7 @@ impl LaReviewApp {
                             ui.add(egui::Label::new(
                                 egui::RichText::new(egui_phosphor::regular::CIRCLE_HALF)
                                     .size(22.0)
-                                    .color(MOCHA.mauve),
+                                    .color(theme.brand),
                             ));
                         }
                     }
@@ -67,7 +68,7 @@ impl LaReviewApp {
                     ui.heading(
                         egui::RichText::new("LaReview")
                             .strong()
-                            .color(MOCHA.text)
+                            .color(theme.text_primary)
                             .size(18.0),
                     );
                 });
@@ -78,9 +79,9 @@ impl LaReviewApp {
                     let generate_response = ui.add(
                         egui::Button::new(egui::RichText::new("GENERATE").color(
                             if self.state.current_view == AppView::Generate {
-                                MOCHA.mauve
+                                theme.brand
                             } else {
-                                MOCHA.subtext1
+                                theme.text_disabled
                             },
                         ))
                         .frame(false)
@@ -95,9 +96,9 @@ impl LaReviewApp {
                     let review_response = ui.add(
                         egui::Button::new(egui::RichText::new("REVIEW").color(
                             if self.state.current_view == AppView::Review {
-                                MOCHA.mauve
+                                theme.brand
                             } else {
-                                MOCHA.subtext1
+                                theme.text_disabled
                             },
                         ))
                         .frame(false)
@@ -111,9 +112,9 @@ impl LaReviewApp {
                         let settings_response = ui.add(
                             egui::Button::new(egui::RichText::new("SETTINGS").color(
                                 if self.state.current_view == AppView::Settings {
-                                    MOCHA.mauve
+                                    theme.brand
                                 } else {
-                                    MOCHA.subtext1
+                                    theme.text_disabled
                                 },
                             ))
                             .frame(false)

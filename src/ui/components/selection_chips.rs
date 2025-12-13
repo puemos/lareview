@@ -1,10 +1,11 @@
-use catppuccin_egui::MOCHA;
 use eframe::egui;
 use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
+
+use crate::ui::theme;
 
 static LOGO_BYTES_CACHE: Lazy<Mutex<HashMap<String, Arc<[u8]>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
@@ -34,46 +35,62 @@ pub fn selection_chips<T>(
 ) where
     T: PartialEq + Clone,
 {
-    ui.horizontal_wrapped(|ui| {
+    // configure wrapping gap
+    let spacing = egui::vec2(8.0, 8.0);
+    ui.spacing_mut().item_spacing = spacing;
+
+    ui.horizontal_wrapped(|wrap_ui| {
         if !label_prefix.is_empty() {
-            ui.label(label_prefix);
+            wrap_ui.label(label_prefix);
         }
 
         for (i, item) in items.iter().enumerate() {
-            if i < labels.len() {
-                let selected = current_item == item;
-                let label = labels[i];
-                let logo_path = logos.get(i).and_then(|l| l.as_ref());
+            if i >= labels.len() {
+                continue;
+            }
 
-                let frame = egui::Frame::new()
-                    .fill(if selected { MOCHA.surface1 } else { MOCHA.base })
-                    .stroke(egui::Stroke::new(1.0, MOCHA.surface2))
-                    .inner_margin(egui::vec2(8.0, 4.0))
-                    .corner_radius(egui::CornerRadius::same(20));
+            let selected = current_item == item;
+            let label = labels[i];
+            let logo_path = logos.get(i).and_then(|l| l.as_ref());
 
-                let response = frame
-                    .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            if let Some(path) = logo_path
-                                && let Some(bytes) = load_logo_bytes(path)
-                            {
-                                let uri = format!("bytes://{path}");
-                                ui.add(
-                                    egui::Image::from_bytes(uri, bytes)
-                                        .fit_to_exact_size(egui::vec2(16.0, 16.0)),
-                                );
-                            }
-                            let text = egui::RichText::new(label)
-                                .color(egui::Color32::from_rgb(255, 255, 255));
-                            ui.label(text);
-                        });
-                    })
-                    .response
-                    .on_hover_cursor(egui::CursorIcon::PointingHand);
+            let theme = theme::current_theme();
+            let frame = egui::Frame::new()
+                .fill(if selected {
+                    theme.bg_card
+                } else {
+                    theme.bg_primary
+                })
+                .stroke(egui::Stroke::new(1.0, theme.border))
+                .inner_margin(egui::vec2(8.0, 4.0))
+                .corner_radius(egui::CornerRadius::same(20));
 
-                if response.interact(egui::Sense::click()).clicked() {
-                    *current_item = item.clone();
-                }
+            // each chip gets a small constrained child ui
+            let available_width = wrap_ui.available_width();
+            let response = frame
+                .show(wrap_ui, |inner_ui| {
+                    // allow inner to shrink and wrap
+                    inner_ui.set_min_width(0.0);
+                    inner_ui.set_max_width(available_width);
+
+                    inner_ui.horizontal(|h_ui| {
+                        if let Some(path) = logo_path
+                            && let Some(bytes) = load_logo_bytes(path)
+                        {
+                            let uri = format!("bytes://{path}");
+                            h_ui.add(
+                                egui::Image::from_bytes(uri, bytes)
+                                    .fit_to_exact_size(egui::vec2(16.0, 16.0)),
+                            );
+                        }
+                        let text = egui::RichText::new(label).color(theme.text_inverse);
+                        h_ui.label(text);
+                    });
+                })
+                .response
+                .on_hover_cursor(egui::CursorIcon::PointingHand);
+
+            if response.interact(egui::Sense::click()).clicked() {
+                *current_item = item.clone();
             }
         }
     });

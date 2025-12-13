@@ -2,7 +2,7 @@ use super::model::{ChangeType, DiffLine, DiffState, FileDiff, Row};
 use super::{DiffAction, LineContext};
 use crate::ui::components::diff::parse::parse_diff_by_files;
 use crate::ui::spacing;
-use catppuccin_egui::MOCHA;
+use crate::ui::theme;
 use eframe::egui::{self, FontId, TextFormat, text::LayoutJob};
 use egui_phosphor::regular::PLUS;
 
@@ -120,14 +120,16 @@ pub fn render_diff_editor_with_options(
 
     if let Some(err) = &state.parse_error {
         let msg = format!("{} {}", egui_phosphor::regular::WARNING, err);
-        ui.colored_label(MOCHA.red, msg);
+        let theme = theme::current_theme();
+        ui.colored_label(theme.destructive, msg);
         return DiffAction::None;
     }
 
     let mut open_full = false;
 
+    let theme = theme::current_theme();
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new("Diff").color(MOCHA.text));
+        ui.label(egui::RichText::new("Diff").color(theme.text_primary));
 
         ui.label(egui::RichText::new(format!(
             "{} {} files",
@@ -143,7 +145,7 @@ pub fn render_diff_editor_with_options(
                             "{} Open",
                             egui_phosphor::regular::ARROW_SQUARE_OUT
                         ))
-                        .color(MOCHA.mauve),
+                        .color(theme.brand),
                     )
                     .clicked()
                 {
@@ -216,6 +218,7 @@ fn render_file_header(
     state: &mut DiffState,
     state_id: egui::Id,
 ) {
+    let theme = theme::current_theme();
     let file = &state.files[file_idx];
 
     let is_open = !state.collapsed[file_idx];
@@ -237,7 +240,7 @@ fn render_file_header(
                 .button(
                     egui::RichText::new(icon.to_string())
                         .size(DIFF_FONT_SIZE)
-                        .color(MOCHA.text),
+                        .color(theme.text_primary),
                 )
                 .clicked()
             {
@@ -247,7 +250,7 @@ fn render_file_header(
             ui.label(
                 egui::RichText::new(display_path)
                     .strong()
-                    .color(MOCHA.text)
+                    .color(theme.text_primary)
                     .size(HEADER_FONT_SIZE),
             );
 
@@ -255,14 +258,14 @@ fn render_file_header(
                 if file.deletions > 0 {
                     ui.label(
                         egui::RichText::new(format!("-{}", file.deletions))
-                            .color(MOCHA.red)
+                            .color(theme.destructive)
                             .size(DIFF_FONT_SIZE),
                     );
                 }
                 if file.additions > 0 {
                     ui.label(
                         egui::RichText::new(format!("+{}", file.additions))
-                            .color(MOCHA.green)
+                            .color(theme.success)
                             .size(DIFF_FONT_SIZE),
                     );
                 }
@@ -300,6 +303,7 @@ fn render_unified_row(
     on_comment_click: Option<&dyn Fn(usize, usize, usize)>,
     _active_comment_line: Option<LineContext>,
 ) -> DiffAction {
+    let theme = theme::current_theme();
     let mut action = DiffAction::None;
 
     let comment_open_id = ui.id().with(("comment_open", ctx.file_idx, ctx.line_idx));
@@ -314,26 +318,26 @@ fn render_unified_row(
     let (prefix, mut bg_color, text_color, mut line_num_bg) = match line.change_type {
         ChangeType::Equal => (
             " ",
-            egui::Color32::TRANSPARENT,
-            MOCHA.text,
-            egui::Color32::TRANSPARENT,
+            theme.transparent,
+            theme.text_primary,
+            theme.transparent,
         ),
         ChangeType::Delete => (
             "-",
-            MOCHA.red.gamma_multiply(0.15),
-            MOCHA.red,
-            MOCHA.red.gamma_multiply(0.25),
+            theme.destructive.gamma_multiply(0.15),
+            theme.destructive,
+            theme.destructive.gamma_multiply(0.25),
         ),
         ChangeType::Insert => (
             "+",
-            MOCHA.green.gamma_multiply(0.15),
-            MOCHA.green,
-            MOCHA.green.gamma_multiply(0.25),
+            theme.success.gamma_multiply(0.15),
+            theme.success,
+            theme.success.gamma_multiply(0.25),
         ),
     };
 
     if is_active {
-        let active_color = MOCHA.blue.gamma_multiply(0.2);
+        let active_color = theme.accent.gamma_multiply(0.2);
         bg_color = active_color;
         line_num_bg = active_color;
     }
@@ -375,7 +379,7 @@ fn render_unified_row(
                         ui.label(
                             egui::RichText::new(line_numbers)
                                 .font(FontId::monospace(DIFF_FONT_SIZE))
-                                .color(MOCHA.overlay0),
+                                .color(theme.text_disabled),
                         );
                     });
 
@@ -406,9 +410,9 @@ fn render_unified_row(
 
                         if let Some(segments) = &line.inline_segments {
                             let highlight_bg = match line.change_type {
-                                ChangeType::Delete => MOCHA.red.gamma_multiply(0.4),
-                                ChangeType::Insert => MOCHA.green.gamma_multiply(0.4),
-                                ChangeType::Equal => egui::Color32::TRANSPARENT,
+                                ChangeType::Delete => theme.destructive.gamma_multiply(0.4),
+                                ChangeType::Insert => theme.success.gamma_multiply(0.4),
+                                ChangeType::Equal => theme.transparent,
                             };
                             paint_inline_text_job(&mut job, segments, text_color, highlight_bg);
                         } else {
@@ -458,14 +462,14 @@ fn render_unified_row(
 
         let painter = ui.painter();
 
-        painter.rect_filled(button_rect, size * 0.5, MOCHA.blue);
+        painter.rect_filled(button_rect, size * 0.5, theme.accent);
 
         painter.text(
             button_rect.center(),
             egui::Align2::CENTER_CENTER,
             PLUS.to_string(),
             FontId::proportional(size - 2.0),
-            MOCHA.base,
+            theme.bg_primary,
         );
 
         let hovered_button = pointer_pos.is_some_and(|p| button_rect.contains(p));

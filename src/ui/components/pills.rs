@@ -1,7 +1,7 @@
-use catppuccin_egui::MOCHA;
 use eframe::egui;
 
 use crate::ui::spacing;
+use crate::ui::theme;
 
 pub fn pill_divider(ui: &mut egui::Ui) {
     ui.add_sized(
@@ -17,17 +17,22 @@ pub fn pill_action_button(
     enabled: bool,
     tint: egui::Color32,
 ) -> egui::Response {
+    let theme = theme::current_theme();
     let text = egui::RichText::new(format!("{icon} {label}"))
         .size(12.0)
-        .color(if enabled { MOCHA.text } else { MOCHA.subtext0 });
+        .color(if enabled {
+            theme.text_primary
+        } else {
+            theme.text_disabled
+        });
 
     let fill = if enabled {
-        MOCHA.surface0
+        theme.bg_secondary
     } else {
-        MOCHA.mantle
+        theme.bg_surface
     };
 
-    let stroke = if enabled { tint } else { MOCHA.surface2 };
+    let stroke = if enabled { tint } else { theme.border };
 
     let old_padding = ui.spacing().button_padding;
     ui.spacing_mut().button_padding =

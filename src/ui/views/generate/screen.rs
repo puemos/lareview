@@ -27,7 +27,7 @@ impl LaReviewApp {
 
             header(
                 ui,
-                "Generate",
+                "Generate a new review",
                 Some(HeaderAction::new(
                     action_text.as_str(),
                     has_content && !self.state.is_generating && !self.state.is_preview_fetching,
@@ -301,6 +301,7 @@ impl LaReviewApp {
                 let mut selected_agent = self.state.selected_agent.clone();
                 egui::ScrollArea::vertical()
                     .max_height(72.0)
+                    .auto_shrink([false, true])
                     .id_salt(ui.id().with("agent_chips_scroll"))
                     .show(ui, |ui| {
                         selection_chips(

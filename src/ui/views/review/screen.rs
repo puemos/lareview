@@ -71,8 +71,6 @@ impl LaReviewApp {
 
         // Top header (minimal, Linear-ish).
         ui.horizontal(|ui| {
-            ui.heading(egui::RichText::new("Review").size(18.0).color(MOCHA.text));
-
             if !self.state.reviews.is_empty() {
                 ui.add_space(spacing::SPACING_MD); // 10.0 -> 12.0 (closest standard value)
                 let current_id = self.state.selected_review_id.clone();

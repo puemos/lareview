@@ -1,4 +1,3 @@
-use catppuccin_egui::MOCHA;
 use eframe::egui;
 
 use super::LaReviewApp;
@@ -6,7 +5,8 @@ use super::state::AppView;
 
 impl eframe::App for LaReviewApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        catppuccin_egui::set_theme(ctx, MOCHA);
+        // Set the base Catppuccin theme for overall UI appearance
+        catppuccin_egui::set_theme(ctx, catppuccin_egui::MOCHA);
 
         self.poll_gh_messages();
         self.poll_d2_install_messages();

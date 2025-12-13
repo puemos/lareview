@@ -1,7 +1,8 @@
 use crate::ui::app::{Action, LaReviewApp, SettingsAction};
 use crate::ui::spacing;
-use catppuccin_egui::MOCHA;
 use eframe::egui;
+
+use crate::ui::theme;
 
 impl LaReviewApp {
     pub fn ui_settings(&mut self, ui: &mut egui::Ui) {
@@ -9,8 +10,9 @@ impl LaReviewApp {
         ui.add_space(spacing::SPACING_LG);
 
         // --- GitHub Section ---
+        let theme = theme::current_theme();
         egui::Frame::group(ui.style())
-            .fill(MOCHA.surface0)
+            .fill(theme.bg_secondary)
             .inner_margin(spacing::SPACING_LG)
             .show(ui, |ui| {
                 // 1. Consistent Header Layout (Title + Status far right)
@@ -19,13 +21,13 @@ impl LaReviewApp {
                     // Use right_to_left layout for the status indicator
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if self.state.is_gh_status_checking {
-                            ui.label(egui::RichText::new("Checking...").color(MOCHA.yellow));
+                            ui.label(egui::RichText::new("Checking...").color(theme.warning));
                         } else if self.state.gh_status.is_some()
                             && self.state.gh_status_error.is_none()
                         {
-                            ui.colored_label(MOCHA.green, "✔ Ready");
+                            ui.colored_label(theme.success, "✔ Ready");
                         } else {
-                            ui.colored_label(MOCHA.red, "✖ Error/Unknown");
+                            ui.colored_label(theme.destructive, "✖ Error/Unknown");
                         }
                     });
                 });
@@ -42,19 +44,19 @@ impl LaReviewApp {
                         // Value Column
                         ui.horizontal(|ui| {
                             if let Some(err) = &self.state.gh_status_error {
-                                ui.colored_label(MOCHA.red, "Disconnected");
+                                ui.colored_label(theme.destructive, "Disconnected");
                                 ui.weak(format!("(Error: {})", err));
                             } else if let Some(status) = &self.state.gh_status {
-                                ui.colored_label(MOCHA.green, "Connected");
+                                ui.colored_label(theme.success, "Connected");
                                 if let Some(login) = &status.login {
                                     ui.label(
                                         egui::RichText::new(format!("(@{})", login))
-                                            .color(MOCHA.subtext0)
+                                            .color(theme.text_disabled)
                                             .strong(),
                                     );
                                 }
                             } else {
-                                ui.colored_label(MOCHA.yellow, "Unknown");
+                                ui.colored_label(theme.warning, "Unknown");
                             }
                         });
                         ui.end_row();
@@ -103,7 +105,7 @@ impl LaReviewApp {
 
         // --- D2 Section ---
         egui::Frame::group(ui.style())
-            .fill(MOCHA.surface0)
+            .fill(theme.bg_secondary)
             .inner_margin(spacing::SPACING_LG)
             .show(ui, |ui| {
                 // ⚠️ CRITICAL: Still calculating this every frame due to state restriction.
@@ -115,11 +117,11 @@ impl LaReviewApp {
                     // Use right_to_left layout for the installation status
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if self.state.is_d2_installing {
-                            ui.label(egui::RichText::new("Installing...").color(MOCHA.yellow));
+                            ui.label(egui::RichText::new("Installing...").color(theme.warning));
                         } else if d2_installed {
-                            ui.colored_label(MOCHA.green, "✔ Installed");
+                            ui.colored_label(theme.success, "✔ Installed");
                         } else {
-                            ui.colored_label(MOCHA.overlay1, "Not Installed");
+                            ui.colored_label(theme.text_disabled, "Not Installed");
                         }
                     });
                 });
@@ -138,7 +140,7 @@ impl LaReviewApp {
                         self.ui_copyable_command(ui, "Manual Uninstall", uninstall_cmd);
 
                         ui.add_space(spacing::SPACING_SM);
-                        let btn = egui::Button::new("Run Uninstall Script").fill(MOCHA.surface1);
+                        let btn = egui::Button::new("Run Uninstall Script").fill(theme.bg_card);
                         if ui.add_enabled(!self.state.is_d2_installing, btn).clicked() {
                             self.dispatch(Action::Settings(SettingsAction::RequestD2Uninstall));
                         }
@@ -146,12 +148,12 @@ impl LaReviewApp {
                 } else {
                     // Warning box for remote script
                     egui::Frame::NONE
-                        .fill(MOCHA.mantle)
+                        .fill(theme.bg_surface)
                         .inner_margin(spacing::SPACING_SM)
-                        .stroke(egui::Stroke::new(1.0, MOCHA.yellow))
+                        .stroke(egui::Stroke::new(1.0, theme.warning))
                         .show(ui, |ui| {
                             ui.horizontal(|ui| {
-                                ui.label(egui::RichText::new("⚠").color(MOCHA.yellow).size(16.0));
+                                ui.label(egui::RichText::new("⚠").color(theme.warning).size(16.0));
                                 ui.vertical(|ui| {
                                     ui.strong("Remote Script Warning");
                                     ui.label("Installation requires running a remote shell script. You can run it manually or allow LaReview to run it.");
@@ -214,11 +216,12 @@ impl LaReviewApp {
 
     /// Helper UI component for commands
     fn ui_copyable_command(&self, ui: &mut egui::Ui, label: &str, cmd: &str) {
+        let theme = theme::current_theme();
         ui.label(label);
         ui.horizontal(|ui| {
             // Command text in a box
             egui::Frame::NONE
-                .fill(MOCHA.mantle)
+                .fill(theme.bg_surface)
                 .inner_margin(spacing::SPACING_SM) // Using SPACING_SM (8.0) as closest to 6.0
                 .corner_radius(4.0)
                 .show(ui, |ui| {

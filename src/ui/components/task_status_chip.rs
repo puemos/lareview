@@ -1,7 +1,7 @@
-use catppuccin_egui::MOCHA;
 use eframe::egui;
 
 use crate::ui::spacing;
+use crate::ui::theme;
 
 pub fn task_status_chip(
     ui: &mut egui::Ui,
@@ -10,10 +10,11 @@ pub fn task_status_chip(
     selected: bool,
     tint: egui::Color32,
 ) -> egui::Response {
+    let theme = theme::current_theme();
     let (fill, stroke, fg) = if selected {
         (tint.gamma_multiply(0.18), tint, tint)
     } else {
-        (MOCHA.surface0, MOCHA.surface2, MOCHA.subtext0)
+        (theme.bg_secondary, theme.border, theme.text_disabled)
     };
 
     let text = egui::RichText::new(format!("{icon} {label}"))

@@ -1,9 +1,15 @@
-use catppuccin_egui::MOCHA;
 use eframe::egui;
 
+use crate::ui::theme;
+
 pub fn header(ui: &mut egui::Ui, title: &str, action: Option<HeaderAction<'_>>) {
+    let theme = theme::current_theme();
     ui.horizontal(|ui| {
-        ui.heading(egui::RichText::new(title).size(20.0).color(MOCHA.text));
+        ui.heading(
+            egui::RichText::new(title)
+                .size(20.0)
+                .color(theme.text_primary),
+        );
 
         if let Some(action) = action {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -47,21 +53,22 @@ pub fn action_button(
     enabled: bool,
     color_if_enabled: egui::Color32,
 ) -> egui::Response {
+    let theme = theme::current_theme();
     let button_text = egui::RichText::new(label).size(15.0).color(if enabled {
-        MOCHA.crust
+        theme.text_inverse
     } else {
-        MOCHA.subtext0
+        theme.text_disabled
     });
 
     let fill_color = if enabled {
         color_if_enabled
     } else {
-        MOCHA.surface1
+        theme.bg_card
     };
     let stroke_color = if enabled {
-        MOCHA.overlay0
+        theme.text_disabled
     } else {
-        MOCHA.surface2
+        theme.border
     };
 
     let button = egui::Button::new(button_text)
