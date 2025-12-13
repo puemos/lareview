@@ -5,6 +5,8 @@ use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Stdin, Stdout};
 use tokio::sync::Mutex;
 
+use super::logging::log_raw_line;
+
 #[derive(Debug)]
 pub(super) struct LineDelimitedStdioTransport {
     stdin: Arc<Mutex<BufReader<Stdin>>>,
@@ -25,6 +27,9 @@ impl Transport for LineDelimitedStdioTransport {
     async fn send(&mut self, message: TransportMessage) -> pmcp::Result<()> {
         let json = serde_json::to_string(&message)
             .map_err(|e| pmcp::Error::Transport(TransportError::Serialization(e.to_string())))?;
+
+        // Log outbound messages for full request/response visibility.
+        log_raw_line(&format!("OUT {json}"));
 
         let mut stdout = self.stdout.lock().await;
         stdout
@@ -58,6 +63,9 @@ impl Transport for LineDelimitedStdioTransport {
         let json_value: serde_json::Value = serde_json::from_str(&line).map_err(|e| {
             pmcp::Error::Transport(TransportError::InvalidMessage(format!("Invalid JSON: {e}")))
         })?;
+
+        // Log every inbound message for debugging failed tool calls (schema validation, etc).
+        log_raw_line(&format!("IN {}", line.trim_end()));
 
         if json_value.get("method").is_some() {
             if json_value.get("id").is_some() {
