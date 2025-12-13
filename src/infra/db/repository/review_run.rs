@@ -1,5 +1,5 @@
 use super::DbConn;
-use crate::domain::{ReviewRun, ReviewRunId};
+use crate::domain::{ReviewId, ReviewRun, ReviewRunId};
 use anyhow::Result;
 
 /// Repository for review run operations.
@@ -30,6 +30,31 @@ impl ReviewRunRepository {
             ),
         )?;
         Ok(())
+    }
+
+    pub fn find_by_review_id(&self, review_id: &ReviewId) -> Result<Vec<ReviewRun>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, review_id, agent_id, input_ref, diff_text, diff_hash, created_at FROM review_runs WHERE review_id = ?1",
+        )?;
+        let rows = stmt.query_map([review_id], |row| {
+            Ok(ReviewRun {
+                id: row.get::<_, ReviewRunId>(0)?,
+                review_id: row.get(1)?,
+                agent_id: row.get(2)?,
+                input_ref: row.get(3)?,
+                diff_text: row.get(4)?,
+                diff_hash: row.get(5)?,
+                created_at: row.get(6)?,
+            })
+        })?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    pub fn delete_by_review_id(&self, review_id: &ReviewId) -> Result<usize> {
+        let conn = self.conn.lock().unwrap();
+        let affected = conn.execute("DELETE FROM review_runs WHERE review_id = ?1", [review_id])?;
+        Ok(affected)
     }
 
     pub fn list_all(&self) -> Result<Vec<ReviewRun>> {

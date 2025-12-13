@@ -4,13 +4,18 @@ use crate::application::review::ordering::{
     sub_flows_in_display_order, tasks_in_display_order, tasks_in_sub_flow_display_order,
 };
 use crate::ui::app::{Action, LaReviewApp, ReviewAction};
-use crate::ui::components::header::action_button;
+use crate::ui::components::action_button::action_button;
 use crate::ui::components::status::error_banner;
 use crate::ui::components::{badge::badge, pills::pill_action_button};
 use crate::ui::spacing;
+use crate::ui::theme::current_theme;
 use catppuccin_egui::MOCHA;
 use eframe::egui;
 use egui_phosphor::regular as icons;
+
+// Fixed top header sizing for consistent alignment across widgets.
+const TOP_HEADER_HEIGHT: f32 = 44.0;
+const TOP_HEADER_CONTROL_HEIGHT: f32 = 28.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RightPaneState {
@@ -52,10 +57,6 @@ impl LaReviewApp {
             0.0
         };
 
-        let has_done_tasks = display_order_tasks
-            .iter()
-            .any(|t| t.status == crate::domain::TaskStatus::Done);
-
         let next_open_id = display_order_tasks
             .iter()
             .find(|t| t.status == crate::domain::TaskStatus::Pending)
@@ -66,134 +67,162 @@ impl LaReviewApp {
             })
             .map(|t| t.id.clone());
 
-        let mut trigger_clean_done = false;
-        let mut trigger_next_open = false;
+        let mut trigger_delete_review = false;
 
-        // Top header (minimal, Linear-ish).
-        ui.horizontal(|ui| {
-            if !self.state.reviews.is_empty() {
-                ui.add_space(spacing::SPACING_MD); // 10.0 -> 12.0 (closest standard value)
-                let current_id = self.state.selected_review_id.clone();
-                let current_label = current_id
-                    .as_ref()
-                    .and_then(|id| self.state.reviews.iter().find(|r| &r.id == id))
-                    .map(|r| r.title.clone())
-                    .unwrap_or_else(|| "Select review…".to_string());
+        // --- Top Header Frame for consistent padding and sizing ---
+        egui::Frame::NONE
+            .fill(ui.style().visuals.panel_fill)
+            .inner_margin(egui::Margin::symmetric(
+                spacing::SPACING_MD as i8,
+                spacing::SPACING_SM as i8,
+            ))
+            .show(ui, |ui| {
+                let header_inner_height =
+                    (TOP_HEADER_HEIGHT - 2.0 * spacing::SPACING_SM).max(TOP_HEADER_CONTROL_HEIGHT);
+                ui.set_min_height(header_inner_height);
 
-                egui::ComboBox::from_id_salt("review_select")
-                    .selected_text(current_label)
-                    .show_ui(ui, |ui| {
-                        let mut next_review_id: Option<String> = None;
-                        for review in &self.state.reviews {
-                            let selected = current_id.as_deref() == Some(&review.id);
-                            if ui.selectable_label(selected, &review.title).clicked() {
-                                next_review_id = Some(review.id.clone());
+                ui.scope(|ui| {
+                    let old_interact_size = ui.spacing().interact_size;
+                    let old_button_padding = ui.spacing().button_padding;
+                    ui.spacing_mut().interact_size.y = TOP_HEADER_CONTROL_HEIGHT;
+                    ui.spacing_mut().button_padding =
+                        egui::vec2(spacing::BUTTON_PADDING.0, spacing::BUTTON_PADDING.1);
+
+                    ui.allocate_ui_with_layout(
+                        egui::vec2(ui.available_width(), header_inner_height),
+                        egui::Layout::left_to_right(egui::Align::Center),
+                        |ui| {
+                            // LEFT: Review and Run Selection Dropdowns
+                            if !self.state.reviews.is_empty() {
+                                let current_id = self.state.selected_review_id.clone();
+                                let current_label = current_id
+                                    .as_ref()
+                                    .and_then(|id| {
+                                        self.state.reviews.iter().find(|r| &r.id == id)
+                                    })
+                                    .map(|r| r.title.clone())
+                                    .unwrap_or_else(|| "Select review…".to_string());
+
+                                egui::ComboBox::from_id_salt("review_select")
+                                    .selected_text(current_label)
+                                    .width(180.0)
+                                    .show_ui(ui, |ui| {
+                                        let mut next_review_id: Option<String> = None;
+                                        for review in &self.state.reviews {
+                                            let selected =
+                                                current_id.as_deref() == Some(&review.id);
+                                            if ui
+                                                .selectable_label(selected, &review.title)
+                                                .clicked()
+                                            {
+                                                next_review_id = Some(review.id.clone());
+                                            }
+                                        }
+
+                                        if let Some(review_id) = next_review_id {
+                                            self.dispatch(Action::Review(
+                                                ReviewAction::SelectReview { review_id },
+                                            ));
+                                        }
+                                    });
                             }
-                        }
 
-                        if let Some(review_id) = next_review_id {
-                            self.dispatch(Action::Review(ReviewAction::SelectReview { review_id }));
-                        }
-                    });
-            }
+                            ui.add_space(spacing::SPACING_SM);
 
-            if let Some(selected_review_id) = self.state.selected_review_id.clone() {
-                let runs_for_review: Vec<(String, String)> = self
-                    .state
-                    .runs
-                    .iter()
-                    .filter(|run| run.review_id == selected_review_id)
-                    .map(|run| {
-                        let short = run.id.chars().take(8).collect::<String>();
-                        (run.id.clone(), format!("{short}… ({})", run.agent_id))
-                    })
-                    .collect();
+                            if let Some(selected_review_id) = self.state.selected_review_id.clone()
+                            {
+                                let runs_for_review: Vec<(String, String)> = self
+                                    .state
+                                    .runs
+                                    .iter()
+                                    .filter(|run| run.review_id == selected_review_id)
+                                    .map(|run| {
+                                        let short = run.id.chars().take(8).collect::<String>();
+                                        (run.id.clone(), format!("{short}… ({})", run.agent_id))
+                                    })
+                                    .collect();
 
-                if !runs_for_review.is_empty() {
-                    ui.add_space(spacing::SPACING_MD); // 10.0 -> 12.0 (closest standard value)
-                    let current_run_id = self.state.selected_run_id.clone();
-                    let current_run_label = current_run_id
-                        .as_ref()
-                        .and_then(|id| runs_for_review.iter().find(|(run_id, _)| run_id == id))
-                        .map(|(run_id, _)| {
-                            format!("Run {}…", run_id.chars().take(8).collect::<String>())
-                        })
-                        .unwrap_or_else(|| "Select run…".to_string());
+                                if !runs_for_review.is_empty() {
+                                    let current_run_id = self.state.selected_run_id.clone();
+                                    let current_run_label = current_run_id
+                                        .as_ref()
+                                        .and_then(|id| {
+                                            runs_for_review
+                                                .iter()
+                                                .find(|(run_id, _)| run_id == id)
+                                        })
+                                        .map(|(run_id, _)| {
+                                            format!(
+                                                "Run {}…",
+                                                run_id.chars().take(8).collect::<String>()
+                                            )
+                                        })
+                                        .unwrap_or_else(|| "Select run…".to_string());
 
-                    let mut next_run_id: Option<String> = None;
-                    egui::ComboBox::from_id_salt("run_select")
-                        .selected_text(current_run_label)
-                        .show_ui(ui, |ui| {
-                            for (run_id, label) in &runs_for_review {
-                                let selected = current_run_id.as_deref() == Some(run_id.as_str());
-                                if ui.selectable_label(selected, label).clicked() {
-                                    next_run_id = Some(run_id.clone());
+                                    let mut next_run_id: Option<String> = None;
+                                    egui::ComboBox::from_id_salt("run_select")
+                                        .selected_text(current_run_label)
+                                        .width(120.0)
+                                        .show_ui(ui, |ui| {
+                                            for (run_id, label) in &runs_for_review {
+                                                let selected = current_run_id.as_deref()
+                                                    == Some(run_id.as_str());
+                                                if ui.selectable_label(selected, label).clicked()
+                                                {
+                                                    next_run_id = Some(run_id.clone());
+                                                }
+                                            }
+                                        });
+
+                                    if let Some(run_id) = next_run_id {
+                                        self.dispatch(Action::Review(ReviewAction::SelectRun {
+                                            run_id,
+                                        }));
+                                    }
                                 }
                             }
-                        });
 
-                    if let Some(run_id) = next_run_id {
-                        self.dispatch(Action::Review(ReviewAction::SelectRun { run_id }));
-                    }
-                }
-            }
+                            // RIGHT: Actions
+                            ui.allocate_ui_with_layout(
+                                egui::vec2(ui.available_width(), ui.available_height()),
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    let review_selected = self.state.selected_review_id.is_some();
+                                    if review_selected {
+                                        let resp = pill_action_button(
+                                            ui,
+                                            icons::TRASH_SIMPLE,
+                                            "Delete",
+                                            review_selected,
+                                            current_theme().border,
+                                        )
+                                        .on_hover_text(
+                                            "Delete the selected review, including all its runs, tasks, and notes.",
+                                        );
+                                        if resp.clicked() {
+                                            trigger_delete_review = true;
+                                        }
+                                    }
+                                },
+                            );
+                        },
+                    );
 
-            if total_tasks > 0 {
-                ui.add_space(spacing::SPACING_MD); // 10.0 -> 12.0 (closest standard value)
-                badge(
-                    ui,
-                    &format!("{done_tasks}/{total_tasks} done"),
-                    MOCHA.surface0,
-                    MOCHA.subtext0,
-                );
-            }
-
-            if total_tasks > 0 {
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let resp = pill_action_button(
-                        ui,
-                        icons::TRASH_SIMPLE,
-                        "Clean done",
-                        has_done_tasks,
-                        MOCHA.red,
-                    )
-                    .on_hover_text("Remove DONE tasks (and their notes) for this PR");
-                    if resp.clicked() {
-                        trigger_clean_done = true;
-                    }
-
-                    ui.add_space(spacing::SPACING_SM);
-
-                    let next_enabled = next_open_id.is_some();
-                    let resp = pill_action_button(
-                        ui,
-                        icons::ARROW_RIGHT,
-                        "Next open",
-                        next_enabled,
-                        MOCHA.mauve,
-                    )
-                    .on_hover_text("Jump to the next open task");
-                    if resp.clicked() {
-                        trigger_next_open = true;
-                    }
+                    ui.spacing_mut().interact_size = old_interact_size;
+                    ui.spacing_mut().button_padding = old_button_padding;
                 });
-            }
-        });
-        ui.add_space(spacing::SPACING_XS + 2.0);
+            }); // Close the header frame
 
-        if trigger_clean_done {
-            self.clean_done_tasks();
-            return;
-        }
+        // Removed: ui.add_space(spacing::SPACING_XS + 2.0);
 
-        if trigger_next_open && let Some(id) = next_open_id.as_deref() {
-            self.select_task_by_id(&all_tasks, id);
+        if trigger_delete_review {
+            self.dispatch(Action::Review(ReviewAction::DeleteReview));
             return;
         }
 
         // Error Banner
         if let Some(err) = &self.state.review_error {
-            ui.add_space(6.0); // Keep 6.0 as this is a custom spacing value
+            ui.add_space(6.0);
             error_banner(ui, err);
         }
 
@@ -459,9 +488,9 @@ impl LaReviewApp {
                                 .default_open(true)
                                 .show(ui, |ui| {
                                     ui.spacing_mut().item_spacing = egui::vec2(
-                                        spacing::DIFF_ITEM_SPACING.0,
-                                        spacing::DIFF_ITEM_SPACING.1,
-                                    ); // 0.0, 2.0
+                                        spacing::TIGHT_ITEM_SPACING.0,
+                                        spacing::TIGHT_ITEM_SPACING.1,
+                                    ); // 4.0, 4.0
                                     for task in tasks_in_sub_flow_display_order(tasks) {
                                         self.render_nav_item(ui, task);
                                     }
@@ -504,7 +533,7 @@ impl LaReviewApp {
         let mut right_ui = ui.new_child(egui::UiBuilder::new().max_rect(right_rect));
         egui::Frame::NONE
             .fill(ui.style().visuals.window_fill)
-            .inner_margin(egui::Margin::symmetric(spacing::SPACING_XL as i8, spacing::SPACING_LG as i8)) // 24, 16 -> 24, 16
+            .inner_margin(egui::Margin::symmetric(spacing::SPACING_XL as i8, 0))
             .show(&mut right_ui, |ui| {
                 let right_state = if display_order_tasks.is_empty() {
                     RightPaneState::NoTasks

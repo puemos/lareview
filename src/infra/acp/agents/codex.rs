@@ -11,7 +11,7 @@ fn is_command_available(command: &str) -> bool {
 pub fn codex_candidate() -> AgentCandidate {
     AgentCandidate {
         id: "codex".to_string(),
-        label: "OpenAI Codex".to_string(),
+        label: "Codex".to_string(),
         logo: Some("assets/icons/codex.svg".to_string()),
         command: Some("npx".to_string()),
         args: vec![
@@ -33,7 +33,7 @@ impl super::super::agent_trait::AcpAgent for CodexAgent {
     }
 
     fn display_name(&self) -> &'static str {
-        "OpenAI Codex"
+        "Codex"
     }
 
     fn candidate(&self) -> AgentCandidate {

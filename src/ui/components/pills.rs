@@ -4,9 +4,19 @@ use crate::ui::spacing;
 use crate::ui::theme;
 
 pub fn pill_divider(ui: &mut egui::Ui) {
-    ui.add_sized(
-        egui::vec2(spacing::SPACING_XS + 2.0, 22.0),
-        egui::Separator::default().vertical(),
+    let theme = theme::current_theme();
+
+    // Small, subtle divider to separate inline "pill" elements without adding visual weight.
+    let size = egui::vec2(spacing::SPACING_SM, 18.0);
+    let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+
+    let x = rect.center().x;
+    let top = rect.top() + 2.0;
+    let bottom = rect.bottom() - 2.0;
+
+    ui.painter().line_segment(
+        [egui::pos2(x, top), egui::pos2(x, bottom)],
+        egui::Stroke::new(1.0, theme.border_secondary.gamma_multiply(0.8)),
     );
 }
 
@@ -44,7 +54,7 @@ pub fn pill_action_button(
             .fill(fill)
             .stroke(egui::Stroke::new(1.0, stroke))
             .corner_radius(egui::CornerRadius::same(255))
-            .min_size(egui::vec2(0.0, 24.0)),
+            .min_size(egui::vec2(0.0, 28.0)),
     );
 
     let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);

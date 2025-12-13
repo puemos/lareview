@@ -58,4 +58,10 @@ impl ReviewRepository {
 
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
+
+    pub fn delete(&self, id: &ReviewId) -> Result<usize> {
+        let conn = self.conn.lock().unwrap();
+        let affected = conn.execute("DELETE FROM reviews WHERE id = ?1", [id])?;
+        Ok(affected)
+    }
 }

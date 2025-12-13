@@ -51,7 +51,7 @@ pub enum ReviewAction {
         task_id: TaskId,
         status: TaskStatus,
     },
-    CleanDoneTasks,
+    DeleteReview,
     SaveCurrentNote,
     SaveLineNote {
         task_id: TaskId,
@@ -87,7 +87,7 @@ pub enum AsyncAction {
     },
     TaskStatusSaved(Result<(), String>),
     NoteSaved(Result<(), String>),
-    DoneTasksCleaned(Result<(), String>),
+    ReviewDeleted(Result<(), String>),
     D2InstallOutput(String),
     D2InstallComplete,
 }

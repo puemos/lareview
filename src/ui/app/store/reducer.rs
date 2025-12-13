@@ -161,11 +161,13 @@ fn reduce_review(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
             state.review_error = None;
             vec![Command::UpdateTaskStatus { task_id, status }]
         }
-        ReviewAction::CleanDoneTasks => {
-            state.review_error = None;
-            vec![Command::CleanDoneTasks {
-                run_id: state.selected_run_id.clone(),
-            }]
+        ReviewAction::DeleteReview => {
+            if let Some(review_id) = state.selected_review_id.clone() {
+                state.review_error = None;
+                vec![Command::DeleteReview { review_id }]
+            } else {
+                Vec::new()
+            }
         }
         ReviewAction::SaveCurrentNote => {
             let Some(task_id) = state.selected_task_id.clone() else {
@@ -316,17 +318,19 @@ fn reduce_async(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
             }
             Vec::new()
         }
-        AsyncAction::DoneTasksCleaned(result) => {
+        AsyncAction::ReviewDeleted(result) => {
             if let Err(err) = result {
                 state.review_error = Some(err);
                 Vec::new()
             } else {
                 state.review_error = None;
+                state.selected_review_id = None;
+                state.selected_run_id = None;
                 state.selected_task_id = None;
                 state.current_note = None;
                 state.current_line_note = None;
                 vec![Command::RefreshReviewData {
-                    reason: ReviewDataRefreshReason::AfterCleanup,
+                    reason: ReviewDataRefreshReason::AfterReviewDelete,
                 }]
             }
         }
@@ -677,25 +681,6 @@ mod tests {
                 }]
             ),
             "expected refresh when entering review"
-        );
-    }
-
-    #[test]
-    fn clean_done_tasks_enqueues_command() {
-        let mut state = AppState {
-            selected_run_id: Some("run1".into()),
-            ..Default::default()
-        };
-
-        let commands = reduce(&mut state, Action::Review(ReviewAction::CleanDoneTasks));
-        assert!(state.review_error.is_none());
-        assert!(
-            matches!(
-                commands.as_slice(),
-                [Command::CleanDoneTasks { run_id }]
-                if run_id.as_deref() == Some("run1")
-            ),
-            "expected clean-done command"
         );
     }
 

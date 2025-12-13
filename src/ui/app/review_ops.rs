@@ -35,8 +35,4 @@ impl LaReviewApp {
             status: new_status,
         }));
     }
-
-    pub fn clean_done_tasks(&mut self) {
-        self.dispatch(Action::Review(ReviewAction::CleanDoneTasks));
-    }
 }

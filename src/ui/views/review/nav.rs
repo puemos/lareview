@@ -35,7 +35,10 @@ impl LaReviewApp {
         let response = egui::Frame::NONE
             .fill(bg_color)
             .corner_radius(4.0)
-            .inner_margin(spacing::SPACING_XS)
+            .inner_margin(egui::Margin::symmetric(
+                spacing::SPACING_SM as i8,
+                (spacing::SPACING_XS + 2.0) as i8,
+            ))
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
@@ -45,7 +48,11 @@ impl LaReviewApp {
 
                     ui.add_space(6.0); // Keep 6.0 as this is a custom spacing value
 
-                    ui.add(egui::Label::new(title_text).wrap());
+                    ui.add(
+                        egui::Label::new(title_text)
+                            .truncate()
+                            .show_tooltip_when_elided(true),
+                    );
                 })
                 .response
             })

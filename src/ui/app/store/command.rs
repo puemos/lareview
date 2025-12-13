@@ -1,4 +1,4 @@
-use crate::domain::{TaskId, TaskStatus};
+use crate::domain::{ReviewId, TaskId, TaskStatus};
 use crate::infra::acp::RunContext;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -7,7 +7,7 @@ pub enum ReviewDataRefreshReason {
     Navigation,
     AfterGeneration,
     AfterStatusChange,
-    AfterCleanup,
+    AfterReviewDelete,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,8 +44,8 @@ pub enum Command {
         task_id: TaskId,
         status: TaskStatus,
     },
-    CleanDoneTasks {
-        run_id: Option<String>,
+    DeleteReview {
+        review_id: ReviewId,
     },
     SaveNote {
         task_id: TaskId,

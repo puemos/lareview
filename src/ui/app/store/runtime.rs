@@ -1,5 +1,6 @@
 use super::action::{Action, AsyncAction, ReviewDataPayload};
 use super::command::{Command, D2Command};
+use crate::domain::ReviewId;
 use crate::infra::acp::{GenerateTasksInput, generate_tasks_with_acp, list_agent_candidates};
 use crate::ui::app::{GenMsg, GenResultPayload};
 use crate::ui::app::{GhMsg, GhStatusPayload};
@@ -25,7 +26,7 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
         Command::RefreshReviewData { reason } => refresh_review_data(app, reason),
         Command::LoadTaskNote { task_id } => load_task_note(app, task_id),
         Command::UpdateTaskStatus { task_id, status } => update_task_status(app, task_id, status),
-        Command::CleanDoneTasks { run_id } => clean_done_tasks(app, run_id),
+        Command::DeleteReview { review_id } => delete_review(app, review_id),
         Command::SaveNote {
             task_id,
             body,
@@ -292,41 +293,44 @@ fn update_task_status(
     app.dispatch(Action::Async(AsyncAction::TaskStatusSaved(result)));
 }
 
-fn clean_done_tasks(app: &mut LaReviewApp, run_id: Option<String>) {
-    let Some(run_id) = run_id else {
-        app.dispatch(Action::Async(AsyncAction::DoneTasksCleaned(Err(
-            "No review run selected".into(),
-        ))));
-        return;
-    };
-
-    let done_ids = match app.task_repo.find_done_ids_by_run(&run_id) {
-        Ok(ids) => ids,
-        Err(err) => {
-            app.dispatch(Action::Async(AsyncAction::DoneTasksCleaned(Err(format!(
-                "Failed to list done tasks: {err}"
-            )))));
-            return;
-        }
-    };
-
-    if done_ids.is_empty() {
-        return;
-    }
-
+fn delete_review(app: &mut LaReviewApp, review_id: ReviewId) {
     let result = (|| -> Result<(), String> {
-        app.note_repo
-            .delete_by_task_ids(&done_ids)
-            .map_err(|e| format!("Failed to delete notes for done tasks: {e}"))?;
+        let runs = app
+            .run_repo
+            .find_by_review_id(&review_id)
+            .map_err(|e| format!("Failed to fetch runs for review: {e}"))?;
 
-        app.task_repo
-            .delete_by_ids(&done_ids)
-            .map_err(|e| format!("Failed to delete done tasks: {e}"))?;
+        if !runs.is_empty() {
+            let run_ids: Vec<_> = runs.iter().map(|r| r.id.clone()).collect();
+            let tasks = app
+                .task_repo
+                .find_by_run_ids(&run_ids)
+                .map_err(|e| format!("Failed to fetch tasks for runs: {e}"))?;
+
+            if !tasks.is_empty() {
+                let task_ids: Vec<_> = tasks.iter().map(|t| t.id.clone()).collect();
+
+                app.note_repo
+                    .delete_by_task_ids(&task_ids)
+                    .map_err(|e| format!("Failed to delete notes: {e}"))?;
+
+                app.task_repo
+                    .delete_by_ids(&task_ids)
+                    .map_err(|e| format!("Failed to delete tasks: {e}"))?;
+            }
+
+            app.run_repo
+                .delete_by_review_id(&review_id)
+                .map_err(|e| format!("Failed to delete runs: {e}"))?;
+        }
+
+        app.review_repo
+            .delete(&review_id)
+            .map_err(|e| format!("Failed to delete review: {e}"))?;
 
         Ok(())
     })();
-
-    app.dispatch(Action::Async(AsyncAction::DoneTasksCleaned(result)));
+    app.dispatch(Action::Async(AsyncAction::ReviewDeleted(result)));
 }
 
 fn save_note(

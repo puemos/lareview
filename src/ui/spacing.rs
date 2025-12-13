@@ -28,6 +28,7 @@ pub const BUTTON_PADDING: (f32, f32) = (8.0, 4.0);
 pub const ITEM_SPACING: (f32, f32) = (8.0, 6.0);
 
 /// Diff component spacing (0px horizontal, 2px vertical) - for temporary UI changes
+#[allow(dead_code)]
 pub const DIFF_ITEM_SPACING: (f32, f32) = (0.0, 2.0);
 
 /// Tight item spacing (4px horizontal, 4px vertical) - for temporary UI changes

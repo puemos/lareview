@@ -62,15 +62,6 @@ impl TaskRepository {
         Ok(())
     }
 
-    pub fn find_done_ids_by_run(&self, run_id: &ReviewRunId) -> Result<Vec<TaskId>> {
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT id FROM tasks WHERE run_id = ?1 AND status IN ('DONE','REVIEWED','COMPLETED')",
-        )?;
-        let rows = stmt.query_map([run_id], |row| row.get::<_, String>(0))?;
-        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
-    }
-
     pub fn delete_by_ids(&self, task_ids: &[TaskId]) -> Result<usize> {
         if task_ids.is_empty() {
             return Ok(0);
@@ -91,6 +82,83 @@ impl TaskRepository {
         )?;
 
         let rows = stmt.query_map([], |row| {
+            let run_id: String = row.get(1)?;
+            let files_json: String = row.get(4)?;
+            let stats_json: String = row.get(5)?;
+            let diffs_json: Option<String> = row.get(7)?;
+            let status_str: String = row.get(10)?;
+            let sub_flow: Option<String> = row.get(11)?;
+
+            Ok((
+                row.get::<_, String>(0)?,
+                run_id,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                files_json,
+                stats_json,
+                row.get::<_, Option<String>>(6)?,
+                diffs_json,
+                row.get::<_, Option<String>>(8)?,
+                row.get::<_, i32>(9)?,
+                status_str,
+                sub_flow,
+            ))
+        })?;
+
+        let mut tasks = Vec::new();
+        for row in rows {
+            let (
+                id,
+                run_id,
+                title,
+                description,
+                files_json,
+                stats_json,
+                insight,
+                diffs_json,
+                diagram,
+                ai_generated,
+                status_str,
+                sub_flow,
+            ) = row?;
+
+            let status = Self::parse_task_status(status_str.as_str());
+
+            tasks.push(ReviewTask {
+                id,
+                run_id,
+                title,
+                description,
+                files: serde_json::from_str(&files_json).unwrap_or_default(),
+                stats: serde_json::from_str(&stats_json).unwrap_or_default(),
+                insight,
+                diffs: diffs_json
+                    .map(|s| serde_json::from_str(&s).unwrap_or_default())
+                    .unwrap_or_default(),
+                diagram,
+                ai_generated: ai_generated != 0,
+                status,
+                sub_flow,
+            });
+        }
+        Ok(tasks)
+    }
+
+    pub fn find_by_run_ids(&self, run_ids: &[ReviewRunId]) -> Result<Vec<ReviewTask>> {
+        if run_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let conn = self.conn.lock().unwrap();
+        let placeholders = std::iter::repeat_n("?", run_ids.len())
+            .collect::<Vec<_>>()
+            .join(",");
+        let sql = format!(
+            "SELECT id, run_id, title, description, files, stats, insight, diffs, diagram, ai_generated, status, sub_flow FROM tasks WHERE run_id IN ({})",
+            placeholders
+        );
+
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(run_ids.iter()), |row| {
             let run_id: String = row.get(1)?;
             let files_json: String = row.get(4)?;
             let stats_json: String = row.get(5)?;

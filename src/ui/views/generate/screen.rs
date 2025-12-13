@@ -1,8 +1,9 @@
 use crate::ui::app::{Action, GenerateAction, LaReviewApp, SelectedAgent};
-use crate::ui::components::header::{HeaderAction, header};
+use crate::ui::components::action_button::action_button;
 use crate::ui::components::selection_chips::selection_chips;
 use crate::ui::components::status::error_banner;
 use crate::ui::spacing;
+use crate::ui::theme;
 use catppuccin_egui::MOCHA;
 use eframe::egui;
 
@@ -13,39 +14,17 @@ impl LaReviewApp {
         // New: Trigger for auto-fetching PRs
         let mut trigger_fetch_pr: Option<String> = None;
 
-        // --- Header Section ---
-        ui.vertical(|ui| {
-            let action_text = if self.state.is_generating {
-                format!("{} Generating...", egui_phosphor::regular::HOURGLASS_HIGH)
-            } else {
-                format!("{} Run", egui_phosphor::regular::PLAY)
-            };
+        let action_text = if self.state.is_generating {
+            format!("{} Generating...", egui_phosphor::regular::HOURGLASS_HIGH)
+        } else {
+            format!("{} Run", egui_phosphor::regular::PLAY)
+        };
 
-            // Calculate if we have valid input (either raw diff or a loaded preview)
-            let has_content =
-                !self.state.diff_text.trim().is_empty() || self.state.generate_preview.is_some();
-
-            header(
-                ui,
-                "Generate a new review",
-                Some(HeaderAction::new(
-                    action_text.as_str(),
-                    has_content && !self.state.is_generating && !self.state.is_preview_fetching,
-                    MOCHA.mauve,
-                    || {
-                        trigger_generate = true;
-                    },
-                )),
-            );
-
-            ui.add_space(spacing::SPACING_SM);
-
-            if let Some(err) = &self.state.generation_error {
-                ui.add_space(spacing::SPACING_XS);
-                error_banner(ui, err);
-            }
-            ui.add_space(spacing::SPACING_MD); // 10.0 -> 12.0 (closest standard value)
-        });
+        let theme = theme::current_theme();
+        let has_content =
+            !self.state.diff_text.trim().is_empty() || self.state.generate_preview.is_some();
+        let run_enabled =
+            has_content && !self.state.is_generating && !self.state.is_preview_fetching;
 
         // --- Resizable Panes Setup ---
         let pane_width_id = ui.id().with("pane_width");
@@ -233,12 +212,11 @@ impl LaReviewApp {
         }
 
         // --- RESIZE HANDLE (Standard) ---
-        let resize_id = ui.id().with("resize_handle");
+        let resize_id = ui.id().with("resize");
         let resize_rect = egui::Rect::from_min_size(
-            egui::pos2(left_rect.max.x - 2.0, left_rect.min.y),
-            egui::vec2(4.0, ui.available_rect_before_wrap().height()), // Slightly thicker handle for easier grabbing
+            egui::pos2(left_rect.max.x, left_rect.min.y),
+            egui::vec2(4.0, left_rect.height()),
         );
-
         let resize_response = ui.interact(resize_rect, resize_id, egui::Sense::drag());
 
         if resize_response.dragged()
@@ -252,13 +230,13 @@ impl LaReviewApp {
             });
         }
 
-        let handle_color = if resize_response.hovered() || resize_response.dragged() {
-            MOCHA.surface2
+        let line_color = if resize_response.hovered() || resize_response.dragged() {
+            theme.accent
         } else {
-            egui::Color32::TRANSPARENT // Only visible on hover/drag for cleaner look
+            theme.bg_secondary
         };
-        ui.painter().rect_filled(resize_rect, 2.0, handle_color);
-        if resize_response.hovered() || resize_response.dragged() {
+        ui.painter().rect_filled(resize_rect, 2.0, line_color);
+        if resize_response.hovered() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
         }
 
@@ -275,7 +253,23 @@ impl LaReviewApp {
                 ui.spacing_mut().item_spacing =
                     egui::vec2(spacing::BUTTON_PADDING.0, spacing::BUTTON_PADDING.1); // 8.0, 4.0
 
-                ui.heading(egui::RichText::new("AGENT").size(16.0).color(MOCHA.text));
+                ui.horizontal(|ui| {
+                    ui.heading(egui::RichText::new("AGENT").size(16.0).color(MOCHA.text));
+
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if action_button(ui, action_text.as_str(), run_enabled, theme.brand)
+                            .clicked()
+                        {
+                            trigger_generate = true;
+                        }
+                    });
+                });
+
+                if let Some(err) = &self.state.generation_error {
+                    ui.add_space(spacing::SPACING_XS);
+                    error_banner(ui, err);
+                }
+
                 ui.add_space(spacing::SPACING_XS);
 
                 // ... Agent Selection Chips (Existing Code) ...
@@ -304,6 +298,11 @@ impl LaReviewApp {
                     .auto_shrink([false, true])
                     .id_salt(ui.id().with("agent_chips_scroll"))
                     .show(ui, |ui| {
+                        let width = ui.clip_rect().width();
+                        if width.is_finite() && width > 0.0 {
+                            ui.set_min_width(width);
+                            ui.set_max_width(width);
+                        }
                         selection_chips(
                             ui,
                             &mut selected_agent,

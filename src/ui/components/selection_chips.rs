@@ -1,10 +1,12 @@
 use eframe::egui;
 use once_cell::sync::Lazy;
 use std::{
+    borrow::Cow,
     collections::HashMap,
     sync::{Arc, Mutex},
 };
 
+use crate::ui::spacing;
 use crate::ui::theme;
 
 static LOGO_BYTES_CACHE: Lazy<Mutex<HashMap<String, Arc<[u8]>>>> =
@@ -24,6 +26,23 @@ fn load_logo_bytes(path: &str) -> Option<Arc<[u8]>> {
     }
 }
 
+fn wrap_hint(text: &str) -> Cow<'_, str> {
+    if !text.contains(['-', '_', '/', '.', ':']) {
+        return Cow::Borrowed(text);
+    }
+
+    // Insert zero-width spaces after common separators so Egui can wrap model IDs like
+    // `claude-3-5-sonnet` instead of overflowing horizontally.
+    let mut out = String::with_capacity(text.len() + 8);
+    for ch in text.chars() {
+        out.push(ch);
+        if matches!(ch, '-' | '_' | '/' | '.' | ':') {
+            out.push('\u{200B}');
+        }
+    }
+    Cow::Owned(out)
+}
+
 /// Selection chips component for any enum type
 pub fn selection_chips<T>(
     ui: &mut egui::Ui,
@@ -35,11 +54,20 @@ pub fn selection_chips<T>(
 ) where
     T: PartialEq + Clone,
 {
-    // configure wrapping gap
-    let spacing = egui::vec2(8.0, 8.0);
-    ui.spacing_mut().item_spacing = spacing;
+    ui.spacing_mut().item_spacing = egui::vec2(spacing::ITEM_SPACING.0, spacing::ITEM_SPACING.1);
 
     ui.horizontal_wrapped(|wrap_ui| {
+        wrap_ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+
+        let row_width = {
+            let w = wrap_ui.available_width();
+            if w.is_finite() {
+                w
+            } else {
+                wrap_ui.clip_rect().width()
+            }
+        };
+
         if !label_prefix.is_empty() {
             wrap_ui.label(label_prefix);
         }
@@ -54,25 +82,30 @@ pub fn selection_chips<T>(
             let logo_path = logos.get(i).and_then(|l| l.as_ref());
 
             let theme = theme::current_theme();
+            let fill = if selected {
+                theme.bg_secondary
+            } else {
+                theme.bg_primary
+            };
+            let stroke = if selected { theme.brand } else { theme.border };
             let frame = egui::Frame::new()
-                .fill(if selected {
-                    theme.bg_card
-                } else {
-                    theme.bg_primary
-                })
-                .stroke(egui::Stroke::new(1.0, theme.border))
-                .inner_margin(egui::vec2(8.0, 4.0))
-                .corner_radius(egui::CornerRadius::same(20));
+                .fill(fill)
+                .stroke(egui::Stroke::new(1.0, stroke))
+                .inner_margin(egui::vec2(spacing::SPACING_SM, spacing::SPACING_XS))
+                .corner_radius(egui::CornerRadius::same(255));
 
-            // each chip gets a small constrained child ui
-            let available_width = wrap_ui.available_width();
             let response = frame
                 .show(wrap_ui, |inner_ui| {
                     // allow inner to shrink and wrap
                     inner_ui.set_min_width(0.0);
-                    inner_ui.set_max_width(available_width);
+                    if row_width.is_finite() && row_width > 0.0 {
+                        inner_ui.set_max_width((row_width - spacing::SPACING_SM).max(120.0));
+                    }
 
-                    inner_ui.horizontal(|h_ui| {
+                    inner_ui.horizontal_wrapped(|h_ui| {
+                        h_ui.spacing_mut().item_spacing =
+                            egui::vec2(spacing::TIGHT_ITEM_SPACING.0, 0.0);
+
                         if let Some(path) = logo_path
                             && let Some(bytes) = load_logo_bytes(path)
                         {
@@ -82,8 +115,9 @@ pub fn selection_chips<T>(
                                     .fit_to_exact_size(egui::vec2(16.0, 16.0)),
                             );
                         }
-                        let text = egui::RichText::new(label).color(theme.text_inverse);
-                        h_ui.label(text);
+                        let label = wrap_hint(label);
+                        let text = egui::RichText::new(label.as_ref()).color(theme.text_primary);
+                        h_ui.add(egui::Label::new(text).wrap());
                     });
                 })
                 .response

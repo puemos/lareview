@@ -2,7 +2,6 @@ use crate::infra::diff::{combine_diffs_to_unified_diff, extract_file_path_from_d
 use crate::ui::app::{Action, FullDiffView, LaReviewApp, LineNoteContext, ReviewAction};
 use crate::ui::components::badge::badge;
 use crate::ui::components::pills::pill_divider;
-use crate::ui::components::task_status_chip::task_status_chip;
 use crate::ui::components::{DiffAction, LineContext};
 use crate::ui::spacing;
 use catppuccin_egui::MOCHA;
@@ -16,14 +15,16 @@ impl LaReviewApp {
         ui: &mut egui::Ui,
         task: &crate::domain::ReviewTask,
     ) {
+        let section_title = |text: &str| egui::RichText::new(text).strong().size(14.0);
+
         egui::ScrollArea::vertical()
             .id_salt("detail_scroll")
             .show(ui, |ui| {
-                // 1. Task Header
+                // 1. Task Header (title)
                 ui.add(
                     egui::Label::new(
                         egui::RichText::new(&task.title)
-                            .size(24.0)
+                            .size(22.0)
                             .color(MOCHA.text),
                     )
                     .wrap(),
@@ -31,91 +32,151 @@ impl LaReviewApp {
 
                 ui.add_space(spacing::SPACING_SM);
 
-                // 2. Metadata Badges (includes status actions)
+                // 2. Metadata row (risk + stats + status)
                 let mut status_changed = false;
-                ui.horizontal_wrapped(|ui| {
-                    ui.spacing_mut().item_spacing =
-                        egui::vec2(spacing::ITEM_SPACING.0, spacing::ITEM_SPACING.1); // 8.0, 6.0
+                let row_width = ui.available_width();
+                let row_height = 28.0;
+                let status_width = 160.0;
+                let gap = spacing::SPACING_SM;
+                let left_width = (row_width - status_width - gap).max(120.0);
 
-                    let to_do_resp = task_status_chip(
-                        ui,
-                        icons::CIRCLE,
-                        "To do",
-                        task.status == crate::domain::TaskStatus::Pending,
-                        MOCHA.mauve, // gray
-                    );
-                    if to_do_resp.clicked() && task.status != crate::domain::TaskStatus::Pending {
-                        self.set_task_status(&task.id, crate::domain::TaskStatus::Pending);
-                        status_changed = true;
+                let status_visuals = |status: crate::domain::TaskStatus| match status {
+                    crate::domain::TaskStatus::Pending => (icons::CIRCLE, "To do", MOCHA.mauve),
+                    crate::domain::TaskStatus::InProgress => {
+                        (icons::CIRCLE_HALF, "In progress", MOCHA.blue)
                     }
+                    crate::domain::TaskStatus::Done => (icons::CHECK_CIRCLE, "Done", MOCHA.green),
+                    crate::domain::TaskStatus::Ignored => (icons::X_CIRCLE, "Ignored", MOCHA.red),
+                };
 
-                    let in_progress_resp = task_status_chip(
-                        ui,
-                        icons::CIRCLE_HALF,
-                        "In progress",
-                        task.status == crate::domain::TaskStatus::InProgress,
-                        MOCHA.blue,
-                    );
-                    if in_progress_resp.clicked()
-                        && task.status != crate::domain::TaskStatus::InProgress
-                    {
-                        self.set_task_status(&task.id, crate::domain::TaskStatus::InProgress);
-                        status_changed = true;
-                    }
-
-                    let done_resp = task_status_chip(
-                        ui,
-                        icons::CHECK_CIRCLE,
-                        "Done",
-                        task.status == crate::domain::TaskStatus::Done,
-                        MOCHA.green,
-                    );
-                    if done_resp.clicked() && task.status != crate::domain::TaskStatus::Done {
-                        self.set_task_status(&task.id, crate::domain::TaskStatus::Done);
-                        status_changed = true;
-                    }
-
-                    let ignored_resp = task_status_chip(
-                        ui,
-                        icons::X_CIRCLE,
-                        "Ignored",
-                        task.status == crate::domain::TaskStatus::Ignored,
-                        MOCHA.red,
-                    );
-                    if ignored_resp.clicked() && task.status != crate::domain::TaskStatus::Ignored {
-                        self.set_task_status(&task.id, crate::domain::TaskStatus::Ignored);
-                        status_changed = true;
-                    }
-
-                    pill_divider(ui);
-
-                    let (risk_icon, risk_fg, risk_text) = match task.stats.risk {
-                        crate::domain::RiskLevel::High => {
-                            (icons::CARET_CIRCLE_DOUBLE_UP, MOCHA.red, "High risk")
-                        }
-                        crate::domain::RiskLevel::Medium => {
-                            (icons::CARET_CIRCLE_UP, MOCHA.yellow, "Med risk")
-                        }
-                        crate::domain::RiskLevel::Low => {
-                            (icons::CARET_CIRCLE_DOWN, MOCHA.blue, "Low risk")
-                        }
+                let status_widget_text =
+                    |icon: &str,
+                     icon_color: egui::Color32,
+                     label: &str,
+                     label_color: egui::Color32| {
+                        let mut job = egui::text::LayoutJob::default();
+                        let icon_format = egui::text::TextFormat {
+                            font_id: egui::FontId::proportional(12.0),
+                            color: icon_color,
+                            ..Default::default()
+                        };
+                        let label_format = egui::text::TextFormat {
+                            font_id: egui::FontId::proportional(12.0),
+                            color: label_color,
+                            ..Default::default()
+                        };
+                        job.append(icon, 0.0, icon_format);
+                        job.append(" ", 0.0, label_format.clone());
+                        job.append(label, 0.0, label_format);
+                        egui::WidgetText::from(job)
                     };
-                    badge(
-                        ui,
-                        &format!("{risk_icon} {risk_text}"),
-                        risk_fg.gamma_multiply(0.2),
-                        risk_fg,
+
+                ui.scope(|ui| {
+                    let old_interact_size = ui.spacing().interact_size;
+                    ui.spacing_mut().interact_size.y = row_height;
+
+                    ui.allocate_ui_with_layout(
+                        egui::vec2(row_width, row_height),
+                        egui::Layout::left_to_right(egui::Align::Center),
+                        |ui| {
+                            ui.allocate_ui_with_layout(
+                                egui::vec2(left_width, row_height),
+                                egui::Layout::left_to_right(egui::Align::Center),
+                                |ui| {
+                                    ui.spacing_mut().item_spacing = egui::vec2(
+                                        spacing::ITEM_SPACING.0,
+                                        spacing::ITEM_SPACING.1,
+                                    );
+
+                                    ui.horizontal(|ui| {
+                                        let (risk_icon, risk_fg, risk_text) = match task.stats.risk
+                                        {
+                                            crate::domain::RiskLevel::High => (
+                                                icons::CARET_CIRCLE_DOUBLE_UP,
+                                                MOCHA.red,
+                                                "High risk",
+                                            ),
+                                            crate::domain::RiskLevel::Medium => {
+                                                (icons::CARET_CIRCLE_UP, MOCHA.yellow, "Med risk")
+                                            }
+                                            crate::domain::RiskLevel::Low => {
+                                                (icons::CARET_CIRCLE_DOWN, MOCHA.blue, "Low risk")
+                                            }
+                                        };
+                                        badge(
+                                            ui,
+                                            &format!("{risk_icon} {risk_text}"),
+                                            risk_fg.gamma_multiply(0.2),
+                                            risk_fg,
+                                        );
+
+                                        pill_divider(ui);
+
+                                        let stats_text = format!(
+                                            "{} files | +{} / -{} lines",
+                                            task.files.len(),
+                                            task.stats.additions,
+                                            task.stats.deletions
+                                        );
+                                        badge(ui, &stats_text, MOCHA.surface0, MOCHA.subtext0);
+                                    });
+                                },
+                            );
+
+                            ui.add_space(gap);
+                            pill_divider(ui);
+                            ui.add_space(gap);
+
+                            ui.allocate_ui_with_layout(
+                                egui::vec2(status_width, row_height),
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    let (selected_icon, selected_label, selected_color) =
+                                        status_visuals(task.status);
+                                    let selected_text = status_widget_text(
+                                        selected_icon,
+                                        selected_color,
+                                        selected_label,
+                                        MOCHA.text,
+                                    );
+
+                                    egui::ComboBox::from_id_salt(
+                                        ui.id().with(("task_status", &task.id)),
+                                    )
+                                    .selected_text(selected_text)
+                                    .width(status_width)
+                                    .show_ui(ui, |ui| {
+                                        let mut next_status: Option<crate::domain::TaskStatus> =
+                                            None;
+
+                                        for status in [
+                                            crate::domain::TaskStatus::Pending,
+                                            crate::domain::TaskStatus::InProgress,
+                                            crate::domain::TaskStatus::Done,
+                                            crate::domain::TaskStatus::Ignored,
+                                        ] {
+                                            let (icon, label, color) = status_visuals(status);
+                                            let text =
+                                                status_widget_text(icon, color, label, MOCHA.text);
+                                            let selected = task.status == status;
+                                            if ui.selectable_label(selected, text).clicked() {
+                                                next_status = Some(status);
+                                            }
+                                        }
+
+                                        if let Some(next_status) = next_status
+                                            && next_status != task.status
+                                        {
+                                            self.set_task_status(&task.id, next_status);
+                                            status_changed = true;
+                                        }
+                                    });
+                                },
+                            );
+                        },
                     );
 
-                    pill_divider(ui);
-
-                    let stats_text = format!(
-                        "{} files |+{} -{} lines",
-                        task.files.len(),
-                        task.stats.additions,
-                        task.stats.deletions
-                    );
-                    badge(ui, &stats_text, MOCHA.surface0, MOCHA.subtext0);
+                    ui.spacing_mut().interact_size = old_interact_size;
                 });
 
                 if status_changed {
@@ -133,11 +194,8 @@ impl LaReviewApp {
                         ui.set_width(ui.available_width());
 
                         // Description
-                        ui.label(
-                            egui::RichText::new("Description")
-                                .strong()
-                                .color(MOCHA.lavender),
-                        );
+                        ui.label(section_title("Description").color(MOCHA.lavender));
+                        ui.add_space(spacing::SPACING_XS);
                         ui.label(egui::RichText::new(&task.description).color(MOCHA.text));
 
                         // Insight (if any)
@@ -148,12 +206,9 @@ impl LaReviewApp {
                                     egui::RichText::new(egui_phosphor::regular::SPARKLE)
                                         .color(MOCHA.yellow),
                                 );
-                                ui.label(
-                                    egui::RichText::new("AI Insight")
-                                        .strong()
-                                        .color(MOCHA.yellow),
-                                );
+                                ui.label(section_title("AI Insight").color(MOCHA.yellow));
                             });
+                            ui.add_space(spacing::SPACING_XS);
                             ui.label(egui::RichText::new(insight).italics().color(MOCHA.subtext0));
                         }
                     });
@@ -162,7 +217,8 @@ impl LaReviewApp {
 
                 // Diagram Viewer
                 if task.diagram.as_ref().is_some_and(|d| !d.is_empty()) {
-                    ui.label(egui::RichText::new("Diagram").strong().size(16.0));
+                    ui.label(section_title("Diagram").color(MOCHA.text));
+                    ui.add_space(spacing::SPACING_XS);
                     egui::Frame::NONE
                         .stroke(egui::Stroke::new(1.0, MOCHA.surface1))
                         .inner_margin(spacing::SPACING_MD)
@@ -182,7 +238,8 @@ impl LaReviewApp {
                 }
 
                 // 4. Diff Viewer
-                ui.label(egui::RichText::new("Changes").strong().size(16.0));
+                ui.label(section_title("Changes").color(MOCHA.text));
+                ui.add_space(spacing::SPACING_XS);
 
                 let unified_diff = match &self.state.cached_unified_diff {
                     Some((cached_diffs, diff_string)) if cached_diffs == &task.diffs => {

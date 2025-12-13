@@ -3,6 +3,7 @@ use eframe::egui;
 use crate::ui::spacing;
 use crate::ui::theme;
 
+#[allow(dead_code)]
 pub fn task_status_chip(
     ui: &mut egui::Ui,
     icon: &str,
@@ -30,7 +31,7 @@ pub fn task_status_chip(
             .fill(fill)
             .stroke(egui::Stroke::new(1.0, stroke))
             .corner_radius(egui::CornerRadius::same(255))
-            .min_size(egui::vec2(0.0, 22.0)),
+            .min_size(egui::vec2(0.0, 28.0)),
     );
 
     ui.spacing_mut().button_padding = old_padding;
