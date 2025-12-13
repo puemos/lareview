@@ -12,6 +12,7 @@ pub fn codex_candidate() -> AgentCandidate {
     AgentCandidate {
         id: "codex".to_string(),
         label: "OpenAI Codex".to_string(),
+        logo: Some("assets/icons/codex.svg".to_string()),
         command: Some("npx".to_string()),
         args: vec![
             "-y".to_string(),

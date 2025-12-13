@@ -1,6 +1,8 @@
 use catppuccin_egui::MOCHA;
 use eframe::egui;
 
+use crate::ui::spacing;
+
 pub fn task_status_chip(
     ui: &mut egui::Ui,
     icon: &str,
@@ -19,7 +21,8 @@ pub fn task_status_chip(
         .color(fg);
 
     let old_padding = ui.spacing().button_padding;
-    ui.spacing_mut().button_padding = egui::vec2(8.0, 4.0);
+    ui.spacing_mut().button_padding =
+        egui::vec2(spacing::BUTTON_PADDING.0, spacing::BUTTON_PADDING.1);
 
     let resp = ui.add(
         egui::Button::new(text)
@@ -30,5 +33,6 @@ pub fn task_status_chip(
     );
 
     ui.spacing_mut().button_padding = old_padding;
-    resp
+
+    resp.on_hover_cursor(egui::CursorIcon::PointingHand)
 }

@@ -1,6 +1,7 @@
 use super::model::{ChangeType, DiffLine, DiffState, FileDiff, Row};
 use super::{DiffAction, LineContext};
 use crate::ui::components::diff::parse::parse_diff_by_files;
+use crate::ui::spacing;
 use catppuccin_egui::MOCHA;
 use eframe::egui::{self, FontId, TextFormat, text::LayoutJob};
 use egui_phosphor::regular::PLUS;
@@ -348,7 +349,7 @@ fn render_unified_row(
 
                 let _line_numbers_frame = egui::Frame::NONE
                     .fill(line_num_bg)
-                    .inner_margin(egui::Margin::symmetric(4, 0))
+                    .inner_margin(egui::Margin::symmetric(spacing::SPACING_XS as i8, 0))
                     .show(ui, |ui| {
                         let line_numbers = match line.change_type {
                             ChangeType::Equal => match (line.old_line_num, line.new_line_num) {
@@ -380,7 +381,7 @@ fn render_unified_row(
 
                 egui::Frame::NONE
                     .fill(bg_color)
-                    .inner_margin(egui::Margin::symmetric(4, 0))
+                    .inner_margin(egui::Margin::symmetric(spacing::SPACING_XS as i8, 0))
                     .show(ui, |ui| {
                         let mut job = LayoutJob::default();
 

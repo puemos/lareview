@@ -1,16 +1,17 @@
 use crate::ui::app::{Action, LaReviewApp, SettingsAction};
+use crate::ui::spacing;
 use catppuccin_egui::MOCHA;
 use eframe::egui;
 
 impl LaReviewApp {
     pub fn ui_settings(&mut self, ui: &mut egui::Ui) {
         ui.heading("Settings");
-        ui.add_space(20.0);
+        ui.add_space(spacing::SPACING_LG);
 
         // --- GitHub Section ---
         egui::Frame::group(ui.style())
             .fill(MOCHA.surface0)
-            .inner_margin(16.0)
+            .inner_margin(spacing::SPACING_LG)
             .show(ui, |ui| {
                 // 1. Consistent Header Layout (Title + Status far right)
                 ui.horizontal(|ui| {
@@ -29,11 +30,11 @@ impl LaReviewApp {
                     });
                 });
 
-                ui.add_space(8.0);
+                ui.add_space(spacing::SPACING_SM);
 
                 egui::Grid::new("gh_settings_grid")
                     .num_columns(2)
-                    .spacing([20.0, 10.0])
+                    .spacing([spacing::SPACING_LG, spacing::SPACING_MD])
                     .show(ui, |ui| {
                         // Label Column
                         ui.label("Connection:");
@@ -66,7 +67,7 @@ impl LaReviewApp {
                         }
                     });
 
-                ui.add_space(12.0);
+                ui.add_space(spacing::SPACING_MD);
 
                 // Action Bar
                 ui.horizontal(|ui| {
@@ -88,9 +89,9 @@ impl LaReviewApp {
 
                 // Troubleshooting (Only visible if needed)
                 if self.state.gh_status.is_none() || self.state.gh_status_error.is_some() {
-                    ui.add_space(12.0);
+                    ui.add_space(spacing::SPACING_MD);
                     ui.separator();
-                    ui.add_space(8.0);
+                    ui.add_space(spacing::SPACING_SM);
                     ui.label(egui::RichText::new("Setup Instructions").strong());
 
                     self.ui_copyable_command(ui, "Install via Homebrew", "brew install gh");
@@ -98,12 +99,12 @@ impl LaReviewApp {
                 }
             });
 
-        ui.add_space(20.0);
+        ui.add_space(spacing::SPACING_LG);
 
         // --- D2 Section ---
         egui::Frame::group(ui.style())
             .fill(MOCHA.surface0)
-            .inner_margin(16.0)
+            .inner_margin(spacing::SPACING_LG)
             .show(ui, |ui| {
                 // ⚠️ CRITICAL: Still calculating this every frame due to state restriction.
                 let d2_installed = which::which("d2").is_ok();
@@ -123,20 +124,20 @@ impl LaReviewApp {
                     });
                 });
 
-                ui.add_space(12.0);
+                ui.add_space(spacing::SPACING_MD);
 
                 let install_cmd = "curl -fsSL https://d2lang.com/install.sh | sh -s --";
                 let uninstall_cmd = "curl -fsSL https://d2lang.com/install.sh | sh -s -- --uninstall";
 
                 if d2_installed {
                     ui.label("D2 is ready to render diagrams.");
-                    ui.add_space(12.0);
+                    ui.add_space(spacing::SPACING_MD);
 
                     ui.collapsing("Uninstall Options", |ui| {
-                        ui.add_space(8.0);
+                        ui.add_space(spacing::SPACING_SM);
                         self.ui_copyable_command(ui, "Manual Uninstall", uninstall_cmd);
 
-                        ui.add_space(8.0);
+                        ui.add_space(spacing::SPACING_SM);
                         let btn = egui::Button::new("Run Uninstall Script").fill(MOCHA.surface1);
                         if ui.add_enabled(!self.state.is_d2_installing, btn).clicked() {
                             self.dispatch(Action::Settings(SettingsAction::RequestD2Uninstall));
@@ -146,7 +147,7 @@ impl LaReviewApp {
                     // Warning box for remote script
                     egui::Frame::NONE
                         .fill(MOCHA.mantle)
-                        .inner_margin(8.0)
+                        .inner_margin(spacing::SPACING_SM)
                         .stroke(egui::Stroke::new(1.0, MOCHA.yellow))
                         .show(ui, |ui| {
                             ui.horizontal(|ui| {
@@ -158,7 +159,7 @@ impl LaReviewApp {
                             });
                         });
 
-                    ui.add_space(12.0);
+                    ui.add_space(spacing::SPACING_MD);
 
                     // Confirmation Checkbox
                     let mut allow = self.state.allow_d2_install;
@@ -218,7 +219,7 @@ impl LaReviewApp {
             // Command text in a box
             egui::Frame::NONE
                 .fill(MOCHA.mantle)
-                .inner_margin(6.0)
+                .inner_margin(spacing::SPACING_SM) // Using SPACING_SM (8.0) as closest to 6.0
                 .corner_radius(4.0)
                 .show(ui, |ui| {
                     ui.monospace(cmd);

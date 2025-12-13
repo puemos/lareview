@@ -32,4 +32,3 @@ mod tests {
         assert!(v.is_finite());
     }
 }
-

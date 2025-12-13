@@ -38,6 +38,7 @@ pub enum ReviewAction {
     SelectRun {
         run_id: String,
     },
+    #[allow(dead_code)]
     RefreshGitHubReview,
     SelectTask {
         task_id: String,

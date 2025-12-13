@@ -2,13 +2,18 @@ use agent_client_protocol::{Plan, PlanEntryStatus};
 use catppuccin_egui::MOCHA;
 use eframe::egui;
 
+use crate::ui::spacing;
+
 pub(super) fn render_plan_panel(ui: &mut egui::Ui, plan: &Plan) {
     if plan.entries.is_empty() {
         return;
     }
 
     egui::Frame::group(ui.style())
-        .inner_margin(egui::Margin::symmetric(10, 8))
+        .inner_margin(egui::Margin::symmetric(
+            spacing::SPACING_MD as i8,
+            spacing::SPACING_SM as i8,
+        )) // 10,8 -> 12,8
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(
@@ -35,9 +40,9 @@ pub(super) fn render_plan_panel(ui: &mut egui::Ui, plan: &Plan) {
                 });
             });
 
-            ui.add_space(6.0);
+            ui.add_space(spacing::SPACING_XS + 2.0);
             ui.separator();
-            ui.add_space(4.0);
+            ui.add_space(spacing::SPACING_XS);
 
             render_plan_entries(ui, plan, /*dense=*/ false);
         });
@@ -81,7 +86,8 @@ pub(super) fn render_plan_timeline_item(ui: &mut egui::Ui, plan: &Plan) {
         .id_salt(("plan", "timeline"))
         .default_open(default_open)
         .show(ui, |ui| {
-            ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
+            ui.spacing_mut().item_spacing =
+                egui::vec2(spacing::SPACING_XS + 2.0, spacing::SPACING_XS + 2.0);
             render_plan_entries(ui, plan, /*dense=*/ true);
         });
 }
@@ -92,7 +98,7 @@ fn render_plan_entries(ui: &mut egui::Ui, plan: &Plan, dense: bool) {
         let (icon, color, label) = plan_entry_style(status.clone());
 
         ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing = egui::vec2(8.0, 0.0);
+            ui.spacing_mut().item_spacing = egui::vec2(spacing::SPACING_SM, 0.0); // 8.0, 0.0
 
             ui.label(egui::RichText::new(icon).size(14.0).color(color));
 
@@ -118,7 +124,7 @@ fn render_plan_entries(ui: &mut egui::Ui, plan: &Plan, dense: bool) {
         });
 
         if !dense && idx + 1 < plan.entries.len() {
-            ui.add_space(2.0);
+            ui.add_space(2.0); // Keep 2.0 as this is specific spacing for plan entry gaps
         }
     }
 }

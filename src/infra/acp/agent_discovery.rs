@@ -10,6 +10,8 @@ pub struct AgentCandidate {
     pub id: String,
     /// User-friendly display name for the agent
     pub label: String,
+    /// Path to the agent's logo
+    pub logo: Option<String>,
     /// Command to execute the agent, if available
     pub command: Option<String>,
     /// Arguments to pass to the agent command

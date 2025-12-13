@@ -1,6 +1,7 @@
 use eframe::egui;
 
 use super::{Action, LaReviewApp, ReviewAction};
+use crate::ui::spacing;
 
 impl LaReviewApp {
     pub(super) fn render_full_diff_overlay(&mut self, ctx: &egui::Context) {
@@ -14,12 +15,17 @@ impl LaReviewApp {
         });
 
         let mut open = true;
-        let outer_padding = egui::vec2(12.0, 8.0);
+        let outer_padding = egui::vec2(spacing::SPACING_MD, spacing::SPACING_SM);
 
         egui::Window::new(full.title.clone())
             .open(&mut open)
             .fixed_rect(viewport_rect.shrink2(outer_padding))
-            .frame(egui::Frame::window(&ctx.style()).inner_margin(egui::Margin::symmetric(12, 8)))
+            .frame(
+                egui::Frame::window(&ctx.style()).inner_margin(egui::Margin::symmetric(
+                    spacing::SPACING_MD as i8,
+                    spacing::SPACING_SM as i8,
+                )),
+            )
             .collapsible(false)
             .resizable(false)
             .title_bar(true)

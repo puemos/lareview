@@ -3,6 +3,7 @@ use eframe::egui;
 
 use super::LaReviewApp;
 use super::state::AppView;
+use crate::ui::spacing;
 
 impl LaReviewApp {
     pub(super) fn render_header(&mut self, ctx: &egui::Context) {
@@ -14,7 +15,7 @@ impl LaReviewApp {
                 MOCHA.base,
             );
 
-            let line_spacing = 20.0;
+            let line_spacing = 20.0; // Keep original value to avoid type issue
             let line_width = 0.5;
             let color = MOCHA.surface0.linear_multiply(0.25);
 
@@ -42,7 +43,7 @@ impl LaReviewApp {
                 pos += line_spacing;
             }
 
-            ui.add_space(12.0);
+            ui.add_space(spacing::SPACING_MD);
             ui.horizontal(|ui| {
                 ui.horizontal(|ui| {
                     match ui.ctx().try_load_texture(
@@ -62,7 +63,7 @@ impl LaReviewApp {
                         }
                     }
 
-                    ui.add_space(2.0);
+                    ui.add_space(2.0); // Keep as 2 (custom spacing for logo/text gap)
                     ui.heading(
                         egui::RichText::new("LaReview")
                             .strong()
@@ -71,7 +72,7 @@ impl LaReviewApp {
                     );
                 });
 
-                ui.add_space(20.0);
+                ui.add_space(spacing::SPACING_LG);
 
                 ui.horizontal(|ui| {
                     let generate_response = ui.add(
@@ -89,7 +90,7 @@ impl LaReviewApp {
                         self.switch_to_generate();
                     }
 
-                    ui.add_space(12.0);
+                    ui.add_space(spacing::SPACING_MD);
 
                     let review_response = ui.add(
                         egui::Button::new(egui::RichText::new("REVIEW").color(
@@ -124,7 +125,7 @@ impl LaReviewApp {
                     });
                 });
             });
-            ui.add_space(8.0);
+            ui.add_space(spacing::SPACING_SM);
         });
     }
 }

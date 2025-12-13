@@ -1,4 +1,5 @@
 use crate::ui::app::{TimelineContent, TimelineItem};
+use crate::ui::spacing;
 use catppuccin_egui::MOCHA;
 use eframe::egui;
 
@@ -54,7 +55,8 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                     ToolCallStatus::Pending | ToolCallStatus::InProgress
                 ))
                 .show(ui, |ui| {
-                    ui.spacing_mut().item_spacing = egui::vec2(4.0, 4.0);
+                    ui.spacing_mut().item_spacing =
+                        egui::vec2(spacing::TIGHT_ITEM_SPACING.0, spacing::TIGHT_ITEM_SPACING.1); // 4.0, 4.0
 
                     if let Some(kind) =
                         (!matches!(call.kind, agent_client_protocol::ToolKind::Other))
@@ -162,7 +164,7 @@ fn render_json_block<S: std::hash::Hash + Clone>(
     label: &str,
     value: &serde_json::Value,
 ) {
-    ui.add_space(2.0);
+    ui.add_space(2.0); // Keep 2.0 as this is a custom spacing value
     ui.label(
         egui::RichText::new(label.to_uppercase())
             .color(MOCHA.subtext0)

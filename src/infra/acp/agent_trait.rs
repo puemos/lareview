@@ -57,10 +57,12 @@ impl Default for AgentRegistry {
         let mut registry = Self::new();
 
         // Register all known agents
+        registry.register_agent(Box::new(super::agents::claude::ClaudeAgent));
         registry.register_agent(Box::new(super::agents::codex::CodexAgent));
         registry.register_agent(Box::new(super::agents::gemini::GeminiAgent));
-        registry.register_agent(Box::new(super::agents::qwen::QwenAgent));
+        registry.register_agent(Box::new(super::agents::grok::GrokAgent));
         registry.register_agent(Box::new(super::agents::mistral::MistralAgent));
+        registry.register_agent(Box::new(super::agents::qwen::QwenAgent));
 
         registry
     }

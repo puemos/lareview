@@ -7,6 +7,7 @@ use crate::ui::app::{Action, LaReviewApp, ReviewAction};
 use crate::ui::components::header::action_button;
 use crate::ui::components::status::error_banner;
 use crate::ui::components::{badge::badge, pills::pill_action_button};
+use crate::ui::spacing;
 use catppuccin_egui::MOCHA;
 use eframe::egui;
 use egui_phosphor::regular as icons;
@@ -73,7 +74,7 @@ impl LaReviewApp {
             ui.heading(egui::RichText::new("Review").size(18.0).color(MOCHA.text));
 
             if !self.state.reviews.is_empty() {
-                ui.add_space(10.0);
+                ui.add_space(spacing::SPACING_MD); // 10.0 -> 12.0 (closest standard value)
                 let current_id = self.state.selected_review_id.clone();
                 let current_label = current_id
                     .as_ref()
@@ -111,7 +112,7 @@ impl LaReviewApp {
                     .collect();
 
                 if !runs_for_review.is_empty() {
-                    ui.add_space(10.0);
+                    ui.add_space(spacing::SPACING_MD); // 10.0 -> 12.0 (closest standard value)
                     let current_run_id = self.state.selected_run_id.clone();
                     let current_run_label = current_run_id
                         .as_ref()
@@ -140,7 +141,7 @@ impl LaReviewApp {
             }
 
             if total_tasks > 0 {
-                ui.add_space(10.0);
+                ui.add_space(spacing::SPACING_MD); // 10.0 -> 12.0 (closest standard value)
                 badge(
                     ui,
                     &format!("{done_tasks}/{total_tasks} done"),
@@ -163,7 +164,7 @@ impl LaReviewApp {
                         trigger_clean_done = true;
                     }
 
-                    ui.add_space(8.0);
+                    ui.add_space(spacing::SPACING_SM);
 
                     let next_enabled = next_open_id.is_some();
                     let resp = pill_action_button(
@@ -180,7 +181,7 @@ impl LaReviewApp {
                 });
             }
         });
-        ui.add_space(6.0);
+        ui.add_space(spacing::SPACING_XS + 2.0);
 
         if trigger_clean_done {
             self.clean_done_tasks();
@@ -194,11 +195,11 @@ impl LaReviewApp {
 
         // Error Banner
         if let Some(err) = &self.state.review_error {
-            ui.add_space(6.0);
+            ui.add_space(6.0); // Keep 6.0 as this is a custom spacing value
             error_banner(ui, err);
         }
 
-        ui.add_space(8.0);
+        ui.add_space(spacing::SPACING_SM);
 
         // 3. Default selection rule (meaningful auto-select only)
         let selected_task_is_valid = self
@@ -296,7 +297,7 @@ impl LaReviewApp {
         let mut left_ui = ui.new_child(egui::UiBuilder::new().max_rect(left_rect));
         egui::Frame::NONE
             .fill(MOCHA.mantle) // Darker background for sidebar
-            .inner_margin(egui::Margin::same(12))
+            .inner_margin(egui::Margin::same(spacing::SPACING_MD as i8))
             .show(&mut left_ui, |ui| {
                 if total_tasks == 0 {
                     ui.vertical_centered(|ui| {
@@ -306,7 +307,7 @@ impl LaReviewApp {
                                 .size(48.0)
                                 .color(MOCHA.surface2),
                         );
-                        ui.add_space(12.0);
+                        ui.add_space(spacing::SPACING_MD);
                         ui.heading("No review tasks yet");
                         ui.add_space(6.0);
                         ui.label(
@@ -388,7 +389,7 @@ impl LaReviewApp {
                     });
                 });
 
-                ui.add_space(4.0);
+                ui.add_space(spacing::SPACING_XS);
 
                 // Progress Bar
                 let progress_bar = egui::ProgressBar::new(progress).fill(if progress == 1.0 {
@@ -399,7 +400,7 @@ impl LaReviewApp {
 
                 ui.add(progress_bar);
 
-                ui.add_space(8.0);
+                ui.add_space(spacing::SPACING_SM);
 
                 // Review Source Metadata
                 if let Some(review) = selected_review {
@@ -423,9 +424,9 @@ impl LaReviewApp {
                     );
                 }
 
-                ui.add_space(12.0);
+                ui.add_space(spacing::SPACING_MD);
                 ui.separator();
-                ui.add_space(12.0);
+                ui.add_space(spacing::SPACING_MD);
 
                 // B. Navigation Tree (Sub-flows)
                 egui::ScrollArea::vertical()
@@ -459,12 +460,15 @@ impl LaReviewApp {
                                 .id_salt(ui.id().with(("sub_flow", title)))
                                 .default_open(true)
                                 .show(ui, |ui| {
-                                    ui.spacing_mut().item_spacing = egui::vec2(0.0, 2.0);
+                                    ui.spacing_mut().item_spacing = egui::vec2(
+                                        spacing::DIFF_ITEM_SPACING.0,
+                                        spacing::DIFF_ITEM_SPACING.1,
+                                    ); // 0.0, 2.0
                                     for task in tasks_in_sub_flow_display_order(tasks) {
                                         self.render_nav_item(ui, task);
                                     }
                                 });
-                            ui.add_space(8.0);
+                            ui.add_space(spacing::SPACING_SM);
                         }
                     });
             });
@@ -502,7 +506,7 @@ impl LaReviewApp {
         let mut right_ui = ui.new_child(egui::UiBuilder::new().max_rect(right_rect));
         egui::Frame::NONE
             .fill(ui.style().visuals.window_fill)
-            .inner_margin(egui::Margin::symmetric(24, 16))
+            .inner_margin(egui::Margin::symmetric(spacing::SPACING_XL as i8, spacing::SPACING_LG as i8)) // 24, 16 -> 24, 16
             .show(&mut right_ui, |ui| {
                 let right_state = if display_order_tasks.is_empty() {
                     RightPaneState::NoTasks

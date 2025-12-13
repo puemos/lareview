@@ -4,6 +4,7 @@ use crate::ui::components::badge::badge;
 use crate::ui::components::pills::pill_divider;
 use crate::ui::components::task_status_chip::task_status_chip;
 use crate::ui::components::{DiffAction, LineContext};
+use crate::ui::spacing;
 use catppuccin_egui::MOCHA;
 use eframe::egui;
 use egui_phosphor::regular as icons;
@@ -28,12 +29,13 @@ impl LaReviewApp {
                     .wrap(),
                 );
 
-                ui.add_space(8.0);
+                ui.add_space(spacing::SPACING_SM);
 
                 // 2. Metadata Badges (includes status actions)
                 let mut status_changed = false;
                 ui.horizontal_wrapped(|ui| {
-                    ui.spacing_mut().item_spacing = egui::vec2(8.0, 6.0);
+                    ui.spacing_mut().item_spacing =
+                        egui::vec2(spacing::ITEM_SPACING.0, spacing::ITEM_SPACING.1); // 8.0, 6.0
 
                     let to_do_resp = task_status_chip(
                         ui,
@@ -120,13 +122,13 @@ impl LaReviewApp {
                     return;
                 }
 
-                ui.add_space(16.0);
+                ui.add_space(spacing::SPACING_LG);
 
                 // 3. Context Section (Description + Insight)
                 egui::Frame::group(ui.style())
                     .fill(MOCHA.surface0.gamma_multiply(0.3))
                     .stroke(egui::Stroke::new(1.0, MOCHA.surface1))
-                    .inner_margin(12.0)
+                    .inner_margin(spacing::SPACING_MD)
                     .show(ui, |ui| {
                         ui.set_width(ui.available_width());
 
@@ -140,7 +142,7 @@ impl LaReviewApp {
 
                         // Insight (if any)
                         if let Some(insight) = &task.insight {
-                            ui.add_space(8.0);
+                            ui.add_space(spacing::SPACING_SM);
                             ui.horizontal(|ui| {
                                 ui.label(
                                     egui::RichText::new(egui_phosphor::regular::SPARKLE)
@@ -156,14 +158,14 @@ impl LaReviewApp {
                         }
                     });
 
-                ui.add_space(16.0);
+                ui.add_space(spacing::SPACING_LG);
 
                 // Diagram Viewer
                 if task.diagram.as_ref().is_some_and(|d| !d.is_empty()) {
                     ui.label(egui::RichText::new("Diagram").strong().size(16.0));
                     egui::Frame::NONE
                         .stroke(egui::Stroke::new(1.0, MOCHA.surface1))
-                        .inner_margin(12.0)
+                        .inner_margin(spacing::SPACING_MD)
                         .corner_radius(4.0)
                         .show(ui, |ui| {
                             ui.set_min_height(200.0);
@@ -176,7 +178,7 @@ impl LaReviewApp {
                                 self.switch_to_settings();
                             }
                         });
-                    ui.add_space(16.0);
+                    ui.add_space(spacing::SPACING_LG);
                 }
 
                 // 4. Diff Viewer
@@ -229,7 +231,7 @@ impl LaReviewApp {
                 } else {
                     egui::Frame::NONE
                         .stroke(egui::Stroke::new(1.0, MOCHA.surface1))
-                        .inner_margin(12.0)
+                        .inner_margin(spacing::SPACING_MD)
                         .corner_radius(4.0)
                         .show(ui, |ui| {
                             ui.set_min_height(300.0);
@@ -312,7 +314,7 @@ impl LaReviewApp {
                         });
                 }
 
-                ui.add_space(16.0);
+                ui.add_space(spacing::SPACING_LG);
 
                 // 5. Notes Section
                 egui::CollapsingHeader::new("Review Notes")
@@ -336,14 +338,14 @@ impl LaReviewApp {
                                 )));
                             }
 
-                            ui.add_space(4.0);
+                            ui.add_space(spacing::SPACING_XS);
                             if ui.button("Save Note").clicked() {
                                 self.dispatch(Action::Review(ReviewAction::SaveCurrentNote));
                             }
                         }
                     });
 
-                ui.add_space(20.0);
+                ui.add_space(spacing::SPACING_LG);
             });
     }
 }

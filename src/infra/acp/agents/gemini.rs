@@ -12,6 +12,7 @@ pub fn gemini_candidate() -> AgentCandidate {
     AgentCandidate {
         id: "gemini".to_string(),
         label: "Gemini".to_string(),
+        logo: Some("assets/icons/gemini.svg".to_string()),
         command: Some("gemini".to_string()),
         args: vec!["--experimental-acp".to_string()],
         available: is_command_available("gemini"),

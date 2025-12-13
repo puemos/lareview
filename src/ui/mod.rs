@@ -3,5 +3,6 @@
 pub mod app;
 pub mod components;
 pub mod diagram;
-pub(crate) mod layout;
+pub mod layout;
+pub mod spacing;
 pub mod views;

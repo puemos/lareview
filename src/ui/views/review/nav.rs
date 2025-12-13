@@ -1,4 +1,5 @@
 use crate::ui::app::LaReviewApp;
+use crate::ui::spacing;
 use catppuccin_egui::MOCHA;
 use eframe::egui;
 use egui_phosphor::regular as icons;
@@ -34,7 +35,7 @@ impl LaReviewApp {
         let response = egui::Frame::NONE
             .fill(bg_color)
             .corner_radius(4.0)
-            .inner_margin(4.0)
+            .inner_margin(spacing::SPACING_XS)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
@@ -42,7 +43,7 @@ impl LaReviewApp {
                     ui.label(egui::RichText::new(risk_icon).size(16.0).color(risk_color))
                         .on_hover_text(risk_label);
 
-                    ui.add_space(6.0);
+                    ui.add_space(6.0); // Keep 6.0 as this is a custom spacing value
 
                     ui.add(egui::Label::new(title_text).wrap());
                 })

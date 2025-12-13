@@ -1,7 +1,9 @@
 //! ACP agents module - one file per agent
 
+pub mod claude;
 pub mod codex;
 pub mod gemini;
+pub mod grok;
 pub mod mistral;
 pub mod qwen;
 

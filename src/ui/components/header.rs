@@ -69,5 +69,7 @@ pub fn action_button(
         .stroke(egui::Stroke::new(1.0, stroke_color))
         .min_size(egui::vec2(140.0, 32.0));
 
-    ui.add_enabled(enabled, button)
+    let resp = ui.add_enabled(enabled, button);
+
+    resp.on_hover_cursor(egui::CursorIcon::PointingHand)
 }

@@ -8,10 +8,11 @@ fn is_command_available(command: &str) -> bool {
 }
 
 /// Mistral ACP-Vibe candidate
-pub fn mistral_vibe_candidate() -> AgentCandidate {
+pub fn mistral_candidate() -> AgentCandidate {
     AgentCandidate {
         id: "mistral".to_string(),
-        label: "Mistral Vibe".to_string(),
+        label: "Mistral".to_string(),
+        logo: Some("assets/icons/mistral.svg".to_string()),
         command: Some("vibe-acp".to_string()),
         args: vec![],
         available: is_command_available("vibe-acp"),
@@ -27,11 +28,11 @@ impl super::super::agent_trait::AcpAgent for MistralAgent {
     }
 
     fn display_name(&self) -> &'static str {
-        "Mistral Vibe"
+        "Mistral"
     }
 
     fn candidate(&self) -> AgentCandidate {
-        mistral_vibe_candidate()
+        mistral_candidate()
     }
 
     fn is_available(&self) -> bool {

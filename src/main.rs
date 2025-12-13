@@ -76,6 +76,9 @@ fn main() -> Result<(), eframe::Error> {
     eframe::run_native(
         "LaReview",
         options,
-        Box::new(|cc| Ok(Box::new(ui::app::LaReviewApp::new_egui(cc)))),
+        Box::new(|cc| {
+            egui_extras::install_image_loaders(&cc.egui_ctx);
+            Ok(Box::new(ui::app::LaReviewApp::new_egui(cc)))
+        }),
     )
 }

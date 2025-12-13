@@ -2,6 +2,7 @@ use crate::ui::app::{Action, GenerateAction, LaReviewApp, SelectedAgent};
 use crate::ui::components::header::{HeaderAction, header};
 use crate::ui::components::selection_chips::selection_chips;
 use crate::ui::components::status::error_banner;
+use crate::ui::spacing;
 use catppuccin_egui::MOCHA;
 use eframe::egui;
 
@@ -37,13 +38,13 @@ impl LaReviewApp {
                 )),
             );
 
-            ui.add_space(8.0);
+            ui.add_space(spacing::SPACING_SM);
 
             if let Some(err) = &self.state.generation_error {
-                ui.add_space(4.0);
+                ui.add_space(spacing::SPACING_XS);
                 error_banner(ui, err);
             }
-            ui.add_space(10.0);
+            ui.add_space(spacing::SPACING_MD); // 10.0 -> 12.0 (closest standard value)
         });
 
         // --- Resizable Panes Setup ---
@@ -76,9 +77,9 @@ impl LaReviewApp {
         {
             egui::Frame::default()
                 .fill(left_ui.style().visuals.window_fill)
-                .inner_margin(egui::Margin::same(8))
+                .inner_margin(egui::Margin::same(spacing::SPACING_SM as i8))
                 .show(&mut left_ui, |ui| {
-                    ui.spacing_mut().item_spacing = egui::vec2(4.0, 6.0);
+                    ui.spacing_mut().item_spacing = egui::vec2(spacing::SPACING_XS, 6.0);
 
                     // 1. DETERMINE CONTENT SOURCE
                     // We prioritize the fetched preview if it exists.
@@ -118,12 +119,12 @@ impl LaReviewApp {
                         });
                     });
 
-                    ui.add_space(4.0);
+                    ui.add_space(spacing::SPACING_XS);
 
                     // -- UNIFIED CONTENT AREA --
                     egui::Frame::new()
                         .fill(MOCHA.crust)
-                        .inner_margin(egui::Margin::same(4))
+                        .inner_margin(egui::Margin::same(spacing::SPACING_XS as i8))
                         .stroke(egui::Stroke::new(1.0, MOCHA.surface0))
                         .show(ui, |ui| {
                             // Loading Spinner Override
@@ -152,7 +153,7 @@ impl LaReviewApp {
                                     egui::Frame::group(ui.style())
                                         .fill(MOCHA.mantle)
                                         .stroke(egui::Stroke::NONE)
-                                        .inner_margin(8.0)
+                                        .inner_margin(spacing::SPACING_SM as i8)
                                         .show(ui, |ui| {
                                             ui.set_min_width(ui.available_width());
                                             ui.horizontal(|ui| {
@@ -266,12 +267,16 @@ impl LaReviewApp {
 
         egui::Frame::default()
             .fill(right_ui.style().visuals.window_fill)
-            .inner_margin(egui::Margin::symmetric(8, 8))
+            .inner_margin(egui::Margin::symmetric(
+                spacing::SPACING_SM as i8,
+                spacing::SPACING_SM as i8,
+            ))
             .show(&mut right_ui, |ui| {
-                ui.spacing_mut().item_spacing = egui::vec2(8.0, 4.0);
+                ui.spacing_mut().item_spacing =
+                    egui::vec2(spacing::BUTTON_PADDING.0, spacing::BUTTON_PADDING.1); // 8.0, 4.0
 
                 ui.heading(egui::RichText::new("AGENT").size(16.0).color(MOCHA.text));
-                ui.add_space(4.0);
+                ui.add_space(spacing::SPACING_XS);
 
                 // ... Agent Selection Chips (Existing Code) ...
                 let candidates = crate::infra::acp::list_agent_candidates();
@@ -287,6 +292,12 @@ impl LaReviewApp {
                     .map(|c| c.label.clone())
                     .collect();
 
+                let agent_logos: Vec<Option<String>> = candidates
+                    .iter()
+                    .filter(|c| c.available)
+                    .map(|c| c.logo.clone())
+                    .collect();
+
                 let mut selected_agent = self.state.selected_agent.clone();
                 egui::ScrollArea::vertical()
                     .max_height(72.0)
@@ -297,6 +308,7 @@ impl LaReviewApp {
                             &mut selected_agent,
                             &available_agents,
                             &agent_labels.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
+                            &agent_logos,
                             "",
                         );
                     });
@@ -306,11 +318,14 @@ impl LaReviewApp {
                     )));
                 }
 
-                ui.add_space(8.0);
+                ui.add_space(spacing::SPACING_SM);
 
                 // Status Section
                 egui::Frame::group(ui.style())
-                    .inner_margin(egui::Margin::symmetric(10, 8))
+                    .inner_margin(egui::Margin::symmetric(
+                        spacing::SPACING_MD as i8,
+                        spacing::SPACING_SM as i8,
+                    ))
                     .show(ui, |ui| {
                         ui.set_min_width(ui.available_width());
                         ui.horizontal(|ui| {
@@ -320,7 +335,7 @@ impl LaReviewApp {
                                     .color(MOCHA.subtext0),
                             );
                         });
-                        ui.add_space(4.0);
+                        ui.add_space(spacing::SPACING_XS);
                         let status_text = if self.state.is_generating {
                             "Agent is working..."
                         } else if self.state.diff_text.trim().is_empty() {
@@ -340,11 +355,14 @@ impl LaReviewApp {
                 // Plan & Timeline (Existing Code)
                 if let Some(plan) = &self.state.latest_plan {
                     super::plan::render_plan_panel(ui, plan);
-                    ui.add_space(8.0);
+                    ui.add_space(spacing::SPACING_SM);
                 }
 
                 egui::Frame::group(ui.style())
-                    .inner_margin(egui::Margin::symmetric(10, 8))
+                    .inner_margin(egui::Margin::symmetric(
+                        spacing::SPACING_MD as i8,
+                        spacing::SPACING_SM as i8,
+                    ))
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
                             ui.label(
@@ -374,7 +392,7 @@ impl LaReviewApp {
                             );
                         });
 
-                        ui.add_space(4.0);
+                        ui.add_space(spacing::SPACING_XS);
                         ui.separator();
 
                         egui::ScrollArea::vertical()
