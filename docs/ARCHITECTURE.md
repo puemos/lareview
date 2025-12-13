@@ -24,17 +24,21 @@ LaReview follows a layered architecture to keep core concepts stable and keep IO
 - `src/ui/components/`: reusable UI widgets (buttons, pills, badges). Avoid business logic here.
 - `src/ui/views/`: screens. Keep views thin; lean on `application/` for policies and `infra/` for integrations.
 
-## UI state + reducers (direction)
+## UI store (reducers + commands)
 
-LaReview is moving toward a reducer-style UI architecture so behavior is deterministic and testable:
+UI logic now goes through a reducer-style store in `src/ui/app/store/` so state is deterministic and testable:
 
-- **Action**: user intent or external event (e.g., “Run generation”, “GenMsg received”).
-- **Reducer**: pure-ish state transitions (no DB/ACP/IO), returning **Command** values.
-- **Command runtime**: executes side effects (DB, ACP, filesystem) and emits new Actions back.
+- **Action** (`action.rs`): user intent or external event (Navigation, Generate, Review, Settings, Async).
+- **Reducer** (`reducer.rs`): pure-ish state transitions that mutate `AppState` and emit **Command** values for side effects.
+- **Command runtime** (`runtime.rs`): executes side effects (DB, ACP, filesystem), then dispatches follow-up `AsyncAction`s.
+- **Dispatch entrypoint** (`mod.rs`): `LaReviewApp::dispatch` runs the reducer, then feeds commands to the runtime.
 
-Current state:
-- The **Generate flow** is wired through this pattern (`src/ui/app/store/`).
-- Review and settings screens now dispatch actions through reducers + commands instead of mutating state directly.
+Flow highlights:
+- Generate: `RunRequested` validates diff input, flips `is_generating`, clears the timeline, and emits `StartGeneration {pull_request, diff_text, selected_agent_id}`. Async ACP messages update the timeline; `Done(Ok)` triggers `RefreshReviewData::AfterGeneration` and view switching.
+- Review: `RefreshFromDb` emits `RefreshReviewData`, applied in `Async::ReviewDataLoaded` which reselects PR/task invariants and loads the first open task note. Status/note actions clear errors and enqueue DB commands; cleanup removes DONE tasks + notes and refreshes.
+- Settings: D2 install/uninstall requests gate on `allow_d2_install`/`is_d2_installing` and emit `RunD2` commands; async output is streamed back.
+
+Add new UI behaviors by introducing an `Action` variant, handling it in `reducer.rs` (with tests there), and emitting a `Command` that the runtime can execute.
 
 ## Dependency rules (intent)
 - `domain` depends on nothing internal.
@@ -57,5 +61,6 @@ If you’re unsure where something goes:
 - Review display ordering: `src/application/review/ordering.rs`
 - Diff UI component: `src/ui/components/diff/` (model/parse/render)
 - App shell + store: `src/ui/app/` (init/header/polling/overlay/update + `store/`)
+- Store plumbing (actions/reducer/commands/runtime): `src/ui/app/store/`
 - Generate screen (UI): `src/ui/views/generate/` (screen/plan/timeline)
 - Review screen (UI): `src/ui/views/review/` (screen/nav/selection/task_detail)

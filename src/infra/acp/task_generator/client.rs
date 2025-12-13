@@ -111,8 +111,14 @@ impl LaReviewClient {
             root.join(requested)
         };
 
-        let root_canon = root.canonicalize().unwrap_or_else(|_| root.clone());
-        let joined_canon = joined.canonicalize().unwrap_or(joined);
+        // If canonicalization fails, we cannot safely determine if the path is within the root,
+        // so we err on the side of caution and return false
+        let Ok(root_canon) = root.canonicalize() else {
+            return false;
+        };
+        let Ok(joined_canon) = joined.canonicalize() else {
+            return false;
+        };
 
         joined_canon.starts_with(&root_canon)
     }

@@ -242,13 +242,29 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
     // Send prompt
     let prompt_text = build_prompt(&pull_request, &diff_text, repo_root.as_ref());
     push_log(&logs, "prompt", debug);
-    let _result = connection
+    let prompt_result = connection
         .prompt(PromptRequest::new(
             session.session_id,
             vec![ContentBlock::Text(TextContent::new(prompt_text))],
         ))
-        .await
-        .with_context(|| "ACP prompt failed")?;
+        .await;
+
+    if let Err(err) = &prompt_result {
+        push_log(
+            &logs,
+            format!("prompt error: {err:?}"),
+            /* always log to stderr when debug */ true,
+        );
+        if let Ok(Some(status)) = child.try_wait() {
+            push_log(
+                &logs,
+                format!("agent exited before prompt completed: {status}"),
+                true,
+            );
+        }
+    }
+
+    let _result = prompt_result.with_context(|| "ACP prompt failed")?;
     push_log(&logs, "prompt ok", debug);
 
     // Wait for the agent to finish naturally. If tasks are captured, we allow a short

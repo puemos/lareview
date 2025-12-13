@@ -16,3 +16,8 @@
 - `LAREVIEW_DB_PATH`: override SQLite path (helpful for tests/dev sandboxes)
 - `ACP_DEBUG`: enable ACP debug logging (prints ACP session updates/tool calls)
 
+## Working with the UI reducer store
+- UI state lives in `src/ui/app/state.rs` and is mutated through reducer actions (`src/ui/app/store/action.rs` + `reducer.rs`). Dispatch actions from views instead of mutating state directly.
+- Reducers should stay side-effect free and return `Command`s; implement side effects in `store/runtime.rs`, then dispatch `AsyncAction` results back through the reducer.
+- Add tests in `store/reducer.rs` for new actions/commands to lock in selection rules, error handling, and view switching.
+- Review data refreshes should go through `ReviewAction::RefreshFromDb` so selection + note loading invariants remain centralized in the reducer.
