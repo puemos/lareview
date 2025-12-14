@@ -18,7 +18,7 @@ pub fn codex_candidate() -> AgentCandidate {
             "-y".to_string(),
             "@zed-industries/codex-acp@latest".to_string(),
             "-c".to_string(),
-            "model=\"gpt-5.1-codex\"".to_string(),
+            "model=\"gpt-5.2\"".to_string(),
         ],
         available: is_command_available("npx"),
     }

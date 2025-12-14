@@ -194,7 +194,7 @@ fn start_generation(
         agent_args: candidate.args,
         progress_tx: Some(progress_tx),
         mcp_server_binary: None,
-        timeout_secs: Some(500),
+        timeout_secs: Some(5000),
         debug: false,
     };
 

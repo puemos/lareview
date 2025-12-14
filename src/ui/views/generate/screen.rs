@@ -29,14 +29,16 @@ impl LaReviewApp {
         // --- Resizable Panes Setup ---
         let pane_width_id = ui.id().with("pane_width");
         let available_width = ui.available_width();
+        let resize_handle_width = spacing::SPACING_XS;
+        let content_width = (available_width - resize_handle_width).max(0.0);
 
         let saved_right_width = ui
             .memory(|mem| mem.data.get_temp::<f32>(pane_width_id))
             .unwrap_or(300.0);
         let right_width =
-            crate::ui::layout::clamp_width(saved_right_width, 250.0, available_width * 0.5);
+            crate::ui::layout::clamp_width(saved_right_width, 400.0, content_width * 0.5);
 
-        let left_width = available_width - right_width;
+        let left_width = content_width - right_width;
 
         let (left_rect, right_rect) = {
             let available = ui.available_rect_before_wrap();
@@ -44,8 +46,12 @@ impl LaReviewApp {
                 available.min,
                 egui::vec2(left_width, available.height()),
             );
+            // Add a small gap for the resize handle.
             let right = egui::Rect::from_min_size(
-                egui::pos2(available.min.x + left_width, available.min.y),
+                egui::pos2(
+                    available.min.x + left_width + resize_handle_width,
+                    available.min.y,
+                ),
                 egui::vec2(right_width, available.height()),
             );
             (left, right)
@@ -53,6 +59,7 @@ impl LaReviewApp {
 
         // --- LEFT PANE (Smart Input) ---
         let mut left_ui = ui.new_child(egui::UiBuilder::new().max_rect(left_rect));
+        left_ui.set_clip_rect(left_rect);
         {
             egui::Frame::default()
                 .fill(left_ui.style().visuals.window_fill)
@@ -215,16 +222,16 @@ impl LaReviewApp {
         let resize_id = ui.id().with("resize");
         let resize_rect = egui::Rect::from_min_size(
             egui::pos2(left_rect.max.x, left_rect.min.y),
-            egui::vec2(4.0, left_rect.height()),
+            egui::vec2(resize_handle_width, left_rect.height()),
         );
         let resize_response = ui.interact(resize_rect, resize_id, egui::Sense::drag());
 
         if resize_response.dragged()
             && let Some(pointer_pos) = ui.ctx().pointer_interact_pos()
         {
-            let new_right_width = available_width - (pointer_pos.x - left_rect.min.x);
+            let new_right_width = content_width - (pointer_pos.x - left_rect.min.x);
             let clamped_width =
-                crate::ui::layout::clamp_width(new_right_width, 250.0, available_width * 0.5);
+                crate::ui::layout::clamp_width(new_right_width, 250.0, content_width * 0.5);
             ui.memory_mut(|mem| {
                 mem.data.insert_temp(pane_width_id, clamped_width);
             });
@@ -242,6 +249,7 @@ impl LaReviewApp {
 
         // --- RIGHT PANE (Agent & Timeline) ---
         let mut right_ui = ui.new_child(egui::UiBuilder::new().max_rect(right_rect));
+        right_ui.set_clip_rect(right_rect);
 
         egui::Frame::default()
             .fill(right_ui.style().visuals.window_fill)
@@ -298,10 +306,9 @@ impl LaReviewApp {
                     .auto_shrink([false, true])
                     .id_salt(ui.id().with("agent_chips_scroll"))
                     .show(ui, |ui| {
-                        let width = ui.clip_rect().width();
+                        let width = ui.available_width();
                         if width.is_finite() && width > 0.0 {
-                            ui.set_min_width(width);
-                            ui.set_max_width(width);
+                            ui.set_width(width);
                         }
                         selection_chips(
                             ui,
@@ -327,29 +334,32 @@ impl LaReviewApp {
                         spacing::SPACING_SM as i8,
                     ))
                     .show(ui, |ui| {
-                        ui.set_min_width(ui.available_width());
                         ui.horizontal(|ui| {
                             ui.label(
                                 egui::RichText::new("STATUS")
                                     .size(11.0)
                                     .color(MOCHA.subtext0),
                             );
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    ui.add_space(spacing::SPACING_XS);
+                                    let status_text = if self.state.is_generating {
+                                        "Agent is working..."
+                                    } else if self.state.diff_text.trim().is_empty() {
+                                        "Waiting for input..."
+                                    } else {
+                                        "Ready."
+                                    };
+                                    ui.label(
+                                        egui::RichText::new(status_text)
+                                            .color(MOCHA.subtext1)
+                                            .size(12.0),
+                                    );
+                                },
+                            );
                         });
-                        ui.add_space(spacing::SPACING_XS);
-                        let status_text = if self.state.is_generating {
-                            "Agent is working..."
-                        } else if self.state.diff_text.trim().is_empty() {
-                            "Waiting for input..."
-                        } else {
-                            "Ready."
-                        };
-                        ui.label(
-                            egui::RichText::new(status_text)
-                                .color(MOCHA.subtext1)
-                                .size(12.0),
-                        );
                     });
-
                 ui.add_space(8.0);
 
                 // Plan & Timeline (Existing Code)

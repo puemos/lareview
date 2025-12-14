@@ -27,19 +27,18 @@ fn load_logo_bytes(path: &str) -> Option<Arc<[u8]>> {
 }
 
 fn wrap_hint(text: &str) -> Cow<'_, str> {
-    if !text.contains(['-', '_', '/', '.', ':']) {
+    let has_separator = text.contains(['-', '_', '/', '.', ':']);
+    let has_whitespace = text.chars().any(|c| c.is_whitespace());
+    let long_single_token = !has_whitespace && text.chars().count() > 18;
+
+    if !has_separator && !long_single_token {
         return Cow::Borrowed(text);
     }
 
     // Insert zero-width spaces after common separators so Egui can wrap model IDs like
     // `claude-3-5-sonnet` instead of overflowing horizontally.
-    let mut out = String::with_capacity(text.len() + 8);
-    for ch in text.chars() {
-        out.push(ch);
-        if matches!(ch, '-' | '_' | '/' | '.' | ':') {
-            out.push('\u{200B}');
-        }
-    }
+    let out = String::with_capacity(text.len() + 8);
+
     Cow::Owned(out)
 }
 
