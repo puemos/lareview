@@ -25,13 +25,13 @@ impl TaskRepository {
         let conn = self.conn.lock().unwrap();
         let files_json = serde_json::to_string(&task.files)?;
         let stats_json = serde_json::to_string(&task.stats)?;
-        let diffs_json = serde_json::to_string(&task.diffs)?;
+        let diff_refs_json = serde_json::to_string(&task.diff_refs)?;
 
         let status_str = serde_json::to_string(&task.status)?.replace('"', "");
 
         conn.execute(
             r#"
-            INSERT OR REPLACE INTO tasks (id, run_id, title, description, files, stats, insight, diffs, diagram, ai_generated, status, sub_flow)
+            INSERT OR REPLACE INTO tasks (id, run_id, title, description, files, stats, insight, diff_refs, diagram, ai_generated, status, sub_flow)
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
             "#,
             (
@@ -42,7 +42,7 @@ impl TaskRepository {
                 &files_json,
                 &stats_json,
                 &task.insight,
-                &diffs_json,
+                &diff_refs_json,
                 &task.diagram,
                 task.ai_generated as i32,
                 &status_str,
@@ -78,14 +78,14 @@ impl TaskRepository {
     pub fn find_all(&self) -> Result<Vec<ReviewTask>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, run_id, title, description, files, stats, insight, diffs, diagram, ai_generated, status, sub_flow FROM tasks",
+            "SELECT id, run_id, title, description, files, stats, insight, diff_refs, diagram, ai_generated, status, sub_flow FROM tasks",
         )?;
 
         let rows = stmt.query_map([], |row| {
             let run_id: String = row.get(1)?;
             let files_json: String = row.get(4)?;
             let stats_json: String = row.get(5)?;
-            let diffs_json: Option<String> = row.get(7)?;
+            let diff_refs_json: Option<String> = row.get(7)?;
             let status_str: String = row.get(10)?;
             let sub_flow: Option<String> = row.get(11)?;
 
@@ -97,7 +97,7 @@ impl TaskRepository {
                 files_json,
                 stats_json,
                 row.get::<_, Option<String>>(6)?,
-                diffs_json,
+                diff_refs_json,
                 row.get::<_, Option<String>>(8)?,
                 row.get::<_, i32>(9)?,
                 status_str,
@@ -115,7 +115,7 @@ impl TaskRepository {
                 files_json,
                 stats_json,
                 insight,
-                diffs_json,
+                diff_refs_json,
                 diagram,
                 ai_generated,
                 status_str,
@@ -132,7 +132,7 @@ impl TaskRepository {
                 files: serde_json::from_str(&files_json).unwrap_or_default(),
                 stats: serde_json::from_str(&stats_json).unwrap_or_default(),
                 insight,
-                diffs: diffs_json
+                diff_refs: diff_refs_json
                     .map(|s| serde_json::from_str(&s).unwrap_or_default())
                     .unwrap_or_default(),
                 diagram,
@@ -153,7 +153,7 @@ impl TaskRepository {
             .collect::<Vec<_>>()
             .join(",");
         let sql = format!(
-            "SELECT id, run_id, title, description, files, stats, insight, diffs, diagram, ai_generated, status, sub_flow FROM tasks WHERE run_id IN ({})",
+            "SELECT id, run_id, title, description, files, stats, insight, diff_refs, diagram, ai_generated, status, sub_flow FROM tasks WHERE run_id IN ({})",
             placeholders
         );
 
@@ -162,7 +162,7 @@ impl TaskRepository {
             let run_id: String = row.get(1)?;
             let files_json: String = row.get(4)?;
             let stats_json: String = row.get(5)?;
-            let diffs_json: Option<String> = row.get(7)?;
+            let diff_refs_json: Option<String> = row.get(7)?;
             let status_str: String = row.get(10)?;
             let sub_flow: Option<String> = row.get(11)?;
 
@@ -174,7 +174,7 @@ impl TaskRepository {
                 files_json,
                 stats_json,
                 row.get::<_, Option<String>>(6)?,
-                diffs_json,
+                diff_refs_json,
                 row.get::<_, Option<String>>(8)?,
                 row.get::<_, i32>(9)?,
                 status_str,
@@ -192,7 +192,7 @@ impl TaskRepository {
                 files_json,
                 stats_json,
                 insight,
-                diffs_json,
+                diff_refs_json,
                 diagram,
                 ai_generated,
                 status_str,
@@ -209,7 +209,7 @@ impl TaskRepository {
                 files: serde_json::from_str(&files_json).unwrap_or_default(),
                 stats: serde_json::from_str(&stats_json).unwrap_or_default(),
                 insight,
-                diffs: diffs_json
+                diff_refs: diff_refs_json
                     .map(|s| serde_json::from_str(&s).unwrap_or_default())
                     .unwrap_or_default(),
                 diagram,
@@ -225,14 +225,14 @@ impl TaskRepository {
     pub fn find_by_run(&self, run_id_filter: &ReviewRunId) -> Result<Vec<ReviewTask>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, run_id, title, description, files, stats, insight, diffs, diagram, ai_generated, status, sub_flow FROM tasks WHERE run_id = ?1",
+            "SELECT id, run_id, title, description, files, stats, insight, diff_refs, diagram, ai_generated, status, sub_flow FROM tasks WHERE run_id = ?1",
         )?;
 
         let rows = stmt.query_map([run_id_filter], |row| {
             let run_id: String = row.get(1)?;
             let files_json: String = row.get(4)?;
             let stats_json: String = row.get(5)?;
-            let diffs_json: Option<String> = row.get(7)?;
+            let diff_refs_json: Option<String> = row.get(7)?;
             let status_str: String = row.get(10)?;
             let sub_flow: Option<String> = row.get(11)?;
 
@@ -244,7 +244,7 @@ impl TaskRepository {
                 files_json,
                 stats_json,
                 row.get::<_, Option<String>>(6)?,
-                diffs_json,
+                diff_refs_json,
                 row.get::<_, Option<String>>(8)?,
                 row.get::<_, i32>(9)?,
                 status_str,
@@ -262,7 +262,7 @@ impl TaskRepository {
                 files_json,
                 stats_json,
                 insight,
-                diffs_json,
+                diff_refs_json,
                 diagram,
                 ai_generated,
                 status_str,
@@ -279,7 +279,7 @@ impl TaskRepository {
                 files: serde_json::from_str(&files_json).unwrap_or_default(),
                 stats: serde_json::from_str(&stats_json).unwrap_or_default(),
                 insight,
-                diffs: diffs_json
+                diff_refs: diff_refs_json
                     .map(|s| serde_json::from_str(&s).unwrap_or_default())
                     .unwrap_or_default(),
                 diagram,

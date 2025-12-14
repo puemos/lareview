@@ -29,7 +29,7 @@ fn sample_task(id: &str, files: &[&str]) -> crate::domain::ReviewTask {
             risk: crate::domain::RiskLevel::Low,
             tags: vec![],
         },
-        diffs: vec![],
+        diff_refs: vec![],
         insight: None,
         diagram: None,
         ai_generated: true,
@@ -44,7 +44,8 @@ fn prompt_renders_no_repo_access_block() {
     let run = sample_run(diff);
     let prompt = super::prompt::build_prompt(&run, None);
     assert!(prompt.contains("You do NOT have repository access."));
-    assert!(prompt.contains("Do NOT call any tools except `return_review`."));
+    assert!(prompt.contains("Use `return_task` to submit each task individually during analysis"));
+    assert!(prompt.contains("Use `finalize_review` to submit the final review title and summary"));
     assert!(!prompt.contains("You have READ-ONLY access"));
 }
 
@@ -114,12 +115,18 @@ async fn permission_cancelled_without_repo_access() {
 }
 
 #[tokio::test(flavor = "current_thread")]
-async fn permission_allows_return_tasks_even_without_repo_access() {
+async fn permission_allows_return_task_even_without_repo_access() {
     let client = super::client::LaReviewClient::new(None, "run-1", None);
     let fields = agent_client_protocol::ToolCallUpdateFields::new()
         .kind(agent_client_protocol::ToolKind::Other)
-        .title("return_tasks")
-        .raw_input(serde_json::json!({ "tasks": [] }));
+        .title("return_task")
+        .raw_input(serde_json::json!({
+            "id": "test-task",
+            "title": "Test Task",
+            "description": "Test task description",
+            "stats": { "risk": "LOW", "tags": ["test"] },
+            "diff_refs": []
+        }));
     let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
     let options = vec![agent_client_protocol::PermissionOption::new(
         "allow",
@@ -144,11 +151,42 @@ async fn permission_allows_return_tasks_even_without_repo_access() {
 }
 
 #[tokio::test(flavor = "current_thread")]
-async fn permission_allows_tasks_payload_embedded_in_title() {
+async fn permission_allows_single_task_payload_embedded_in_title() {
     let client = super::client::LaReviewClient::new(None, "run-1", None);
+    let task_json = r#"{"id":"T1","title":"Example","description":"Test","stats":{"risk":"LOW","tags":[]},"diff_refs":[{"file":"test.rs","hunks":[{"old_start":1,"old_lines":1,"new_start":1,"new_lines":1}]}]}"#;
     let fields = agent_client_protocol::ToolCallUpdateFields::new()
         .kind(agent_client_protocol::ToolKind::Other)
-        .title(r#"{"tasks":[{"id":"T1","title":"Example","description":"","files":[],"stats":{"additions":0,"deletions":0,"risk":"LOW","tags":[]},"patches":[]}]}"#);
+        .title(task_json);
+    let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
+    let options = vec![agent_client_protocol::PermissionOption::new(
+        "allow",
+        "Allow",
+        agent_client_protocol::PermissionOptionKind::AllowOnce,
+    )];
+    let req = agent_client_protocol::RequestPermissionRequest::new(
+        agent_client_protocol::SessionId::new("s1"),
+        tool_call,
+        options,
+    );
+    let resp =
+        <super::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
+            &client, req,
+        )
+        .await
+        .unwrap();
+    assert!(matches!(
+        resp.outcome,
+        agent_client_protocol::RequestPermissionOutcome::Selected(_)
+    ));
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn permission_allows_finalize_review_payload_embedded_in_title() {
+    let client = super::client::LaReviewClient::new(None, "run-1", None);
+    let finalize_json = r#"{"title":"Review Title","summary":"Review summary"}"#;
+    let fields = agent_client_protocol::ToolCallUpdateFields::new()
+        .kind(agent_client_protocol::ToolKind::Other)
+        .title(finalize_json);
     let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
     let options = vec![agent_client_protocol::PermissionOption::new(
         "allow",

@@ -5,5 +5,6 @@
 pub mod acp;
 pub mod db;
 pub mod diff;
+pub mod diff_index;
 pub mod github;
 pub mod hash;

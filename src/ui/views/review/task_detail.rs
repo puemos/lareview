@@ -1,4 +1,3 @@
-use crate::infra::diff::{combine_diffs_to_unified_diff, extract_file_path_from_diff};
 use crate::ui::app::{Action, FullDiffView, LaReviewApp, LineNoteContext, ReviewAction};
 use crate::ui::components::badge::badge;
 use crate::ui::components::pills::pill_divider;
@@ -241,18 +240,48 @@ impl LaReviewApp {
                 ui.label(section_title("Changes").color(MOCHA.text));
                 ui.add_space(spacing::SPACING_XS);
 
+                // Build unified diff from diff_refs instead of stored diffs
                 let unified_diff = match &self.state.cached_unified_diff {
-                    Some((cached_diffs, diff_string)) if cached_diffs == &task.diffs => {
-                        // Cache Hit: Diffs haven't changed, use the cached string
+                    Some((cached_diff_refs, diff_string)) if cached_diff_refs == &task.diff_refs => {
+                        // Cache Hit: Diff refs haven't changed, use the cached string
                         diff_string.clone()
                     }
                     _ => {
-                        // Cache Miss: Recalculate and update cache
-                        let new_diff = combine_diffs_to_unified_diff(&task.diffs);
+                        // Cache Miss: Recalculate and update cache using diff_refs
+                        let new_diff = if !task.diff_refs.is_empty() {
+                            // Look up the canonical run diff text using the task.run_id
+                            let run = self.state.runs.iter().find(|r| r.id == task.run_id);
+                            match run {
+                                Some(run) => {
+                                    match crate::infra::diff_index::DiffIndex::new(&run.diff_text) {
+                                        Ok(diff_index) => {
+                                            match diff_index.render_unified_diff(&task.diff_refs) {
+                                                Ok((diff_text, _ordered_files)) => diff_text,
+                                                Err(_) => {
+                                                    // Fallback to empty string if rendering fails
+                                                    String::new()
+                                                }
+                                            }
+                                        }
+                                        Err(_) => {
+                                            // Fallback to empty string if diff_index fails
+                                            String::new()
+                                        }
+                                    }
+                                }
+                                None => {
+                                    // Run not found, fallback to empty string
+                                    String::new()
+                                }
+                            }
+                        } else {
+                            // Fallback to empty string if no diff_refs
+                            String::new()
+                        };
 
-                        // Update the cache with the new diff and the current diffs as the key
+                        // Update the cache with the new diff and the current diff_refs as the key
                         self.state.cached_unified_diff =
-                            Some((task.diffs.clone(), new_diff.clone()));
+                            Some((task.diff_refs.clone(), new_diff.clone()));
 
                         new_diff
                     }
@@ -280,7 +309,7 @@ impl LaReviewApp {
                         line_idx: ctx.line_idx,
                     });
 
-                if task.diffs.is_empty() {
+                if task.diff_refs.is_empty() {
                     ui.label(
                         egui::RichText::new("No code changes in this task (metadata only?)")
                             .italics(),
@@ -322,10 +351,52 @@ impl LaReviewApp {
                                         line_idx,
                                         line_number,
                                     } => {
-                                        let file_path = if file_idx < task.diffs.len() {
-                                            extract_file_path_from_diff(&task.diffs[file_idx])
-                                                .unwrap_or("unknown".to_string())
+                                        let file_path = if !task.diff_refs.is_empty() {
+                                            // Use the render_unified_diff to get the correct ordered files
+                                            let run = self.state.runs.iter().find(|r| r.id == task.run_id);
+                                            match run {
+                                                Some(run) => {
+                                                    match crate::infra::diff_index::DiffIndex::new(&run.diff_text) {
+                                                        Ok(diff_index) => {
+                                                            match diff_index.render_unified_diff(&task.diff_refs) {
+                                                                Ok((_diff_text, ordered_files)) => {
+                                                                    if file_idx < ordered_files.len() {
+                                                                        ordered_files[file_idx].clone()
+                                                                    } else {
+                                                                        "unknown".to_string()
+                                                                    }
+                                                                }
+                                                                Err(_) => {
+                                                                    // Fallback to task.files if rendering fails
+                                                                    if file_idx < task.files.len() {
+                                                                        task.files[file_idx].clone()
+                                                                    } else {
+                                                                        "unknown".to_string()
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                        Err(_) => {
+                                                            // Fallback to task.files if diff_index fails
+                                                            if file_idx < task.files.len() {
+                                                                task.files[file_idx].clone()
+                                                            } else {
+                                                                "unknown".to_string()
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                None => {
+                                                    // Fallback to task.files if run not found
+                                                    if file_idx < task.files.len() {
+                                                        task.files[file_idx].clone()
+                                                    } else {
+                                                        "unknown".to_string()
+                                                    }
+                                                }
+                                            }
                                         } else {
+                                            // No valid file_path found
                                             "unknown".to_string()
                                         };
 
@@ -346,10 +417,52 @@ impl LaReviewApp {
                                         line_number,
                                         note_text,
                                     } => {
-                                        let file_path = if file_idx < task.diffs.len() {
-                                            extract_file_path_from_diff(&task.diffs[file_idx])
-                                                .unwrap_or("unknown".to_string())
+                                        let file_path = if !task.diff_refs.is_empty() {
+                                            // Use the render_unified_diff to get the correct ordered files
+                                            let run = self.state.runs.iter().find(|r| r.id == task.run_id);
+                                            match run {
+                                                Some(run) => {
+                                                    match crate::infra::diff_index::DiffIndex::new(&run.diff_text) {
+                                                        Ok(diff_index) => {
+                                                            match diff_index.render_unified_diff(&task.diff_refs) {
+                                                                Ok((_diff_text, ordered_files)) => {
+                                                                    if file_idx < ordered_files.len() {
+                                                                        ordered_files[file_idx].clone()
+                                                                    } else {
+                                                                        "unknown".to_string()
+                                                                    }
+                                                                }
+                                                                Err(_) => {
+                                                                    // Fallback to task.files if rendering fails
+                                                                    if file_idx < task.files.len() {
+                                                                        task.files[file_idx].clone()
+                                                                    } else {
+                                                                        "unknown".to_string()
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                        Err(_) => {
+                                                            // Fallback to task.files if diff_index fails
+                                                            if file_idx < task.files.len() {
+                                                                task.files[file_idx].clone()
+                                                            } else {
+                                                                "unknown".to_string()
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                None => {
+                                                    // Fallback to task.files if run not found
+                                                    if file_idx < task.files.len() {
+                                                        task.files[file_idx].clone()
+                                                    } else {
+                                                        "unknown".to_string()
+                                                    }
+                                                }
+                                            }
                                         } else {
+                                            // No valid file_path found
                                             "unknown".to_string()
                                         };
 

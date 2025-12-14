@@ -509,7 +509,7 @@ mod tests {
             description: "Desc".into(),
             files: vec![],
             stats: TaskStats::default(),
-            diffs: vec![],
+            diff_refs: vec![],
             insight: None,
             diagram: None,
             ai_generated: false,

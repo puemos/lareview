@@ -44,6 +44,8 @@ Rules:
 {{#if has_repo_access}}
 Allowed tools:
 - Read-only file reads for context (only if needed to understand code referenced in the provided <diff>)
+- `return_task` to submit individual review tasks (call this repeatedly for each task)
+- `finalize_review` to submit the final review title and summary
 
 Forbidden:
 - Any terminal execution
@@ -51,12 +53,14 @@ Forbidden:
 - Any file writes
 
 Always:
-- The only tool you should call is `return_review` at the end to submit the JSON.
+- Use `return_task` to submit each task individually during analysis
+- Use `finalize_review` to submit the final review title and summary
 {{else}}
 Rules:
-- Do NOT call any tools except `return_review`.
+- Use `return_task` to submit each task individually during analysis
+- Use `finalize_review` to submit the final review title and summary
 - Use ONLY the PR metadata and the provided <diff>.
-- Do NOT print review JSON in plain text; only submit via `return_review`.
+- Do NOT print review JSON in plain text; only submit via tools.
 {{/if}}
 </tool_policy>
 
@@ -226,9 +230,11 @@ Treat <diff> as complete and authoritative. Never attempt to obtain or generate 
 3. **Create**: Build one task per flow, ensuring every file is assigned
 4. **Prioritize**: Order tasks by risk level (HIGH → MEDIUM → LOW)
 5. **Visualize**: Add D2 diagrams for complex or risky tasks
-6. **Submit**: Call the tool `return_review` with your complete JSON payload
+6. **Submit**:
+   - Call the tool `return_task` for each task individually (2-7 times total)
+   - Call the tool `finalize_review` once at the end with the review title and summary
 
-**Coverage verification**: Before submitting, mentally check that every file in the diff appears in at least one task's `diffs` list. If some changes are trivial or miscellaneous, create a final "Verify remaining changes" task to cover them.
+**Coverage verification**: Before finishing, mentally check that every file in the diff appears in at least one task's `diff_refs`. Copy the exact file paths and hunk coordinates from the `@@ -old,+new @@` headers in the `<diff>` section. If some changes are trivial or miscellaneous, create a final "Verify remaining changes" task to cover them.
 </process>
 
 </instructions>
@@ -238,27 +244,61 @@ Treat <diff> as complete and authoritative. Never attempt to obtain or generate 
 <example type="high_risk">
 **Scenario**: PR adds JWT authentication to an API
 
-**Task structure**:
+**First task submission**:
 ```json
 {
-  "tasks": [
+  "id": "auth-T1",
+  "title": "Review JWT authentication implementation and security",
+  "description": "- What changed: Added JWT generation/validation and middleware wiring.\n- Why it matters / risk: Security-sensitive auth path; bad validation can allow escalation.\n- What to verify: Signature/expiry checks, secret handling, and consistent enforcement.\n- Edge cases: Missing/expired tokens, clock skew, malformed claims.\n- Tests to add/adjust: Token validation cases and protected endpoint coverage.",
+  "stats": {
+    "risk": "HIGH",
+    "tags": ["security", "authentication", "breaking-change", "needs-tests"]
+  },
+  "sub_flow": "authentication-flow",
+  "diagram": "Client -> API: POST /login\nAPI -> JWTService: generate()\nJWTService -> API: token\nClient -> API: request with token\nAPI -> Middleware: validate()\nMiddleware -> JWTService: verify()",
+  "diff_refs": [
     {
-      "id": "auth-T1",
-      "title": "Review JWT authentication implementation and security",
-      "description": "- What changed: Added JWT generation/validation and middleware wiring.\n- Why it matters / risk: Security-sensitive auth path; bad validation can allow escalation.\n- What to verify: Signature/expiry checks, secret handling, and consistent enforcement.\n- Edge cases: Missing/expired tokens, clock skew, malformed claims.\n- Tests to add/adjust: Token validation cases and protected endpoint coverage.",
-      "stats": {
-        "risk": "HIGH",
-        "tags": ["security", "authentication", "breaking-change", "needs-tests"]
-      },
-      "sub_flow": "authentication-flow",
-      "diagram": "Client -> API: POST /login\nAPI -> JWTService: generate()\nJWTService -> API: token\nClient -> API: request with token\nAPI -> Middleware: validate()\nMiddleware -> JWTService: verify()",
-      "diffs": [
-        "diff --git a/src/auth/jwt.rs b/src/auth/jwt.rs\n--- a/src/auth/jwt.rs\n+++ b/src/auth/jwt.rs\n@@ -0,0 +1,35 @@\n+use jsonwebtoken::{encode, Header};\n+use crate::keys::KEYS;\n+\n+pub fn generate_token(user_id: &str) -> Result<String, jsonwebtoken::errors::Error> {\n+    let claims = Claims { user_id: user_id.to_string() };\n+    encode(&Header::default(), &claims, &KEYS.encoding)\n+}\n+\n+#[derive(Serialize, Deserialize)]\n+struct Claims {\n+    user_id: String,\n+}\n",
-        "diff --git a/src/middleware/auth.rs b/src/middleware/auth.rs\n--- a/src/middleware/auth.rs\n+++ b/src/middleware/auth.rs\n@@ -10,6 +10,20 @@ pub async fn authenticate(req: Request) -> Result<Request, Response> {\n-    // TODO: add real validation\n+    let token = extract_token(&req)?;\n+    let data = decode::<Claims>(&token, &KEYS.decoding, &Validation::default())?;\n+    req.extensions_mut().insert(data.claims.user_id);\n     Ok(req)\n }\n",
-        "diff --git a/src/api/handlers.rs b/src/api/handlers.rs\n--- a/src/api/handlers.rs\n+++ b/src/api/handlers.rs\n@@ -3,6 +3,7 @@ use crate::db;\n pub async fn get_profile(req: Request) -> Result<Response, Error> {\n+    let user_id: String = req.extensions().get().cloned().ok_or(Error::Unauthorized)?;\n     let profile = db::load_profile(&user_id)?;\n     Ok(Response::json(profile))\n }\n"
+      "file": "src/auth/jwt.rs",
+      "hunks": [
+        {
+          "old_start": 0,
+          "old_lines": 0,
+          "new_start": 1,
+          "new_lines": 35
+        }
+      ]
+    },
+    {
+      "file": "src/middleware/auth.rs",
+      "hunks": [
+        {
+          "old_start": 10,
+          "old_lines": 6,
+          "new_start": 10,
+          "new_lines": 20
+        }
+      ]
+    },
+    {
+      "file": "src/api/handlers.rs",
+      "hunks": [
+        {
+          "old_start": 3,
+          "old_lines": 6,
+          "new_start": 3,
+          "new_lines": 7
+        }
       ]
     }
   ]
+}
+```
+
+**Finalization**:
+```json
+{
+  "title": "Review of JWT Authentication Implementation",
+  "summary": "This PR introduces JWT-based authentication with security considerations around token validation and middleware enforcement. The changes are well-structured but require careful review of security practices."
 }
 ```
 </example>
@@ -266,26 +306,56 @@ Treat <diff> as complete and authoritative. Never attempt to obtain or generate 
 <example type="medium_risk">
 **Scenario**: PR refactors database query builder
 
-**Task structure**:
+**Task submission**:
 ```json
 {
-  "tasks": [
+  "id": "db-refactor-T1",
+  "title": "Verify refactored query builder and SQL generation",
+  "description": "- What changed: Refactored query builder into condition-based API with build().\n- Why it matters / risk: Medium risk of SQL generation or binding regressions.\n- What to verify: Correct clause ordering, parameter binding, and output SQL.\n- Edge cases: Empty conditions, multiple conditions, special characters.\n- Tests to add/adjust: Unit tests for SQL strings across common cases.",
+  "stats": {
+    "risk": "MEDIUM",
+    "tags": ["refactor", "database", "type-safety"]
+  },
+  "sub_flow": "query-builder-refactor",
+  "diagram": "Repository -> QueryBuilder: new()\nQueryBuilder -> QueryBuilder: where(condition)\nQueryBuilder -> SQL: build()\nSQL -> Database: execute()",
+  "diff_refs": [
     {
-      "id": "db-refactor-T1",
-      "title": "Verify refactored query builder and SQL generation",
-      "description": "- What changed: Refactored query builder into condition-based API with build().\n- Why it matters / risk: Medium risk of SQL generation or binding regressions.\n- What to verify: Correct clause ordering, parameter binding, and output SQL.\n- Edge cases: Empty conditions, multiple conditions, special characters.\n- Tests to add/adjust: Unit tests for SQL strings across common cases.",
-      "stats": {
-        "risk": "MEDIUM",
-        "tags": ["refactor", "database", "type-safety"]
-      },
-      "sub_flow": "query-builder-refactor",
-      "diagram": "Repository -> QueryBuilder: new()\nQueryBuilder -> QueryBuilder: where(condition)\nQueryBuilder -> SQL: build()\nSQL -> Database: execute()",
-      "diffs": [
-        "diff --git a/src/db/query_builder.rs b/src/db/query_builder.rs\n--- a/src/db/query_builder.rs\n+++ b/src/db/query_builder.rs\n@@ -5,10 +5,25 @@ pub struct QueryBuilder {\n-    query: String,\n+    base: String,\n+    conditions: Vec<String>,\n }\n@@ -20,7 +35,13 @@ impl QueryBuilder {\n-    pub fn where_clause(&mut self, clause: &str) {\n-        self.query.push_str(&format!(\" WHERE {}\", clause));\n+    pub fn where_clause(&mut self, condition: &str) -> &mut Self {\n+        self.conditions.push(condition.to_string());\n+        self\n     }\n+\n+    pub fn build(&self) -> String {\n+        let mut q = self.base.clone();\n+        if !self.conditions.is_empty() {\n+            q.push_str(\" WHERE \");\n+            q.push_str(&self.conditions.join(\" AND \"));\n+        }\n+        q\n+    }\n }\n",
-        "diff --git a/src/db/repository.rs b/src/db/repository.rs\n--- a/src/db/repository.rs\n+++ b/src/db/repository.rs\n@@ -12,7 +12,9 @@ pub fn load_user(id: i32) -> Result<User> {\n-    let mut q = QueryBuilder::new(\"SELECT * FROM users\");\n-    q.where_clause(&format!(\"id = {}\", id));\n-    db::query(&q.query)\n+    let mut qb = QueryBuilder::new(\"SELECT * FROM users\".into());\n+    qb.where_clause(&format!(\"id = {}\", id));\n+    let sql = qb.build();\n+    db::query(&sql)\n }\n"
+      "file": "src/db/query_builder.rs",
+      "hunks": [
+        {
+          "old_start": 5,
+          "old_lines": 10,
+          "new_start": 5,
+          "new_lines": 25
+        },
+        {
+          "old_start": 20,
+          "old_lines": 7,
+          "new_start": 35,
+          "new_lines": 13
+        }
+      ]
+    },
+    {
+      "file": "src/db/repository.rs",
+      "hunks": [
+        {
+          "old_start": 12,
+          "old_lines": 7,
+          "new_start": 12,
+          "new_lines": 9
+        }
       ]
     }
   ]
+}
+```
+
+**Finalization**:
+```json
+{
+  "title": "Review of Database Query Builder Refactor",
+  "summary": "This PR refactors the query builder API to support a more fluent interface with build() method. Changes are well-structured but require verification of SQL generation accuracy."
 }
 ```
 </example>
@@ -293,22 +363,38 @@ Treat <diff> as complete and authoritative. Never attempt to obtain or generate 
 <example type="low_risk">
 **Scenario**: PR updates logging format and adds debug statements
 
-**Task structure**:
+**Task submission**:
 ```json
 {
-  "tasks": [
+  "id": "logging-T1",
+  "title": "Review updated logging format and debug statements",
+  "description": "- What changed: Updated logging formatter to include timestamps and added debug logs.\n- Why it matters / risk: Low risk; ensure observability without leaking data.\n- What to verify: Log levels, formatting, and absence of sensitive info.\n- Edge cases: High-volume log paths, multi-line messages.\n- Tests to add/adjust: Snapshot/format tests if present.",
+  "stats": {
+    "risk": "LOW",
+    "tags": ["logging", "observability"]
+  },
+  "diagram": "",
+  "diff_refs": [
     {
-      "id": "logging-T1",
-      "title": "Review updated logging format and debug statements",
-      "description": "- What changed: Updated logging formatter to include timestamps and added debug logs.\n- Why it matters / risk: Low risk; ensure observability without leaking data.\n- What to verify: Log levels, formatting, and absence of sensitive info.\n- Edge cases: High-volume log paths, multi-line messages.\n- Tests to add/adjust: Snapshot/format tests if present.",
-      "stats": {
-        "risk": "LOW",
-        "tags": ["logging", "observability"]
-      },
-      "diagram": "",
-      "diffs": [
-        "diff --git a/src/logging/formatter.rs b/src/logging/formatter.rs\n--- a/src/logging/formatter.rs\n+++ b/src/logging/formatter.rs\n@@ -8,4 +8,8 @@ pub fn format(level: &str, message: &str) -> String {\n-    format!(\"{} - {}\", level, message)\n+    let ts = chrono::Utc::now().format(\"%Y-%m-%d %H:%M:%S\");\n+    format!(\"[{}] {} - {}\", ts, level, message)\n }\n",
-        "diff --git a/src/api/handlers.rs b/src/api/handlers.rs\n--- a/src/api/handlers.rs\n+++ b/src/api/handlers.rs\n@@ -15,6 +15,8 @@ pub async fn save_item(item: Item) -> Result<Response> {\n+    log::debug!(\"Saving item: {}\", item.id);\n     db::save(item)?;\n+    log::debug!(\"Item saved successfully\");\n     Ok(Response::ok())\n }\n"
+      "file": "src/logging/formatter.rs",
+      "hunks": [
+        {
+          "old_start": 8,
+          "old_lines": 4,
+          "new_start": 8,
+          "new_lines": 8
+        }
+      ]
+    },
+    {
+      "file": "src/api/handlers.rs",
+      "hunks": [
+        {
+          "old_start": 15,
+          "old_lines": 6,
+          "new_start": 15,
+          "new_lines": 8
+        }
       ]
     }
   ]
@@ -319,52 +405,59 @@ Treat <diff> as complete and authoritative. Never attempt to obtain or generate 
 </examples>
 
 <output_format>
-When ready, call the MCP tool `return_review` on server `lareview-tasks` with this JSON structure:
+When ready, call the MCP tools on server `lareview-tasks`:
 
+**For each task individually, call `return_task` with this JSON structure**:
 ```json
 {
-  "title": "string (agent-generated review title)",
-  "summary": "string (optional short summary of intent + main risks)",
-  "tasks": [
+  "id": "string",
+  "title": "string",
+  "description": "string (use bullets for readability)",
+  "stats": {
+    "risk": "HIGH|MEDIUM|LOW",
+    "tags": ["tag1", "tag2", "tag3"]
+  },
+  "sub_flow": "optional-grouping-name",
+  "diagram": "optional D2 diagram string",
+  "diff_refs": [
     {
-      "id": "string",
-      "title": "string",
-      "description": "string (use bullets for readability)",
-      "stats": {
-        "risk": "HIGH|MEDIUM|LOW",
-        "tags": ["tag1", "tag2", "tag3"]
-      },
-      "sub_flow": "optional-grouping-name",
-      "diagram": "optional D2 diagram string",
-      "diffs": ["complete unified diff string with headers and hunks"]
-    },
-    {
-      "id": "string",
-      "title": "string",
-      "description": "string (use bullets for readability)",
-      "stats": {
-        "risk": "HIGH|MEDIUM|LOW",
-        "tags": ["tag1", "tag2", "tag3"]
-      },
-      "sub_flow": "optional-grouping-name",
-      "diagram": "optional D2 diagram string",
-      "diffs": ["complete unified diff string with headers and hunks"]
+      "file": "string (relative file path)",
+      "hunks": [
+        {
+          "old_start": integer,
+          "old_lines": integer,
+          "new_start": integer,
+          "new_lines": integer
+        }
+      ]
     }
   ]
 }
 ```
 
+**Finally, call `finalize_review` with this JSON structure**:
+```json
+{
+  "title": "string (agent-generated review title)",
+  "summary": "string (optional short summary of intent + main risks)"
+}
+```
+
 **Important**:
-- Call the tool directly - do not output JSON to chat
-- Ensure tasks array is complete before calling
-- `files` and line stats are computed automatically from `diffs`
+- Call `return_task` for each task individually (2-7 times total)
+- Call `finalize_review` once at the end
+- Do not output JSON to chat
+- `files` and line stats are computed automatically from `diff_refs`
+- Copy the exact hunk coordinates from `@@ -old,+new @@` in the provided `<diff>`
 </output_format>
 
 <reminders>
 - Think step-by-step first
-- Include all changes - every file must be included in at least one task's `diffs`
+- Include all changes - every file must be covered by at least one task's `diff_refs`
 - Aim for 2-7 tasks total (balance granularity with completeness)
 - Add diagrams for MEDIUM/HIGH risk or multi-component flows
 - Order by risk level: HIGH → MEDIUM → LOW
+- Call `return_task` for each task individually (2-7 times total)
+- Call `finalize_review` once at the end with title and summary
 - Be thorough and insightful - help the team ship better code
 </reminders>

@@ -38,50 +38,42 @@ pub(super) fn build_client_capabilities(has_repo_access: bool) -> ClientCapabili
         .terminal(false)
         .meta(Meta::from_iter([
             (
-                "lareview-return-tasks".into(),
+                "lareview-return-task".into(),
                 serde_json::json!({
                     "type": "extension",
-                    "method": "lareview/return_tasks",
-                    "description": "Submit review tasks back to the client as structured data",
+                    "method": "lareview/return_task",
+                    "description": "Submit a single review task back to the client as structured data",
                     "params": {
-                        "tasks": [{
-                            "id": "string",
-                            "title": "string",
-                            "description": "string",
-                            "files": ["string"],
-                            "stats": {
-                                "additions": "number",
-                                "deletions": "number",
-                                "risk": "LOW|MEDIUM|HIGH",
-                                "tags": ["string"]
-                            },
-                            "patches": [{"file": "string", "hunk": "string"}]
+                        "id": "string",
+                        "title": "string",
+                        "description": "string",
+                        "stats": {
+                            "additions": "number",
+                            "deletions": "number",
+                            "risk": "LOW|MEDIUM|HIGH",
+                            "tags": ["string"]
+                        },
+                        "diff_refs": [{
+                            "file": "string",
+                            "hunks": [{
+                                "old_start": "number",
+                                "old_lines": "number",
+                                "new_start": "number",
+                                "new_lines": "number"
+                            }]
                         }]
                     }
                 }),
             ),
             (
-                "lareview-return-review".into(),
+                "lareview-finalize-review".into(),
                 serde_json::json!({
                     "type": "extension",
-                    "method": "lareview/return_review",
-                    "description": "Submit review metadata (title/summary) plus tasks back to the client as structured data",
+                    "method": "lareview/finalize_review",
+                    "description": "Submit review title and summary to finalize the review",
                     "params": {
                         "title": "string",
-                        "summary": "string",
-                        "tasks": [{
-                            "id": "string",
-                            "title": "string",
-                            "description": "string",
-                            "files": ["string"],
-                            "stats": {
-                                "additions": "number",
-                                "deletions": "number",
-                                "risk": "LOW|MEDIUM|HIGH",
-                                "tags": ["string"]
-                            },
-                            "patches": [{"file": "string", "hunk": "string"}]
-                        }]
+                        "summary": "string"
                     }
                 }),
             ),

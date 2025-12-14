@@ -15,7 +15,8 @@ use crate::domain::ReviewTask;
 pub(super) struct LaReviewClient {
     pub(super) messages: Arc<Mutex<Vec<String>>>,
     pub(super) thoughts: Arc<Mutex<Vec<String>>>,
-    pub(super) tasks: Arc<Mutex<Option<Vec<ReviewTask>>>>,
+    pub(super) tasks: Arc<Mutex<Vec<ReviewTask>>>, // Changed to accumulate tasks
+    pub(super) finalization_received: Arc<Mutex<bool>>, // Track if finalize_review was called
     pub(super) raw_tasks_payload: Arc<Mutex<Option<serde_json::Value>>>,
     last_message_id: Arc<Mutex<Option<String>>>,
     last_thought_id: Arc<Mutex<Option<String>>>,
@@ -29,25 +30,22 @@ impl LaReviewClient {
     fn parse_return_payload_from_str(payload: &str) -> Option<serde_json::Value> {
         serde_json::from_str::<serde_json::Value>(payload)
             .ok()
-            .filter(|value| value.get("tasks").is_some() || value.get("plans").is_some())
+            .filter(|value| {
+                // Accept single task payload if it has id and diff_refs (and likely title)
+                (value.get("id").is_some() && value.get("diff_refs").is_some()) ||
+                // Accept finalize payload if it has title
+                value.get("title").is_some() ||
+                // Keep supporting plans for compatibility
+                value.get("plans").is_some() ||
+                // For backward compatibility, still accept bulk tasks
+                value.get("tasks").is_some()
+            })
     }
 
-    fn looks_like_return_tool(
-        &self,
-        tool_title: &str,
-        raw_input: &Option<serde_json::Value>,
-    ) -> bool {
-        if tool_title.contains("return_tasks") || tool_title.contains("return_plans") {
-            return true;
-        }
-
-        if let Some(input) = raw_input
-            && (input.get("tasks").is_some() || input.get("plans").is_some())
-        {
-            return true;
-        }
-
-        Self::parse_return_payload_from_str(tool_title).is_some()
+    fn looks_like_return_tool(&self, tool_title: &str) -> bool {
+        return tool_title.contains("return_task")
+            || tool_title.contains("return_plans")
+            || tool_title.contains("finalize_review");
     }
 
     pub(super) fn new(
@@ -59,7 +57,8 @@ impl LaReviewClient {
         Self {
             messages: Arc::new(Mutex::new(Vec::new())),
             thoughts: Arc::new(Mutex::new(Vec::new())),
-            tasks: Arc::new(Mutex::new(None)),
+            tasks: Arc::new(Mutex::new(Vec::new())), // Changed to accumulate tasks
+            finalization_received: Arc::new(Mutex::new(false)), // Track if finalize_review was called
             raw_tasks_payload: Arc::new(Mutex::new(None)),
             last_message_id: Arc::new(Mutex::new(None)),
             last_thought_id: Arc::new(Mutex::new(None)),
@@ -70,26 +69,30 @@ impl LaReviewClient {
         }
     }
 
-    /// Attempt to parse and store tasks from arbitrary JSON value.
-    fn store_tasks_from_value(&self, value: serde_json::Value) -> bool {
-        let parsed = super::super::task_mcp_server::parse_tasks(value.clone());
+    /// Attempt to append a single task from JSON value (for return_task).
+    fn append_single_task_from_value(&self, value: serde_json::Value) -> bool {
+        let parsed = super::super::task_mcp_server::parse_task(value.clone());
         match parsed {
-            Ok(mut tasks) => {
-                for task in &mut tasks {
-                    task.run_id = self.run_id.clone();
-                }
+            Ok(mut task) => {
+                task.run_id = self.run_id.clone();
                 if let Ok(mut guard) = self.tasks.lock() {
-                    *guard = Some(tasks);
+                    guard.push(task);
                 }
-                if let Ok(mut guard) = self.raw_tasks_payload.lock() {
-                    *guard = Some(value);
-                }
+                // Don't store raw payload for streaming - validation now works from task objects
                 true
             }
             Err(err) => {
-                eprintln!("[acp] failed to parse return_tasks payload: {err:?}");
+                eprintln!("[acp] failed to parse return_task payload: {err:?}");
                 false
             }
+        }
+    }
+
+
+    /// Mark finalization as received.
+    fn mark_finalization_received(&self) {
+        if let Ok(mut guard) = self.finalization_received.lock() {
+            *guard = true;
         }
     }
 
@@ -125,15 +128,19 @@ impl LaReviewClient {
 
     /// Handle task submission via extension payloads.
     fn handle_extension_payload(&self, method: &str, params: &RawValue) -> bool {
-        if matches!(
-            method,
-            "lareview/return_tasks"
-                | "return_tasks"
-                | "lareview/create_review_tasks"
-                | "create_review_tasks"
-        ) && let Ok(value) = serde_json::from_str::<serde_json::Value>(params.get())
+
+        if matches!(method, "lareview/return_task" | "return_task")
+            && let Ok(value) = serde_json::from_str::<serde_json::Value>(params.get())
         {
-            return self.store_tasks_from_value(value);
+            return self.append_single_task_from_value(value);
+        }
+
+        if matches!(method, "lareview/finalize_review" | "finalize_review")
+            && let Ok(_value) = serde_json::from_str::<serde_json::Value>(params.get())
+        {
+            // For finalize_review, we don't need to do anything special, just note that it was received
+            self.mark_finalization_received();
+            return true;
         }
 
         false
@@ -198,9 +205,21 @@ impl agent_client_protocol::Client for LaReviewClient {
     ) -> agent_client_protocol::Result<RequestPermissionResponse> {
         let tool_kind = args.tool_call.fields.kind;
         let tool_title = args.tool_call.fields.title.clone().unwrap_or_default();
-
         let raw_input = &args.tool_call.fields.raw_input;
-        let is_return_tool = self.looks_like_return_tool(&tool_title, raw_input);
+
+        // Check if this looks like a return tool by checking tool name or if it's JSON in title that looks like a task/finalize payload
+        let is_return_tool = self.looks_like_return_tool(&tool_title) || {
+            // For ToolKind::Other, check if the title is JSON with required streaming fields
+            matches!(tool_kind, Some(ToolKind::Other)) &&
+            Self::parse_return_payload_from_str(&tool_title)
+                .map(|value| {
+                    // Check if it's a single task (has id and diff_refs) or finalize review (has title)
+                    (value.get("id").is_some() && value.get("diff_refs").is_some()) ||
+                    value.get("title").is_some()
+                })
+                .unwrap_or(false)
+        };
+
         let allow_option = if is_return_tool {
             args.options.iter().find(|opt| {
                 matches!(
@@ -257,6 +276,7 @@ impl agent_client_protocol::Client for LaReviewClient {
                         &text.text,
                     );
                 }
+                // Important: No progress update for messages because they're not the final result
             }
             SessionUpdate::AgentThoughtChunk(chunk) => {
                 if let ContentBlock::Text(text) = &chunk.content {
@@ -267,6 +287,7 @@ impl agent_client_protocol::Client for LaReviewClient {
                         &text.text,
                     );
                 }
+                // Important: No progress update for thoughts because they're not the final result
             }
             SessionUpdate::ToolCall(call) => {
                 // Debug log tool call details
@@ -277,21 +298,41 @@ impl agent_client_protocol::Client for LaReviewClient {
                     );
                 }
 
-                let is_task_tool = self.looks_like_return_tool(&call.title, &call.raw_input)
-                    || call.title.contains("create_review_tasks");
+                let is_return_task_tool = call.title.contains("return_task");
+                let is_finalize_tool = call.title.contains("finalize_review");
 
-                if is_task_tool {
+                if is_return_task_tool {
+                    // Handle streaming return_task
                     if let Some(ref input) = call.raw_input {
-                        self.store_tasks_from_value(input.clone());
+                        self.append_single_task_from_value(input.clone());
                     }
                     if let Some(ref output) = call.raw_output {
-                        self.store_tasks_from_value(output.clone());
+                        self.append_single_task_from_value(output.clone());
                     }
                     if call.raw_input.is_none()
                         && call.raw_output.is_none()
                         && let Some(value) = Self::parse_return_payload_from_str(&call.title)
                     {
-                        self.store_tasks_from_value(value);
+                        self.append_single_task_from_value(value);
+                    }
+                } else if is_finalize_tool {
+                    // Handle finalize_review
+                    if let Some(ref input) = call.raw_input
+                        && input.get("title").is_some()
+                    {
+                        self.mark_finalization_received();
+                    }
+                    if let Some(ref output) = call.raw_output
+                        && output.get("title").is_some()
+                    {
+                        self.mark_finalization_received();
+                    }
+                    if call.raw_input.is_none()
+                        && call.raw_output.is_none()
+                        && let Some(value) = Self::parse_return_payload_from_str(&call.title)
+                        && value.get("title").is_some()
+                    {
+                        self.mark_finalization_received();
                     }
                 }
             }

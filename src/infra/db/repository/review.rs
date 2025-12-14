@@ -59,6 +59,20 @@ impl ReviewRepository {
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
+    pub fn update_title_and_summary(
+        &self,
+        review_id: &ReviewId,
+        title: &str,
+        summary: Option<&str>,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE reviews SET title = ?1, summary = ?2, updated_at = CURRENT_TIMESTAMP WHERE id = ?3",
+            (title, summary, review_id),
+        )?;
+        Ok(())
+    }
+
     pub fn delete(&self, id: &ReviewId) -> Result<usize> {
         let conn = self.conn.lock().unwrap();
         let affected = conn.execute("DELETE FROM reviews WHERE id = ?1", [id])?;

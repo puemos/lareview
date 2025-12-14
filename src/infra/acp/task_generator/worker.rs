@@ -157,6 +157,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
     let thoughts = client.thoughts.clone();
     let tasks_capture = client.tasks.clone();
     let raw_tasks_capture = client.raw_tasks_payload.clone();
+    let finalization_received_capture = client.finalization_received.clone(); // Add this to check finalization later
 
     // Convert tokio streams for ACP
     use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
@@ -266,23 +267,22 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
     let _result = prompt_result.with_context(|| "ACP prompt failed")?;
     push_log(&logs, "prompt ok", debug);
 
-    // Wait for the agent to finish naturally. If tasks are captured, we allow a short
+    // Wait for the agent to finish naturally. If finalization is received, we allow a short
     // grace period and then terminate to avoid hanging the UI on agents that don't exit.
+    // If no finalization is received, we may need to timeout to avoid hanging indefinitely.
     let status = loop {
-        let tasks_ready = tasks_capture
+        let finalization_received = *finalization_received_capture
             .lock()
-            .unwrap()
-            .as_ref()
-            .is_some_and(|t| !t.is_empty());
+            .unwrap();
 
-        if tasks_ready {
+        if finalization_received {
             let wait_res = tokio::time::timeout(Duration::from_secs(2), child.wait()).await;
             break match wait_res {
                 Ok(res) => res?,
                 Err(_) => {
                     push_log(
                         &logs,
-                        "tasks captured but agent still running; sending kill",
+                        "finalization received but agent still running; sending kill",
                         debug,
                     );
                     let _ = child.start_kill();
@@ -295,7 +295,12 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
             res = child.wait() => {
                 break res?;
             }
-            _ = tokio::time::sleep(Duration::from_millis(200)) => {}
+            _ = tokio::time::sleep(Duration::from_millis(200)) => {
+                // Check if agent exited with an error but we didn't get any tasks
+                if child.try_wait().unwrap_or(None).is_some() {
+                    break child.wait().await?;
+                }
+            }
         }
     };
     // Wait for IO loop to flush pending notifications
@@ -303,14 +308,15 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
 
     push_log(&logs, format!("Agent exit status: {}", status), debug);
 
-    // Prefer tasks captured via MCP callbacks, fall back to file written by MCP server.
-    let final_tasks = tasks_capture.lock().unwrap().clone().unwrap_or_default();
+    // Get captured tasks (now stored as Vec<ReviewTask> instead of Option<Vec<ReviewTask>>)
+    let final_tasks = tasks_capture.lock().unwrap().clone();
+    let finalization_received = *finalization_received_capture.lock().unwrap();
 
     // Collect output for return and for richer error contexts
     let final_messages = messages.lock().unwrap().clone();
     let final_thoughts = thoughts.lock().unwrap().clone();
 
-    if final_tasks.is_empty() {
+    if final_tasks.is_empty() || !finalization_received {
         let final_logs = logs.lock().unwrap().clone();
         let ctx_logs = if final_logs.is_empty() {
             "ACP invocation produced no stderr or phase logs".to_string()
@@ -336,9 +342,15 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
             ctx_parts.push(ctx_thoughts);
         }
 
-        return Err(anyhow::anyhow!(
-            "Agent completed but did not call MCP tool return_tasks (no tasks captured)"
-        )
+        let error_msg = if final_tasks.is_empty() && !finalization_received {
+            "Agent completed but did not call MCP tools return_task (no tasks captured) or finalize_review (no finalization)"
+        } else if final_tasks.is_empty() {
+            "Agent completed but did not call MCP tool return_task (no tasks captured)"
+        } else {
+            "Agent completed but did not call MCP tool finalize_review (no finalization)"
+        };
+
+        return Err(anyhow::anyhow!(error_msg)
         .context(ctx_parts.join("\n\n")));
     }
 

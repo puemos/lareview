@@ -96,6 +96,28 @@ pub struct ReviewRun {
     pub created_at: String,
 }
 
+/// A reference to a specific hunk within a file's diff.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct HunkRef {
+    /// The starting line number of the hunk in the old file.
+    pub old_start: u32,
+    /// The number of lines in the hunk from the old file.
+    pub old_lines: u32,
+    /// The starting line number of the hunk in the new file.
+    pub new_start: u32,
+    /// The number of lines in the hunk from the new file.
+    pub new_lines: u32,
+}
+
+/// A reference to changed sections of a file, represented by a list of hunks.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct DiffRef {
+    /// The path to the file that was changed.
+    pub file: String,
+    /// A list of specific hunks that are relevant to a task.
+    pub hunks: Vec<HunkRef>,
+}
+
 /// Statistics for a review task
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TaskStats {
@@ -150,13 +172,13 @@ pub struct ReviewTask {
     pub title: String,
     /// Detailed description of the review task
     pub description: String,
-    /// List of files affected by this task
+    /// List of files affected by this task. Derived from `diff_refs`.
     pub files: Vec<String>,
     /// Statistical information about the changes
     pub stats: TaskStats,
-    /// Diff strings showing the specific changes to review
+    /// References to the specific diff hunks relevant to this task.
     #[serde(default)]
-    pub diffs: Vec<String>,
+    pub diff_refs: Vec<DiffRef>,
     /// AI-generated insight about the task (optional)
     pub insight: Option<String>,
     /// Optional diagram describing the task context

@@ -74,7 +74,7 @@ pub struct AppState {
 
     pub full_diff: Option<FullDiffView>,
 
-    pub cached_unified_diff: Option<(Vec<String>, String)>,
+    pub cached_unified_diff: Option<(Vec<crate::domain::DiffRef>, String)>,
 
     pub d2_install_output: String,
     pub is_d2_installing: bool,

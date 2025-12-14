@@ -42,7 +42,7 @@ fn test_task_save_and_load() -> anyhow::Result<()> {
         description: "Desc".to_string(),
         files: vec![],
         stats: TaskStats::default(),
-        diffs: vec![],
+        diff_refs: vec![],
         insight: None,
         diagram: None,
         ai_generated: false,

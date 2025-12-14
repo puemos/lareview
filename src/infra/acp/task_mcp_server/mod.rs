@@ -1,19 +1,20 @@
-//! Minimal MCP server that exposes a single `return_tasks` tool.
+//! Minimal MCP server that exposes streaming `return_task` and `finalize_review` tools.
 //!
-//! The tool expects a JSON object `{ "tasks": [...] }` and writes it verbatim to the path
-//! specified by the `TASK_MCP_OUT` environment variable. The server runs over stdio so the ACP
-//! agent can launch it as an MCP server.
+//! The server accepts individual tasks via `return_task` then finalizes with `finalize_review`.
+//! It also supports legacy bulk tools for backward compatibility.
+//! The server runs over stdio so the ACP agent can launch it as an MCP server.
 
 mod config;
 mod logging;
 mod parsing;
 mod persistence;
 mod run_context;
+mod task_ingest;
 mod tool;
 mod transport;
 
 pub use config::ServerConfig;
-pub(crate) use parsing::parse_tasks;
+pub(crate) use parsing::parse_task;
 pub use run_context::RunContext;
 
 use std::sync::Arc;
@@ -29,13 +30,11 @@ pub async fn run_task_mcp_server() -> pmcp::Result<()> {
         .name("lareview-tasks")
         .version("0.1.0")
         .capabilities(ServerCapabilities::default())
+        // New streaming tools
+        .tool("return_task", tool::create_return_task_tool(config.clone()))
         .tool(
-            "return_review",
-            tool::create_return_review_tool(config.clone()),
-        )
-        .tool(
-            "return_tasks",
-            tool::create_return_tasks_tool(config.clone()),
+            "finalize_review",
+            tool::create_finalize_review_tool(config.clone()),
         )
         .build()?;
 

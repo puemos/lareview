@@ -54,7 +54,7 @@ impl Database {
     /// Initialize database schema
     fn init(&self) -> Result<()> {
         let conn = self.conn.lock().unwrap();
-        const SCHEMA_VERSION: i32 = 2;
+        const SCHEMA_VERSION: i32 = 3;
 
         conn.execute_batch("PRAGMA foreign_keys = ON;")?;
 
@@ -102,7 +102,7 @@ impl Database {
                     files TEXT NOT NULL,
                     stats TEXT NOT NULL,
                     insight TEXT,
-                    diffs TEXT,
+                    diff_refs TEXT,
                     diagram TEXT,
                     ai_generated INTEGER DEFAULT 0,
                     status TEXT DEFAULT 'PENDING',

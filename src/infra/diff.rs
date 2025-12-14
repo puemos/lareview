@@ -1,24 +1,5 @@
 use std::collections::HashSet;
 
-pub fn combine_diffs_to_unified_diff(diffs: &[String]) -> String {
-    diffs.join("\n")
-}
-
-pub fn extract_file_path_from_diff(diff: &str) -> Option<String> {
-    for line in diff.lines() {
-        if line.starts_with("diff --git ") {
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() >= 3 {
-                let file_part = parts[1];
-                if let Some(stripped) = file_part.strip_prefix("a/") {
-                    return Some(stripped.to_string());
-                }
-            }
-        }
-    }
-    None
-}
-
 pub fn normalize_task_path(path: &str) -> String {
     path.trim()
         .trim_start_matches("./")
