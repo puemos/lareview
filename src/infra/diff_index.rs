@@ -5,15 +5,115 @@
 //! partial diffs based on `DiffRef` pointers.
 
 use crate::domain::{DiffRef, HunkRef};
-use anyhow::{Result, anyhow};
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use unidiff::{Hunk, PatchSet};
+
+// serde_json is used for error serialization
+use serde_json;
+
+use std::fmt;
+
+/// Errors that can occur when working with DiffIndex
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum DiffIndexError {
+    /// File not found in the diff index
+    FileNotFound { file: String },
+    /// Hunk not found in a file
+    HunkNotFound {
+        file: String,
+        old_start: u32,
+        new_start: u32,
+    },
+    /// Invalid hunk ID format
+    InvalidHunkId { file: String, hunk_id: String },
+    /// Parse error when processing the diff
+    Parse { message: String },
+    /// Nearest hunk information when a hunk is not found
+    NearestHunk {
+        file: String,
+        old_start: u32,
+        new_start: u32,
+        nearest: Option<(u32, u32)>,
+    },
+}
+
+impl fmt::Display for DiffIndexError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DiffIndexError::FileNotFound { file } => {
+                write!(f, "File not found in diff index: {}", file)
+            }
+            DiffIndexError::HunkNotFound {
+                file,
+                old_start,
+                new_start,
+            } => {
+                write!(
+                    f,
+                    "Hunk not found in file {}: old_start={}, new_start={}",
+                    file, old_start, new_start
+                )
+            }
+            DiffIndexError::InvalidHunkId { file, hunk_id } => {
+                write!(f, "Invalid hunk ID in file {}: {}", file, hunk_id)
+            }
+            DiffIndexError::Parse { message } => {
+                write!(f, "Parse error: {}", message)
+            }
+            DiffIndexError::NearestHunk {
+                file,
+                old_start,
+                new_start,
+                nearest,
+            } => {
+                write!(
+                    f,
+                    "Hunk not found at ({}, {}) in file {}, nearest hunk: {:?}",
+                    old_start, new_start, file, nearest
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for DiffIndexError {}
+
+impl DiffIndexError {
+    /// Convert the error to a JSON string representation
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).unwrap_or_else(|_| format!("{:?}", self))
+    }
+
+    /// Get the nearest hunk coordinates if this error contains them
+    pub fn nearest(&self) -> Option<(u32, u32)> {
+        match self {
+            DiffIndexError::NearestHunk { nearest, .. } => *nearest,
+            _ => None,
+        }
+    }
+}
+
+/// A hunk with its coordinates and potentially an ID
+#[derive(Debug, Clone)]
+struct IndexedHunk {
+    hunk: Hunk,
+    /// The coordinates of the hunk (old_start, new_start)
+    coords: (u32, u32),
+    /// A string identifier for the hunk based on its position and content
+    hunk_id: String,
+}
 
 /// An index for a single file within a larger diff.
 #[derive(Debug, Clone)]
 struct FileIndex {
-    /// A map from (old_start, new_start) to the hunk.
-    hunks: HashMap<(u32, u32), Hunk>,
+    /// A map from (old_start, new_start) to the indexed hunk.
+    hunks: HashMap<(u32, u32), IndexedHunk>,
+    /// A map from hunk ID to the indexed hunk.
+    hunks_by_id: HashMap<String, IndexedHunk>,
+    /// A list of all available hunks in order.
+    all_hunks: Vec<IndexedHunk>,
 }
 
 /// An index for a unified diff, allowing for efficient queries.
@@ -23,11 +123,17 @@ pub struct DiffIndex {
 }
 
 impl DiffIndex {
+    /// Returns all file paths in the diff index
+    pub fn get_all_file_paths(&self) -> Vec<&String> {
+        self.files.keys().collect()
+    }
     /// Creates a new `DiffIndex` from a unified diff string.
     pub fn new(diff_text: &str) -> Result<Self> {
         let trimmed = diff_text.trim();
         if trimmed.is_empty() {
-            return Ok(Self { files: HashMap::new() });
+            return Ok(Self {
+                files: HashMap::new(),
+            });
         }
 
         let mut patch_set = PatchSet::new();
@@ -42,25 +148,40 @@ impl DiffIndex {
                 .unwrap_or(&file.target_file);
 
             let mut hunks = HashMap::new();
-            for hunk in file.hunks() {
-                // Use the correct fields for the unidiff crate
-                hunks.insert(
-                    (hunk.source_start as u32, hunk.target_start as u32),
-                    hunk.clone(),
-                );
+            let mut hunks_by_id = HashMap::new();
+            let mut all_hunks = Vec::new();
+
+            // Convert file path to a safe identifier format for use in IDs
+            let safe_file_path = file_path.replace("/", "_").replace("-", "_");
+            for (hunk_idx, hunk) in file.hunks().iter().enumerate() {
+                let coords = (hunk.source_start as u32, hunk.target_start as u32);
+
+                // Create a hunk ID that's descriptive based on file and sequential index
+                // Format: file_path#Hn where n is the sequential hunk number in the file (1-indexed)
+                let hunk_id = format!("{}#H{}", safe_file_path, hunk_idx);
+
+                let indexed_hunk = IndexedHunk {
+                    hunk: hunk.clone(),
+                    coords,
+                    hunk_id: hunk_id.clone(),
+                };
+
+                hunks.insert(coords, indexed_hunk.clone());
+                hunks_by_id.insert(hunk_id, indexed_hunk.clone());
+                all_hunks.push(indexed_hunk);
             }
 
             files.insert(
                 file_path.to_string(),
                 FileIndex {
                     hunks,
+                    hunks_by_id,
+                    all_hunks,
                 },
             );
         }
 
-        Ok(Self {
-            files,
-        })
+        Ok(Self { files })
     }
 
     /// Calculates the total number of additions and deletions for a set of `DiffRef`s.
@@ -69,25 +190,32 @@ impl DiffIndex {
         let mut deletions = 0;
 
         for diff_ref in diff_refs {
-            let file_index = self
-                .files
-                .get(&diff_ref.file)
-                .ok_or_else(|| anyhow!("File not found in diff index: {}", diff_ref.file))?;
+            let file_index =
+                self.files
+                    .get(&diff_ref.file)
+                    .ok_or_else(|| DiffIndexError::FileNotFound {
+                        file: diff_ref.file.clone(),
+                    })?;
 
             for hunk_ref in &diff_ref.hunks {
-                let hunk = file_index
+                let indexed_hunk = file_index
                     .hunks
                     .get(&(hunk_ref.old_start, hunk_ref.new_start))
                     .ok_or_else(|| {
-                        anyhow!(
-                            "Hunk not found in file {}: old_start={}, new_start={}",
-                            diff_ref.file,
-                            hunk_ref.old_start,
-                            hunk_ref.new_start
-                        )
+                        // Find the nearest hunk for better error reporting
+                        let nearest = find_nearest_hunk(
+                            &file_index.all_hunks,
+                            (hunk_ref.old_start, hunk_ref.new_start),
+                        );
+                        DiffIndexError::NearestHunk {
+                            file: diff_ref.file.clone(),
+                            old_start: hunk_ref.old_start,
+                            new_start: hunk_ref.new_start,
+                            nearest,
+                        }
                     })?;
 
-                for line in hunk.lines() {
+                for line in indexed_hunk.hunk.lines() {
                     match line.line_type.as_str() {
                         unidiff::LINE_TYPE_ADDED => additions += 1,
                         unidiff::LINE_TYPE_REMOVED => deletions += 1,
@@ -104,18 +232,25 @@ impl DiffIndex {
         let file_index = self
             .files
             .get(file_path)
-            .ok_or_else(|| anyhow!("File not found in diff index: {}", file_path))?;
+            .ok_or_else(|| DiffIndexError::FileNotFound {
+                file: file_path.to_string(),
+            })?;
 
         file_index
             .hunks
             .get(&(hunk_ref.old_start, hunk_ref.new_start))
             .ok_or_else(|| {
-                anyhow!(
-                    "Hunk not found in file {}: old_start={}, new_start={}",
-                    file_path,
-                    hunk_ref.old_start,
-                    hunk_ref.new_start
-                )
+                // Find the nearest hunk for better error reporting
+                let nearest = find_nearest_hunk(
+                    &file_index.all_hunks,
+                    (hunk_ref.old_start, hunk_ref.new_start),
+                );
+                DiffIndexError::NearestHunk {
+                    file: file_path.to_string(),
+                    old_start: hunk_ref.old_start,
+                    new_start: hunk_ref.new_start,
+                    nearest,
+                }
             })?;
 
         Ok(())
@@ -128,10 +263,12 @@ impl DiffIndex {
         let mut ordered_files = Vec::new();
 
         for diff_ref in diff_refs {
-            let file_index = self
-                .files
-                .get(&diff_ref.file)
-                .ok_or_else(|| anyhow!("File not found in diff index: {}", diff_ref.file))?;
+            let file_index =
+                self.files
+                    .get(&diff_ref.file)
+                    .ok_or_else(|| DiffIndexError::FileNotFound {
+                        file: diff_ref.file.clone(),
+                    })?;
 
             // Build the header for this file
             let header = format!(
@@ -142,23 +279,150 @@ impl DiffIndex {
             result.push_str(&header);
 
             for hunk_ref in &diff_ref.hunks {
-                let hunk = file_index
+                let indexed_hunk = file_index
                     .hunks
                     .get(&(hunk_ref.old_start, hunk_ref.new_start))
                     .ok_or_else(|| {
-                        anyhow!(
-                            "Hunk not found in file {}: old_start={}, new_start={}",
-                            diff_ref.file,
-                            hunk_ref.old_start,
-                            hunk_ref.new_start
-                        )
+                        // Find the nearest hunk for better error reporting
+                        let nearest = find_nearest_hunk(
+                            &file_index.all_hunks,
+                            (hunk_ref.old_start, hunk_ref.new_start),
+                        );
+                        DiffIndexError::NearestHunk {
+                            file: diff_ref.file.clone(),
+                            old_start: hunk_ref.old_start,
+                            new_start: hunk_ref.new_start,
+                            nearest,
+                        }
                     })?;
-                result.push_str(&hunk.to_string());
+                result.push_str(&indexed_hunk.hunk.to_string());
             }
         }
 
         Ok((result, ordered_files))
     }
+
+    /// Returns all hunks available in the specified file.
+    pub fn available_hunks(&self, file_path: &str) -> Vec<HunkRef> {
+        if let Some(file_index) = self.files.get(file_path) {
+            file_index
+                .all_hunks
+                .iter()
+                .map(|indexed_hunk| HunkRef {
+                    old_start: indexed_hunk.coords.0,
+                    old_lines: indexed_hunk.hunk.source_length as u32,
+                    new_start: indexed_hunk.coords.1,
+                    new_lines: indexed_hunk.hunk.target_length as u32,
+                })
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Returns hunk IDs and coordinates for the diff manifest tool
+    pub fn get_file_hunk_entries(&self, file_path: &str) -> Vec<(String, HunkRef)> {
+        if let Some(file_index) = self.files.get(file_path) {
+            file_index
+                .all_hunks
+                .iter()
+                .map(|indexed_hunk| {
+                    let hunk_ref = HunkRef {
+                        old_start: indexed_hunk.coords.0,
+                        old_lines: indexed_hunk.hunk.source_length as u32,
+                        new_start: indexed_hunk.coords.1,
+                        new_lines: indexed_hunk.hunk.target_length as u32,
+                    };
+                    (indexed_hunk.hunk_id.clone(), hunk_ref)
+                })
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Resolves a hunk ID to its HunkRef coordinates.
+    pub fn resolve_hunk_id(
+        &self,
+        file_path: &str,
+        hunk_id: &str,
+    ) -> Result<HunkRef, DiffIndexError> {
+        // The hunk ID is in format "file_path#Hn" where n is the hunk number (1-indexed)
+        // We need to extract the number and find the n-th hunk in the file
+        if let Some(index_str) = hunk_id.strip_prefix(&format!(
+            "{}#H",
+            file_path.replace("/", "_").replace("-", "_")
+        )) && let Ok(index) = index_str.parse::<usize>()
+            && index > 0
+        {
+            // Get the file index
+            let file_index =
+                self.files
+                    .get(file_path)
+                    .ok_or_else(|| DiffIndexError::FileNotFound {
+                        file: file_path.to_string(),
+                    })?;
+
+            // Get the hunk at the specified index (1-indexed)
+            if index <= file_index.all_hunks.len() {
+                let indexed_hunk = &file_index.all_hunks[index - 1]; // Convert to 0-indexed
+                return Ok(HunkRef {
+                    old_start: indexed_hunk.coords.0,
+                    old_lines: indexed_hunk.hunk.source_length as u32,
+                    new_start: indexed_hunk.coords.1,
+                    new_lines: indexed_hunk.hunk.target_length as u32,
+                });
+            }
+        }
+
+        // If the ID doesn't match the expected format or the hunk doesn't exist,
+        // try direct lookup in the hunk map (for backward compatibility)
+        let file_index = self
+            .files
+            .get(file_path)
+            .ok_or_else(|| DiffIndexError::FileNotFound {
+                file: file_path.to_string(),
+            })?;
+
+        let indexed_hunk =
+            file_index
+                .hunks_by_id
+                .get(hunk_id)
+                .ok_or_else(|| DiffIndexError::InvalidHunkId {
+                    file: file_path.to_string(),
+                    hunk_id: hunk_id.to_string(),
+                })?;
+
+        Ok(HunkRef {
+            old_start: indexed_hunk.coords.0,
+            old_lines: indexed_hunk.hunk.source_length as u32,
+            new_start: indexed_hunk.coords.1,
+            new_lines: indexed_hunk.hunk.target_length as u32,
+        })
+    }
+}
+
+/// Helper function to find the nearest hunk to the given coordinates
+fn find_nearest_hunk(all_hunks: &[IndexedHunk], target: (u32, u32)) -> Option<(u32, u32)> {
+    if all_hunks.is_empty() {
+        return None;
+    }
+
+    let mut nearest = None;
+    let mut min_distance = u32::MAX;
+
+    for indexed_hunk in all_hunks {
+        let coords = indexed_hunk.coords;
+        // Calculate a simple distance metric
+        let distance =
+            (target.0 as i32 - coords.0 as i32).abs() + (target.1 as i32 - coords.1 as i32).abs();
+        if distance < min_distance as i32 {
+            min_distance = distance as u32;
+            nearest = Some(coords);
+        }
+    }
+
+    nearest
 }
 
 #[cfg(test)]

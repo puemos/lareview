@@ -194,7 +194,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
     } else {
         Some(tempfile::tempdir().context("create temp working directory")?)
     };
-    let cwd = match &repo_root {
+    let cwd: PathBuf = match &repo_root {
         Some(root) => root.clone(),
         None => temp_cwd
             .as_ref()
@@ -215,15 +215,11 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
     )
     .context("write run context file")?;
 
-    let mut mcp_args = vec![
+    let mcp_args = vec![
         "--task-mcp-server".to_string(),
         "--pr-context".to_string(),
         pr_context_file.path().to_string_lossy().to_string(),
     ];
-    if let Ok(db_path) = std::env::var("LAREVIEW_DB_PATH") {
-        mcp_args.push("--db-path".to_string());
-        mcp_args.push(db_path);
-    }
 
     let mcp_servers = vec![McpServer::Stdio(
         McpServerStdio::new("lareview-tasks", task_mcp_server_path.clone()).args(mcp_args),
@@ -271,9 +267,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
     // grace period and then terminate to avoid hanging the UI on agents that don't exit.
     // If no finalization is received, we may need to timeout to avoid hanging indefinitely.
     let status = loop {
-        let finalization_received = *finalization_received_capture
-            .lock()
-            .unwrap();
+        let finalization_received = *finalization_received_capture.lock().unwrap();
 
         if finalization_received {
             let wait_res = tokio::time::timeout(Duration::from_secs(2), child.wait()).await;
@@ -350,8 +344,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
             "Agent completed but did not call MCP tool finalize_review (no finalization)"
         };
 
-        return Err(anyhow::anyhow!(error_msg)
-        .context(ctx_parts.join("\n\n")));
+        return Err(anyhow::anyhow!(error_msg).context(ctx_parts.join("\n\n")));
     }
 
     let raw_payload = raw_tasks_capture.lock().unwrap().clone();

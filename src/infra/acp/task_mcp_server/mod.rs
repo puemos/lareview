@@ -36,6 +36,10 @@ pub async fn run_task_mcp_server() -> pmcp::Result<()> {
             "finalize_review",
             tool::create_finalize_review_tool(config.clone()),
         )
+        .tool(
+            "diff_manifest",
+            tool::create_diff_manifest_tool(config.clone()),
+        )
         .build()?;
 
     logging::log_to_file(&config, "running task MCP server on stdio (line-delimited)");

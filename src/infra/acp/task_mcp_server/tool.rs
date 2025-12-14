@@ -54,11 +54,23 @@ pub(super) fn create_return_task_tool(config: Arc<ServerConfig>) -> impl ToolHan
                 Ok(Err(err)) => {
                     log_to_file(
                         &config,
-                        &format!("ReturnTaskTool failed to persist task: {err}"),
+                        &format!("ReturnTaskTool failed to persist task: {err:?}"),
                     );
-                    Err(pmcp::Error::Validation(format!(
-                        "invalid return_task payload: {err}"
-                    )))
+
+                    // Log the full error chain for better debugging
+                    for cause in err.chain() {
+                        log_to_file(&config, &format!("  Caused by: {cause}"));
+                    }
+
+                    // Check if this is a DiffIndexError and format appropriately
+                    let error_msg = if let Some(diff_index_err) = err.downcast_ref::<crate::infra::diff_index::DiffIndexError>() {
+                        // Return structured JSON error for agent parsing
+                        diff_index_err.to_json()
+                    } else {
+                        format!("invalid return_task payload: {err:?}")
+                    };
+
+                    Err(pmcp::Error::Validation(error_msg))
                 }
                 Err(join_err) => {
                     log_to_file(
@@ -79,6 +91,75 @@ pub(super) fn create_return_task_tool(config: Arc<ServerConfig>) -> impl ToolHan
          Optionally include sub_flow (grouping name) and diagram (D2 format for visualization).",
     )
     .with_schema(single_task_schema())
+}
+
+/// Create the diff_manifest tool for getting all files and hunks with stable IDs.
+pub(super) fn create_diff_manifest_tool(config: Arc<ServerConfig>) -> impl ToolHandler {
+    SimpleTool::new("diff_manifest", move |_args: Value, _extra| {
+        let config = config.clone();
+        Box::pin(async move {
+            log_to_file(&config, "diff_manifest called");
+
+            // Load the run context to get the diff text
+            let ctx = super::task_ingest::load_run_context(&config);
+            let diff_text = ctx.diff_text;
+
+            // Create a DiffIndex to get all hunks
+            match crate::infra::diff_index::DiffIndex::new(&diff_text) {
+                Ok(diff_index) => {
+                    // Get all files and their hunks with IDs
+                    let mut result_files = Vec::new();
+
+                    for file_path in diff_index.get_all_file_paths() {
+                        // Get all hunks for this file using the get_file_hunk_entries method
+                        let file_hunk_entries = diff_index.get_file_hunk_entries(file_path);
+                        let mut result_hunks = Vec::new();
+
+                        for (hunk_id, hunk_ref) in file_hunk_entries {
+                            result_hunks.push(json!({
+                                "id": hunk_id,
+                                "old_start": hunk_ref.old_start,
+                                "old_lines": hunk_ref.old_lines,
+                                "new_start": hunk_ref.new_start,
+                                "new_lines": hunk_ref.new_lines
+                            }));
+                        }
+
+                        if !result_hunks.is_empty() {
+                            result_files.push(json!({
+                                "file": file_path,
+                                "hunks": result_hunks
+                            }));
+                        }
+                    }
+
+                    log_to_file(&config, &format!("diff_manifest returning {} files", result_files.len()));
+
+                    Ok(json!({
+                        "status": "ok",
+                        "files": result_files
+                    }))
+                },
+                Err(err) => {
+                    log_to_file(&config, &format!("diff_manifest failed to parse diff: {err:?}"));
+                    for cause in err.chain() {
+                        log_to_file(&config, &format!("  Caused by: {cause}"));
+                    }
+                    Err(pmcp::Error::Validation(format!("failed to parse diff: {err:?}")))
+                }
+            }
+        })
+    })
+    .with_description(
+        "Get a manifest of all files and hunks in the canonical diff with stable IDs. \
+         Returns an array of files, each with its hunks. Use these hunk IDs in return_task calls \
+         instead of trying to copy numeric coordinates.",
+    )
+    .with_schema(json!({
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+    }))
 }
 
 /// Create the finalize_review tool for finalizing the review.
@@ -133,11 +214,23 @@ pub(super) fn create_finalize_review_tool(config: Arc<ServerConfig>) -> impl Too
                 Ok(Err(err)) => {
                     log_to_file(
                         &config,
-                        &format!("FinalizeReviewTool failed to update metadata: {err}"),
+                        &format!("FinalizeReviewTool failed to update metadata: {err:?}"),
                     );
-                    Err(pmcp::Error::Validation(format!(
-                        "invalid finalize_review payload: {err}"
-                    )))
+
+                    // Log the full error chain for better debugging
+                    for cause in err.chain() {
+                        log_to_file(&config, &format!("  Caused by: {cause}"));
+                    }
+
+                    // Check if this is a DiffIndexError and format appropriately
+                    let error_msg = if let Some(diff_index_err) = err.downcast_ref::<crate::infra::diff_index::DiffIndexError>() {
+                        // Return structured JSON error for agent parsing
+                        diff_index_err.to_json()
+                    } else {
+                        format!("invalid finalize_review payload: {err:?}")
+                    };
+
+                    Err(pmcp::Error::Validation(error_msg))
                 }
                 Err(join_err) => {
                     log_to_file(
@@ -157,6 +250,9 @@ pub(super) fn create_finalize_review_tool(config: Arc<ServerConfig>) -> impl Too
     )
     .with_schema(review_metadata_schema())
 }
+
+
+
 
 fn single_task_schema() -> Value {
     json!({
@@ -201,24 +297,42 @@ fn single_task_schema() -> Value {
                             "description": "File path in the diff (no a/ or b/ prefixes)"
                         },
                         "hunks": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "old_start": {"type": "integer"},
-                                    "old_lines": {"type": "integer"},
-                                    "new_start": {"type": "integer"},
-                                    "new_lines": {"type": "integer"}
+                            "oneOf": [
+                                {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string",
+                                        "description": "Hunk ID from diff_manifest tool output"
+                                    }
                                 },
-                                "required": ["old_start", "old_lines", "new_start", "new_lines"],
-                                "description": "Hunk coordinates: (old_start, old_lines, new_start, new_lines)"
-                            }
+                                {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "old_start": {"type": "integer"},
+                                            "old_lines": {"type": "integer"},
+                                            "new_start": {"type": "integer"},
+                                            "new_lines": {"type": "integer"}
+                                        },
+                                        "required": ["old_start", "old_lines", "new_start", "new_lines"],
+                                        "description": "Hunk coordinates: (old_start, old_lines, new_start, new_lines)"
+                                    }
+                                },
+                                {
+                                    "type": "array",
+                                    "items": {},
+                                    "maxItems": 0,
+                                    "description": "Empty array selects all hunks in the file"
+                                }
+                            ],
+                            "description": "Hunk references: either stable string IDs from diff_manifest tool, numeric coordinates, or empty array to select all hunks in the file"
                         }
                     },
                     "required": ["file", "hunks"],
-                    "description": "Reference to specific hunks in the diff by line numbers"
+                    "description": "Reference to specific hunks in the diff. Use hunk IDs from diff_manifest tool for reliability."
                 },
-                "description": "Array of references to specific hunks in the canonical diff. Each ref points to a specific file and range of lines."
+                "description": "Array of references to specific hunks in the canonical diff. Each ref points to a specific file and range of lines. Prefer using hunk IDs from the diff_manifest tool."
             },
             "sub_flow": {
                 "type": "string",

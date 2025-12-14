@@ -1,7 +1,7 @@
 use crate::domain::{DiffRef, ReviewTask, RiskLevel, TaskStats, TaskStatus};
 use anyhow::Result;
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::Value;
 use std::collections::HashSet;
 
 #[derive(Deserialize)]

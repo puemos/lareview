@@ -43,9 +43,9 @@ impl LaReviewClient {
     }
 
     fn looks_like_return_tool(&self, tool_title: &str) -> bool {
-        return tool_title.contains("return_task")
+        tool_title.contains("return_task")
             || tool_title.contains("return_plans")
-            || tool_title.contains("finalize_review");
+            || tool_title.contains("finalize_review")
     }
 
     pub(super) fn new(
@@ -88,7 +88,6 @@ impl LaReviewClient {
         }
     }
 
-
     /// Mark finalization as received.
     fn mark_finalization_received(&self) {
         if let Ok(mut guard) = self.finalization_received.lock() {
@@ -128,7 +127,6 @@ impl LaReviewClient {
 
     /// Handle task submission via extension payloads.
     fn handle_extension_payload(&self, method: &str, params: &RawValue) -> bool {
-
         if matches!(method, "lareview/return_task" | "return_task")
             && let Ok(value) = serde_json::from_str::<serde_json::Value>(params.get())
         {
@@ -210,14 +208,14 @@ impl agent_client_protocol::Client for LaReviewClient {
         // Check if this looks like a return tool by checking tool name or if it's JSON in title that looks like a task/finalize payload
         let is_return_tool = self.looks_like_return_tool(&tool_title) || {
             // For ToolKind::Other, check if the title is JSON with required streaming fields
-            matches!(tool_kind, Some(ToolKind::Other)) &&
-            Self::parse_return_payload_from_str(&tool_title)
-                .map(|value| {
-                    // Check if it's a single task (has id and diff_refs) or finalize review (has title)
-                    (value.get("id").is_some() && value.get("diff_refs").is_some()) ||
-                    value.get("title").is_some()
-                })
-                .unwrap_or(false)
+            matches!(tool_kind, Some(ToolKind::Other))
+                && Self::parse_return_payload_from_str(&tool_title)
+                    .map(|value| {
+                        // Check if it's a single task (has id and diff_refs) or finalize review (has title)
+                        (value.get("id").is_some() && value.get("diff_refs").is_some())
+                            || value.get("title").is_some()
+                    })
+                    .unwrap_or(false)
         };
 
         let allow_option = if is_return_tool {

@@ -18,13 +18,13 @@ async fn test_return_task_tool_writes_file() {
         "initial_title": "Test Review",
         "created_at": "2024-01-01T00:00:00Z"
     });
-    std::fs::write(run_context_path.path(), run_context_content.to_string()).expect("write run context");
+    std::fs::write(run_context_path.path(), run_context_content.to_string())
+        .expect("write run context");
 
     let config = Arc::new(ServerConfig {
         tasks_out: Some(out_path.clone()),
         log_file: None,
         run_context: Some(run_context_path.path().to_path_buf()),
-        db_path: None, // Don't use database for this test
     });
 
     let tool = tool::create_return_task_tool(config);

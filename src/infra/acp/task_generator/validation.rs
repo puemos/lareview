@@ -31,11 +31,19 @@ pub(super) fn validate_tasks_payload(
             for hunk_ref in &diff_ref.hunks {
                 match diff_index.validate_hunk_exists(diff_ref.file.as_str(), hunk_ref) {
                     Ok(_) => {} // Valid hunk reference
-                    Err(_) => {
-                        warnings.push(format!(
-                            "Task {} references hunk in file {} that does not exist in diff",
-                            task.id, diff_ref.file
-                        ));
+                    Err(err) => {
+                        // If this is a DiffIndexError, we can get more details
+                        if let Some(diff_index_err) = err.downcast_ref::<crate::infra::diff_index::DiffIndexError>() {
+                            warnings.push(format!(
+                                "Task {} references hunk in file {} that does not exist in diff. Nearest hunks: {:?}",
+                                task.id, diff_ref.file, diff_index_err.nearest()
+                            ));
+                        } else {
+                            warnings.push(format!(
+                                "Task {} references hunk in file {} that does not exist in diff",
+                                task.id, diff_ref.file
+                            ));
+                        }
                     }
                 }
             }

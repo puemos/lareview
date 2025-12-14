@@ -44,6 +44,7 @@ Rules:
 {{#if has_repo_access}}
 Allowed tools:
 - Read-only file reads for context (only if needed to understand code referenced in the provided <diff>)
+- `diff_manifest` to get stable hunk IDs for all files (call this first)
 - `return_task` to submit individual review tasks (call this repeatedly for each task)
 - `finalize_review` to submit the final review title and summary
 
@@ -53,10 +54,12 @@ Forbidden:
 - Any file writes
 
 Always:
+- Call `diff_manifest` first to get stable hunk IDs
 - Use `return_task` to submit each task individually during analysis
 - Use `finalize_review` to submit the final review title and summary
 {{else}}
 Rules:
+- Call `diff_manifest` first to get stable hunk IDs
 - Use `return_task` to submit each task individually during analysis
 - Use `finalize_review` to submit the final review title and summary
 - Use ONLY the PR metadata and the provided <diff>.
@@ -225,16 +228,17 @@ Follow these steps:
 
 Treat <diff> as complete and authoritative. Never attempt to obtain or generate another diff.
 
-1. **Analyze**: Read the entire diff and think step-by-step about flows, risks, and coverage
-2. **Group**: Identify 2-6 logical flows or concerns
-3. **Create**: Build one task per flow, ensuring every file is assigned
-4. **Prioritize**: Order tasks by risk level (HIGH → MEDIUM → LOW)
-5. **Visualize**: Add D2 diagrams for complex or risky tasks
-6. **Submit**:
+1. **Get diff manifest**: Call `diff_manifest` tool first to get all files and stable hunk IDs
+2. **Analyze**: Read the entire diff and think step-by-step about flows, risks, and coverage
+3. **Group**: Identify 2-6 logical flows or concerns
+4. **Create**: Build one task per flow, ensuring every file is assigned using hunk IDs from manifest
+5. **Prioritize**: Order tasks by risk level (HIGH → MEDIUM → LOW)
+6. **Visualize**: Add D2 diagrams for complex or risky tasks
+7. **Submit**:
    - Call the tool `return_task` for each task individually (2-7 times total)
    - Call the tool `finalize_review` once at the end with the review title and summary
 
-**Coverage verification**: Before finishing, mentally check that every file in the diff appears in at least one task's `diff_refs`. Copy the exact file paths and hunk coordinates from the `@@ -old,+new @@` headers in the `<diff>` section. If some changes are trivial or miscellaneous, create a final "Verify remaining changes" task to cover them.
+**Coverage verification**: Before finishing, mentally check that every file in the diff appears in at least one task's `diff_refs`. Use the hunk IDs from the `diff_manifest` tool output. Only use numeric coordinates if copying directly from tool responses. If some changes are trivial or miscellaneous, create a final "Verify remaining changes" task to cover them using empty hunk arrays `"hunks": []` to select all hunks in a file.
 </process>
 
 </instructions>
@@ -260,34 +264,19 @@ Treat <diff> as complete and authoritative. Never attempt to obtain or generate 
     {
       "file": "src/auth/jwt.rs",
       "hunks": [
-        {
-          "old_start": 0,
-          "old_lines": 0,
-          "new_start": 1,
-          "new_lines": 35
-        }
+        "src_auth_jwt_rs#H1"
       ]
     },
     {
       "file": "src/middleware/auth.rs",
       "hunks": [
-        {
-          "old_start": 10,
-          "old_lines": 6,
-          "new_start": 10,
-          "new_lines": 20
-        }
+        "src_middleware_auth_rs#H1"
       ]
     },
     {
       "file": "src/api/handlers.rs",
       "hunks": [
-        {
-          "old_start": 3,
-          "old_lines": 6,
-          "new_start": 3,
-          "new_lines": 7
-        }
+        "src_api_handlers_rs#H1"
       ]
     }
   ]
@@ -423,17 +412,18 @@ When ready, call the MCP tools on server `lareview-tasks`:
     {
       "file": "string (relative file path)",
       "hunks": [
-        {
-          "old_start": integer,
-          "old_lines": integer,
-          "new_start": integer,
-          "new_lines": integer
-        }
+        "string (hunk ID from diff_manifest tool)", // Example: "src_main_rs#H1"
+        "another_hunk_id" // Example: "src_main_rs#H2"
       ]
     }
   ]
 }
 ```
+
+Alternative formats for `diff_refs.hunks`:
+- Use hunk IDs from `diff_manifest` tool for precise selection
+- Use empty array `[]` to select all hunks in a file
+- Use numeric coordinates only if copying directly from tool responses
 
 **Finally, call `finalize_review` with this JSON structure**:
 ```json
@@ -448,7 +438,7 @@ When ready, call the MCP tools on server `lareview-tasks`:
 - Call `finalize_review` once at the end
 - Do not output JSON to chat
 - `files` and line stats are computed automatically from `diff_refs`
-- Copy the exact hunk coordinates from `@@ -old,+new @@` in the provided `<diff>`
+- Use hunk IDs from `diff_manifest` tool, not coordinates from @@ headers
 </output_format>
 
 <reminders>
