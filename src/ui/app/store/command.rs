@@ -21,6 +21,7 @@ pub enum Command {
     ResolveGenerateInput {
         input_text: String,
         selected_agent_id: String,
+        review_id: Option<String>,
     },
     FetchPrContextPreview {
         input_ref: String,

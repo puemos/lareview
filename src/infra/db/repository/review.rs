@@ -59,6 +59,41 @@ impl ReviewRepository {
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
+    pub fn find_by_id(&self, id: &ReviewId) -> Result<Option<Review>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT id, title, summary, source_json, active_run_id, created_at, updated_at FROM reviews WHERE id = ?1")?;
+        let mut rows = stmt.query_map([id], |row| {
+            let source_json: String = row.get(3)?;
+            let source: ReviewSource =
+                serde_json::from_str(&source_json).unwrap_or(ReviewSource::DiffPaste {
+                    diff_hash: String::new(),
+                });
+            Ok(Review {
+                id: row.get::<_, ReviewId>(0)?,
+                title: row.get(1)?,
+                summary: row.get(2)?,
+                source,
+                active_run_id: row.get::<_, Option<ReviewRunId>>(4)?,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
+            })
+        })?;
+
+        match rows.next() {
+            Some(row) => row.map(Some).map_err(Into::into),
+            None => Ok(None),
+        }
+    }
+
+    pub fn set_active_run(&self, review_id: &ReviewId, run_id: &ReviewRunId) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE reviews SET active_run_id = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
+            (run_id, review_id),
+        )?;
+        Ok(())
+    }
+
     pub fn update_title_and_summary(
         &self,
         review_id: &ReviewId,

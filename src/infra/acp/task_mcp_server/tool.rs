@@ -133,19 +133,27 @@ pub(super) fn create_diff_manifest_tool(config: Arc<ServerConfig>) -> impl ToolH
                         }
                     }
 
-                    log_to_file(&config, &format!("diff_manifest returning {} files", result_files.len()));
+                    log_to_file(
+                        &config,
+                        &format!("diff_manifest returning {} files", result_files.len()),
+                    );
 
                     Ok(json!({
                         "status": "ok",
                         "files": result_files
                     }))
-                },
+                }
                 Err(err) => {
-                    log_to_file(&config, &format!("diff_manifest failed to parse diff: {err:?}"));
+                    log_to_file(
+                        &config,
+                        &format!("diff_manifest failed to parse diff: {err:?}"),
+                    );
                     for cause in err.chain() {
                         log_to_file(&config, &format!("  Caused by: {cause}"));
                     }
-                    Err(pmcp::Error::Validation(format!("failed to parse diff: {err:?}")))
+                    Err(pmcp::Error::Validation(format!(
+                        "failed to parse diff: {err:?}"
+                    )))
                 }
             }
         })
@@ -251,9 +259,6 @@ pub(super) fn create_finalize_review_tool(config: Arc<ServerConfig>) -> impl Too
     .with_schema(review_metadata_schema())
 }
 
-
-
-
 fn single_task_schema() -> Value {
     json!({
         "type": "object",
@@ -297,17 +302,14 @@ fn single_task_schema() -> Value {
                             "description": "File path in the diff (no a/ or b/ prefixes)"
                         },
                         "hunks": {
-                            "oneOf": [
-                                {
-                                    "type": "array",
-                                    "items": {
+                            "type": "array",
+                            "items": {
+                                "oneOf": [
+                                    {
                                         "type": "string",
                                         "description": "Hunk ID from diff_manifest tool output"
-                                    }
-                                },
-                                {
-                                    "type": "array",
-                                    "items": {
+                                    },
+                                    {
                                         "type": "object",
                                         "properties": {
                                             "old_start": {"type": "integer"},
@@ -318,14 +320,8 @@ fn single_task_schema() -> Value {
                                         "required": ["old_start", "old_lines", "new_start", "new_lines"],
                                         "description": "Hunk coordinates: (old_start, old_lines, new_start, new_lines)"
                                     }
-                                },
-                                {
-                                    "type": "array",
-                                    "items": {},
-                                    "maxItems": 0,
-                                    "description": "Empty array selects all hunks in the file"
-                                }
-                            ],
+                                ]
+                            },
                             "description": "Hunk references: either stable string IDs from diff_manifest tool, numeric coordinates, or empty array to select all hunks in the file"
                         }
                     },

@@ -12,7 +12,8 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
         Command::ResolveGenerateInput {
             input_text,
             selected_agent_id,
-        } => resolve_generate_input(app, input_text, selected_agent_id),
+            review_id,
+        } => resolve_generate_input(app, input_text, selected_agent_id, review_id),
         Command::FetchPrContextPreview { input_ref } => fetch_pr_context_preview(app, input_ref),
         Command::CheckGitHubStatus => check_github_status(app),
         Command::RefreshGitHubReview {
@@ -37,14 +38,22 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
     }
 }
 
-fn resolve_generate_input(app: &mut LaReviewApp, input_text: String, selected_agent_id: String) {
+fn resolve_generate_input(
+    app: &mut LaReviewApp,
+    input_text: String,
+    selected_agent_id: String,
+    review_id: Option<String>,
+) {
     let gen_tx = app.gen_tx.clone();
 
     tokio::spawn(async move {
-        let result =
-            crate::ui::app::generate_input::resolve_generate_input(input_text, selected_agent_id)
-                .await
-                .map_err(|e| e.to_string());
+        let result = crate::ui::app::generate_input::resolve_generate_input(
+            input_text,
+            selected_agent_id,
+            review_id,
+        )
+        .await
+        .map_err(|e| e.to_string());
 
         let _ = gen_tx
             .send(crate::ui::app::GenMsg::InputResolved(Box::new(result)))

@@ -242,7 +242,9 @@ impl LaReviewApp {
 
                 // Build unified diff from diff_refs instead of stored diffs
                 let unified_diff = match &self.state.cached_unified_diff {
-                    Some((cached_diff_refs, diff_string)) if cached_diff_refs == &task.diff_refs => {
+                    Some((cached_diff_refs, diff_string))
+                        if cached_diff_refs == &task.diff_refs =>
+                    {
                         // Cache Hit: Diff refs haven't changed, use the cached string
                         diff_string.clone()
                     }
@@ -353,15 +355,26 @@ impl LaReviewApp {
                                     } => {
                                         let file_path = if !task.diff_refs.is_empty() {
                                             // Use the render_unified_diff to get the correct ordered files
-                                            let run = self.state.runs.iter().find(|r| r.id == task.run_id);
+                                            let run = self
+                                                .state
+                                                .runs
+                                                .iter()
+                                                .find(|r| r.id == task.run_id);
                                             match run {
                                                 Some(run) => {
-                                                    match crate::infra::diff_index::DiffIndex::new(&run.diff_text) {
+                                                    match crate::infra::diff_index::DiffIndex::new(
+                                                        &run.diff_text,
+                                                    ) {
                                                         Ok(diff_index) => {
-                                                            match diff_index.render_unified_diff(&task.diff_refs) {
+                                                            match diff_index.render_unified_diff(
+                                                                &task.diff_refs,
+                                                            ) {
                                                                 Ok((_diff_text, ordered_files)) => {
-                                                                    if file_idx < ordered_files.len() {
-                                                                        ordered_files[file_idx].clone()
+                                                                    if file_idx
+                                                                        < ordered_files.len()
+                                                                    {
+                                                                        ordered_files[file_idx]
+                                                                            .clone()
                                                                     } else {
                                                                         "unknown".to_string()
                                                                     }
@@ -419,15 +432,26 @@ impl LaReviewApp {
                                     } => {
                                         let file_path = if !task.diff_refs.is_empty() {
                                             // Use the render_unified_diff to get the correct ordered files
-                                            let run = self.state.runs.iter().find(|r| r.id == task.run_id);
+                                            let run = self
+                                                .state
+                                                .runs
+                                                .iter()
+                                                .find(|r| r.id == task.run_id);
                                             match run {
                                                 Some(run) => {
-                                                    match crate::infra::diff_index::DiffIndex::new(&run.diff_text) {
+                                                    match crate::infra::diff_index::DiffIndex::new(
+                                                        &run.diff_text,
+                                                    ) {
                                                         Ok(diff_index) => {
-                                                            match diff_index.render_unified_diff(&task.diff_refs) {
+                                                            match diff_index.render_unified_diff(
+                                                                &task.diff_refs,
+                                                            ) {
                                                                 Ok((_diff_text, ordered_files)) => {
-                                                                    if file_idx < ordered_files.len() {
-                                                                        ordered_files[file_idx].clone()
+                                                                    if file_idx
+                                                                        < ordered_files.len()
+                                                                    {
+                                                                        ordered_files[file_idx]
+                                                                            .clone()
                                                                     } else {
                                                                         "unknown".to_string()
                                                                     }

@@ -31,30 +31,37 @@ pub(super) fn save_task(config: &ServerConfig, raw_task: Value) -> Result<Review
             .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
     };
 
-    // Also ensure the parent review exists
+    // Also ensure the parent review exists, but don't overwrite it if it does
     let review_repo = crate::infra::db::ReviewRepository::new(conn.clone());
-    let review = crate::domain::Review {
-        id: ctx.review_id.clone(),
-        title: ctx
-            .initial_title
-            .clone()
-            .unwrap_or_else(|| "Untitled Review".to_string()),
-        summary: None,
-        source: ctx.source.clone(),
-        active_run_id: Some(ctx.run_id.clone()),
-        created_at: ctx
-            .created_at
-            .clone()
-            .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
-        updated_at: ctx
-            .created_at
-            .clone()
-            .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
-    };
+    let existing_review = review_repo.find_by_id(&ctx.review_id)?;
 
-    review_repo
-        .save(&review)
-        .with_context(|| format!("save review {}", ctx.review_id))?;
+    if existing_review.is_none() {
+        let review = crate::domain::Review {
+            id: ctx.review_id.clone(),
+            title: ctx
+                .initial_title
+                .clone()
+                .unwrap_or_else(|| "Untitled Review".to_string()),
+            summary: None,
+            source: ctx.source.clone(),
+            active_run_id: Some(ctx.run_id.clone()),
+            created_at: ctx
+                .created_at
+                .clone()
+                .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
+            updated_at: ctx
+                .created_at
+                .clone()
+                .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
+        };
+        review_repo
+            .save(&review)
+            .with_context(|| format!("save review {}", ctx.review_id))?;
+    } else {
+        review_repo
+            .set_active_run(&ctx.review_id, &ctx.run_id)
+            .with_context(|| format!("set active run for review {}", ctx.review_id))?;
+    }
 
     review_run_repo
         .save(&review_run)
@@ -163,23 +170,33 @@ pub(super) fn update_review_metadata(config: &ServerConfig, args: Value) -> Resu
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
+    if title.is_none() && summary.is_none() {
+        return Ok(());
+    }
+
+    let ctx = load_run_context(config);
     let db = Database::open().context("open database")?;
     let conn = db.connection();
     let review_repo = ReviewRepository::new(conn.clone());
     let review_run_repo = crate::infra::db::ReviewRunRepository::new(conn.clone());
 
-    if let Some(title) = title {
-        // Note: run_context_id is not available in ServerConfig, so we'll use ctx.review_id from load_run_context
-        let ctx = load_run_context(config);
+    let existing_review = review_repo.find_by_id(&ctx.review_id)?;
 
-        // Also ensure the parent review exists
+    let review_title = if let Some(t) = title {
+        t
+    } else if let Some(r) = existing_review.as_ref() {
+        r.title.clone()
+    } else {
+        ctx.initial_title
+            .clone()
+            .unwrap_or_else(|| "Untitled Review".to_string())
+    };
+
+    if existing_review.is_none() {
         let review = crate::domain::Review {
             id: ctx.review_id.clone(),
-            title: ctx
-                .initial_title
-                .clone()
-                .unwrap_or_else(|| "Untitled Review".to_string()),
-            summary: None,
+            title: review_title,
+            summary: summary.clone(),
             source: ctx.source.clone(),
             active_run_id: Some(ctx.run_id.clone()),
             created_at: ctx
@@ -191,33 +208,33 @@ pub(super) fn update_review_metadata(config: &ServerConfig, args: Value) -> Resu
                 .clone()
                 .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
         };
-
-        let review_repo_for_save = crate::infra::db::ReviewRepository::new(conn.clone());
-        review_repo_for_save
+        review_repo
             .save(&review)
             .with_context(|| format!("save review {}", ctx.review_id))?;
-
-        // Ensure the review run exists in the database
-        let review_run = crate::domain::ReviewRun {
-            id: ctx.run_id.clone(),
-            review_id: ctx.review_id.clone(),
-            agent_id: ctx.agent_id.clone(),
-            input_ref: ctx.input_ref.clone(),
-            diff_text: ctx.diff_text.clone(),
-            diff_hash: ctx.diff_hash.clone(),
-            created_at: ctx
-                .created_at
-                .clone()
-                .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
-        };
-        review_run_repo
-            .save(&review_run)
-            .with_context(|| format!("save review run {}", ctx.run_id))?;
-
+    } else {
         review_repo
-            .update_title_and_summary(&ctx.review_id, &title, summary.as_deref())
+            .set_active_run(&ctx.review_id, &ctx.run_id)
+            .with_context(|| format!("set active run for review {}", ctx.review_id))?;
+        review_repo
+            .update_title_and_summary(&ctx.review_id, &review_title, summary.as_deref())
             .context("update review title and summary")?;
     }
+
+    let review_run = crate::domain::ReviewRun {
+        id: ctx.run_id.clone(),
+        review_id: ctx.review_id.clone(),
+        agent_id: ctx.agent_id.clone(),
+        input_ref: ctx.input_ref.clone(),
+        diff_text: ctx.diff_text.clone(),
+        diff_hash: ctx.diff_hash.clone(),
+        created_at: ctx
+            .created_at
+            .clone()
+            .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
+    };
+    review_run_repo
+        .save(&review_run)
+        .with_context(|| format!("save review run {}", ctx.run_id))?;
 
     Ok(())
 }

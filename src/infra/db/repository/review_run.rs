@@ -16,8 +16,9 @@ impl ReviewRunRepository {
         let conn = self.conn.lock().unwrap();
         conn.execute(
             r#"
-            INSERT OR REPLACE INTO review_runs (id, review_id, agent_id, input_ref, diff_text, diff_hash, created_at)
+            INSERT INTO review_runs (id, review_id, agent_id, input_ref, diff_text, diff_hash, created_at)
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            ON CONFLICT(id) DO NOTHING
             "#,
             (
                 &run.id,

@@ -58,8 +58,10 @@ fn reduce_generate(state: &mut AppState, action: GenerateAction) -> Vec<Command>
             vec![Command::ResolveGenerateInput {
                 input_text: state.diff_text.clone(),
                 selected_agent_id: state.selected_agent.id.clone(),
+                review_id: None,
             }]
         }
+
         GenerateAction::FetchPrContext(input_ref) => {
             let input_ref = input_ref.trim().to_string();
             if input_ref.is_empty() {

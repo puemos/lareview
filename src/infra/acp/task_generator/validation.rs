@@ -33,7 +33,9 @@ pub(super) fn validate_tasks_payload(
                     Ok(_) => {} // Valid hunk reference
                     Err(err) => {
                         // If this is a DiffIndexError, we can get more details
-                        if let Some(diff_index_err) = err.downcast_ref::<crate::infra::diff_index::DiffIndexError>() {
+                        if let Some(diff_index_err) =
+                            err.downcast_ref::<crate::infra::diff_index::DiffIndexError>()
+                        {
                             warnings.push(format!(
                                 "Task {} references hunk in file {} that does not exist in diff. Nearest hunks: {:?}",
                                 task.id, diff_ref.file, diff_index_err.nearest()

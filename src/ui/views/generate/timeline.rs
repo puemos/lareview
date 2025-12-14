@@ -6,13 +6,19 @@ use eframe::egui;
 use agent_client_protocol::{ContentBlock, SessionUpdate, ToolCallStatus};
 
 pub(super) fn render_timeline_item(ui: &mut egui::Ui, item: &TimelineItem) {
+    // FIX: Set a maximum width for this item to force wrapping logic to kick in.
+    ui.set_max_width(ui.available_width());
+
     match &item.content {
         TimelineContent::LocalLog(line) => {
-            ui.label(
-                egui::RichText::new(line)
-                    .color(MOCHA.subtext0)
-                    .monospace()
-                    .size(12.0),
+            ui.add(
+                egui::Label::new(
+                    egui::RichText::new(line)
+                        .color(MOCHA.subtext0)
+                        .monospace()
+                        .size(12.0),
+                )
+                .wrap(), // Fixed: .wrap() takes no arguments now
             );
         }
         TimelineContent::Update(update) => {
@@ -22,110 +28,147 @@ pub(super) fn render_timeline_item(ui: &mut egui::Ui, item: &TimelineItem) {
 }
 
 fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
+    let get_status_style = |status: &ToolCallStatus| -> (egui::Color32, &str) {
+        match status {
+            ToolCallStatus::Pending => (MOCHA.overlay2, "pending"),
+            ToolCallStatus::InProgress => (MOCHA.yellow, "in progress"),
+            ToolCallStatus::Completed => (MOCHA.green, "completed"),
+            ToolCallStatus::Failed => (MOCHA.red, "failed"),
+            _ => (MOCHA.overlay2, "unknown"),
+        }
+    };
+
     match update {
         SessionUpdate::UserMessageChunk(chunk) | SessionUpdate::AgentMessageChunk(chunk) => {
             render_content_chunk(ui, chunk, MOCHA.text, false);
         }
         SessionUpdate::AgentThoughtChunk(chunk) => {
-            render_content_chunk(ui, chunk, MOCHA.sky, true);
+            ui.indent("thought_indent", |ui| {
+                render_content_chunk(ui, chunk, MOCHA.sky, true);
+            });
         }
         SessionUpdate::ToolCall(call) => {
-            let status_color = match call.status {
-                ToolCallStatus::Pending => MOCHA.overlay2,
-                ToolCallStatus::InProgress => MOCHA.yellow,
-                ToolCallStatus::Completed => MOCHA.green,
-                ToolCallStatus::Failed => MOCHA.red,
-                _ => MOCHA.overlay2,
-            };
-            let status_label = match call.status {
-                ToolCallStatus::Pending => "pending",
-                ToolCallStatus::InProgress => "in progress",
-                ToolCallStatus::Completed => "completed",
-                ToolCallStatus::Failed => "failed",
-                _ => "",
-            };
-            let header_text = egui::RichText::new(format!("{} ({})", call.title, status_label))
-                .color(status_color)
-                .size(12.0);
+            ui.group(|ui| {
+                ui.set_width(ui.available_width());
+                let (status_color, status_label) = get_status_style(&call.status);
 
-            egui::CollapsingHeader::new(header_text)
-                .id_salt(("tool_call", call.tool_call_id.clone()))
-                .default_open(matches!(
-                    call.status,
-                    ToolCallStatus::Pending | ToolCallStatus::InProgress
-                ))
-                .show(ui, |ui| {
-                    ui.spacing_mut().item_spacing =
-                        egui::vec2(spacing::TIGHT_ITEM_SPACING.0, spacing::TIGHT_ITEM_SPACING.1); // 4.0, 4.0
+                // Header text
+                let header_text = egui::RichText::new(format!("{} ({})", call.title, status_label))
+                    .color(status_color)
+                    .strong()
+                    .size(12.0);
 
-                    if let Some(kind) =
-                        (!matches!(call.kind, agent_client_protocol::ToolKind::Other))
-                            .then_some(call.kind)
-                    {
-                        ui.label(
-                            egui::RichText::new(format!("kind: {kind:?}"))
-                                .color(MOCHA.subtext0)
-                                .size(11.0),
+                egui::CollapsingHeader::new(header_text)
+                    .id_salt(("tool_call", call.tool_call_id.clone()))
+                    .default_open(matches!(
+                        call.status,
+                        ToolCallStatus::Pending | ToolCallStatus::InProgress
+                    ))
+                    .show(ui, |ui| {
+                        ui.spacing_mut().item_spacing = egui::vec2(
+                            spacing::TIGHT_ITEM_SPACING.0,
+                            spacing::TIGHT_ITEM_SPACING.1,
                         );
-                    }
 
-                    if let Some(input) = &call.raw_input {
-                        render_json_block(
-                            ui,
-                            ("tool_json", call.tool_call_id.clone(), "input"),
-                            "input",
-                            input,
-                        );
-                    }
-                    if let Some(output) = &call.raw_output {
-                        render_json_block(
-                            ui,
-                            ("tool_json", call.tool_call_id.clone(), "output"),
-                            "output",
-                            output,
-                        );
-                    }
-                });
+                        // Kind Label
+                        if let Some(kind) =
+                            (!matches!(call.kind, agent_client_protocol::ToolKind::Other))
+                                .then_some(call.kind)
+                        {
+                            ui.horizontal(|ui| {
+                                ui.label(
+                                    egui::RichText::new("kind:")
+                                        .size(11.0)
+                                        .color(MOCHA.overlay1),
+                                );
+                                ui.label(
+                                    egui::RichText::new(format!("{kind:?}"))
+                                        .size(11.0)
+                                        .color(MOCHA.subtext0),
+                                );
+                            });
+                        }
+
+                        if let Some(input) = &call.raw_input {
+                            render_json_block(
+                                ui,
+                                ("tool_json", call.tool_call_id.clone(), "input"),
+                                "Input",
+                                input,
+                            );
+                        }
+                        if let Some(output) = &call.raw_output {
+                            render_json_block(
+                                ui,
+                                ("tool_json", call.tool_call_id.clone(), "output"),
+                                "Output",
+                                output,
+                            );
+                        }
+                    });
+            });
         }
         SessionUpdate::ToolCallUpdate(update) => {
             let status = update.fields.status.unwrap_or(ToolCallStatus::Pending);
-            let status_color = match status {
-                ToolCallStatus::Pending => MOCHA.overlay2,
-                ToolCallStatus::InProgress => MOCHA.yellow,
-                ToolCallStatus::Completed => MOCHA.green,
-                ToolCallStatus::Failed => MOCHA.red,
-                _ => MOCHA.overlay2,
-            };
+            let (status_color, _) = get_status_style(&status);
             let title = update.fields.title.as_deref().unwrap_or("tool update");
-            ui.label(
-                egui::RichText::new(format!("{title} ({status:?})"))
-                    .color(status_color)
-                    .size(12.0),
-            );
+
+            ui.horizontal_wrapped(|ui| {
+                ui.label(
+                    egui::RichText::new("Update:")
+                        .color(MOCHA.subtext0)
+                        .size(12.0),
+                );
+
+                ui.add(
+                    egui::Label::new(
+                        egui::RichText::new(format!("{title} -> {status:?}"))
+                            .color(status_color)
+                            .size(12.0),
+                    )
+                    .wrap(), // Fixed
+                );
+            });
         }
         SessionUpdate::Plan(plan) => {
             super::plan::render_plan_timeline_item(ui, plan);
         }
         SessionUpdate::AvailableCommandsUpdate(_) => {
-            ui.label(
-                egui::RichText::new("Available commands updated")
-                    .color(MOCHA.subtext0)
-                    .size(12.0),
+            ui.add(
+                egui::Label::new(
+                    egui::RichText::new("Available commands updated")
+                        .color(MOCHA.overlay1)
+                        .italics()
+                        .size(12.0),
+                )
+                .wrap(), // Fixed
             );
         }
         SessionUpdate::CurrentModeUpdate(mode) => {
-            ui.label(
-                egui::RichText::new(format!("Mode: {}", mode.current_mode_id))
-                    .color(MOCHA.subtext0)
-                    .size(12.0),
-            );
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new("Mode switch:")
+                        .color(MOCHA.overlay1)
+                        .size(12.0),
+                );
+                ui.label(
+                    // Fixed: Added .to_string()
+                    egui::RichText::new(mode.current_mode_id.to_string())
+                        .color(MOCHA.text)
+                        .strong()
+                        .size(12.0),
+                );
+            });
         }
         _ => {
-            ui.label(
-                egui::RichText::new(format!("{update:?}"))
-                    .color(MOCHA.subtext0)
-                    .monospace()
-                    .size(11.0),
+            ui.add(
+                egui::Label::new(
+                    egui::RichText::new(format!("{update:?}"))
+                        .color(MOCHA.subtext0)
+                        .monospace()
+                        .size(11.0),
+                )
+                .wrap(), // Fixed
             );
         }
     }
@@ -143,7 +186,7 @@ fn render_content_chunk(
             if italics {
                 rt = rt.italics();
             }
-            ui.label(rt);
+            ui.add(egui::Label::new(rt).wrap()); // Fixed
         }
         other => {
             let mut rt = egui::RichText::new(format!("{other:?}"))
@@ -153,7 +196,7 @@ fn render_content_chunk(
             if italics {
                 rt = rt.italics();
             }
-            ui.label(rt);
+            ui.add(egui::Label::new(rt).wrap()); // Fixed
         }
     }
 }
@@ -164,15 +207,17 @@ fn render_json_block<S: std::hash::Hash + Clone>(
     label: &str,
     value: &serde_json::Value,
 ) {
-    ui.add_space(2.0); // Keep 2.0 as this is a custom spacing value
+    ui.add_space(spacing::TIGHT_ITEM_SPACING.1);
     ui.label(
-        egui::RichText::new(label.to_uppercase())
-            .color(MOCHA.subtext0)
+        egui::RichText::new(label)
+            .color(MOCHA.overlay1)
             .size(11.0)
             .strong(),
     );
+
     let pretty = serde_json::to_string_pretty(value).unwrap_or_else(|_| value.to_string());
     let mut text = pretty;
+
     egui::ScrollArea::vertical()
         .id_salt(("json_scroll", id_salt.clone()))
         .max_height(160.0)
@@ -181,9 +226,11 @@ fn render_json_block<S: std::hash::Hash + Clone>(
                 egui::TextEdit::multiline(&mut text)
                     .id_salt(("json_text", id_salt.clone()))
                     .font(egui::FontId::monospace(11.0))
+                    .code_editor()
                     .desired_rows(6)
                     .desired_width(ui.available_width())
-                    .interactive(false),
+                    .interactive(false)
+                    .frame(true),
             );
         });
 }

@@ -17,15 +17,17 @@ fn looks_like_unified_diff(text: &str) -> bool {
 pub async fn resolve_generate_input(
     input_text: String,
     selected_agent_id: String,
+    review_id: Option<String>,
 ) -> Result<GenerateResolvedPayload> {
     let trimmed = input_text.trim().to_string();
     if trimmed.is_empty() {
         anyhow::bail!("Input is empty");
     }
 
+    let review_id = review_id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+
     if looks_like_unified_diff(&trimmed) {
         let diff_hash = format!("{:016x}", crate::infra::hash::hash64(&trimmed));
-        let review_id = uuid::Uuid::new_v4().to_string();
         let run_id = uuid::Uuid::new_v4().to_string();
 
         return Ok(GenerateResolvedPayload {
@@ -61,7 +63,6 @@ pub async fn resolve_generate_input(
         .with_context(|| format!("Fetch PR diff via `gh` ({})", pr_ref.url))?;
 
     let diff_hash = format!("{:016x}", crate::infra::hash::hash64(&diff));
-    let review_id = uuid::Uuid::new_v4().to_string();
     let run_id = uuid::Uuid::new_v4().to_string();
 
     Ok(GenerateResolvedPayload {

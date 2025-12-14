@@ -89,15 +89,13 @@ fn count_line_changes_legacy(diffs: &[String]) -> (u32, u32) {
     (additions, deletions)
 }
 
-
 fn normalize_single_task_payload(args: Value) -> Result<Value> {
     let mut current = args;
 
     if let Some(s) = current.as_str() {
         if let Ok(v) = serde_json::from_str::<Value>(s) {
             current = v;
-        } else if s.contains("\"id\"")
-            && (s.contains("\"title\"") || s.contains("\"description\""))
+        } else if s.contains("\"id\"") && (s.contains("\"title\"") || s.contains("\"description\""))
         {
             // Try to find the outermost object that looks like a task
             let mut brace_depth = 0;
@@ -113,15 +111,17 @@ fn normalize_single_task_payload(args: Value) -> Result<Value> {
                     }
                     '}' => {
                         brace_depth -= 1;
-                        if brace_depth == 0 && start_idx.is_some()
+                        if brace_depth == 0
+                            && start_idx.is_some()
                             && let Some(start) = start_idx
-                                && let Ok(v) = serde_json::from_str::<Value>(&s[start..=i]) {
-                                    // Check if it has required fields for a task
-                                    if v.get("id").is_some() && v.get("title").is_some() {
-                                        current = v;
-                                        break;
-                                    }
-                                }
+                            && let Ok(v) = serde_json::from_str::<Value>(&s[start..=i])
+                        {
+                            // Check if it has required fields for a task
+                            if v.get("id").is_some() && v.get("title").is_some() {
+                                current = v;
+                                break;
+                            }
+                        }
                     }
                     _ => {}
                 }
@@ -136,20 +136,23 @@ fn normalize_single_task_payload(args: Value) -> Result<Value> {
 
     // Try to extract from params or arguments
     if let Some(params) = current.get("params")
-        && params.get("id").is_some() && params.get("title").is_some()
+        && params.get("id").is_some()
+        && params.get("title").is_some()
     {
         return Ok(params.clone());
     }
 
     if let Some(arguments) = current.get("arguments")
-        && arguments.get("id").is_some() && arguments.get("title").is_some()
+        && arguments.get("id").is_some()
+        && arguments.get("title").is_some()
     {
         return Ok(arguments.clone());
     }
 
-    Err(anyhow::anyhow!("missing required fields `id` and `title` for task"))
+    Err(anyhow::anyhow!(
+        "missing required fields `id` and `title` for task"
+    ))
 }
-
 
 pub(crate) fn parse_task(args: Value) -> Result<ReviewTask> {
     let normalized = normalize_single_task_payload(args)?;
