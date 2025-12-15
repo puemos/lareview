@@ -60,8 +60,9 @@ impl Default for AgentRegistry {
         registry.register_agent(Box::new(super::agents::claude::ClaudeAgent));
         registry.register_agent(Box::new(super::agents::codex::CodexAgent));
         registry.register_agent(Box::new(super::agents::gemini::GeminiAgent));
-        registry.register_agent(Box::new(super::agents::grok::GrokAgent));
+        registry.register_agent(Box::new(super::agents::kimi::KimiAgent));
         registry.register_agent(Box::new(super::agents::mistral::MistralAgent));
+        registry.register_agent(Box::new(super::agents::opencode::OpenCodeAgent));
         registry.register_agent(Box::new(super::agents::qwen::QwenAgent));
 
         registry

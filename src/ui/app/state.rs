@@ -32,6 +32,12 @@ impl SelectedAgent {
     }
 }
 
+impl std::fmt::Display for SelectedAgent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.id)
+    }
+}
+
 /// All app state in one struct.
 #[derive(Default)]
 pub struct AppState {

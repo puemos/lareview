@@ -91,12 +91,13 @@ impl LaReviewClient {
     /// Mark finalization as received.
     fn mark_finalization_received(&self) {
         if let Ok(mut guard) = self.finalization_received.lock()
-            && !*guard {
-                *guard = true;
-                if let Some(tx) = &self.progress {
-                    let _ = tx.send(ProgressEvent::Finalized);
-                }
+            && !*guard
+        {
+            *guard = true;
+            if let Some(tx) = &self.progress {
+                let _ = tx.send(ProgressEvent::Finalized);
             }
+        }
     }
 
     fn is_safe_read_request(&self, raw_input: &Option<serde_json::Value>) -> bool {

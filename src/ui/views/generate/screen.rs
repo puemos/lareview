@@ -1,6 +1,5 @@
-use crate::ui::app::{Action, GenerateAction, LaReviewApp, SelectedAgent};
+use crate::ui::app::{Action, GenerateAction, LaReviewApp};
 
-use crate::ui::components::selection_chips::selection_chips;
 use crate::ui::components::status::error_banner;
 use crate::ui::spacing;
 use crate::ui::theme;
@@ -414,48 +413,11 @@ impl LaReviewApp {
                 ui.add_space(spacing::SPACING_XS);
 
                 // ... Agent Selection Chips (Existing Code) ...
-                let candidates = crate::infra::acp::list_agent_candidates();
-                let available_agents: Vec<SelectedAgent> = candidates
-                    .iter()
-                    .filter(|c| c.available)
-                    .map(|c| SelectedAgent::from_str(&c.id))
-                    .collect();
-
-                let agent_labels: Vec<String> = candidates
-                    .iter()
-                    .filter(|c| c.available)
-                    .map(|c| c.label.clone())
-                    .collect();
-
-                let agent_logos: Vec<Option<String>> = candidates
-                    .iter()
-                    .filter(|c| c.available)
-                    .map(|c| c.logo.clone())
-                    .collect();
-
-                let mut selected_agent = self.state.selected_agent.clone();
-                egui::ScrollArea::vertical()
-                    .max_height(72.0)
-                    .auto_shrink([false, true])
-                    .id_salt(ui.id().with("agent_chips_scroll"))
-                    .show(ui, |ui| {
-                        let width = ui.available_width();
-                        if width.is_finite() && width > 0.0 {
-                            ui.set_width(width);
-                        }
-                        selection_chips(
-                            ui,
-                            &mut selected_agent,
-                            &available_agents,
-                            &agent_labels.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
-                            &agent_logos,
-                            "",
-                        );
-                    });
-                if selected_agent != self.state.selected_agent {
-                    self.dispatch(Action::Generate(GenerateAction::SelectAgent(
-                        selected_agent,
-                    )));
+                // Agent Selector Component
+                let mut temp_agent = self.state.selected_agent.clone();
+                crate::ui::components::agent_selector::agent_selector(ui, &mut temp_agent);
+                if temp_agent != self.state.selected_agent {
+                    self.dispatch(Action::Generate(GenerateAction::SelectAgent(temp_agent)));
                 }
 
                 ui.add_space(spacing::SPACING_SM);

@@ -1,10 +1,11 @@
 pub mod action_button;
+pub mod agent_selector;
 pub mod badge;
 pub mod columns;
 pub mod diagram;
 pub mod diff;
 pub mod pills;
-pub mod selection_chips;
+
 pub mod status;
 pub mod task_status_chip;
 
