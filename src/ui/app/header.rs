@@ -44,7 +44,7 @@ impl LaReviewApp {
                 pos += line_spacing;
             }
 
-            ui.add_space(spacing::SPACING_MD);
+            ui.add_space(spacing::SPACING_LG);
             ui.horizontal(|ui| {
                 ui.horizontal(|ui| {
                     match ui.ctx().try_load_texture(
@@ -63,8 +63,6 @@ impl LaReviewApp {
                             ));
                         }
                     }
-
-                    ui.add_space(2.0); // Keep as 2 (custom spacing for logo/text gap)
                     ui.heading(
                         egui::RichText::new("LaReview")
                             .strong()
@@ -73,7 +71,7 @@ impl LaReviewApp {
                     );
                 });
 
-                ui.add_space(spacing::SPACING_LG);
+                ui.add_space(spacing::SPACING_XL);
 
                 ui.horizontal(|ui| {
                     let generate_response = ui.add(
@@ -126,7 +124,7 @@ impl LaReviewApp {
                     });
                 });
             });
-            ui.add_space(spacing::SPACING_SM);
+            ui.add_space(spacing::SPACING_LG);
         });
     }
 }

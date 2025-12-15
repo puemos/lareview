@@ -262,12 +262,31 @@ impl LaReviewApp {
 
                 ui.horizontal(|ui| {
                     ui.heading(egui::RichText::new("AGENT").size(16.0).color(MOCHA.text));
+                });
+
+                if let Some(err) = &self.state.generation_error {
+                    ui.add_space(spacing::SPACING_XS);
+                    error_banner(ui, err);
+                }
+
+                ui.add_space(spacing::SPACING_XS);
+
+                // ... Agent Selection Chips (Existing Code) ...
+                // Agent Selector Component & Run Button Row
+                ui.horizontal(|ui| {
+                    let mut temp_agent = self.state.selected_agent.clone();
+                    crate::ui::components::agent_selector::agent_selector(ui, &mut temp_agent);
+                    if temp_agent != self.state.selected_agent {
+                        self.dispatch(Action::Generate(GenerateAction::SelectAgent(temp_agent)));
+                    }
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         // Custom "Run" Button with Sci-Fi/Tron Effect
                         let button_size = egui::vec2(120.0, 28.0);
                         let (rect, response) =
                             ui.allocate_exact_size(button_size, egui::Sense::click());
+
+                        let response = response.on_hover_cursor(egui::CursorIcon::PointingHand);
 
                         if response.clicked() && run_enabled {
                             trigger_generate = true;
@@ -362,7 +381,8 @@ impl LaReviewApp {
                                     alpha,
                                 )
                             } else if run_enabled {
-                                theme.text_inverse
+                                // High contrast (dark) text on the brand (light/pastel) background
+                                MOCHA.crust
                             } else {
                                 theme.text_disabled
                             };
@@ -404,22 +424,6 @@ impl LaReviewApp {
                         }
                     });
                 });
-
-                if let Some(err) = &self.state.generation_error {
-                    ui.add_space(spacing::SPACING_XS);
-                    error_banner(ui, err);
-                }
-
-                ui.add_space(spacing::SPACING_XS);
-
-                // ... Agent Selection Chips (Existing Code) ...
-                // Agent Selector Component
-                let mut temp_agent = self.state.selected_agent.clone();
-                crate::ui::components::agent_selector::agent_selector(ui, &mut temp_agent);
-                if temp_agent != self.state.selected_agent {
-                    self.dispatch(Action::Generate(GenerateAction::SelectAgent(temp_agent)));
-                }
-
                 ui.add_space(spacing::SPACING_SM);
 
                 // Status Section

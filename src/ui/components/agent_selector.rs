@@ -200,8 +200,9 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
                             });
 
                             if !is_available && item_response.hovered() {
-                                item_response
-                                    .on_hover_text("Agent not available (missing API key/config)");
+                                item_response.on_hover_text(
+                                    "Agent not available. Please install it or add it to your PATH.",
+                                );
                             }
                         }
                     });
