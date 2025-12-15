@@ -7,6 +7,13 @@ use std::path::PathBuf;
 pub(super) fn build_prompt(run: &RunContext, repo_root: Option<&PathBuf>) -> String {
     let has_repo_access = repo_root.is_some();
     let source_json = serde_json::to_string(&run.source).unwrap_or_default();
+
+    // Generate a hunk manifest to help agents accurately reference hunks
+    let hunk_manifest = match crate::infra::diff_index::DiffIndex::new(&run.diff_text) {
+        Ok(index) => index.generate_hunk_manifest(),
+        Err(_) => String::new(),
+    };
+
     prompts::render(
         "generate_tasks",
         &json!({
@@ -14,6 +21,7 @@ pub(super) fn build_prompt(run: &RunContext, repo_root: Option<&PathBuf>) -> Str
             "source_json": source_json,
             "initial_title": run.initial_title,
             "diff": run.diff_text,
+            "hunk_manifest": hunk_manifest,
             "has_repo_access": has_repo_access,
             "repo_root": repo_root.map(|p| p.display().to_string()),
             "repo_access_note": if has_repo_access { "read-only" } else { "none" }

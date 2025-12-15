@@ -240,6 +240,54 @@ impl DiffIndex {
         Ok(())
     }
 
+    /// Generate a manifest of all hunks with their coordinates.
+    /// This helps agents reference hunks accurately by providing exact coordinates to copy.
+    pub fn generate_hunk_manifest(&self) -> String {
+        let mut result = String::new();
+
+        // Sort files for consistent ordering
+        let mut sorted_files: Vec<_> = self.files.keys().collect();
+        sorted_files.sort();
+
+        for file_path in sorted_files {
+            let file_index = self.files.get(file_path).unwrap();
+            if file_index.all_hunks.is_empty() {
+                continue;
+            }
+
+            result.push_str(&format!("{}:\n", file_path));
+
+            for (idx, indexed_hunk) in file_index.all_hunks.iter().enumerate() {
+                let hunk = &indexed_hunk.hunk;
+                let coords = &indexed_hunk.coords;
+
+                // Count additions and deletions in this hunk
+                let mut adds = 0;
+                let mut dels = 0;
+                for line in hunk.lines() {
+                    match line.line_type.as_str() {
+                        unidiff::LINE_TYPE_ADDED => adds += 1,
+                        unidiff::LINE_TYPE_REMOVED => dels += 1,
+                        _ => {}
+                    }
+                }
+
+                result.push_str(&format!(
+                    "  H{}: {{ \"old_start\": {}, \"old_lines\": {}, \"new_start\": {}, \"new_lines\": {} }}  (+{}, -{})\n",
+                    idx + 1,
+                    coords.0,
+                    hunk.source_length,
+                    coords.1,
+                    hunk.target_length,
+                    adds,
+                    dels
+                ));
+            }
+        }
+
+        result
+    }
+
     /// Renders a unified diff snippet for the given `DiffRef`s.
     /// Returns the diff string and a list of ordered file paths.
     pub fn render_unified_diff(&self, diff_refs: &[DiffRef]) -> Result<(String, Vec<String>)> {
@@ -332,19 +380,19 @@ mod tests {
 
     const TEST_DIFF: &str = r#"diff --git a/src/main.rs b/src/main.rs
 index 0123456..789abcd 100644
----	a/src/main.rs
-+++	b/src/main.rs
+--- a/src/main.rs
++++ b/src/main.rs
 @@ -1,5 +1,5 @@
-fn main() {
+ fn main() {
 -    println!("Hello, world!");
 +    println!("Hello, Gemini!");
-    println!("Another line");
-}
+     println!("Another line");
+ }
 
 diff --git a/src/lib.rs b/src/lib.rs
 new file mode 100644
 index 0000000..abcdefg
----	/dev/null
+--- /dev/null
 +++ b/src/lib.rs
 @@ -0,0 +1,3 @@
 +pub fn add(a: i32, b: i32) -> i32 {
@@ -414,8 +462,8 @@ index 0000000..abcdefg
     #[test]
     fn test_render_multiple_hunks() {
         let diff_with_multiple_hunks = r###"diff --git a/file.txt b/file.txt
----	a/file.txt
-+++	b/file.txt
+--- a/file.txt
++++ b/file.txt
 @@ -1,3 +1,3 @@
  line 1
 -line 2
@@ -427,6 +475,7 @@ index 0000000..abcdefg
 +line 11 changed
  line 12
 "###;
+
         let index = DiffIndex::new(diff_with_multiple_hunks).unwrap();
         let diff_refs = vec![DiffRef {
             file: "file.txt".to_string(),

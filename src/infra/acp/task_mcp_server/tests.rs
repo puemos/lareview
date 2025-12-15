@@ -71,6 +71,11 @@ async fn test_return_task_tool_persists_to_db() {
     let db_path = tmp_dir.path().join("db.sqlite");
     let run_context_path = tmp_dir.path().join("run.json");
 
+    // Set the database path so Database::open() uses our temp path
+    unsafe {
+        std::env::set_var("LAREVIEW_DB_PATH", db_path.to_string_lossy().to_string());
+    }
+
     let run_context = serde_json::json!({
         "review_id": "rev-db",
         "run_id": "run-db",
@@ -88,7 +93,6 @@ async fn test_return_task_tool_persists_to_db() {
         tasks_out: None,
         log_file: None,
         run_context: Some(run_context_path),
-        db_path: Some(db_path.clone()),
     });
 
     let tool = tool::create_return_task_tool(config);
@@ -137,14 +141,11 @@ async fn test_return_task_tool_persists_to_db() {
 async fn test_finalize_review_tool_updates_metadata() {
     let tmp = tempfile::NamedTempFile::new().expect("tmp file");
     let out_path = tmp.path().to_path_buf();
-    let tmp_db = tempfile::tempdir().expect("tmp db dir");
-    let db_path = tmp_db.path().join("db.sqlite");
 
     let config = Arc::new(ServerConfig {
         tasks_out: Some(out_path.clone()),
         log_file: None,
         run_context: None,
-        db_path: Some(db_path),
     });
 
     let tool = tool::create_finalize_review_tool(config);
@@ -171,6 +172,11 @@ async fn test_multiple_tasks_and_finalize_persists_correctly() {
     let db_path = tmp_dir.path().join("db.sqlite");
     let run_context_path = tmp_dir.path().join("run.json");
 
+    // Set the database path so Database::open() uses our temp path
+    unsafe {
+        std::env::set_var("LAREVIEW_DB_PATH", db_path.to_string_lossy().to_string());
+    }
+
     let run_context = serde_json::json!({
         "review_id": "rev-multi",
         "run_id": "run-multi",
@@ -188,7 +194,6 @@ async fn test_multiple_tasks_and_finalize_persists_correctly() {
         tasks_out: None,
         log_file: None,
         run_context: Some(run_context_path.clone()),
-        db_path: Some(db_path.clone()),
     });
 
     let return_task_tool = tool::create_return_task_tool(config.clone());

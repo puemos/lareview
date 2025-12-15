@@ -18,6 +18,15 @@ Your goal is to help development teams ship better code by providing insightful,
 <diff>
 {{diff}}
 </diff>
+
+{{#if hunk_manifest}}
+<hunk_manifest>
+Use this manifest to accurately reference hunks in your tasks. Copy coordinates exactly as shown.
+Format: H{n}: { "old_start": X, "old_lines": Y, "new_start": Z, "new_lines": W }  (+adds, -dels)
+
+{{hunk_manifest}}
+</hunk_manifest>
+{{/if}}
 </input>
 
 <instructions>
@@ -214,14 +223,17 @@ Treat <diff> as complete and authoritative. Never attempt to obtain or generate 
 1. **Plan** with a task list plan
 2. **Analyze**: Read the entire diff and think step-by-step about flows, risks, and coverage
 3. **Group**: Identify around 2-6 logical flows or concerns
-4. **Create**: Build one task per flow, ensuring every file is assigned using hunk IDs from manifest
-5. **Prioritize**: Order tasks by risk level (HIGH → MEDIUM → LOW)
-6. **Visualize**: Add D2 diagrams for complex or risky tasks
-7. **Submit**:
+4. **Create**: Build one task per flow, ensuring every file is assigned
+5. **Reference Hunks**: For each task's `diff_refs`, use the `<hunk_manifest>` to find exact coordinates. **Copy the JSON objects exactly** - do not guess or approximate coordinates.
+6. **Prioritize**: Order tasks by risk level (HIGH → MEDIUM → LOW)
+7. **Visualize**: Add D2 diagrams for complex or risky tasks
+8. **Submit**:
    - Call the tool `return_task` for each task individually
    - Call the tool `finalize_review` once at the end with the review title and summary
 
-**Coverage verification**: Before finishing, mentally check that every file in the diff appears in at least one task's `diff_refs`. Use numeric coordinates if copying directly from tool responses. If some changes are trivial or miscellaneous, create a final "Verify remaining changes" task to cover them using empty hunk arrays `"hunks": []` to select all hunks in a file.
+**Coverage verification**: Before finishing, mentally check that every file in the diff appears in at least one task's `diff_refs`. If some changes are trivial or miscellaneous, create a final "Verify remaining changes" task to cover them using empty hunk arrays `"hunks": []` to select all hunks in a file.
+
+> **CRITICAL**: Hunk coordinates MUST match exactly. Copy from `<hunk_manifest>` - do not use string IDs or estimate line numbers.
 </process>
 
 </instructions>
@@ -247,19 +259,19 @@ Treat <diff> as complete and authoritative. Never attempt to obtain or generate 
     {
       "file": "src/auth/jwt.rs",
       "hunks": [
-        "src_auth_jwt_rs#H1"
+        { "old_start": 1, "old_lines": 10, "new_start": 1, "new_lines": 25 }
       ]
     },
     {
       "file": "src/middleware/auth.rs",
       "hunks": [
-        "src_middleware_auth_rs#H1"
+        { "old_start": 5, "old_lines": 8, "new_start": 5, "new_lines": 12 }
       ]
     },
     {
       "file": "src/api/handlers.rs",
       "hunks": [
-        "src_api_handlers_rs#H1"
+        { "old_start": 20, "old_lines": 5, "new_start": 20, "new_lines": 8 }
       ]
     }
   ]
@@ -407,9 +419,12 @@ When ready, call the MCP tools on server `lareview-tasks`:
         }
   ```
   
-  Alternative formats for `diff_refs.hunks`:
-  - Use empty array `[]` to select all hunks in a file.
-  - Use numeric coordinates for each hunk object, like the example above. These coordinates **must** correspond to actual hunks found in the provided `<diff>`.
+  **How to fill `diff_refs.hunks`**:
+  - **Copy from `<hunk_manifest>`**: Find your file, copy the JSON object for the hunk(s) you need.
+  - **Use empty array `[]`** to select all hunks in a file.
+  
+  > [!IMPORTANT]
+  > Coordinates MUST match the `<hunk_manifest>` exactly. Do NOT use string IDs like `"file#H1"` or estimate line numbers.
 **Finally, call `finalize_review` with this JSON structure**:
 ```json
 {
