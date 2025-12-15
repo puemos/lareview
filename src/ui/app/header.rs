@@ -1,4 +1,6 @@
 use eframe::egui;
+use egui_phosphor::regular::COFFEE;
+use egui_phosphor::regular::ONIGIRI;
 
 use super::LaReviewApp;
 use super::state::AppView;
@@ -44,9 +46,10 @@ impl LaReviewApp {
                 pos += line_spacing;
             }
 
-            ui.add_space(spacing::SPACING_LG);
+            ui.add_space(spacing::SPACING_SM);
             ui.horizontal(|ui| {
                 ui.horizontal(|ui| {
+                    ui.add_space(spacing::SPACING_MD);
                     match ui.ctx().try_load_texture(
                         "app_logo",
                         egui::TextureOptions::LINEAR,
@@ -72,16 +75,19 @@ impl LaReviewApp {
                 });
 
                 ui.add_space(spacing::SPACING_XL);
+                ui.add_space(spacing::SPACING_XL);
 
                 ui.horizontal(|ui| {
                     let generate_response = ui.add(
-                        egui::Button::new(egui::RichText::new("GENERATE").color(
-                            if self.state.current_view == AppView::Generate {
-                                theme.brand
-                            } else {
-                                theme.text_disabled
-                            },
-                        ))
+                        egui::Button::new(
+                            egui::RichText::new(format!("{} GENERATE", ONIGIRI)).color(
+                                if self.state.current_view == AppView::Generate {
+                                    theme.brand
+                                } else {
+                                    theme.text_disabled
+                                },
+                            ),
+                        )
                         .frame(false)
                         .corner_radius(egui::CornerRadius::same(4)),
                     );
@@ -89,10 +95,10 @@ impl LaReviewApp {
                         self.switch_to_generate();
                     }
 
-                    ui.add_space(spacing::SPACING_MD);
+                    ui.add_space(spacing::SPACING_LG);
 
                     let review_response = ui.add(
-                        egui::Button::new(egui::RichText::new("REVIEW").color(
+                        egui::Button::new(egui::RichText::new(format!("{} REVIEW", COFFEE)).color(
                             if self.state.current_view == AppView::Review {
                                 theme.brand
                             } else {
@@ -102,11 +108,16 @@ impl LaReviewApp {
                         .frame(false)
                         .corner_radius(egui::CornerRadius::same(4)),
                     );
+
+                    let review_response =
+                        review_response.on_hover_cursor(egui::CursorIcon::PointingHand);
+
                     if review_response.clicked() {
                         self.switch_to_review();
                     }
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.add_space(spacing::SPACING_MD);
                         let settings_response = ui.add(
                             egui::Button::new(egui::RichText::new("SETTINGS").color(
                                 if self.state.current_view == AppView::Settings {
@@ -118,13 +129,15 @@ impl LaReviewApp {
                             .frame(false)
                             .corner_radius(egui::CornerRadius::same(4)),
                         );
+                        let settings_response =
+                            settings_response.on_hover_cursor(egui::CursorIcon::PointingHand);
                         if settings_response.clicked() {
                             self.switch_to_settings();
                         }
                     });
                 });
             });
-            ui.add_space(spacing::SPACING_LG);
+            ui.add_space(spacing::SPACING_SM);
         });
     }
 }
