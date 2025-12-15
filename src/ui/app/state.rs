@@ -170,6 +170,15 @@ impl AppState {
                     content: TimelineContent::Update(Box::new(update.clone())),
                 });
             }
+
+            ProgressEvent::Finalized => {
+                self.is_generating = false;
+                self.agent_timeline.push(TimelineItem {
+                    seq,
+                    stream_key: None,
+                    content: TimelineContent::LocalLog("Review finalized.".into()),
+                });
+            }
         }
     }
 

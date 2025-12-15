@@ -258,10 +258,25 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
                 true,
             );
         }
-    }
 
-    let _result = prompt_result.with_context(|| "ACP prompt failed")?;
-    push_log(&logs, "prompt ok", debug);
+        // If finalization was already received, the agent successfully completed its work
+        // even if the prompt() call itself failed (e.g., due to early termination).
+        // We only fail on prompt errors if finalization was NOT received.
+        if !*finalization_received_capture.lock().unwrap() {
+            return Err(anyhow::anyhow!(
+                "ACP prompt failed: {:?}",
+                prompt_result.unwrap_err()
+            ));
+        }
+
+        push_log(
+            &logs,
+            "prompt error ignored because finalization was received",
+            debug,
+        );
+    } else {
+        push_log(&logs, "prompt ok", debug);
+    }
 
     // Wait for the agent to finish naturally. If finalization is received, we allow a short
     // grace period and then terminate to avoid hanging the UI on agents that don't exit.
@@ -270,19 +285,30 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
         let finalization_received = *finalization_received_capture.lock().unwrap();
 
         if finalization_received {
-            let wait_res = tokio::time::timeout(Duration::from_secs(2), child.wait()).await;
-            break match wait_res {
-                Ok(res) => res?,
-                Err(_) => {
+            push_log(
+                &logs,
+                "finalization received; terminating agent immediately",
+                debug,
+            );
+
+            // Immediately kill the process. We don't wait for graceful exit because
+            // the agent has explicitly signaled it is done.
+            let _ = child.start_kill();
+            match child.wait().await {
+                Ok(res) => break res,
+                Err(e) => {
                     push_log(
                         &logs,
-                        "finalization received but agent still running; sending kill",
+                        format!("failed to wait on child after kill: {}", e),
                         debug,
                     );
-                    let _ = child.start_kill();
-                    child.wait().await?
+                    // If we can't wait, we assume it's gone or broken, but we need a status.
+                    // We'll construct a synthetic success status if possible, or just break.
+                    // Since `ExitStatus` isn't easily constructible, we'll try to rely on previous wait or just panic/error?
+                    // Actually, if wait fails, we can propagate the error.
+                    break child.wait().await?;
                 }
-            };
+            }
         }
 
         tokio::select! {

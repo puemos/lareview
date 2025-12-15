@@ -90,9 +90,13 @@ impl LaReviewClient {
 
     /// Mark finalization as received.
     fn mark_finalization_received(&self) {
-        if let Ok(mut guard) = self.finalization_received.lock() {
-            *guard = true;
-        }
+        if let Ok(mut guard) = self.finalization_received.lock()
+            && !*guard {
+                *guard = true;
+                if let Some(tx) = &self.progress {
+                    let _ = tx.send(ProgressEvent::Finalized);
+                }
+            }
     }
 
     fn is_safe_read_request(&self, raw_input: &Option<serde_json::Value>) -> bool {
@@ -332,6 +336,22 @@ impl agent_client_protocol::Client for LaReviewClient {
                     {
                         self.mark_finalization_received();
                     }
+                }
+            }
+            SessionUpdate::ToolCallUpdate(update) => {
+                // Check if this is a finalize_review tool completing
+                let tool_id: &str = &update.tool_call_id.0;
+                let is_finalize = tool_id.contains("finalize_review");
+                let is_completed = matches!(
+                    update.fields.status,
+                    Some(agent_client_protocol::ToolCallStatus::Completed)
+                );
+
+                if is_finalize && is_completed {
+                    if std::env::var("ACP_DEBUG").is_ok() {
+                        eprintln!("[acp] finalize_review completed via ToolCallUpdate");
+                    }
+                    self.mark_finalization_received();
                 }
             }
             _ => {}

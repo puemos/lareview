@@ -40,4 +40,6 @@ pub enum ProgressEvent {
     Update(Box<SessionUpdate>),
     /// Local log output from the ACP worker/process.
     LocalLog(String),
+    /// Signal that the agent has finished its work (received finalize_review).
+    Finalized,
 }

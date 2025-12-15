@@ -1,5 +1,5 @@
 use crate::ui::app::{Action, GenerateAction, LaReviewApp, SelectedAgent};
-use crate::ui::components::action_button::action_button;
+
 use crate::ui::components::selection_chips::selection_chips;
 use crate::ui::components::status::error_banner;
 use crate::ui::spacing;
@@ -14,7 +14,7 @@ impl LaReviewApp {
         // New: Trigger for auto-fetching PRs
         let mut trigger_fetch_pr: Option<String> = None;
 
-        let action_text = if self.state.is_generating {
+        let _action_text = if self.state.is_generating {
             format!("{} Generating...", egui_phosphor::regular::HOURGLASS_HIGH)
         } else {
             format!("{} Run", egui_phosphor::regular::PLAY)
@@ -265,10 +265,143 @@ impl LaReviewApp {
                     ui.heading(egui::RichText::new("AGENT").size(16.0).color(MOCHA.text));
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if action_button(ui, action_text.as_str(), run_enabled, theme.brand)
-                            .clicked()
-                        {
+                        // Custom "Run" Button with Sci-Fi/Tron Effect
+                        let button_size = egui::vec2(120.0, 28.0);
+                        let (rect, response) =
+                            ui.allocate_exact_size(button_size, egui::Sense::click());
+
+                        if response.clicked() && run_enabled {
                             trigger_generate = true;
+                        }
+
+                        // Animation State
+                        if self.state.is_generating {
+                            ui.ctx().request_repaint(); // Continuous animation
+                        }
+
+                        let t = ui.input(|i| i.time);
+
+                        if ui.is_rect_visible(rect) {
+                            let painter = ui.painter();
+                            let style = ui.style();
+                            // visuals variable removed as unused
+
+                            let mut fill_color = if self.state.is_generating {
+                                // Deep "Void" background for Tron mode
+                                MOCHA.crust
+                            } else if run_enabled {
+                                theme.brand
+                            } else {
+                                theme.bg_card
+                            };
+
+                            if response.hovered() && run_enabled {
+                                // Manual lighten (blend with white)
+                                let c = fill_color;
+                                fill_color = egui::Color32::from_rgb(
+                                    c.r().saturating_add(20),
+                                    c.g().saturating_add(20),
+                                    c.b().saturating_add(20),
+                                );
+                            }
+
+                            // Base Button Shape
+                            painter.rect(
+                                rect,
+                                style.visuals.widgets.noninteractive.corner_radius,
+                                fill_color,
+                                egui::Stroke::NONE,
+                                egui::StrokeKind::Middle,
+                            );
+
+                            let border_color = if self.state.is_generating {
+                                MOCHA.surface2
+                            } else {
+                                theme.border
+                            };
+
+                            painter.rect_stroke(
+                                rect,
+                                style.visuals.widgets.noninteractive.corner_radius,
+                                egui::Stroke::new(1.0, border_color),
+                                egui::StrokeKind::Middle,
+                            );
+
+                            // Tron/Sci-Fi Animation (Simplified)
+                            if self.state.is_generating {
+                                let scanner_color = MOCHA.sky;
+
+                                // Pulsing Border Only
+                                let pulse = (t * 2.0).sin() * 0.5 + 0.5; // 0.0 to 1.0
+                                let border_alpha = (pulse * 200.0) as u8; // 0-200 alpha
+
+                                painter.rect_stroke(
+                                    rect,
+                                    style.visuals.widgets.noninteractive.corner_radius,
+                                    egui::Stroke::new(
+                                        1.5,
+                                        egui::Color32::from_rgba_unmultiplied(
+                                            scanner_color.r(),
+                                            scanner_color.g(),
+                                            scanner_color.b(),
+                                            border_alpha,
+                                        ),
+                                    ),
+                                    egui::StrokeKind::Middle,
+                                );
+                            }
+
+                            // Text & Icon
+                            let text_color = if self.state.is_generating {
+                                // Pulsing Text
+                                let text_pulse = (t * 3.0).sin() * 0.3 + 0.7;
+                                let alpha = (text_pulse * 255.0) as u8;
+                                egui::Color32::from_rgba_unmultiplied(
+                                    MOCHA.text.r(),
+                                    MOCHA.text.g(),
+                                    MOCHA.text.b(),
+                                    alpha,
+                                )
+                            } else if run_enabled {
+                                theme.text_inverse
+                            } else {
+                                theme.text_disabled
+                            };
+
+                            let display_text = if self.state.is_generating {
+                                "GENERATING..."
+                            } else {
+                                "RUN AGENT"
+                            };
+
+                            let icon = if self.state.is_generating {
+                                None
+                            } else {
+                                Some(egui_phosphor::regular::PLAY)
+                            };
+
+                            // Centered Layout
+                            let font_id = egui::FontId::proportional(14.0);
+                            let galley = ui.painter().layout_no_wrap(
+                                format!(
+                                    "{}{}",
+                                    if let Some(ic) = icon {
+                                        format!("{} ", ic)
+                                    } else {
+                                        "".to_string()
+                                    },
+                                    display_text
+                                ),
+                                font_id,
+                                text_color,
+                            );
+
+                            let text_pos = rect.center() - galley.size() / 2.0;
+                            ui.painter().galley(
+                                text_pos,
+                                galley,
+                                egui::Color32::BLACK, /* unused background */
+                            );
                         }
                     });
                 });

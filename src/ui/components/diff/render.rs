@@ -260,9 +260,36 @@ fn render_file_header(
                     clicked_local = true;
                 }
 
-                // 2. Fill remainder with Right-to-Left layout
+                // 2. Fill remainder (Path Left, Stats Right)
+
+                // Calculate reserved space for stats
+                let mut stats_reserved_width = 0.0;
+                if file.additions > 0 {
+                    stats_reserved_width += 60.0;
+                }
+                if file.deletions > 0 {
+                    stats_reserved_width += 60.0;
+                }
+
+                // Draw Path (Left Aligned)
+                let available_width = ui.available_width();
+                let path_area_width = (available_width - stats_reserved_width).max(50.0);
+
+                let char_capacity = (path_area_width / 7.0) as usize;
+                let max_len = char_capacity.saturating_sub(3).max(15);
+
+                let truncated_path = middle_truncate(display_path, max_len);
+
+                ui.label(
+                    egui::RichText::new(truncated_path)
+                        .strong()
+                        .color(theme.text_primary)
+                        .size(HEADER_FONT_SIZE),
+                )
+                .on_hover_text(display_path);
+
+                // Draw Stats (Right Aligned)
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    // A. Draw Stats (Rightmost first)
                     if file.additions > 0 {
                         ui.label(
                             egui::RichText::new(format!("+{}", file.additions))
@@ -277,22 +304,6 @@ fn render_file_header(
                                 .size(DIFF_FONT_SIZE),
                         );
                     }
-
-                    // B. Draw Path (Middle)
-                    let available_width = ui.available_width();
-                    let text_area_width = available_width.max(50.0);
-                    let char_capacity = (text_area_width / 7.0) as usize;
-                    let max_len = char_capacity.saturating_sub(3).max(15);
-
-                    let truncated_path = middle_truncate(display_path, max_len);
-
-                    ui.label(
-                        egui::RichText::new(truncated_path)
-                            .strong()
-                            .color(theme.text_primary)
-                            .size(HEADER_FONT_SIZE),
-                    )
-                    .on_hover_text(display_path);
                 });
 
                 clicked_local

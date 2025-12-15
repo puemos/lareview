@@ -183,6 +183,13 @@ pub(crate) fn parse_task(args: Value) -> Result<ReviewTask> {
         count_line_changes_legacy(&task.diffs)
     };
 
+    let diagram = task.diagram.and_then(clean_d2_code);
+
+    // Validate D2 if present
+    if let Some(ref d) = diagram {
+        crate::infra::d2::validate_d2(d).map_err(|e| anyhow::anyhow!(e))?;
+    }
+
     Ok(ReviewTask {
         id: task.id,
         run_id: String::new(), // set in persistence
@@ -197,9 +204,76 @@ pub(crate) fn parse_task(args: Value) -> Result<ReviewTask> {
         },
         diff_refs: task.diff_refs,
         insight: None,
-        diagram: task.diagram,
+        diagram,
         ai_generated: true,
         status: TaskStatus::Pending,
         sub_flow: task.sub_flow,
     })
+}
+
+fn clean_d2_code(code: String) -> Option<String> {
+    let trimmed = code.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    // Strip wrapping markdown code blocks if present
+    // e.g. ```d2 ... ``` or ``` ... ```
+    let lines: Vec<&str> = trimmed.lines().collect();
+    if lines.is_empty() {
+        return None;
+    }
+
+    let has_start_fence = lines.first().is_some_and(|l| l.trim().starts_with("```"));
+    let has_end_fence = lines.last().is_some_and(|l| l.trim().starts_with("```"));
+
+    let content = if has_start_fence && has_end_fence && lines.len() >= 2 {
+        // Remove first and last lines
+        lines[1..lines.len() - 1].join("\n")
+    } else {
+        trimmed.to_string()
+    };
+
+    let cleaned = content.trim();
+    if cleaned.is_empty() {
+        None
+    } else {
+        Some(cleaned.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_clean_d2_code() {
+        // Case 1: Clean code stays clean
+        let clean = "x -> y";
+        assert_eq!(clean_d2_code(clean.to_string()), Some(clean.to_string()));
+
+        // Case 2: Markdown block with language
+        let md_lang = "```d2\nx -> y\n```";
+        assert_eq!(
+            clean_d2_code(md_lang.to_string()),
+            Some("x -> y".to_string())
+        );
+
+        // Case 3: Markdown block without language
+        let md_plain = "```\nx -> y\n```";
+        assert_eq!(
+            clean_d2_code(md_plain.to_string()),
+            Some("x -> y".to_string())
+        );
+
+        // Case 4: Empty block
+        let empty = "```d2\n```";
+        assert_eq!(clean_d2_code(empty.to_string()), None);
+
+        // Case 5: Empty string
+        assert_eq!(clean_d2_code("".to_string()), None);
+
+        // Case 6: Whitespace only
+        assert_eq!(clean_d2_code("   ".to_string()), None);
+    }
 }

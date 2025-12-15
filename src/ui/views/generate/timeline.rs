@@ -261,6 +261,8 @@ fn render_kv_json(ui: &mut egui::Ui, label: &str, value: &serde_json::Value) {
         egui::Grid::new(ui.id().with(label))
             .num_columns(2)
             .striped(true)
+            .min_col_width(60.0)
+            .max_col_width(ui.available_width() - 80.0) // Leave room for key column
             .show(ui, |ui| {
                 for (k, v) in map {
                     ui.label(
@@ -275,18 +277,21 @@ fn render_kv_json(ui: &mut egui::Ui, label: &str, value: &serde_json::Value) {
                     } else {
                         v.to_string()
                     };
-                    // Truncate long values
-                    let shown_v = if v_str.len() > 100 {
-                        format!("{}...", &v_str[..100])
+                    // Truncate very long values but allow reasonable wrapping
+                    let shown_v = if v_str.len() > 500 {
+                        format!("{}...", &v_str[..500])
                     } else {
                         v_str
                     };
 
-                    ui.label(
-                        egui::RichText::new(shown_v)
-                            .monospace()
-                            .size(11.0)
-                            .color(MOCHA.subtext0),
+                    ui.add(
+                        egui::Label::new(
+                            egui::RichText::new(shown_v)
+                                .monospace()
+                                .size(11.0)
+                                .color(MOCHA.subtext0),
+                        )
+                        .wrap(),
                     );
                     ui.end_row();
                 }

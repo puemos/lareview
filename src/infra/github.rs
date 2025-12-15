@@ -100,10 +100,10 @@ pub async fn fetch_pr_metadata(pr: &GitHubPrRef) -> Result<GitHubPrMetadata> {
 
 pub async fn fetch_pr_diff(pr: &GitHubPrRef) -> Result<String> {
     let output = Command::new("gh")
-        .args(["pr", "diff", pr.url.as_str(), "--patch"])
+        .args(["pr", "diff", pr.url.as_str()])
         .output()
         .await
-        .context("run `gh pr diff --patch`")?;
+        .context("run `gh pr diff`")?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
