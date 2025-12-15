@@ -1,9 +1,24 @@
 use super::*;
 use pmcp::ToolHandler;
+use std::sync::Mutex;
 use tokio_util::sync::CancellationToken;
+
+// Mutex to ensure database tests run sequentially since they share global state via environment variables
+static DB_TEST_MUTEX: Mutex<()> = Mutex::new(());
 
 #[tokio::test]
 async fn test_return_task_tool_writes_file() {
+    let _guard = DB_TEST_MUTEX.lock().unwrap();
+    let tmp_dir = tempfile::tempdir().expect("tempdir");
+    let db_path = tmp_dir.path().join("db.sqlite");
+
+    // Set the database path so Database::open() uses our temp path
+    // Save original value to restore later
+    let original_db_path = std::env::var("LAREVIEW_DB_PATH").ok();
+    unsafe {
+        std::env::set_var("LAREVIEW_DB_PATH", db_path.to_string_lossy().to_string());
+    }
+
     let tmp = tempfile::NamedTempFile::new().expect("tmp file");
     let out_path = tmp.path().to_path_buf();
     let run_context_path = tempfile::NamedTempFile::new().expect("temp file");
@@ -63,15 +78,29 @@ async fn test_return_task_tool_writes_file() {
     assert_eq!(lines.len(), 1); // One task written as JSONL
     let task: serde_json::Value = serde_json::from_str(lines[0]).expect("parse written task");
     assert_eq!(task.get("id").and_then(|v| v.as_str()), Some("x"));
+
+    // Restore original env var
+    if let Some(original) = original_db_path {
+        unsafe {
+            std::env::set_var("LAREVIEW_DB_PATH", original);
+        }
+    } else {
+        unsafe {
+            std::env::remove_var("LAREVIEW_DB_PATH");
+        }
+    }
 }
 
 #[tokio::test]
 async fn test_return_task_tool_persists_to_db() {
+    let _guard = DB_TEST_MUTEX.lock().unwrap();
     let tmp_dir = tempfile::tempdir().expect("tempdir");
     let db_path = tmp_dir.path().join("db.sqlite");
     let run_context_path = tmp_dir.path().join("run.json");
 
     // Set the database path so Database::open() uses our temp path
+    // Save original value to restore later
+    let original_db_path = std::env::var("LAREVIEW_DB_PATH").ok();
     unsafe {
         std::env::set_var("LAREVIEW_DB_PATH", db_path.to_string_lossy().to_string());
     }
@@ -135,10 +164,32 @@ async fn test_return_task_tool_persists_to_db() {
     assert_eq!(tasks[0].id, "task-123");
     assert_eq!(tasks[0].title, "DB Task");
     assert_eq!(tasks[0].status, crate::domain::TaskStatus::Pending);
+
+    // Restore original env var
+    if let Some(original) = original_db_path {
+        unsafe {
+            std::env::set_var("LAREVIEW_DB_PATH", original);
+        }
+    } else {
+        unsafe {
+            std::env::remove_var("LAREVIEW_DB_PATH");
+        }
+    }
 }
 
 #[tokio::test]
 async fn test_finalize_review_tool_updates_metadata() {
+    let _guard = DB_TEST_MUTEX.lock().unwrap();
+    let tmp_dir = tempfile::tempdir().expect("tempdir");
+    let db_path = tmp_dir.path().join("db.sqlite");
+
+    // Set the database path so Database::open() uses our temp path
+    // Save original value to restore later
+    let original_db_path = std::env::var("LAREVIEW_DB_PATH").ok();
+    unsafe {
+        std::env::set_var("LAREVIEW_DB_PATH", db_path.to_string_lossy().to_string());
+    }
+
     let tmp = tempfile::NamedTempFile::new().expect("tmp file");
     let out_path = tmp.path().to_path_buf();
 
@@ -164,15 +215,29 @@ async fn test_finalize_review_tool_updates_metadata() {
         res,
         serde_json::json!({ "status": "ok", "message": "Review finalized successfully" })
     );
+
+    // Restore original env var
+    if let Some(original) = original_db_path {
+        unsafe {
+            std::env::set_var("LAREVIEW_DB_PATH", original);
+        }
+    } else {
+        unsafe {
+            std::env::remove_var("LAREVIEW_DB_PATH");
+        }
+    }
 }
 
 #[tokio::test]
 async fn test_multiple_tasks_and_finalize_persists_correctly() {
+    let _guard = DB_TEST_MUTEX.lock().unwrap();
     let tmp_dir = tempfile::tempdir().expect("tempdir");
     let db_path = tmp_dir.path().join("db.sqlite");
     let run_context_path = tmp_dir.path().join("run.json");
 
     // Set the database path so Database::open() uses our temp path
+    // Save original value to restore later
+    let original_db_path = std::env::var("LAREVIEW_DB_PATH").ok();
     unsafe {
         std::env::set_var("LAREVIEW_DB_PATH", db_path.to_string_lossy().to_string());
     }
@@ -281,4 +346,15 @@ async fn test_multiple_tasks_and_finalize_persists_correctly() {
     assert_eq!(tasks_after_finalize.len(), 2);
     assert_eq!(tasks[0].title, "First Task");
     assert_eq!(tasks[1].title, "Second Task");
+
+    // Restore original env var
+    if let Some(original) = original_db_path {
+        unsafe {
+            std::env::set_var("LAREVIEW_DB_PATH", original);
+        }
+    } else {
+        unsafe {
+            std::env::remove_var("LAREVIEW_DB_PATH");
+        }
+    }
 }
