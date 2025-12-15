@@ -7,7 +7,9 @@ use tokio_util::sync::CancellationToken;
 static DB_TEST_MUTEX: Mutex<()> = Mutex::new(());
 
 #[tokio::test]
+#[allow(clippy::await_holding_lock)]
 async fn test_return_task_tool_writes_file() {
+    // Acquire lock for the duration of the test
     let _guard = DB_TEST_MUTEX.lock().unwrap();
     let tmp_dir = tempfile::tempdir().expect("tempdir");
     let db_path = tmp_dir.path().join("db.sqlite");
@@ -92,7 +94,9 @@ async fn test_return_task_tool_writes_file() {
 }
 
 #[tokio::test]
+#[allow(clippy::await_holding_lock)]
 async fn test_return_task_tool_persists_to_db() {
+    // Acquire lock for the duration of the test
     let _guard = DB_TEST_MUTEX.lock().unwrap();
     let tmp_dir = tempfile::tempdir().expect("tempdir");
     let db_path = tmp_dir.path().join("db.sqlite");
@@ -178,7 +182,9 @@ async fn test_return_task_tool_persists_to_db() {
 }
 
 #[tokio::test]
+#[allow(clippy::await_holding_lock)]
 async fn test_finalize_review_tool_updates_metadata() {
+    // Acquire lock for the duration of the test
     let _guard = DB_TEST_MUTEX.lock().unwrap();
     let tmp_dir = tempfile::tempdir().expect("tempdir");
     let db_path = tmp_dir.path().join("db.sqlite");
@@ -229,7 +235,9 @@ async fn test_finalize_review_tool_updates_metadata() {
 }
 
 #[tokio::test]
+#[allow(clippy::await_holding_lock)]
 async fn test_multiple_tasks_and_finalize_persists_correctly() {
+    // Acquire lock for the duration of the test
     let _guard = DB_TEST_MUTEX.lock().unwrap();
     let tmp_dir = tempfile::tempdir().expect("tempdir");
     let db_path = tmp_dir.path().join("db.sqlite");
