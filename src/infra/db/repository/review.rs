@@ -17,8 +17,9 @@ impl ReviewRepository {
         let source_json = serde_json::to_string(&review.source)?;
         conn.execute(
             r#"
-            INSERT OR REPLACE INTO reviews (id, title, summary, source_json, active_run_id, created_at, updated_at)
+            INSERT INTO reviews (id, title, summary, source_json, active_run_id, created_at, updated_at)
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            ON CONFLICT(id) DO NOTHING
             "#,
             (
                 &review.id,

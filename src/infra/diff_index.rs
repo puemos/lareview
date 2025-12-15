@@ -101,8 +101,6 @@ struct IndexedHunk {
     hunk: Hunk,
     /// The coordinates of the hunk (old_start, new_start)
     coords: (u32, u32),
-    /// A string identifier for the hunk based on its position and content
-    hunk_id: String,
 }
 
 /// An index for a single file within a larger diff.
@@ -110,8 +108,6 @@ struct IndexedHunk {
 struct FileIndex {
     /// A map from (old_start, new_start) to the indexed hunk.
     hunks: HashMap<(u32, u32), IndexedHunk>,
-    /// A map from hunk ID to the indexed hunk.
-    hunks_by_id: HashMap<String, IndexedHunk>,
     /// A list of all available hunks in order.
     all_hunks: Vec<IndexedHunk>,
 }
@@ -123,10 +119,6 @@ pub struct DiffIndex {
 }
 
 impl DiffIndex {
-    /// Returns all file paths in the diff index
-    pub fn get_all_file_paths(&self) -> Vec<&String> {
-        self.files.keys().collect()
-    }
     /// Creates a new `DiffIndex` from a unified diff string.
     pub fn new(diff_text: &str) -> Result<Self> {
         let trimmed = diff_text.trim();
@@ -163,7 +155,6 @@ impl DiffIndex {
                 let indexed_hunk = IndexedHunk {
                     hunk: hunk.clone(),
                     coords,
-                    hunk_id: hunk_id.clone(),
                 };
 
                 hunks.insert(coords, indexed_hunk.clone());
@@ -171,14 +162,7 @@ impl DiffIndex {
                 all_hunks.push(indexed_hunk);
             }
 
-            files.insert(
-                file_path.to_string(),
-                FileIndex {
-                    hunks,
-                    hunks_by_id,
-                    all_hunks,
-                },
-            );
+            files.insert(file_path.to_string(), FileIndex { hunks, all_hunks });
         }
 
         Ok(Self { files })
@@ -278,127 +262,44 @@ impl DiffIndex {
             ordered_files.push(diff_ref.file.clone());
             result.push_str(&header);
 
-            for hunk_ref in &diff_ref.hunks {
-                let indexed_hunk = file_index
-                    .hunks
-                    .get(&(hunk_ref.old_start, hunk_ref.new_start))
-                    .ok_or_else(|| {
-                        // Find the nearest hunk for better error reporting
-                        let nearest = find_nearest_hunk(
-                            &file_index.all_hunks,
-                            (hunk_ref.old_start, hunk_ref.new_start),
-                        );
-                        DiffIndexError::NearestHunk {
-                            file: diff_ref.file.clone(),
-                            old_start: hunk_ref.old_start,
-                            new_start: hunk_ref.new_start,
-                            nearest,
-                        }
-                    })?;
-                result.push_str(&indexed_hunk.hunk.to_string());
+            let hunks_to_render = if diff_ref.hunks.is_empty() {
+                // If hunks are empty, render all available hunks for the file
+                file_index
+                    .all_hunks
+                    .iter()
+                    .map(|indexed_hunk| &indexed_hunk.hunk)
+                    .collect()
+            } else {
+                // Otherwise, render only the specified hunks
+                let mut hunks = Vec::new();
+                for hunk_ref in &diff_ref.hunks {
+                    let indexed_hunk = file_index
+                        .hunks
+                        .get(&(hunk_ref.old_start, hunk_ref.new_start))
+                        .ok_or_else(|| {
+                            // Find the nearest hunk for better error reporting
+                            let nearest = find_nearest_hunk(
+                                &file_index.all_hunks,
+                                (hunk_ref.old_start, hunk_ref.new_start),
+                            );
+                            DiffIndexError::NearestHunk {
+                                file: diff_ref.file.clone(),
+                                old_start: hunk_ref.old_start,
+                                new_start: hunk_ref.new_start,
+                                nearest,
+                            }
+                        })?;
+                    hunks.push(&indexed_hunk.hunk);
+                }
+                hunks
+            };
+
+            for hunk in hunks_to_render {
+                result.push_str(&hunk.to_string());
             }
         }
 
         Ok((result, ordered_files))
-    }
-
-    /// Returns all hunks available in the specified file.
-    pub fn available_hunks(&self, file_path: &str) -> Vec<HunkRef> {
-        if let Some(file_index) = self.files.get(file_path) {
-            file_index
-                .all_hunks
-                .iter()
-                .map(|indexed_hunk| HunkRef {
-                    old_start: indexed_hunk.coords.0,
-                    old_lines: indexed_hunk.hunk.source_length as u32,
-                    new_start: indexed_hunk.coords.1,
-                    new_lines: indexed_hunk.hunk.target_length as u32,
-                })
-                .collect()
-        } else {
-            Vec::new()
-        }
-    }
-
-    /// Returns hunk IDs and coordinates for the diff manifest tool
-    pub fn get_file_hunk_entries(&self, file_path: &str) -> Vec<(String, HunkRef)> {
-        if let Some(file_index) = self.files.get(file_path) {
-            file_index
-                .all_hunks
-                .iter()
-                .map(|indexed_hunk| {
-                    let hunk_ref = HunkRef {
-                        old_start: indexed_hunk.coords.0,
-                        old_lines: indexed_hunk.hunk.source_length as u32,
-                        new_start: indexed_hunk.coords.1,
-                        new_lines: indexed_hunk.hunk.target_length as u32,
-                    };
-                    (indexed_hunk.hunk_id.clone(), hunk_ref)
-                })
-                .collect()
-        } else {
-            Vec::new()
-        }
-    }
-
-    /// Resolves a hunk ID to its HunkRef coordinates.
-    pub fn resolve_hunk_id(
-        &self,
-        file_path: &str,
-        hunk_id: &str,
-    ) -> Result<HunkRef, DiffIndexError> {
-        // The hunk ID is in format "file_path#Hn" where n is the hunk number (1-indexed)
-        // We need to extract the number and find the n-th hunk in the file
-        if let Some(index_str) = hunk_id.strip_prefix(&format!(
-            "{}#H",
-            file_path.replace("/", "_").replace("-", "_")
-        )) && let Ok(index) = index_str.parse::<usize>()
-            && index > 0
-        {
-            // Get the file index
-            let file_index =
-                self.files
-                    .get(file_path)
-                    .ok_or_else(|| DiffIndexError::FileNotFound {
-                        file: file_path.to_string(),
-                    })?;
-
-            // Get the hunk at the specified index (1-indexed)
-            if index <= file_index.all_hunks.len() {
-                let indexed_hunk = &file_index.all_hunks[index - 1]; // Convert to 0-indexed
-                return Ok(HunkRef {
-                    old_start: indexed_hunk.coords.0,
-                    old_lines: indexed_hunk.hunk.source_length as u32,
-                    new_start: indexed_hunk.coords.1,
-                    new_lines: indexed_hunk.hunk.target_length as u32,
-                });
-            }
-        }
-
-        // If the ID doesn't match the expected format or the hunk doesn't exist,
-        // try direct lookup in the hunk map (for backward compatibility)
-        let file_index = self
-            .files
-            .get(file_path)
-            .ok_or_else(|| DiffIndexError::FileNotFound {
-                file: file_path.to_string(),
-            })?;
-
-        let indexed_hunk =
-            file_index
-                .hunks_by_id
-                .get(hunk_id)
-                .ok_or_else(|| DiffIndexError::InvalidHunkId {
-                    file: file_path.to_string(),
-                    hunk_id: hunk_id.to_string(),
-                })?;
-
-        Ok(HunkRef {
-            old_start: indexed_hunk.coords.0,
-            old_lines: indexed_hunk.hunk.source_length as u32,
-            new_start: indexed_hunk.coords.1,
-            new_lines: indexed_hunk.hunk.target_length as u32,
-        })
     }
 }
 

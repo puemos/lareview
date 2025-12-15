@@ -2,8 +2,32 @@ use crate::ui::app::{TimelineContent, TimelineItem};
 use crate::ui::spacing;
 use catppuccin_egui::MOCHA;
 use eframe::egui;
+use eframe::egui::collapsing_header::CollapsingState;
 
 use agent_client_protocol::{ContentBlock, SessionUpdate, ToolCallStatus};
+
+fn truncate_end(s: &str, max_chars: usize) -> String {
+    if s.chars().count() <= max_chars {
+        return s.to_owned();
+    }
+    let mut out = String::new();
+    for (i, ch) in s.chars().enumerate() {
+        if i + 1 >= max_chars {
+            break;
+        }
+        out.push(ch);
+    }
+    out.push('…');
+    out
+}
+
+fn strip_json_suffix(s: &str) -> &str {
+    if let Some(i) = s.find(": {") {
+        s[..i].trim()
+    } else {
+        s.trim()
+    }
+}
 
 pub(super) fn render_timeline_item(ui: &mut egui::Ui, item: &TimelineItem) {
     // FIX: Set a maximum width for this item to force wrapping logic to kick in.
@@ -49,28 +73,39 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
         }
         SessionUpdate::ToolCall(call) => {
             ui.group(|ui| {
-                ui.set_width(ui.available_width());
+                ui.set_max_width(ui.available_width());
+
                 let (status_color, status_label) = get_status_style(&call.status);
 
-                // Header text
-                let header_text = egui::RichText::new(format!("{} ({})", call.title, status_label))
+                // Build full string for hover, but show a short one
+                let full = format!("{} ({})", call.title, status_label);
+                let cleaned = strip_json_suffix(&full).to_owned();
+                let shown = truncate_end(&cleaned, 80);
+
+                let header_rt = egui::RichText::new(shown)
                     .color(status_color)
                     .strong()
                     .size(12.0);
 
-                egui::CollapsingHeader::new(header_text)
-                    .id_salt(("tool_call", call.tool_call_id.clone()))
-                    .default_open(matches!(
-                        call.status,
-                        ToolCallStatus::Pending | ToolCallStatus::InProgress
-                    ))
-                    .show(ui, |ui| {
+                let id = ui.make_persistent_id(("tool_call", &call.tool_call_id));
+
+                // collapsed by default
+                let default_open = false;
+
+                CollapsingState::load_with_default_open(ui.ctx(), id, default_open)
+                    .show_header(ui, |ui| {
+                        // Force left aligned layout so it does not center in wide headers
+                        ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                            ui.add(egui::Label::new(header_rt).wrap());
+                        });
+                    })
+                    .body(|ui| {
+                        // your body stays the same
                         ui.spacing_mut().item_spacing = egui::vec2(
                             spacing::TIGHT_ITEM_SPACING.0,
                             spacing::TIGHT_ITEM_SPACING.1,
                         );
 
-                        // Kind Label
                         if let Some(kind) =
                             (!matches!(call.kind, agent_client_protocol::ToolKind::Other))
                                 .then_some(call.kind)

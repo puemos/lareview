@@ -164,3 +164,116 @@ async fn test_finalize_review_tool_updates_metadata() {
         serde_json::json!({ "status": "ok", "message": "Review finalized successfully" })
     );
 }
+
+#[tokio::test]
+async fn test_multiple_tasks_and_finalize_persists_correctly() {
+    let tmp_dir = tempfile::tempdir().expect("tempdir");
+    let db_path = tmp_dir.path().join("db.sqlite");
+    let run_context_path = tmp_dir.path().join("run.json");
+
+    let run_context = serde_json::json!({
+        "review_id": "rev-multi",
+        "run_id": "run-multi",
+        "agent_id": "agent-1",
+        "input_ref": "diff",
+        "diff_text": "diff --git a/src/a.rs b/src/a.rs\n--- a/src/a.rs\n+++ b/src/a.rs\n@@ -1,1 +1,1 @@\n-old content\n+new content\n",
+        "diff_hash": "h",
+        "source": { "type": "diff_paste", "diff_hash": "h" },
+        "initial_title": "Test Review",
+        "created_at": "2024-01-01T00:00:00Z"
+    });
+    std::fs::write(&run_context_path, run_context.to_string()).expect("write run context");
+
+    let config = Arc::new(ServerConfig {
+        tasks_out: None,
+        log_file: None,
+        run_context: Some(run_context_path.clone()),
+        db_path: Some(db_path.clone()),
+    });
+
+    let return_task_tool = tool::create_return_task_tool(config.clone());
+
+    // --- Call 1 ---
+    let payload1 = serde_json::json!({
+        "id": "task-1",
+        "title": "First Task",
+        "description": "First task description",
+        "stats": { "risk": "LOW", "tags": ["one"] },
+        "diff_refs": []
+    });
+
+    let _ = return_task_tool
+        .handle(
+            payload1,
+            pmcp::RequestHandlerExtra::new("test".into(), CancellationToken::new()),
+        )
+        .await
+        .expect("tool call 1 ok");
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+    // --- Call 2 ---
+    let payload2 = serde_json::json!({
+        "id": "task-2",
+        "title": "Second Task",
+        "description": "Second task description",
+        "stats": { "risk": "MEDIUM", "tags": ["two"] },
+        "diff_refs": []
+    });
+
+    let _ = return_task_tool
+        .handle(
+            payload2,
+            pmcp::RequestHandlerExtra::new("test".into(), CancellationToken::new()),
+        )
+        .await
+        .expect("tool call 2 ok");
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    // --- Verify both tasks are saved ---
+    let db = crate::infra::db::Database::open_at(db_path.clone()).expect("open db");
+    let task_repo = crate::infra::db::TaskRepository::new(db.connection());
+    let tasks = task_repo
+        .find_by_run(&"run-multi".to_string())
+        .expect("tasks for run");
+    assert_eq!(tasks.len(), 2);
+    assert!(tasks.iter().any(|t| t.id == "task-1"));
+    assert!(tasks.iter().any(|t| t.id == "task-2"));
+
+    // --- Finalize the review ---
+    let finalize_tool = tool::create_finalize_review_tool(config.clone());
+    let finalize_payload = serde_json::json!({
+        "title": "Final Multi-Task Review",
+        "summary": "This review has two tasks."
+    });
+    let _ = finalize_tool
+        .handle(
+            finalize_payload,
+            pmcp::RequestHandlerExtra::new("test".into(), CancellationToken::new()),
+        )
+        .await
+        .expect("finalize tool call ok");
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    // --- Re-verify tasks and check review metadata ---
+    let review_repo = crate::infra::db::ReviewRepository::new(db.connection());
+    let review = review_repo
+        .find_by_id(&"rev-multi".to_string())
+        .expect("find review")
+        .expect("review should exist");
+
+    assert_eq!(review.title, "Final Multi-Task Review");
+    assert_eq!(
+        review.summary,
+        Some("This review has two tasks.".to_string())
+    );
+
+    let tasks_after_finalize = task_repo
+        .find_by_run(&"run-multi".to_string())
+        .expect("tasks for run after finalize");
+    assert_eq!(tasks_after_finalize.len(), 2);
+    assert_eq!(tasks[0].title, "First Task");
+    assert_eq!(tasks[1].title, "Second Task");
+}
