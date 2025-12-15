@@ -212,6 +212,16 @@ pub fn render_diff_editor_with_options(
     }
 }
 
+fn middle_truncate(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        return s.to_string();
+    }
+    let keep = (max_len - 3) / 2;
+    let start = &s[..keep];
+    let end = &s[s.len() - keep..];
+    format!("{}...{}", start, end)
+}
+
 fn render_file_header(
     ui: &mut egui::Ui,
     file_idx: usize,
@@ -227,51 +237,67 @@ fn render_file_header(
     let icon = if is_open { icon_open } else { icon_closed };
 
     let clicked = ui
-        .horizontal(|ui| {
-            let mut clicked_local = false;
+        .scope(|ui| {
+            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
+            ui.horizontal(|ui| {
+                let mut clicked_local = false;
 
-            let display_path = if file.new_path != "/dev/null" {
-                &file.new_path
-            } else {
-                &file.old_path
-            };
+                let display_path = if file.new_path != "/dev/null" {
+                    &file.new_path
+                } else {
+                    &file.old_path
+                };
 
-            if ui
-                .button(
-                    egui::RichText::new(icon.to_string())
-                        .size(DIFF_FONT_SIZE)
-                        .color(theme.text_primary),
-                )
-                .clicked()
-            {
-                clicked_local = true;
-            }
-
-            ui.label(
-                egui::RichText::new(display_path)
-                    .strong()
-                    .color(theme.text_primary)
-                    .size(HEADER_FONT_SIZE),
-            );
-
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if file.deletions > 0 {
-                    ui.label(
-                        egui::RichText::new(format!("-{}", file.deletions))
-                            .color(theme.destructive)
-                            .size(DIFF_FONT_SIZE),
-                    );
+                // 1. Draw Button (Left)
+                if ui
+                    .button(
+                        egui::RichText::new(icon.to_string())
+                            .size(DIFF_FONT_SIZE)
+                            .color(theme.text_primary),
+                    )
+                    .clicked()
+                {
+                    clicked_local = true;
                 }
-                if file.additions > 0 {
-                    ui.label(
-                        egui::RichText::new(format!("+{}", file.additions))
-                            .color(theme.success)
-                            .size(DIFF_FONT_SIZE),
-                    );
-                }
-            });
 
-            clicked_local
+                // 2. Fill remainder with Right-to-Left layout
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    // A. Draw Stats (Rightmost first)
+                    if file.additions > 0 {
+                        ui.label(
+                            egui::RichText::new(format!("+{}", file.additions))
+                                .color(theme.success)
+                                .size(DIFF_FONT_SIZE),
+                        );
+                    }
+                    if file.deletions > 0 {
+                        ui.label(
+                            egui::RichText::new(format!("-{}", file.deletions))
+                                .color(theme.destructive)
+                                .size(DIFF_FONT_SIZE),
+                        );
+                    }
+
+                    // B. Draw Path (Middle)
+                    let available_width = ui.available_width();
+                    let text_area_width = available_width.max(50.0);
+                    let char_capacity = (text_area_width / 7.0) as usize;
+                    let max_len = char_capacity.saturating_sub(3).max(15);
+
+                    let truncated_path = middle_truncate(display_path, max_len);
+
+                    ui.label(
+                        egui::RichText::new(truncated_path)
+                            .strong()
+                            .color(theme.text_primary)
+                            .size(HEADER_FONT_SIZE),
+                    )
+                    .on_hover_text(display_path);
+                });
+
+                clicked_local
+            })
+            .inner
         })
         .inner;
 

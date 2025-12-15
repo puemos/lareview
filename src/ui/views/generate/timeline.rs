@@ -1,36 +1,13 @@
 use crate::ui::app::{TimelineContent, TimelineItem};
-use crate::ui::spacing;
 use catppuccin_egui::MOCHA;
 use eframe::egui;
 use eframe::egui::collapsing_header::CollapsingState;
 
 use agent_client_protocol::{ContentBlock, SessionUpdate, ToolCallStatus};
 
-fn truncate_end(s: &str, max_chars: usize) -> String {
-    if s.chars().count() <= max_chars {
-        return s.to_owned();
-    }
-    let mut out = String::new();
-    for (i, ch) in s.chars().enumerate() {
-        if i + 1 >= max_chars {
-            break;
-        }
-        out.push(ch);
-    }
-    out.push('…');
-    out
-}
-
-fn strip_json_suffix(s: &str) -> &str {
-    if let Some(i) = s.find(": {") {
-        s[..i].trim()
-    } else {
-        s.trim()
-    }
-}
+// Unused helpers removed
 
 pub(super) fn render_timeline_item(ui: &mut egui::Ui, item: &TimelineItem) {
-    // FIX: Set a maximum width for this item to force wrapping logic to kick in.
     ui.set_max_width(ui.available_width());
 
     match &item.content {
@@ -40,9 +17,9 @@ pub(super) fn render_timeline_item(ui: &mut egui::Ui, item: &TimelineItem) {
                     egui::RichText::new(line)
                         .color(MOCHA.subtext0)
                         .monospace()
-                        .size(12.0),
+                        .size(11.0),
                 )
-                .wrap(), // Fixed: .wrap() takes no arguments now
+                .wrap(),
             );
         }
         TimelineContent::Update(update) => {
@@ -54,156 +31,192 @@ pub(super) fn render_timeline_item(ui: &mut egui::Ui, item: &TimelineItem) {
 fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
     let get_status_style = |status: &ToolCallStatus| -> (egui::Color32, &str) {
         match status {
-            ToolCallStatus::Pending => (MOCHA.overlay2, "pending"),
-            ToolCallStatus::InProgress => (MOCHA.yellow, "in progress"),
-            ToolCallStatus::Completed => (MOCHA.green, "completed"),
-            ToolCallStatus::Failed => (MOCHA.red, "failed"),
-            _ => (MOCHA.overlay2, "unknown"),
+            ToolCallStatus::Pending => (MOCHA.overlay2, "Pending"),
+            ToolCallStatus::InProgress => (MOCHA.yellow, "Running"),
+            ToolCallStatus::Completed => (MOCHA.green, "Done"),
+            ToolCallStatus::Failed => (MOCHA.red, "Failed"),
+            _ => (MOCHA.overlay2, "Unknown"),
         }
     };
 
     match update {
-        SessionUpdate::UserMessageChunk(chunk) | SessionUpdate::AgentMessageChunk(chunk) => {
+        SessionUpdate::UserMessageChunk(chunk) => {
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new("User")
+                        .color(MOCHA.mauve)
+                        .strong()
+                        .size(12.0),
+                );
+                render_content_chunk(ui, chunk, MOCHA.text, false);
+            });
+        }
+        SessionUpdate::AgentMessageChunk(chunk) => {
             render_content_chunk(ui, chunk, MOCHA.text, false);
         }
         SessionUpdate::AgentThoughtChunk(chunk) => {
-            ui.indent("thought_indent", |ui| {
-                render_content_chunk(ui, chunk, MOCHA.sky, true);
-            });
+            // New Design: No quotes, distinct color
+            render_content_chunk(ui, chunk, MOCHA.sky, false);
         }
         SessionUpdate::ToolCall(call) => {
-            ui.group(|ui| {
-                ui.set_max_width(ui.available_width());
+            ui.push_id((&call.tool_call_id, "tool_card"), |ui| {
+                egui::Frame::group(ui.style())
+                    .fill(MOCHA.mantle)
+                    .stroke(egui::Stroke::new(1.0, MOCHA.surface0))
+                    .inner_margin(8.0)
+                    .show(ui, |ui| {
+                        ui.set_max_width(ui.available_width());
 
-                let (status_color, status_label) = get_status_style(&call.status);
+                        let (status_color, status_label) = get_status_style(&call.status);
 
-                // Build full string for hover, but show a short one
-                let full = format!("{} ({})", call.title, status_label);
-                let cleaned = strip_json_suffix(&full).to_owned();
-                let shown = truncate_end(&cleaned, 80);
+                        let id = ui.make_persistent_id("collapsing");
+                        let default_open = call.status == ToolCallStatus::InProgress;
 
-                let header_rt = egui::RichText::new(shown)
-                    .color(status_color)
-                    .strong()
-                    .size(12.0);
+                        CollapsingState::load_with_default_open(ui.ctx(), id, default_open)
+                            .show_header(ui, |ui| {
+                                ui.horizontal(|ui| {
+                                    ui.label(
+                                        egui::RichText::new(egui_phosphor::regular::WRENCH)
+                                            .color(MOCHA.blue),
+                                    );
 
-                let id = ui.make_persistent_id(("tool_call", &call.tool_call_id));
+                                    let full_title = &call.title;
+                                    let display_title = if full_title.len() > 50 {
+                                        format!("{}...", &full_title[..47])
+                                    } else {
+                                        full_title.clone()
+                                    };
 
-                // collapsed by default
-                let default_open = false;
+                                    ui.label(
+                                        egui::RichText::new(display_title)
+                                            .strong()
+                                            .color(MOCHA.text),
+                                    )
+                                    .on_hover_text(full_title);
 
-                CollapsingState::load_with_default_open(ui.ctx(), id, default_open)
-                    .show_header(ui, |ui| {
-                        // Force left aligned layout so it does not center in wide headers
-                        ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                            ui.add(egui::Label::new(header_rt).wrap());
-                        });
-                    })
-                    .body(|ui| {
-                        // your body stays the same
-                        ui.spacing_mut().item_spacing = egui::vec2(
-                            spacing::TIGHT_ITEM_SPACING.0,
-                            spacing::TIGHT_ITEM_SPACING.1,
-                        );
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Center),
+                                        |ui| {
+                                            ui.label(
+                                                egui::RichText::new(status_label)
+                                                    .color(status_color)
+                                                    .size(11.0),
+                                            );
+                                        },
+                                    );
+                                });
+                            })
+                            .body(|ui| {
+                                ui.add_space(4.0);
 
-                        if let Some(kind) =
-                            (!matches!(call.kind, agent_client_protocol::ToolKind::Other))
-                                .then_some(call.kind)
-                        {
-                            ui.horizontal(|ui| {
-                                ui.label(
-                                    egui::RichText::new("kind:")
-                                        .size(11.0)
-                                        .color(MOCHA.overlay1),
-                                );
-                                ui.label(
-                                    egui::RichText::new(format!("{kind:?}"))
-                                        .size(11.0)
-                                        .color(MOCHA.subtext0),
-                                );
+                                // Show full title if it was truncated
+                                if call.title.len() > 50 {
+                                    ui.label(
+                                        egui::RichText::new("Command:")
+                                            .size(11.0)
+                                            .color(MOCHA.overlay1)
+                                            .strong(),
+                                    );
+                                    ui.add(
+                                        egui::Label::new(
+                                            egui::RichText::new(&call.title)
+                                                .monospace()
+                                                .size(11.0)
+                                                .color(MOCHA.text),
+                                        )
+                                        .wrap(),
+                                    );
+                                    ui.add_space(4.0);
+                                }
+
+                                if let Some(input) = &call.raw_input {
+                                    render_kv_json(ui, "Input", input);
+                                }
+                                if let Some(output) = &call.raw_output {
+                                    render_kv_json(ui, "Output", output);
+                                }
                             });
-                        }
-
-                        if let Some(input) = &call.raw_input {
-                            render_json_block(
-                                ui,
-                                ("tool_json", call.tool_call_id.clone(), "input"),
-                                "Input",
-                                input,
-                            );
-                        }
-                        if let Some(output) = &call.raw_output {
-                            render_json_block(
-                                ui,
-                                ("tool_json", call.tool_call_id.clone(), "output"),
-                                "Output",
-                                output,
-                            );
-                        }
                     });
             });
         }
         SessionUpdate::ToolCallUpdate(update) => {
+            // Compact status update
             let status = update.fields.status.unwrap_or(ToolCallStatus::Pending);
-            let (status_color, _) = get_status_style(&status);
-            let title = update.fields.title.as_deref().unwrap_or("tool update");
+            let (color, label) = get_status_style(&status);
+            let title = update.fields.title.as_deref().unwrap_or("Tool");
 
-            ui.horizontal_wrapped(|ui| {
+            ui.horizontal(|ui| {
+                let icon = match status {
+                    ToolCallStatus::Completed => egui_phosphor::regular::CHECK_CIRCLE,
+                    ToolCallStatus::Failed => egui_phosphor::regular::WARNING_CIRCLE,
+                    _ => egui_phosphor::regular::GEAR,
+                };
+                ui.label(egui::RichText::new(icon).color(color).size(12.0));
                 ui.label(
-                    egui::RichText::new("Update:")
+                    egui::RichText::new(format!("{} -> {}", title, label))
                         .color(MOCHA.subtext0)
                         .size(12.0),
-                );
-
-                ui.add(
-                    egui::Label::new(
-                        egui::RichText::new(format!("{title} -> {status:?}"))
-                            .color(status_color)
-                            .size(12.0),
-                    )
-                    .wrap(), // Fixed
                 );
             });
         }
         SessionUpdate::Plan(plan) => {
-            super::plan::render_plan_timeline_item(ui, plan);
+            // Collapsed by default
+            let id = ui.make_persistent_id(format!("plan_{}", plan.entries.len()));
+            egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, false)
+                .show_header(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            egui::RichText::new(egui_phosphor::regular::LIST_CHECKS)
+                                .color(MOCHA.mauve),
+                        );
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "Review Plan ({} steps)",
+                                plan.entries.len()
+                            ))
+                            .strong()
+                            .color(MOCHA.text),
+                        );
+                    });
+                })
+                .body(|ui| {
+                    super::plan::render_plan_timeline_item(ui, plan);
+                });
         }
         SessionUpdate::AvailableCommandsUpdate(_) => {
-            ui.add(
-                egui::Label::new(
-                    egui::RichText::new("Available commands updated")
-                        .color(MOCHA.overlay1)
-                        .italics()
-                        .size(12.0),
-                )
-                .wrap(), // Fixed
+            // Minimal system log
+            ui.label(
+                egui::RichText::new("System: Commands updated")
+                    .color(MOCHA.overlay0)
+                    .italics()
+                    .size(10.0),
             );
         }
         SessionUpdate::CurrentModeUpdate(mode) => {
             ui.horizontal(|ui| {
                 ui.label(
                     egui::RichText::new("Mode switch:")
-                        .color(MOCHA.overlay1)
-                        .size(12.0),
+                        .color(MOCHA.overlay0)
+                        .size(11.0),
                 );
                 ui.label(
-                    // Fixed: Added .to_string()
                     egui::RichText::new(mode.current_mode_id.to_string())
-                        .color(MOCHA.text)
-                        .strong()
-                        .size(12.0),
+                        .color(MOCHA.overlay1)
+                        .background_color(MOCHA.surface0)
+                        .monospace()
+                        .size(10.0),
                 );
             });
         }
         _ => {
             ui.add(
                 egui::Label::new(
-                    egui::RichText::new(format!("{update:?}"))
-                        .color(MOCHA.subtext0)
+                    egui::RichText::new(format!("{:?}", update))
+                        .color(MOCHA.overlay0)
                         .monospace()
-                        .size(11.0),
+                        .size(10.0),
                 )
-                .wrap(), // Fixed
+                .wrap(),
             );
         }
     }
@@ -217,55 +230,77 @@ fn render_content_chunk(
 ) {
     match &chunk.content {
         ContentBlock::Text(text) => {
-            let mut rt = egui::RichText::new(&text.text).color(color).size(12.0);
+            let mut rt = egui::RichText::new(&text.text).color(color).size(13.0); // Slightly larger
             if italics {
                 rt = rt.italics();
             }
-            ui.add(egui::Label::new(rt).wrap()); // Fixed
+            ui.add(egui::Label::new(rt).wrap());
         }
         other => {
-            let mut rt = egui::RichText::new(format!("{other:?}"))
+            let mut rt = egui::RichText::new(format!("{:?}", other))
                 .color(color)
                 .monospace()
                 .size(11.0);
             if italics {
                 rt = rt.italics();
             }
-            ui.add(egui::Label::new(rt).wrap()); // Fixed
+            ui.add(egui::Label::new(rt).wrap());
         }
     }
 }
 
-fn render_json_block<S: std::hash::Hash + Clone>(
-    ui: &mut egui::Ui,
-    id_salt: S,
-    label: &str,
-    value: &serde_json::Value,
-) {
-    ui.add_space(spacing::TIGHT_ITEM_SPACING.1);
+fn render_kv_json(ui: &mut egui::Ui, label: &str, value: &serde_json::Value) {
     ui.label(
         egui::RichText::new(label)
-            .color(MOCHA.overlay1)
             .size(11.0)
+            .color(MOCHA.overlay1)
             .strong(),
     );
 
-    let pretty = serde_json::to_string_pretty(value).unwrap_or_else(|_| value.to_string());
-    let mut text = pretty;
+    if let serde_json::Value::Object(map) = value {
+        egui::Grid::new(ui.id().with(label))
+            .num_columns(2)
+            .striped(true)
+            .show(ui, |ui| {
+                for (k, v) in map {
+                    ui.label(
+                        egui::RichText::new(k)
+                            .monospace()
+                            .size(11.0)
+                            .color(MOCHA.blue),
+                    );
 
-    egui::ScrollArea::vertical()
-        .id_salt(("json_scroll", id_salt.clone()))
-        .max_height(160.0)
-        .show(ui, |ui| {
-            ui.add(
-                egui::TextEdit::multiline(&mut text)
-                    .id_salt(("json_text", id_salt.clone()))
-                    .font(egui::FontId::monospace(11.0))
-                    .code_editor()
-                    .desired_rows(6)
-                    .desired_width(ui.available_width())
-                    .interactive(false)
-                    .frame(true),
-            );
-        });
+                    let v_str = if v.is_string() {
+                        v.as_str().unwrap().to_string()
+                    } else {
+                        v.to_string()
+                    };
+                    // Truncate long values
+                    let shown_v = if v_str.len() > 100 {
+                        format!("{}...", &v_str[..100])
+                    } else {
+                        v_str
+                    };
+
+                    ui.label(
+                        egui::RichText::new(shown_v)
+                            .monospace()
+                            .size(11.0)
+                            .color(MOCHA.subtext0),
+                    );
+                    ui.end_row();
+                }
+            });
+    } else {
+        // Fallback for non-objects
+        let pretty = serde_json::to_string_pretty(value).unwrap_or_else(|_| value.to_string());
+        ui.add(
+            egui::TextEdit::multiline(&mut pretty.as_str())
+                .font(egui::FontId::monospace(11.0))
+                .code_editor()
+                .desired_rows(4)
+                .desired_width(ui.available_width())
+                .interactive(false),
+        );
+    }
 }
