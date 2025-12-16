@@ -83,7 +83,7 @@ impl LaReviewApp {
         };
 
         if let Some(image_bytes) = crate::assets::get_content("assets/icons/icon-512.png")
-            && let Ok(image) = image::load_from_memory(&image_bytes)
+            && let Ok(image) = image::load_from_memory(image_bytes)
         {
             let size = [image.width() as usize, image.height() as usize];
             let rgba = image.to_rgba8();
