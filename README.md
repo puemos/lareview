@@ -86,15 +86,42 @@ LaReview is designed for a local-first, secure, and focused review experience.
 
 ### Option A: Download a release (recommended)
 
-1. Go to the Releases page: https://github.com/puemos/lareview/releases
-2. Download the binary for your OS
-3. Put it on your PATH
+1. Go to the [Releases page](https://github.com/puemos/lareview/releases) and download the latest binary for your operating system.
+2. Follow the instructions for your OS below.
 
-<!-- TODO(install): Add the real binary name and a short example.
-Example:
-  macOS/Linux: chmod +x lareview && mv lareview /usr/local/bin
-  Windows: place lareview.exe somewhere on PATH
--->
+#### macOS
+
+On macOS, you will need to grant permission to run the application since it is not yet signed by Apple.
+
+1.  Download the `lareview-macos.zip` file and unzip it.
+2.  **Right-click (or Ctrl-click)** the `lareview` application icon and select **Open** from the menu.
+3.  A warning dialog will appear. Click **Open** again to confirm you want to run the application.
+
+This action adds an exception to your security settings, allowing you to run it normally in the future.
+
+If the above method doesn't work, you can also go to **System Settings > Privacy & Security**. You will see a message about "lareview" being blocked; click the **"Open Anyway"** button.
+
+After opening it once, you can move the `lareview` binary to a directory in your `$PATH` to run it from anywhere, for example:
+```sh
+mv ./lareview /usr/local/bin/lareview
+```
+
+#### Linux
+
+1.  Download the `lareview-linux.tar.gz` file and extract it.
+    ```sh
+    tar -xzvf lareview-linux.tar.gz
+    ```
+2.  Make the binary executable and move it to your path.
+    ```sh
+    chmod +x ./lareview
+    mv ./lareview /usr/local/bin/lareview
+    ```
+
+#### Windows
+
+1.  Download the `lareview-windows.zip` file and unzip it.
+2.  Place the `lareview.exe` file in a directory that is included in your system's `PATH` environment variable.
 
 ### Option B: Run from source (fastest to try)
 
