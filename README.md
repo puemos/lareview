@@ -5,9 +5,10 @@
       <source srcset="assets/lareview-icon.svg" media="(prefers-color-scheme: light)">
       <img src="assets/lareview-icon.svg" alt="LaReview logo" width="160">
     </picture>
-    LaReview
   </a>
 </p>
+
+<h1 align="center">LaReview</h1>
 
 <p align="center"><b>Intent-driven code review planning for GitHub PRs and diffs.</b></p>
 
