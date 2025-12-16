@@ -62,7 +62,8 @@ fn main() -> Result<(), eframe::Error> {
 
     // Load the app icon
     let icon = eframe::icon_data::from_png_bytes(
-        &std::fs::read("assets/icons/icon-512.png").expect("Failed to read app icon file"),
+        crate::assets::get_content("assets/icons/icon-512.png")
+            .expect("Failed to read app icon file"),
     )
     .expect("Failed to decode app icon");
 
