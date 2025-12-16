@@ -44,19 +44,19 @@ Instead of scrolling through a flat file diff, you review what the PR is trying 
 ## Screenshots
 
 ### Generate a plan from a PR or diff
-![GENERATE view](docs/assets/generation.png)
+![GENERATE view](assets/generation.png)
 
 ### Review plan as a tree with task details
-![REVIEW view with tasks and details](docs/assets/tasks.png)
+![REVIEW view with tasks and details](assets/tasks.png)
 
 ### Task diff viewer
-![Task diff viewer](docs/assets/diff.png)
+![Task diff viewer](assets/diff.png)
 
 ### Diagram viewer
-![Diagram viewer](docs/assets/diagram.png)
+![Diagram viewer](assets/diagram.png)
 
 ### Settings
-![Settings](docs/assets/settings.png)
+![Settings](assets/settings.png)
 
 ## What you get
 - **A plan you can review**: Intent, sub-flows, and tasks you can mark **To Do**, **In Progress**, **Done**, or **Ignored**
@@ -187,17 +187,13 @@ Wipe local state:
 
 Paste a diff (or PR), pick an agent, and generate a plan. While the agent runs, you get a timeline of what’s happening.
 
-<!-- TODO(screenshot): docs/assets/generate.png -->
-
-![GENERATE view](docs/assets/generate.png)
+![GENERATE view](assets/generate.png)
 
 ### REVIEW
 
 The plan is shown as a tree: Intent → Sub-flows → Tasks. Selecting a task shows details plus a unified diff viewer for related hunks. Add notes and mark progress.
 
-<!-- TODO(screenshot): docs/assets/review.png -->
-
-![REVIEW view](docs/assets/review.png)
+![REVIEW view](assets/review.png)
 
 Use **Clean done** to remove completed tasks (and their notes) for the current review.
 
