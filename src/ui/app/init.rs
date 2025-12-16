@@ -16,9 +16,10 @@ impl LaReviewApp {
         let mut fonts = FontDefinitions::default();
         fonts.font_data.insert(
             "SpaceMono".to_owned(),
-            FontData::from_static(include_bytes!(
-                "../../../assets/fonts/SpaceMono-Regular.ttf"
-            ))
+            FontData::from_static(
+                crate::assets::get_content("assets/fonts/SpaceMono-Regular.ttf")
+                    .expect("SpaceMono font missing"),
+            )
             .into(),
         );
         fonts
@@ -81,7 +82,7 @@ impl LaReviewApp {
             d2_install_rx,
         };
 
-        if let Ok(image_bytes) = std::fs::read("assets/icons/icon-512.png")
+        if let Some(image_bytes) = crate::assets::get_content("assets/icons/icon-512.png")
             && let Ok(image) = image::load_from_memory(&image_bytes)
         {
             let size = [image.width() as usize, image.height() as usize];

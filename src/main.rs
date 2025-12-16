@@ -2,6 +2,7 @@
 //! Initializes the egui application framework and sets up the Tokio runtime.
 
 mod application;
+mod assets;
 mod domain;
 mod infra;
 mod prompts;

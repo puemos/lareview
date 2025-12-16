@@ -17,11 +17,11 @@ fn load_logo_bytes(path: &str) -> Option<Arc<[u8]>> {
             return Some(bytes.clone());
         }
 
-        let bytes: Arc<[u8]> = std::fs::read(path).ok()?.into();
+        let bytes: Arc<[u8]> = crate::assets::get_content(path)?.into();
         cache.insert(path.to_owned(), bytes.clone());
         Some(bytes)
     } else {
-        std::fs::read(path).ok().map(Into::into)
+        crate::assets::get_content(path).map(Into::into)
     }
 }
 
