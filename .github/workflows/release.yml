@@ -1,0 +1,89 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    name: Release ${{ matrix.platform_name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            platform_name: macOS-ARM64
+            artifact_name: lareview-macos-aarch64.tar.gz
+            asset_name: lareview-macos-aarch64.tar.gz
+
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            platform_name: macOS-Intel
+            artifact_name: lareview-macos-x86_64.tar.gz
+            asset_name: lareview-macos-x86_64.tar.gz
+
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            platform_name: Linux-x64
+            artifact_name: lareview-linux-x86_64.tar.gz
+            asset_name: lareview-linux-x86_64.tar.gz
+
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            platform_name: Windows-x64
+            artifact_name: lareview-windows-x86_64.zip
+            asset_name: lareview-windows-x86_64.zip
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2025-12-06
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install D2
+        shell: bash
+        run: curl -fsSL https://d2lang.com/install.sh | sh -s --
+
+      - name: Build binary
+        shell: bash
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Strip binary (Unix)
+        if: runner.os != 'Windows'
+        run: strip target/${{ matrix.target }}/release/lareview
+
+      - name: Package binary (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar czf ../../../${{ matrix.artifact_name }} lareview
+
+      - name: Package binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cd target/${{ matrix.target }}/release
+          Compress-Archive -Path lareview.exe -DestinationPath ..\..\..\${{ matrix.artifact_name }}
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: ${{ matrix.artifact_name }}
