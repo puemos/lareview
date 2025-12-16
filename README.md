@@ -44,19 +44,19 @@ Instead of scrolling through a flat file diff, you review what the PR is trying 
 ## Screenshots
 
 ### Generate a plan from a PR or diff
-![GENERATE view](assets/generation.png)
+![GENERATE view](assets/screenshots/generation.png)
 
 ### Review plan as a tree with task details
-![REVIEW view with tasks and details](assets/tasks.png)
+![REVIEW view with tasks and details](assets/screenshots/tasks.png)
 
 ### Task diff viewer
-![Task diff viewer](assets/diff.png)
+![Task diff viewer](assets/screenshots/diff.png)
 
 ### Diagram viewer
-![Diagram viewer](assets/diagram.png)
+![Diagram viewer](assets/screenshots/diagram.png)
 
 ### Settings
-![Settings](assets/settings.png)
+![Settings](assets/screenshots/settings.png)
 
 ## What you get
 - **A plan you can review**: Intent, sub-flows, and tasks you can mark **To Do**, **In Progress**, **Done**, or **Ignored**
