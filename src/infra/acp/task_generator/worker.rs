@@ -181,7 +181,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
     connection
         .initialize(
             InitializeRequest::new(ProtocolVersion::V1)
-                .client_info(Implementation::new("lareview", "0.0.3"))
+                .client_info(Implementation::new("lareview", env!("CARGO_PKG_VERSION")))
                 .client_capabilities(build_client_capabilities(has_repo_access)),
         )
         .await
