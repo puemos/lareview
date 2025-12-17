@@ -76,6 +76,10 @@ jobs:
           security import cert.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k "$MACOS_CERTIFICATE_PWD" build.keychain
 
+      - name: Strip binary (Unix)
+        if: runner.os != 'Windows'
+        run: strip target/${{ matrix.target }}/release/lareview
+
       - name: Codesign binary (macOS)
         if: runner.os == 'macOS'
         env:
@@ -85,9 +89,21 @@ jobs:
             --sign "$MACOS_IDENTITY" \
             target/${{ matrix.target }}/release/lareview
 
-      - name: Strip binary (Unix)
-        if: runner.os != 'Windows'
-        run: strip target/${{ matrix.target }}/release/lareview
+      - name: Notarize binary (macOS)
+        if: runner.os == 'macOS'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          cd target/${{ matrix.target }}/release
+          zip lareview.zip lareview
+          xcrun notarytool submit lareview.zip \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          rm lareview.zip
 
       - name: Package binary (Unix)
         if: runner.os != 'Windows'
