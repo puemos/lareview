@@ -1,4 +1,5 @@
-use super::model::{ChangeType, DiffLine, FileDiff};
+// This file is no longer used in the new architecture, so we can remove the old types
+use super::model::ChangeType;
 use similar::{ChangeTag, TextDiff};
 use std::sync::Arc;
 use unidiff::{Hunk, PatchSet, Result as UnidiffResult};
@@ -30,6 +31,8 @@ fn inline_segments(old: &str, new: &str) -> Vec<(String, bool)> {
     segments
 }
 
+// This function is kept for compatibility, but the new architecture doesn't use this approach
+#[allow(dead_code)]
 fn build_lines_for_hunk(hunk: &Hunk, out: &mut Vec<DiffLine>) {
     let lines = hunk.lines();
     let mut i = 0usize;
@@ -151,7 +154,9 @@ fn build_lines_for_hunk(hunk: &Hunk, out: &mut Vec<DiffLine>) {
     }
 }
 
-pub(super) fn parse_diff_by_files(diff_text: &str) -> UnidiffResult<Vec<FileDiff>> {
+// This function is kept for compatibility with the old code that might still reference it
+#[allow(dead_code)]
+fn parse_diff_by_files(diff_text: &str) -> UnidiffResult<Vec<FileDiff>> {
     let trimmed = diff_text.trim();
     if trimmed.is_empty() {
         return Ok(Vec::new());
@@ -203,6 +208,27 @@ pub(super) fn parse_diff_by_files(diff_text: &str) -> UnidiffResult<Vec<FileDiff
     }
 
     Ok(files_out)
+}
+
+// Define the old types here so that this file can compile, but they're no longer used in the new architecture
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+struct DiffLine {
+    old_line_num: Option<usize>,
+    new_line_num: Option<usize>,
+    content: Arc<str>,
+    change_type: ChangeType,
+    inline_segments: Option<Vec<(String, bool)>>, // (text, highlight)
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+struct FileDiff {
+    old_path: String,
+    new_path: String,
+    lines: Vec<DiffLine>,
+    additions: usize,
+    deletions: usize,
 }
 
 #[cfg(test)]

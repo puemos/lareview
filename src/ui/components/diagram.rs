@@ -76,7 +76,7 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<String>, is_dark_mode: bool) -
         return false;
     };
 
-    let trimmed_code = d2_code.trim();
+    let trimmed_code = normalize_d2_code(d2_code);
     if trimmed_code.is_empty() {
         ui.centered_and_justified(|ui| {
             ui.label(egui::RichText::new("Enter D2 code to render a diagram").weak());
@@ -84,7 +84,7 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<String>, is_dark_mode: bool) -
         return false;
     }
 
-    let diagram_key = diagram_key(trimmed_code, is_dark_mode);
+    let diagram_key = diagram_key(&trimmed_code, is_dark_mode);
 
     let (mut state, is_expanded, mut scene_rect) = ui.ctx().memory_mut(|mem| {
         let memory = mem.data.get_temp_mut_or_default::<DiagramMemory>(memory_id);
@@ -107,7 +107,7 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<String>, is_dark_mode: bool) -
             }
 
             // Spawn background task to generate SVG
-            let trimmed_code = trimmed_code.to_string();
+            let trimmed_code = trimmed_code.clone();
             let ctx = ui.ctx().clone();
             let diagram_key_for_thread = diagram_key;
 
@@ -227,7 +227,7 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<String>, is_dark_mode: bool) -
                 let _ = render_diagram(
                     ui,
                     &state,
-                    trimmed_code,
+                    &trimmed_code,
                     &mut scene_rect,
                     &mut go_to_settings,
                 );
@@ -244,7 +244,7 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<String>, is_dark_mode: bool) -
                 let diagram_response = render_diagram(
                     ui,
                     &state,
-                    trimmed_code,
+                    &trimmed_code,
                     &mut scene_rect,
                     &mut go_to_settings,
                 );
@@ -365,4 +365,8 @@ fn render_error(ui: &mut Ui, error: &str, trimmed_code: &str, go_to_settings: &m
             ui.code(trimmed_code);
         });
     });
+}
+
+fn normalize_d2_code(code: &str) -> String {
+    code.replace("\\n", "\n").trim().to_string()
 }

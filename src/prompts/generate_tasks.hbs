@@ -130,8 +130,6 @@
       | **SQL** | `shape: sql_table` | `User: { shape: sql_table; id: int }` |
 
       ### Grouping vs. Nesting (CRITICAL)
-      - **Grouping is Good**: You CAN group multiple diagrams or components using containers.
-      - Example: `Backend: { shape: package; API; DB }`
       - **Nesting in Sequence is BAD**: Do NOT nest participants *inside* a `shape: sequence_diagram`.
       - **BAD**: `MySeq: { shape: sequence_diagram; Group: { A; B } }` (Causes layout crash)
       - **GOOD**: `MySeq: { shape: sequence_diagram; A; B }` (Flat participants)
@@ -249,8 +247,7 @@
       "tags": ["security", "authentication", "breaking-change", "needs-tests"]
       },
       "sub_flow": "authentication-flow",
-      "diagram": "Client -> API: POST /login\nAPI -> JWTService: generate()\nJWTService -> API: token\nClient -> API:
-      request with token\nAPI -> Middleware: validate()\nMiddleware -> JWTService: verify()",
+      "diagram": "Flow: {\n  shape: sequence_diagram\n  Client -> API: POST /login\n  API -> JWTService: generate()\n  JWTService -> API: token\n  Client -> API: request with token\n  API -> Middleware: validate()\n  Middleware -> JWTService: verify()\n}",
       "diff_refs": [
       {
       "file": "src/auth/jwt.rs",
@@ -301,8 +298,7 @@
       "tags": ["refactor", "database", "type-safety"]
       },
       "sub_flow": "query-builder-refactor",
-      "diagram": "Repository -> QueryBuilder: new()\nQueryBuilder -> QueryBuilder: where(condition)\nQueryBuilder ->
-      SQL: build()\nSQL -> Database: execute()",
+      "diagram": "Flow: {\n  shape: sequence_diagram\n  Repository -> QueryBuilder: new()\n  QueryBuilder -> QueryBuilder: where(condition)\n  QueryBuilder -> SQL: build()\n  SQL -> Database: execute()\n}",
       "diff_refs": [
       {
       "file": "src/db/query_builder.rs",

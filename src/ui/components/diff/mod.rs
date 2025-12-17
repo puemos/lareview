@@ -3,6 +3,8 @@
 //! Handles parsing, rendering, and interaction with git diffs in a unified format with syntax
 //! highlighting, inline diffs, and collapsible file sections.
 
+mod doc;
+mod indexer;
 mod model;
 mod parse;
 mod render;

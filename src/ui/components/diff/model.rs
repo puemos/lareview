@@ -1,4 +1,4 @@
-use std::sync::Arc;
+// No imports needed for the new architecture
 
 /// Possible actions that can be triggered from the diff viewer.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,36 +37,17 @@ pub(super) enum ChangeType {
     Insert,
 }
 
-#[derive(Debug, Clone)]
-pub(super) struct DiffLine {
-    pub(super) old_line_num: Option<usize>,
-    pub(super) new_line_num: Option<usize>,
-    pub(super) content: Arc<str>,
-    pub(super) change_type: ChangeType,
-    pub(super) inline_segments: Option<Vec<(String, bool)>>, // (text, highlight)
-}
-
-#[derive(Debug, Clone)]
-pub(super) struct FileDiff {
-    pub(super) old_path: String,
-    pub(super) new_path: String,
-    pub(super) lines: Vec<DiffLine>,
-    pub(super) additions: usize,
-    pub(super) deletions: usize,
-}
-
+/// Light state stored in egui memory - only keep small UI flags here
 #[derive(Default, Clone)]
-pub(super) struct DiffState {
-    pub(super) last_hash: u64,
-    pub(super) files: Vec<FileDiff>,
-    pub(super) parse_error: Option<String>,
-    pub(super) rows: Vec<Row>,
-    pub(super) row_height: f32,
-    pub(super) collapsed: Vec<bool>, // Per-file collapse state
+pub struct DiffViewState {
+    pub last_hash: u64,
+    pub parse_error: Option<String>,
+    pub collapsed: Vec<bool>, // Per-file collapse state - only this is stored in egui memory
 }
 
-#[derive(Clone)]
-pub(super) enum Row {
-    FileHeader { file_idx: usize },
-    DiffLine { file_idx: usize, line_idx: usize },
+impl DiffViewState {
+    #[allow(dead_code)]
+    pub fn new() -> Self {
+        Self::default()
+    }
 }

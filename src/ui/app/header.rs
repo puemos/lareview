@@ -47,59 +47,87 @@ impl LaReviewApp {
             }
 
             ui.add_space(spacing::SPACING_SM);
+
+            // Get the full header rect for absolute positioning
+            let header_rect = ui.available_rect_before_wrap();
+            let header_width = header_rect.width();
+
             ui.horizontal(|ui| {
-                ui.horizontal(|ui| {
+                // Left section: Logo
+                ui.add_space(spacing::SPACING_MD);
+                match ui.ctx().try_load_texture(
+                    "app_logo",
+                    egui::TextureOptions::LINEAR,
+                    Default::default(),
+                ) {
+                    Ok(egui::load::TexturePoll::Ready { texture }) => {
+                        ui.image(texture);
+                    }
+                    Ok(egui::load::TexturePoll::Pending { .. }) | Err(_) => {
+                        ui.add(egui::Label::new(
+                            egui::RichText::new(egui_phosphor::regular::CIRCLE_HALF)
+                                .size(22.0)
+                                .color(theme.brand),
+                        ));
+                    }
+                }
+                ui.heading(
+                    egui::RichText::new("LaReview")
+                        .strong()
+                        .color(theme.text_primary)
+                        .size(18.0),
+                );
+
+                // Calculate center position for navigation
+                // We'll use the header width to position nav buttons in the absolute center
+                let nav_width = 200.0; // Approximate width of GENERATE + REVIEW buttons
+                let center_x = header_rect.min.x + (header_width / 2.0) - (nav_width / 2.0);
+                let current_x = ui.cursor().min.x;
+                let space_to_center = (center_x - current_x).max(0.0);
+
+                ui.add_space(space_to_center);
+
+                // Center section: Navigation buttons
+                let generate_response = ui.add(
+                    egui::Button::new(egui::RichText::new(format!("{} GENERATE", ONIGIRI)).color(
+                        if self.state.current_view == AppView::Generate {
+                            theme.brand
+                        } else {
+                            theme.text_disabled
+                        },
+                    ))
+                    .frame(false)
+                    .corner_radius(egui::CornerRadius::same(4)),
+                );
+                if generate_response.clicked() {
+                    self.switch_to_generate();
+                }
+
+                ui.add_space(spacing::SPACING_LG);
+
+                let review_response = ui.add(
+                    egui::Button::new(egui::RichText::new(format!("{} REVIEW", COFFEE)).color(
+                        if self.state.current_view == AppView::Review {
+                            theme.brand
+                        } else {
+                            theme.text_disabled
+                        },
+                    ))
+                    .frame(false)
+                    .corner_radius(egui::CornerRadius::same(4)),
+                );
+                let review_response =
+                    review_response.on_hover_cursor(egui::CursorIcon::PointingHand);
+                if review_response.clicked() {
+                    self.switch_to_review();
+                }
+
+                // Right section: Settings (right-aligned)
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.add_space(spacing::SPACING_MD);
-                    match ui.ctx().try_load_texture(
-                        "app_logo",
-                        egui::TextureOptions::LINEAR,
-                        Default::default(),
-                    ) {
-                        Ok(egui::load::TexturePoll::Ready { texture }) => {
-                            ui.image(texture);
-                        }
-                        Ok(egui::load::TexturePoll::Pending { .. }) | Err(_) => {
-                            ui.add(egui::Label::new(
-                                egui::RichText::new(egui_phosphor::regular::CIRCLE_HALF)
-                                    .size(22.0)
-                                    .color(theme.brand),
-                            ));
-                        }
-                    }
-                    ui.heading(
-                        egui::RichText::new("LaReview")
-                            .strong()
-                            .color(theme.text_primary)
-                            .size(18.0),
-                    );
-                });
-
-                ui.add_space(spacing::SPACING_XL);
-                ui.add_space(spacing::SPACING_XL);
-
-                ui.horizontal(|ui| {
-                    let generate_response = ui.add(
-                        egui::Button::new(
-                            egui::RichText::new(format!("{} GENERATE", ONIGIRI)).color(
-                                if self.state.current_view == AppView::Generate {
-                                    theme.brand
-                                } else {
-                                    theme.text_disabled
-                                },
-                            ),
-                        )
-                        .frame(false)
-                        .corner_radius(egui::CornerRadius::same(4)),
-                    );
-                    if generate_response.clicked() {
-                        self.switch_to_generate();
-                    }
-
-                    ui.add_space(spacing::SPACING_LG);
-
-                    let review_response = ui.add(
-                        egui::Button::new(egui::RichText::new(format!("{} REVIEW", COFFEE)).color(
-                            if self.state.current_view == AppView::Review {
+                    let settings_response = ui.add(
+                        egui::Button::new(egui::RichText::new("SETTINGS").color(
+                            if self.state.current_view == AppView::Settings {
                                 theme.brand
                             } else {
                                 theme.text_disabled
@@ -108,33 +136,11 @@ impl LaReviewApp {
                         .frame(false)
                         .corner_radius(egui::CornerRadius::same(4)),
                     );
-
-                    let review_response =
-                        review_response.on_hover_cursor(egui::CursorIcon::PointingHand);
-
-                    if review_response.clicked() {
-                        self.switch_to_review();
+                    let settings_response =
+                        settings_response.on_hover_cursor(egui::CursorIcon::PointingHand);
+                    if settings_response.clicked() {
+                        self.switch_to_settings();
                     }
-
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.add_space(spacing::SPACING_MD);
-                        let settings_response = ui.add(
-                            egui::Button::new(egui::RichText::new("SETTINGS").color(
-                                if self.state.current_view == AppView::Settings {
-                                    theme.brand
-                                } else {
-                                    theme.text_disabled
-                                },
-                            ))
-                            .frame(false)
-                            .corner_radius(egui::CornerRadius::same(4)),
-                        );
-                        let settings_response =
-                            settings_response.on_hover_cursor(egui::CursorIcon::PointingHand);
-                        if settings_response.clicked() {
-                            self.switch_to_settings();
-                        }
-                    });
                 });
             });
             ui.add_space(spacing::SPACING_SM);

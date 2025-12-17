@@ -195,7 +195,8 @@ impl LaReviewApp {
                         // Description
                         ui.label(section_title("Description").color(MOCHA.lavender));
                         ui.add_space(spacing::SPACING_XS);
-                        ui.label(egui::RichText::new(&task.description).color(MOCHA.text));
+                        let description = task.description.replace("\\n", "\n");
+                        ui.label(egui::RichText::new(description.trim()).color(MOCHA.text));
 
                         // Insight (if any)
                         if let Some(insight) = &task.insight {
@@ -208,7 +209,12 @@ impl LaReviewApp {
                                 ui.label(section_title("AI Insight").color(MOCHA.yellow));
                             });
                             ui.add_space(spacing::SPACING_XS);
-                            ui.label(egui::RichText::new(insight).italics().color(MOCHA.subtext0));
+                            let insight_text = insight.replace("\\n", "\n");
+                            ui.label(
+                                egui::RichText::new(insight_text.trim())
+                                    .italics()
+                                    .color(MOCHA.subtext0),
+                            );
                         }
                     });
 
