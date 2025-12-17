@@ -28,7 +28,7 @@ pub async fn run_task_mcp_server() -> pmcp::Result<()> {
 
     let server = Server::builder()
         .name("lareview-tasks")
-        .version("0.1.0")
+        .version("0.0.3")
         .capabilities(ServerCapabilities::tools_only())
         // New streaming tools
         .tool("return_task", tool::create_return_task_tool(config.clone()))

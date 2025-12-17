@@ -63,6 +63,28 @@ jobs:
         shell: bash
         run: cargo build --release --target ${{ matrix.target }}
 
+      - name: Import macOS signing certificate
+        if: runner.os == 'macOS'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+        run: |
+          echo "$MACOS_CERTIFICATE" | base64 -d > cert.p12
+          security create-keychain -p "$MACOS_CERTIFICATE_PWD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$MACOS_CERTIFICATE_PWD" build.keychain
+          security import cert.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$MACOS_CERTIFICATE_PWD" build.keychain
+
+      - name: Codesign binary (macOS)
+        if: runner.os == 'macOS'
+        env:
+          MACOS_IDENTITY: ${{ secrets.MACOS_IDENTITY }}
+        run: |
+          codesign --force --options runtime --timestamp \
+            --sign "$MACOS_IDENTITY" \
+            target/${{ matrix.target }}/release/lareview
+
       - name: Strip binary (Unix)
         if: runner.os != 'Windows'
         run: strip target/${{ matrix.target }}/release/lareview
