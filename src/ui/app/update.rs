@@ -5,8 +5,47 @@ use super::state::AppView;
 
 impl eframe::App for LaReviewApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        crate::ui::window::apply_rounded_corners(_frame);
         // Set the base Catppuccin theme for overall UI appearance
         catppuccin_egui::set_theme(ctx, catppuccin_egui::MOCHA);
+
+        // Apply TUI-like visuals: disable corner rounding and set terminal backgrounds
+        let theme = crate::ui::theme::current_theme();
+        let mut visuals = egui::Visuals::dark();
+
+        // Backgrounds
+        visuals.panel_fill = theme.bg_primary;
+        visuals.window_fill = theme.bg_primary;
+
+        // Borders and Backgrounds for Widgets - TUI style (transparent bg, solid border)
+        visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0, theme.border);
+        visuals.widgets.noninteractive.bg_fill = egui::Color32::TRANSPARENT;
+
+        visuals.widgets.inactive.bg_stroke = egui::Stroke::new(1.0, theme.border);
+        visuals.widgets.inactive.bg_fill = egui::Color32::TRANSPARENT;
+
+        visuals.widgets.hovered.bg_stroke = egui::Stroke::new(1.0, theme.brand);
+        visuals.widgets.hovered.bg_fill = theme.bg_secondary; // Subtle lift on hover
+
+        visuals.widgets.active.bg_stroke = egui::Stroke::new(1.0, theme.brand);
+        visuals.widgets.active.bg_fill = theme.bg_secondary;
+
+        visuals.widgets.open.bg_stroke = egui::Stroke::new(1.0, theme.border);
+        visuals.widgets.open.bg_fill = theme.bg_primary;
+
+        // Selection
+        visuals.selection.bg_fill = theme.brand.gamma_multiply(0.3);
+        visuals.selection.stroke = egui::Stroke::new(1.0, theme.brand);
+
+        // Corner Radii
+        visuals.window_corner_radius = egui::CornerRadius::ZERO;
+        visuals.widgets.noninteractive.corner_radius = egui::CornerRadius::ZERO;
+        visuals.widgets.inactive.corner_radius = egui::CornerRadius::ZERO;
+        visuals.widgets.hovered.corner_radius = egui::CornerRadius::ZERO;
+        visuals.widgets.active.corner_radius = egui::CornerRadius::ZERO;
+        visuals.widgets.open.corner_radius = egui::CornerRadius::ZERO;
+
+        ctx.set_visuals(visuals);
 
         self.poll_gh_messages();
         self.poll_d2_install_messages();

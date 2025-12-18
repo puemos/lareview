@@ -3,7 +3,7 @@ use crate::ui::app::{Action, GenerateAction, LaReviewApp};
 use crate::ui::components::status::error_banner;
 use crate::ui::spacing;
 use crate::ui::theme;
-use catppuccin_egui::MOCHA;
+use crate::ui::theme::current_theme;
 use eframe::egui;
 
 impl LaReviewApp {
@@ -86,7 +86,11 @@ impl LaReviewApp {
 
                     // -- TOOLBAR --
                     ui.horizontal(|ui| {
-                        ui.heading(egui::RichText::new("INPUT").size(16.0).color(MOCHA.text));
+                        ui.heading(
+                            egui::RichText::new("INPUT")
+                                .size(16.0)
+                                .color(current_theme().text_primary),
+                        );
 
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if ui
@@ -95,7 +99,7 @@ impl LaReviewApp {
                                         "{} New",
                                         egui_phosphor::regular::PLUS
                                     ))
-                                    .color(MOCHA.green),
+                                    .color(current_theme().success),
                                 )
                                 .clicked()
                             {
@@ -108,9 +112,10 @@ impl LaReviewApp {
 
                     // -- UNIFIED CONTENT AREA --
                     egui::Frame::new()
-                        .fill(MOCHA.crust)
+                        .fill(current_theme().bg_primary)
                         .inner_margin(egui::Margin::same(spacing::SPACING_XS as i8))
-                        .stroke(egui::Stroke::new(1.0, MOCHA.surface0))
+                        .stroke(egui::Stroke::new(1.0, current_theme().border))
+                        .corner_radius(egui::CornerRadius::ZERO)
                         .show(ui, |ui| {
                             // Loading Spinner Override
                             if self.state.is_preview_fetching && !is_from_github {
@@ -136,8 +141,9 @@ impl LaReviewApp {
                                     && let Some(gh) = &preview.github
                                 {
                                     egui::Frame::group(ui.style())
-                                        .fill(MOCHA.mantle)
+                                        .fill(current_theme().bg_secondary)
                                         .stroke(egui::Stroke::NONE)
+                                        .corner_radius(egui::CornerRadius::ZERO)
                                         .inner_margin(spacing::SPACING_SM as i8)
                                         .show(ui, |ui| {
                                             ui.set_min_width(ui.available_width());
@@ -155,7 +161,7 @@ impl LaReviewApp {
                                                                 "{}/{}",
                                                                 gh.pr.owner, gh.pr.repo
                                                             ))
-                                                            .color(MOCHA.subtext1)
+                                                            .color(current_theme().text_muted)
                                                             .size(11.0),
                                                         );
                                                         ui.label(
@@ -163,14 +169,14 @@ impl LaReviewApp {
                                                                 "#{}",
                                                                 gh.pr.number
                                                             ))
-                                                            .color(MOCHA.subtext0)
+                                                            .color(current_theme().text_muted)
                                                             .size(11.0),
                                                         );
                                                     });
                                                     ui.label(
                                                         egui::RichText::new(&gh.meta.title)
                                                             .strong()
-                                                            .color(MOCHA.text),
+                                                            .color(current_theme().text_primary),
                                                     );
                                                 });
                                             });
@@ -261,7 +267,11 @@ impl LaReviewApp {
                     egui::vec2(spacing::BUTTON_PADDING.0, spacing::BUTTON_PADDING.1); // 8.0, 4.0
 
                 ui.horizontal(|ui| {
-                    ui.heading(egui::RichText::new("AGENT").size(16.0).color(MOCHA.text));
+                    ui.heading(
+                        egui::RichText::new("AGENT")
+                            .size(16.0)
+                            .color(current_theme().text_primary),
+                    );
                 });
 
                 if let Some(err) = &self.state.generation_error {
@@ -301,16 +311,14 @@ impl LaReviewApp {
 
                         if ui.is_rect_visible(rect) {
                             let painter = ui.painter();
-                            let style = ui.style();
                             // visuals variable removed as unused
 
                             let mut fill_color = if self.state.is_generating {
-                                // Deep "Void" background for Tron mode
-                                MOCHA.crust
+                                current_theme().bg_primary
                             } else if run_enabled {
-                                theme.brand
+                                current_theme().brand
                             } else {
-                                theme.bg_card
+                                current_theme().bg_card
                             };
 
                             if response.hovered() && run_enabled {
@@ -326,28 +334,24 @@ impl LaReviewApp {
                             // Base Button Shape
                             painter.rect(
                                 rect,
-                                style.visuals.widgets.noninteractive.corner_radius,
+                                egui::CornerRadius::ZERO,
                                 fill_color,
                                 egui::Stroke::NONE,
                                 egui::StrokeKind::Middle,
                             );
 
-                            let border_color = if self.state.is_generating {
-                                MOCHA.surface2
-                            } else {
-                                theme.border
-                            };
+                            let border_color = current_theme().border;
 
                             painter.rect_stroke(
                                 rect,
-                                style.visuals.widgets.noninteractive.corner_radius,
+                                egui::CornerRadius::ZERO,
                                 egui::Stroke::new(1.0, border_color),
                                 egui::StrokeKind::Middle,
                             );
 
                             // Tron/Sci-Fi Animation (Simplified)
                             if self.state.is_generating {
-                                let scanner_color = MOCHA.sky;
+                                let scanner_color = current_theme().accent;
 
                                 // Pulsing Border Only
                                 let pulse = (t * 2.0).sin() * 0.5 + 0.5; // 0.0 to 1.0
@@ -355,7 +359,7 @@ impl LaReviewApp {
 
                                 painter.rect_stroke(
                                     rect,
-                                    style.visuals.widgets.noninteractive.corner_radius,
+                                    egui::CornerRadius::ZERO,
                                     egui::Stroke::new(
                                         1.5,
                                         egui::Color32::from_rgba_unmultiplied(
@@ -375,16 +379,15 @@ impl LaReviewApp {
                                 let text_pulse = (t * 3.0).sin() * 0.3 + 0.7;
                                 let alpha = (text_pulse * 255.0) as u8;
                                 egui::Color32::from_rgba_unmultiplied(
-                                    MOCHA.text.r(),
-                                    MOCHA.text.g(),
-                                    MOCHA.text.b(),
+                                    current_theme().text_primary.r(),
+                                    current_theme().text_primary.g(),
+                                    current_theme().text_primary.b(),
                                     alpha,
                                 )
                             } else if run_enabled {
-                                // High contrast (dark) text on the brand (light/pastel) background
-                                MOCHA.crust
+                                current_theme().bg_primary
                             } else {
-                                theme.text_disabled
+                                current_theme().text_disabled
                             };
 
                             let display_text = if self.state.is_generating {
@@ -437,7 +440,7 @@ impl LaReviewApp {
                             ui.label(
                                 egui::RichText::new("STATUS")
                                     .size(11.0)
-                                    .color(MOCHA.subtext0),
+                                    .color(current_theme().text_muted),
                             );
                             ui.with_layout(
                                 egui::Layout::right_to_left(egui::Align::Center),
@@ -452,7 +455,7 @@ impl LaReviewApp {
                                     };
                                     ui.label(
                                         egui::RichText::new(status_text)
-                                            .color(MOCHA.subtext1)
+                                            .color(current_theme().text_muted)
                                             .size(12.0),
                                     );
                                 },
@@ -477,7 +480,7 @@ impl LaReviewApp {
                             ui.label(
                                 egui::RichText::new("ACTIVITY")
                                     .size(11.0)
-                                    .color(MOCHA.subtext0),
+                                    .color(current_theme().text_muted),
                             );
                             ui.with_layout(
                                 egui::Layout::right_to_left(egui::Align::Center),
@@ -489,7 +492,7 @@ impl LaReviewApp {
                                                     "{} Clear",
                                                     egui_phosphor::regular::TRASH
                                                 ))
-                                                .color(MOCHA.overlay2),
+                                                .color(current_theme().text_muted),
                                             )
                                             .clicked()
                                     {

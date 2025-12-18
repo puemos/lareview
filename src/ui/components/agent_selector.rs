@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::ui::app::SelectedAgent;
-use catppuccin_egui::MOCHA;
+use crate::ui::theme::current_theme;
 
 static LOGO_BYTES_CACHE: Lazy<Mutex<HashMap<String, Arc<[u8]>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
@@ -64,16 +64,16 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
 
         // Stroke
         let stroke = if is_open {
-            visuals.widgets.open.fg_stroke
+            visuals.widgets.open.bg_stroke
         } else if response.hovered() {
-            visuals.widgets.hovered.fg_stroke
+            visuals.widgets.hovered.bg_stroke
         } else {
-            visuals.widgets.inactive.fg_stroke
+            visuals.widgets.inactive.bg_stroke
         };
 
         ui.painter().rect(
             rect,
-            visuals.widgets.inactive.corner_radius,
+            egui::CornerRadius::ZERO,
             bg_fill,
             stroke,
             egui::StrokeKind::Middle,
@@ -100,8 +100,10 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
 
                 // Text
                 ui.add(
-                    egui::Label::new(egui::RichText::new(selected_label).color(MOCHA.text))
-                        .selectable(false),
+                    egui::Label::new(
+                        egui::RichText::new(selected_label).color(current_theme().text_primary),
+                    )
+                    .selectable(false),
                 );
 
                 // Spacer
@@ -110,7 +112,12 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
                     egui::Layout::right_to_left(egui::Align::Center),
                     |ui| {
                         ui.add_space(2.0);
-                        ui.add(egui::Label::new("⏷").selectable(false));
+                        ui.add(
+                            egui::Label::new(
+                                egui::RichText::new("⏷").color(current_theme().text_disabled),
+                            )
+                            .selectable(false),
+                        );
                     },
                 );
             });
@@ -149,14 +156,18 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
                             }
 
                             // Hover/Select styling
+                            let theme = current_theme();
                             let mut item_bg = egui::Color32::TRANSPARENT;
+                            let mut text_color = theme.text_primary;
+
                             if is_selected {
-                                item_bg = MOCHA.surface0;
+                                item_bg = theme.brand;
+                                text_color = theme.brand_fg;
                             } else if item_response.hovered() && is_available {
-                                item_bg = MOCHA.surface0.gamma_multiply(0.5);
+                                item_bg = theme.bg_secondary;
                             }
 
-                            ui.painter().rect_filled(item_rect, 2.0, item_bg);
+                            ui.painter().rect_filled(item_rect, egui::CornerRadius::ZERO, item_bg);
 
                             // Content - with better padding
                             let content_rect = item_rect.shrink2(egui::vec2(8.0, 4.0));
@@ -182,20 +193,20 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
                                         ui.add_space(6.0);
                                     }
 
-                                    let text_color = if !is_available {
-                                        ui.visuals().weak_text_color()
-                                    } else if is_selected {
-                                        MOCHA.green
+                                    let final_text_color = if !is_available {
+                                        theme.text_disabled
                                     } else {
-                                        MOCHA.text
+                                        text_color
                                     };
 
-                                    ui.add(
-                                        egui::Label::new(
-                                            egui::RichText::new(&agent.label).color(text_color),
-                                        )
-                                        .selectable(false),
-                                    );
+                                    let label = if is_selected {
+                                        egui::RichText::new(&agent.label)
+                                            .color(final_text_color)
+                                            .strong()
+                                    } else {
+                                        egui::RichText::new(&agent.label).color(final_text_color)
+                                    };
+                                    ui.label(label);
                                 });
                             });
 

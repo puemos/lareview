@@ -99,56 +99,56 @@ impl Theme {
     pub fn mocha() -> Self {
         Self {
             // Background-text pairs for accessibility
-            bg_primary: MOCHA.base,   // Main content area
-            text_primary: MOCHA.text, // Contrasts well with base
+            bg_primary: MOCHA.crust, // Main application backdrop (Extreme Dark)
+            text_primary: MOCHA.text,
 
-            bg_secondary: MOCHA.surface0, // Cards and panels
-            text_secondary: MOCHA.text,   // Contrasts well with surface0
+            bg_secondary: MOCHA.mantle, // Sidebars, Header
+            text_secondary: MOCHA.text,
 
-            bg_tertiary: MOCHA.crust,  // Subtle backgrounds
-            text_tertiary: MOCHA.text, // Contrasts well with crust
+            bg_tertiary: MOCHA.base, // Panels, Cards sitting on secondary surfaces
+            text_tertiary: MOCHA.text,
 
-            bg_surface: MOCHA.mantle, // Dialogs and dropdowns
-            text_surface: MOCHA.text, // Contrasts well with mantle
+            bg_surface: MOCHA.base, // Dialogs and dropdowns
+            text_surface: MOCHA.text,
 
-            bg_muted: MOCHA.surface2, // Muted surfaces
-            text_muted: MOCHA.text,   // Contrasts well with surface2
+            bg_muted: MOCHA.surface0, // Muted surfaces (Gray)
+            text_muted: MOCHA.subtext0,
 
-            bg_card: MOCHA.surface1, // Individual cards
-            text_card: MOCHA.text,   // Contrasts well with surface1
+            bg_card: MOCHA.base, // Individual cards
+            text_card: MOCHA.text,
 
             // Brand colors
-            brand: MOCHA.mauve,   // Primary brand color
-            brand_fg: MOCHA.text, // Use text color for better contrast
+            brand: MOCHA.mauve,    // Primary terminal brand color
+            brand_fg: MOCHA.crust, // Dark text on light brand background
 
             // Status colors
-            success: MOCHA.green,   // Success states
-            success_fg: MOCHA.text, // Contrasts well with green
+            success: MOCHA.green,
+            success_fg: MOCHA.crust,
 
-            warning: MOCHA.yellow,  // Warning states
-            warning_fg: MOCHA.text, // Contrasts well with yellow
+            warning: MOCHA.yellow,
+            warning_fg: MOCHA.crust,
 
-            destructive: MOCHA.red,     // Error states
-            destructive_fg: MOCHA.text, // Contrasts well with red
+            destructive: MOCHA.red,
+            destructive_fg: MOCHA.crust,
 
-            accent: MOCHA.blue,    // Secondary accent color
-            accent_fg: MOCHA.text, // Contrasts well with blue
+            accent: MOCHA.blue,
+            accent_fg: MOCHA.crust,
 
             // Text hierarchy
-            text_inverse: egui::Color32::from_rgb(255, 255, 255), // White for dark backgrounds
-            text_disabled: MOCHA.overlay2,                        // Subtle disabled text
-            text_on_muted: MOCHA.text,                            // Text on muted backgrounds
+            text_inverse: egui::Color32::from_rgb(255, 255, 255),
+            text_disabled: MOCHA.overlay2,
+            text_on_muted: MOCHA.subtext1,
 
             // Border colors
-            border: MOCHA.surface2,           // Primary borders
-            border_secondary: MOCHA.surface1, // Secondary borders
+            border: MOCHA.overlay0,           // Strong TUI-style borders
+            border_secondary: MOCHA.surface1, // Subtle borders
 
             // Special colors
             transparent: egui::Color32::TRANSPARENT,
 
-            interactive_selected: MOCHA.sky, // For selected states
+            interactive_selected: MOCHA.sky,
 
-            text_accent: MOCHA.lavender, // Special accent text
+            text_accent: MOCHA.lavender,
         }
     }
 

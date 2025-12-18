@@ -1,3 +1,4 @@
+use crate::ui::theme::current_theme;
 use egui::{Id, Image, Rect, TextureOptions, Ui, load::SizedTexture};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -259,6 +260,7 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<String>, is_dark_mode: bool) -
                     &trimmed_code,
                     &mut scene_rect,
                     &mut go_to_settings,
+                    true, // is_expanded
                 );
             });
     } else {
@@ -266,7 +268,8 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<String>, is_dark_mode: bool) -
         let desired_size = ui.available_size();
 
         egui::Frame::default()
-            .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
+            .stroke(egui::Stroke::new(1.0, current_theme().border))
+            .corner_radius(egui::CornerRadius::ZERO)
             .show(ui, |ui| {
                 ui.set_max_size(desired_size);
 
@@ -276,6 +279,7 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<String>, is_dark_mode: bool) -
                     &trimmed_code,
                     &mut scene_rect,
                     &mut go_to_settings,
+                    false, // is_expanded
                 );
                 if let Some(resp) = diagram_response
                     && resp.clicked()
@@ -306,57 +310,83 @@ fn render_diagram(
     trimmed_code: &str,
     scene_rect: &mut Rect,
     go_to_settings: &mut bool,
+    is_expanded: bool,
 ) -> Option<egui::Response> {
     match state {
-        DiagramState::Loading => {
-            ui.centered_and_justified(|ui| {
-                ui.vertical_centered(|ui| {
-                    ui.spinner();
-                    ui.add_space(8.0);
-                    ui.label("Generating diagram...");
-                });
-            });
-            ui.ctx().request_repaint();
-            None
-        }
-        DiagramState::PixelsReady(_) => {
-            ui.centered_and_justified(|ui| {
-                ui.vertical_centered(|ui| {
-                    ui.spinner();
-                    ui.add_space(8.0);
-                    ui.label("Preparing diagram...");
+        DiagramState::Loading | DiagramState::PixelsReady(_) => {
+            // Use available width but force a reasonable height for centering if it's too small
+            let available = ui.available_size();
+            let min_height = 200.0;
+            let size = egui::vec2(available.x, available.y.max(min_height));
+            let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+
+            ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+                ui.centered_and_justified(|ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.label(
+                            egui::RichText::new("Loading diagram...")
+                                .color(current_theme().text_muted),
+                        );
+                        ui.add_space(8.0);
+                        ui.add(
+                            egui::ProgressBar::new(0.0)
+                                .animate(true)
+                                .desired_width(120.0),
+                        );
+                    });
                 });
             });
             ui.ctx().request_repaint();
             None
         }
         DiagramState::TextureReady(texture) => {
-            let input_used_for_pan_or_zoom = ui
-                .ctx()
-                .input(|i| i.smooth_scroll_delta != egui::Vec2::ZERO || i.zoom_delta() != 1.0);
+            if is_expanded {
+                let input_used_for_pan_or_zoom = ui
+                    .ctx()
+                    .input(|i| i.smooth_scroll_delta != egui::Vec2::ZERO || i.zoom_delta() != 1.0);
 
-            let inner = egui::Scene::new()
-                .zoom_range(0.1..=8.0)
-                .max_inner_size(egui::Vec2::splat(10_000.0))
-                .show(ui, scene_rect, |ui| {
-                    ui.add(
-                        Image::from_texture(SizedTexture::new(
-                            texture.handle.id(),
-                            texture.handle.size_vec2(),
-                        ))
-                        .fit_to_exact_size(texture.handle.size_vec2()),
-                    );
-                });
+                let inner = egui::Scene::new()
+                    .zoom_range(0.1..=8.0)
+                    .max_inner_size(egui::Vec2::splat(10_000.0))
+                    .show(ui, scene_rect, |ui| {
+                        ui.add(
+                            Image::from_texture(SizedTexture::new(
+                                texture.handle.id(),
+                                texture.handle.size_vec2(),
+                            ))
+                            .fit_to_exact_size(texture.handle.size_vec2()),
+                        );
+                    });
 
-            // `Scene` uses scroll input for pan/zoom; clear it so any parent `ScrollArea` won't also scroll.
-            if inner.response.contains_pointer() && input_used_for_pan_or_zoom {
-                ui.ctx().input_mut(|input| {
-                    input.smooth_scroll_delta = egui::Vec2::ZERO;
-                    input.raw_scroll_delta = egui::Vec2::ZERO;
+                // `Scene` uses scroll input for pan/zoom; clear it so any parent `ScrollArea` won't also scroll.
+                if inner.response.contains_pointer() && input_used_for_pan_or_zoom {
+                    ui.ctx().input_mut(|input| {
+                        input.smooth_scroll_delta = egui::Vec2::ZERO;
+                        input.raw_scroll_delta = egui::Vec2::ZERO;
+                    });
+                }
+
+                Some(inner.response)
+            } else {
+                // Compact view: static image, centered, clickable
+                let available = ui.available_size();
+                let min_height = 200.0;
+                let size = egui::vec2(available.x, available.y.max(min_height));
+                let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
+
+                ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+                    ui.centered_and_justified(|ui| {
+                        ui.add(
+                            Image::from_texture(SizedTexture::new(
+                                texture.handle.id(),
+                                texture.handle.size_vec2(),
+                            ))
+                            .shrink_to_fit(),
+                        )
+                    })
                 });
+                Some(response.on_hover_cursor(egui::CursorIcon::PointingHand))
             }
-
-            Some(inner.response)
         }
         DiagramState::Error(e) => {
             render_error(ui, e, trimmed_code, go_to_settings);
@@ -381,13 +411,15 @@ fn image_id_for_key(diagram_key: DiagramKey) -> String {
 fn render_error(ui: &mut Ui, error: &str, trimmed_code: &str, go_to_settings: &mut bool) {
     ui.centered_and_justified(|ui| {
         ui.vertical_centered(|ui| {
-            ui.label("❌ Failed to render diagram:");
+            ui.label(
+                egui::RichText::new("Failed to load diagram.").color(current_theme().destructive),
+            );
             ui.add_space(8.0);
-            ui.label(egui::RichText::new(error).color(ui.visuals().warn_fg_color));
+            ui.label(egui::RichText::new(error).color(current_theme().text_muted));
 
             if error.contains("D2 executable not found") {
                 ui.add_space(8.0);
-                if ui.link("Go to Settings to install D2").clicked() {
+                if ui.button("Install D2").clicked() {
                     *go_to_settings = true;
                 }
             }

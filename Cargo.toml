@@ -54,3 +54,12 @@ resvg = "0.45"
 usvg = "0.45"
 tiny-skia = "0.11"
 fontdb = "0.23"
+
+raw-window-handle = "0.6"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+cocoa = "0.26"
+objc = "0.2"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_UI_WindowsAndMessaging"] }

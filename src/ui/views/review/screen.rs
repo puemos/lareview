@@ -9,7 +9,6 @@ use crate::ui::components::status::error_banner;
 use crate::ui::components::{badge::badge, pills::pill_action_button};
 use crate::ui::spacing;
 use crate::ui::theme::current_theme;
-use catppuccin_egui::MOCHA;
 use eframe::egui;
 use egui_phosphor::regular as icons;
 
@@ -71,7 +70,7 @@ impl LaReviewApp {
 
         // --- Top Header Frame for consistent padding and sizing ---
         egui::Frame::NONE
-            .fill(ui.style().visuals.panel_fill)
+            .fill(current_theme().bg_secondary) // Match app header
             .inner_margin(egui::Margin::symmetric(
                 spacing::SPACING_MD as i8,
                 spacing::SPACING_SM as i8,
@@ -298,13 +297,13 @@ impl LaReviewApp {
                             egui::RichText::new(
                                 "Generate tasks from your diff to start reviewing.",
                             )
-                            .color(MOCHA.subtext0),
+                            .color(current_theme().text_muted),
                         );
                         ui.add_space(16.0);
                         let cta = egui::Button::new(
                             egui::RichText::new("Generate tasks")
                                 .size(15.0)
-                                .color(MOCHA.mauve),
+                                .color(current_theme().brand),
                         )
                         .fill(egui::Color32::TRANSPARENT)
                         .stroke(egui::Stroke::NONE);
@@ -344,7 +343,7 @@ impl LaReviewApp {
         // --- LEFT PANEL: Navigation & Intent (Contains the Tree Layout) ---
         let mut left_ui = ui.new_child(egui::UiBuilder::new().max_rect(left_rect));
         egui::Frame::NONE
-            .fill(MOCHA.mantle) // Darker background for sidebar
+            .fill(current_theme().bg_secondary) // Base background for sidebar
             .inner_margin(egui::Margin::same(spacing::SPACING_MD as i8))
             .show(&mut left_ui, |ui| {
                 if total_tasks == 0 {
@@ -353,7 +352,7 @@ impl LaReviewApp {
                         ui.label(
                             egui::RichText::new(egui_phosphor::regular::BOUNDING_BOX)
                                 .size(48.0)
-                                .color(MOCHA.surface2),
+                                .color(current_theme().border_secondary),
                         );
                         ui.add_space(spacing::SPACING_MD);
                         ui.heading("No review tasks yet");
@@ -362,10 +361,12 @@ impl LaReviewApp {
                             egui::RichText::new(
                                 "Once tasks are generated, they will show up in the left panel.",
                             )
-                            .color(MOCHA.subtext0),
+                            .color(current_theme().text_muted),
                         );
                         ui.add_space(14.0);
-                        if action_button(ui, "Generate tasks", true, MOCHA.mauve).clicked() {
+                        if action_button(ui, "Generate tasks", true, current_theme().brand)
+                            .clicked()
+                        {
                             self.switch_to_generate();
                         }
                     });
@@ -388,7 +389,7 @@ impl LaReviewApp {
                         egui::RichText::new(review_title)
                             .size(15.0)
                             .strong()
-                            .color(MOCHA.text),
+                            .color(current_theme().text_primary),
                     )
                     .wrap(),
                 );
@@ -400,7 +401,7 @@ impl LaReviewApp {
                     // Left: Progress Label
                     ui.label(
                         egui::RichText::new(format!("{} / {} Tasks", done_tasks, total_tasks))
-                            .color(MOCHA.subtext1)
+                            .color(current_theme().text_on_muted)
                             .size(12.0),
                     );
 
@@ -416,20 +417,20 @@ impl LaReviewApp {
                             crate::domain::RiskLevel::Low => (
                                 icons::CARET_CIRCLE_DOWN,
                                 "Low risk",
-                                MOCHA.blue.gamma_multiply(0.2),
-                                MOCHA.blue,
+                                current_theme().accent.gamma_multiply(0.2),
+                                current_theme().accent,
                             ),
                             crate::domain::RiskLevel::Medium => (
                                 icons::CARET_CIRCLE_UP,
                                 "Med risk",
-                                MOCHA.yellow.gamma_multiply(0.2),
-                                MOCHA.yellow,
+                                current_theme().warning.gamma_multiply(0.2),
+                                current_theme().warning,
                             ),
                             crate::domain::RiskLevel::High => (
                                 icons::CARET_CIRCLE_DOUBLE_UP,
                                 "High risk",
-                                MOCHA.red.gamma_multiply(0.2),
-                                MOCHA.red,
+                                current_theme().destructive.gamma_multiply(0.2),
+                                current_theme().destructive,
                             ),
                         };
                         // NOTE: The 'badge' helper is assumed to be defined at the end of the file.
@@ -441,9 +442,9 @@ impl LaReviewApp {
 
                 // Progress Bar
                 let progress_bar = egui::ProgressBar::new(progress).fill(if progress == 1.0 {
-                    MOCHA.green
+                    current_theme().success
                 } else {
-                    MOCHA.blue
+                    current_theme().accent
                 });
 
                 ui.add(progress_bar);
@@ -468,7 +469,7 @@ impl LaReviewApp {
                     ui.label(
                         egui::RichText::new(source_text)
                             .size(11.0)
-                            .color(MOCHA.overlay1),
+                            .color(current_theme().text_disabled),
                     );
                 }
 
@@ -496,9 +497,9 @@ impl LaReviewApp {
                             let mut header_text =
                                 egui::RichText::new(header_title).color(if is_done {
                                     // <--- Use the new formatted string
-                                    MOCHA.subtext0
+                                    current_theme().text_muted
                                 } else {
-                                    MOCHA.text
+                                    current_theme().text_primary
                                 });
                             if is_done {
                                 header_text = header_text.strikethrough();
@@ -541,11 +542,12 @@ impl LaReviewApp {
 
         // Draw resize line
         let line_color = if resize_response.hovered() || resize_response.dragged() {
-            MOCHA.blue
+            current_theme().accent
         } else {
-            MOCHA.surface0
+            current_theme().border // Standardize on overlay0
         };
-        ui.painter().rect_filled(resize_rect, 2.0, line_color);
+        ui.painter()
+            .rect_filled(resize_rect, egui::CornerRadius::ZERO, line_color);
         if resize_response.hovered() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
         }
@@ -553,7 +555,7 @@ impl LaReviewApp {
         // --- RIGHT PANEL: Task Details ---
         let mut right_ui = ui.new_child(egui::UiBuilder::new().max_rect(right_rect));
         egui::Frame::NONE
-            .fill(ui.style().visuals.window_fill)
+            .fill(current_theme().bg_primary) // Crust background for content
             .inner_margin(egui::Margin::symmetric(spacing::SPACING_XL as i8, 0))
             .show(&mut right_ui, |ui| {
                 let right_state = if display_order_tasks.is_empty() {
@@ -613,20 +615,20 @@ impl LaReviewApp {
                             ui.label(
                                 egui::RichText::new(egui_phosphor::regular::LIST_CHECKS)
                                     .size(64.0)
-                                    .color(MOCHA.surface2),
+                                    .color(current_theme().border_secondary),
                             );
                             ui.add_space(16.0);
                             ui.heading("Ready to review");
                             ui.add_space(6.0);
                             ui.label(
                                 egui::RichText::new("Pick a task on the left, or jump in now.")
-                                    .color(MOCHA.subtext0),
+                                    .color(current_theme().text_disabled),
                             );
                             ui.add_space(16.0);
 
                             let primary_enabled = next_open_id.is_some();
                             let primary_resp =
-                                pill_action_button(ui, icons::ARROW_RIGHT, "Next open", primary_enabled, MOCHA.mauve);
+                                pill_action_button(ui, icons::ARROW_RIGHT, "Next open", primary_enabled, current_theme().brand);
                             if should_focus_primary {
                                 ui.memory_mut(|mem| mem.request_focus(primary_resp.id));
                             }
@@ -641,7 +643,7 @@ impl LaReviewApp {
                                 egui::RichText::new(
                                     "Tip: Start with HIGH RISK to catch big issues early.",
                                 )
-                                .color(MOCHA.subtext0)
+                                .color(current_theme().text_muted)
                                 .size(12.0),
                             );
                         });
@@ -652,7 +654,7 @@ impl LaReviewApp {
                             ui.label(
                                 egui::RichText::new(egui_phosphor::regular::BOUNDING_BOX)
                                     .size(64.0)
-                                    .color(MOCHA.surface2),
+                                    .color(current_theme().border_secondary),
                             );
                             ui.add_space(16.0);
                             ui.heading("No review tasks yet");
@@ -661,10 +663,10 @@ impl LaReviewApp {
                                 egui::RichText::new(
                                     "Once tasks are generated, they will show up in the left panel.",
                                 )
-                                .color(MOCHA.subtext0),
+                                .color(current_theme().text_muted),
                             );
                             ui.add_space(16.0);
-                            if action_button(ui, "Generate tasks", true, MOCHA.mauve).clicked() {
+                            if action_button(ui, "Generate tasks", true, current_theme().brand).clicked() {
                                 self.switch_to_generate();
                             }
                         });
@@ -675,17 +677,17 @@ impl LaReviewApp {
                             ui.label(
                                 egui::RichText::new(egui_phosphor::regular::CHECK_CIRCLE)
                                     .size(64.0)
-                                    .color(MOCHA.green.gamma_multiply(0.8)),
+                                    .color(current_theme().success.gamma_multiply(0.8)),
                             );
                             ui.add_space(16.0);
                             ui.heading("All done");
                             ui.add_space(6.0);
                             ui.label(
                                 egui::RichText::new(format!("You closed {} tasks.", done_tasks))
-                                    .color(MOCHA.subtext0),
+                                    .color(current_theme().text_muted),
                             );
                             ui.add_space(16.0);
-                            if action_button(ui, "Back to generate", true, MOCHA.mauve).clicked() {
+                            if action_button(ui, "Back to generate", true, current_theme().brand).clicked() {
                                 self.switch_to_generate();
                             }
                         });

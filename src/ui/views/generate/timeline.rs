@@ -1,5 +1,5 @@
 use crate::ui::app::{TimelineContent, TimelineItem};
-use catppuccin_egui::MOCHA;
+use crate::ui::theme::current_theme;
 use eframe::egui;
 use eframe::egui::collapsing_header::CollapsingState;
 
@@ -15,7 +15,7 @@ pub(super) fn render_timeline_item(ui: &mut egui::Ui, item: &TimelineItem) {
             ui.add(
                 egui::Label::new(
                     egui::RichText::new(line)
-                        .color(MOCHA.subtext0)
+                        .color(current_theme().text_muted)
                         .monospace()
                         .size(11.0),
                 )
@@ -31,11 +31,11 @@ pub(super) fn render_timeline_item(ui: &mut egui::Ui, item: &TimelineItem) {
 fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
     let get_status_style = |status: &ToolCallStatus| -> (egui::Color32, &str) {
         match status {
-            ToolCallStatus::Pending => (MOCHA.overlay2, "Pending"),
-            ToolCallStatus::InProgress => (MOCHA.yellow, "Running"),
-            ToolCallStatus::Completed => (MOCHA.green, "Done"),
-            ToolCallStatus::Failed => (MOCHA.red, "Failed"),
-            _ => (MOCHA.overlay2, "Unknown"),
+            ToolCallStatus::Pending => (current_theme().text_muted, "Pending"),
+            ToolCallStatus::InProgress => (current_theme().warning, "Running"),
+            ToolCallStatus::Completed => (current_theme().success, "Done"),
+            ToolCallStatus::Failed => (current_theme().destructive, "Failed"),
+            _ => (current_theme().text_muted, "Unknown"),
         }
     };
 
@@ -44,25 +44,26 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
             ui.horizontal(|ui| {
                 ui.label(
                     egui::RichText::new("User")
-                        .color(MOCHA.mauve)
+                        .color(current_theme().text_accent)
                         .strong()
                         .size(12.0),
                 );
-                render_content_chunk(ui, chunk, MOCHA.text, false);
+                render_content_chunk(ui, chunk, current_theme().text_primary, false);
             });
         }
         SessionUpdate::AgentMessageChunk(chunk) => {
-            render_content_chunk(ui, chunk, MOCHA.text, false);
+            render_content_chunk(ui, chunk, current_theme().text_primary, false);
         }
         SessionUpdate::AgentThoughtChunk(chunk) => {
             // New Design: No quotes, distinct color
-            render_content_chunk(ui, chunk, MOCHA.sky, false);
+            render_content_chunk(ui, chunk, current_theme().accent, false);
         }
         SessionUpdate::ToolCall(call) => {
             ui.push_id((&call.tool_call_id, "tool_card"), |ui| {
                 egui::Frame::group(ui.style())
-                    .fill(MOCHA.mantle)
-                    .stroke(egui::Stroke::new(1.0, MOCHA.surface0))
+                    .fill(current_theme().bg_secondary)
+                    .stroke(egui::Stroke::new(1.0, current_theme().border))
+                    .corner_radius(egui::CornerRadius::ZERO)
                     .inner_margin(8.0)
                     .show(ui, |ui| {
                         ui.set_max_width(ui.available_width());
@@ -77,7 +78,7 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                                 ui.horizontal(|ui| {
                                     ui.label(
                                         egui::RichText::new(egui_phosphor::regular::WRENCH)
-                                            .color(MOCHA.blue),
+                                            .color(current_theme().accent),
                                     );
 
                                     let full_title = &call.title;
@@ -90,7 +91,7 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                                     ui.label(
                                         egui::RichText::new(display_title)
                                             .strong()
-                                            .color(MOCHA.text),
+                                            .color(current_theme().text_primary),
                                     )
                                     .on_hover_text(full_title);
 
@@ -114,7 +115,7 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                                     ui.label(
                                         egui::RichText::new("Command:")
                                             .size(11.0)
-                                            .color(MOCHA.overlay1)
+                                            .color(current_theme().text_muted)
                                             .strong(),
                                     );
                                     ui.add(
@@ -122,7 +123,7 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                                             egui::RichText::new(&call.title)
                                                 .monospace()
                                                 .size(11.0)
-                                                .color(MOCHA.text),
+                                                .color(current_theme().text_primary),
                                         )
                                         .wrap(),
                                     );
@@ -154,7 +155,7 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                 ui.label(egui::RichText::new(icon).color(color).size(12.0));
                 ui.label(
                     egui::RichText::new(format!("{} -> {}", title, label))
-                        .color(MOCHA.subtext0)
+                        .color(current_theme().text_muted)
                         .size(12.0),
                 );
             });
@@ -167,7 +168,7 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                     ui.horizontal(|ui| {
                         ui.label(
                             egui::RichText::new(egui_phosphor::regular::LIST_CHECKS)
-                                .color(MOCHA.mauve),
+                                .color(current_theme().text_accent),
                         );
                         ui.label(
                             egui::RichText::new(format!(
@@ -175,7 +176,7 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                                 plan.entries.len()
                             ))
                             .strong()
-                            .color(MOCHA.text),
+                            .color(current_theme().text_primary),
                         );
                     });
                 })
@@ -187,7 +188,7 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
             // Minimal system log
             ui.label(
                 egui::RichText::new("System: Commands updated")
-                    .color(MOCHA.overlay0)
+                    .color(current_theme().text_muted)
                     .italics()
                     .size(10.0),
             );
@@ -196,13 +197,13 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
             ui.horizontal(|ui| {
                 ui.label(
                     egui::RichText::new("Mode switch:")
-                        .color(MOCHA.overlay0)
+                        .color(current_theme().text_muted)
                         .size(11.0),
                 );
                 ui.label(
                     egui::RichText::new(mode.current_mode_id.to_string())
-                        .color(MOCHA.overlay1)
-                        .background_color(MOCHA.surface0)
+                        .color(current_theme().text_muted)
+                        .background_color(current_theme().bg_secondary)
                         .monospace()
                         .size(10.0),
                 );
@@ -212,7 +213,7 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
             ui.add(
                 egui::Label::new(
                     egui::RichText::new(format!("{:?}", update))
-                        .color(MOCHA.overlay0)
+                        .color(current_theme().text_muted)
                         .monospace()
                         .size(10.0),
                 )
@@ -253,7 +254,7 @@ fn render_kv_json(ui: &mut egui::Ui, label: &str, value: &serde_json::Value) {
     ui.label(
         egui::RichText::new(label)
             .size(11.0)
-            .color(MOCHA.overlay1)
+            .color(current_theme().text_muted)
             .strong(),
     );
 
@@ -269,7 +270,7 @@ fn render_kv_json(ui: &mut egui::Ui, label: &str, value: &serde_json::Value) {
                         egui::RichText::new(k)
                             .monospace()
                             .size(11.0)
-                            .color(MOCHA.blue),
+                            .color(current_theme().accent),
                     );
 
                     let v_str = if v.is_string() {
@@ -289,7 +290,7 @@ fn render_kv_json(ui: &mut egui::Ui, label: &str, value: &serde_json::Value) {
                             egui::RichText::new(shown_v)
                                 .monospace()
                                 .size(11.0)
-                                .color(MOCHA.subtext0),
+                                .color(current_theme().text_muted),
                         )
                         .wrap(),
                     );

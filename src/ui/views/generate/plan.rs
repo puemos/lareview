@@ -1,5 +1,5 @@
+use crate::ui::theme::current_theme;
 use agent_client_protocol::{Plan, PlanEntryStatus};
-use catppuccin_egui::MOCHA;
 use eframe::egui;
 
 use crate::ui::spacing;
@@ -10,6 +10,9 @@ pub(super) fn render_plan_panel(ui: &mut egui::Ui, plan: &Plan) {
     }
 
     egui::Frame::group(ui.style())
+        .fill(current_theme().bg_secondary)
+        .stroke(egui::Stroke::new(1.0, current_theme().border))
+        .corner_radius(egui::CornerRadius::ZERO)
         .inner_margin(egui::Margin::symmetric(
             spacing::SPACING_MD as i8,
             spacing::SPACING_SM as i8,
@@ -19,7 +22,7 @@ pub(super) fn render_plan_panel(ui: &mut egui::Ui, plan: &Plan) {
                 ui.label(
                     egui::RichText::new(format!("{} PLAN", egui_phosphor::regular::LIST_CHECKS))
                         .size(11.0)
-                        .color(MOCHA.subtext0),
+                        .color(current_theme().text_muted),
                 );
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -35,7 +38,7 @@ pub(super) fn render_plan_panel(ui: &mut egui::Ui, plan: &Plan) {
                             egui_phosphor::regular::CHECK_CIRCLE
                         ))
                         .size(11.0)
-                        .color(MOCHA.overlay2),
+                        .color(current_theme().text_muted),
                     );
                 });
             });
@@ -55,7 +58,7 @@ pub(super) fn render_plan_timeline_item(ui: &mut egui::Ui, plan: &Plan) {
                 "{} Plan updated",
                 egui_phosphor::regular::LIST_CHECKS
             ))
-            .color(MOCHA.subtext0)
+            .color(current_theme().text_muted)
             .size(12.0),
         );
         return;
@@ -79,7 +82,7 @@ pub(super) fn render_plan_timeline_item(ui: &mut egui::Ui, plan: &Plan) {
         "{} Plan ({completed}/{total})",
         egui_phosphor::regular::LIST_CHECKS
     ))
-    .color(MOCHA.subtext0)
+    .color(current_theme().text_muted)
     .size(12.0);
 
     egui::CollapsingHeader::new(header)
@@ -103,10 +106,10 @@ fn render_plan_entries(ui: &mut egui::Ui, plan: &Plan, dense: bool) {
             ui.label(egui::RichText::new(icon).size(14.0).color(color));
 
             let text_color = match status {
-                PlanEntryStatus::Completed => MOCHA.subtext1,
-                PlanEntryStatus::InProgress => MOCHA.text,
-                PlanEntryStatus::Pending => MOCHA.text,
-                _ => MOCHA.text,
+                PlanEntryStatus::Completed => current_theme().text_muted,
+                PlanEntryStatus::InProgress => current_theme().text_primary,
+                PlanEntryStatus::Pending => current_theme().text_primary,
+                _ => current_theme().text_primary,
             };
 
             ui.add(
@@ -119,7 +122,11 @@ fn render_plan_entries(ui: &mut egui::Ui, plan: &Plan, dense: bool) {
             );
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.label(egui::RichText::new(label).size(10.5).color(MOCHA.overlay2));
+                ui.label(
+                    egui::RichText::new(label)
+                        .size(10.5)
+                        .color(current_theme().text_muted),
+                );
             });
         });
 
@@ -131,11 +138,25 @@ fn render_plan_entries(ui: &mut egui::Ui, plan: &Plan, dense: bool) {
 
 fn plan_entry_style(status: PlanEntryStatus) -> (&'static str, egui::Color32, &'static str) {
     match status {
-        PlanEntryStatus::Completed => (egui_phosphor::regular::CHECK_CIRCLE, MOCHA.green, "done"),
-        PlanEntryStatus::InProgress => {
-            (egui_phosphor::regular::CIRCLE_DASHED, MOCHA.yellow, "doing")
-        }
-        PlanEntryStatus::Pending => (egui_phosphor::regular::CIRCLE, MOCHA.overlay1, "todo"),
-        _ => (egui_phosphor::regular::CIRCLE, MOCHA.overlay1, "unknown"),
+        PlanEntryStatus::Completed => (
+            egui_phosphor::regular::CHECK_CIRCLE,
+            current_theme().success,
+            "done",
+        ),
+        PlanEntryStatus::InProgress => (
+            egui_phosphor::regular::CIRCLE_DASHED,
+            current_theme().warning,
+            "doing",
+        ),
+        PlanEntryStatus::Pending => (
+            egui_phosphor::regular::CIRCLE,
+            current_theme().text_muted,
+            "todo",
+        ),
+        _ => (
+            egui_phosphor::regular::CIRCLE,
+            current_theme().text_muted,
+            "unknown",
+        ),
     }
 }

@@ -1,6 +1,6 @@
 use crate::ui::app::LaReviewApp;
 use crate::ui::spacing;
-use catppuccin_egui::MOCHA;
+use crate::ui::theme::current_theme;
 use eframe::egui;
 use egui_phosphor::regular as icons;
 
@@ -10,31 +10,37 @@ impl LaReviewApp {
         let is_selected = self.state.selected_task_id.as_ref() == Some(&task.id);
 
         let (bg_color, text_color) = if is_selected {
-            (MOCHA.surface1, MOCHA.text)
+            (current_theme().bg_secondary, current_theme().text_primary)
         } else {
-            (egui::Color32::TRANSPARENT, MOCHA.subtext0)
+            (egui::Color32::TRANSPARENT, current_theme().text_muted)
         };
 
         let (risk_icon, risk_color, risk_label) = match task.stats.risk {
-            crate::domain::RiskLevel::High => {
-                (icons::CARET_CIRCLE_DOUBLE_UP, MOCHA.red, "High risk")
+            crate::domain::RiskLevel::High => (
+                icons::CARET_CIRCLE_DOUBLE_UP,
+                current_theme().destructive,
+                "High risk",
+            ),
+            crate::domain::RiskLevel::Medium => (
+                icons::CARET_CIRCLE_UP,
+                current_theme().warning,
+                "Medium risk",
+            ),
+            crate::domain::RiskLevel::Low => {
+                (icons::CARET_CIRCLE_DOWN, current_theme().accent, "Low risk")
             }
-            crate::domain::RiskLevel::Medium => {
-                (icons::CARET_CIRCLE_UP, MOCHA.yellow, "Medium risk")
-            }
-            crate::domain::RiskLevel::Low => (icons::CARET_CIRCLE_DOWN, MOCHA.blue, "Low risk"),
         };
 
         let mut title_text = egui::RichText::new(&task.title)
             .size(13.0)
             .color(text_color);
         if task.status.is_closed() {
-            title_text = title_text.color(MOCHA.subtext0).strikethrough();
+            title_text = title_text.color(current_theme().text_muted).strikethrough();
         }
 
         let response = egui::Frame::NONE
             .fill(bg_color)
-            .corner_radius(4.0)
+            .corner_radius(egui::CornerRadius::ZERO)
             .inner_margin(egui::Margin::symmetric(
                 spacing::SPACING_SM as i8,
                 (spacing::SPACING_XS + 2.0) as i8,

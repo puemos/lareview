@@ -3,7 +3,7 @@ use crate::ui::components::badge::badge;
 use crate::ui::components::pills::pill_divider;
 use crate::ui::components::{DiffAction, LineContext};
 use crate::ui::spacing;
-use catppuccin_egui::MOCHA;
+use crate::ui::theme::current_theme;
 use eframe::egui;
 use egui_phosphor::regular as icons;
 
@@ -24,7 +24,7 @@ impl LaReviewApp {
                     egui::Label::new(
                         egui::RichText::new(&task.title)
                             .size(22.0)
-                            .color(MOCHA.text),
+                            .color(current_theme().text_primary),
                     )
                     .wrap(),
                 );
@@ -40,12 +40,18 @@ impl LaReviewApp {
                 let left_width = (row_width - status_width - gap).max(120.0);
 
                 let status_visuals = |status: crate::domain::TaskStatus| match status {
-                    crate::domain::TaskStatus::Pending => (icons::CIRCLE, "To do", MOCHA.mauve),
-                    crate::domain::TaskStatus::InProgress => {
-                        (icons::CIRCLE_HALF, "In progress", MOCHA.blue)
+                    crate::domain::TaskStatus::Pending => {
+                        (icons::CIRCLE, "To do", current_theme().brand)
                     }
-                    crate::domain::TaskStatus::Done => (icons::CHECK_CIRCLE, "Done", MOCHA.green),
-                    crate::domain::TaskStatus::Ignored => (icons::X_CIRCLE, "Ignored", MOCHA.red),
+                    crate::domain::TaskStatus::InProgress => {
+                        (icons::CIRCLE_HALF, "In progress", current_theme().accent)
+                    }
+                    crate::domain::TaskStatus::Done => {
+                        (icons::CHECK_CIRCLE, "Done", current_theme().success)
+                    }
+                    crate::domain::TaskStatus::Ignored => {
+                        (icons::X_CIRCLE, "Ignored", current_theme().destructive)
+                    }
                 };
 
                 let status_widget_text =
@@ -92,20 +98,24 @@ impl LaReviewApp {
                                         {
                                             crate::domain::RiskLevel::High => (
                                                 icons::CARET_CIRCLE_DOUBLE_UP,
-                                                MOCHA.red,
+                                                current_theme().destructive,
                                                 "High risk",
                                             ),
-                                            crate::domain::RiskLevel::Medium => {
-                                                (icons::CARET_CIRCLE_UP, MOCHA.yellow, "Med risk")
-                                            }
-                                            crate::domain::RiskLevel::Low => {
-                                                (icons::CARET_CIRCLE_DOWN, MOCHA.blue, "Low risk")
-                                            }
+                                            crate::domain::RiskLevel::Medium => (
+                                                icons::CARET_CIRCLE_UP,
+                                                current_theme().warning,
+                                                "Med risk",
+                                            ),
+                                            crate::domain::RiskLevel::Low => (
+                                                icons::CARET_CIRCLE_DOWN,
+                                                current_theme().accent,
+                                                "Low risk",
+                                            ),
                                         };
                                         badge(
                                             ui,
                                             &format!("{risk_icon} {risk_text}"),
-                                            risk_fg.gamma_multiply(0.2),
+                                            risk_fg.gamma_multiply(0.1),
                                             risk_fg,
                                         );
 
@@ -117,7 +127,12 @@ impl LaReviewApp {
                                             task.stats.additions,
                                             task.stats.deletions
                                         );
-                                        badge(ui, &stats_text, MOCHA.surface0, MOCHA.subtext0);
+                                        badge(
+                                            ui,
+                                            &stats_text,
+                                            current_theme().bg_secondary,
+                                            current_theme().text_muted,
+                                        );
                                     });
                                 },
                             );
@@ -136,7 +151,7 @@ impl LaReviewApp {
                                         selected_icon,
                                         selected_color,
                                         selected_label,
-                                        MOCHA.text,
+                                        current_theme().text_primary,
                                     );
 
                                     egui::ComboBox::from_id_salt(
@@ -155,8 +170,12 @@ impl LaReviewApp {
                                             crate::domain::TaskStatus::Ignored,
                                         ] {
                                             let (icon, label, color) = status_visuals(status);
-                                            let text =
-                                                status_widget_text(icon, color, label, MOCHA.text);
+                                            let text = status_widget_text(
+                                                icon,
+                                                color,
+                                                label,
+                                                current_theme().text_primary,
+                                            );
                                             let selected = task.status == status;
                                             if ui.selectable_label(selected, text).clicked() {
                                                 next_status = Some(status);
@@ -186,14 +205,15 @@ impl LaReviewApp {
 
                 // 3. Context Section (Description + Insight)
                 egui::Frame::group(ui.style())
-                    .fill(MOCHA.surface0.gamma_multiply(0.3))
-                    .stroke(egui::Stroke::new(1.0, MOCHA.surface1))
+                    .fill(current_theme().bg_tertiary)
+                    .stroke(egui::Stroke::new(1.0, current_theme().border))
+                    .corner_radius(egui::CornerRadius::ZERO)
                     .inner_margin(spacing::SPACING_MD)
                     .show(ui, |ui| {
                         ui.set_width(ui.available_width());
 
                         // Description
-                        ui.label(section_title("Description").color(MOCHA.lavender));
+                        ui.label(section_title("Description").color(current_theme().text_accent));
                         ui.add_space(spacing::SPACING_XS);
                         let description = crate::infra::normalize_newlines(&task.description);
                         egui_commonmark::CommonMarkViewer::new().show(
@@ -208,9 +228,11 @@ impl LaReviewApp {
                             ui.horizontal(|ui| {
                                 ui.label(
                                     egui::RichText::new(egui_phosphor::regular::SPARKLE)
-                                        .color(MOCHA.yellow),
+                                        .color(current_theme().warning),
                                 );
-                                ui.label(section_title("AI Insight").color(MOCHA.yellow));
+                                ui.label(
+                                    section_title("AI Insight").color(current_theme().warning),
+                                );
                             });
                             ui.add_space(spacing::SPACING_XS);
                             let insight_text = crate::infra::normalize_newlines(insight);
@@ -226,12 +248,13 @@ impl LaReviewApp {
 
                 // Diagram Viewer
                 if task.diagram.as_ref().is_some_and(|d| !d.is_empty()) {
-                    ui.label(section_title("Diagram").color(MOCHA.text));
+                    ui.label(section_title("Diagram").color(current_theme().text_primary));
                     ui.add_space(spacing::SPACING_XS);
                     egui::Frame::NONE
-                        .stroke(egui::Stroke::new(1.0, MOCHA.surface1))
+                        .fill(current_theme().bg_tertiary)
+                        .stroke(egui::Stroke::new(1.0, current_theme().border))
                         .inner_margin(spacing::SPACING_MD)
-                        .corner_radius(4.0)
+                        .corner_radius(egui::CornerRadius::ZERO)
                         .show(ui, |ui| {
                             ui.set_min_height(200.0);
                             let go_to_settings = crate::ui::components::diagram::diagram_view(
@@ -247,7 +270,7 @@ impl LaReviewApp {
                 }
 
                 // 4. Diff Viewer
-                ui.label(section_title("Changes").color(MOCHA.text));
+                ui.label(section_title("Changes").color(current_theme().text_primary));
                 ui.add_space(spacing::SPACING_XS);
 
                 // Build unified diff from diff_refs instead of stored diffs
@@ -328,9 +351,10 @@ impl LaReviewApp {
                     );
                 } else {
                     egui::Frame::NONE
-                        .stroke(egui::Stroke::new(1.0, MOCHA.surface1))
+                        .fill(current_theme().bg_tertiary)
+                        .stroke(egui::Stroke::new(1.0, current_theme().border))
                         .inner_margin(spacing::SPACING_MD)
-                        .corner_radius(4.0)
+                        .corner_radius(egui::CornerRadius::ZERO)
                         .show(ui, |ui| {
                             ui.set_min_height(300.0);
 

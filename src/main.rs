@@ -1,3 +1,4 @@
+#![allow(unexpected_cfgs)]
 //! Main entry point for the LaReview application
 //! Initializes the egui application framework and sets up the Tokio runtime.
 
