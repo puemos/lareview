@@ -57,4 +57,13 @@ pub enum Command {
     RunD2 {
         command: D2Command,
     },
+    GenerateExportPreview {
+        review_id: ReviewId,
+        run_id: crate::domain::ReviewRunId,
+    },
+    ExportReview {
+        review_id: ReviewId,
+        run_id: crate::domain::ReviewRunId,
+        path: std::path::PathBuf,
+    },
 }

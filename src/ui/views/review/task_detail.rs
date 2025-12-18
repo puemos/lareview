@@ -195,8 +195,12 @@ impl LaReviewApp {
                         // Description
                         ui.label(section_title("Description").color(MOCHA.lavender));
                         ui.add_space(spacing::SPACING_XS);
-                        let description = task.description.replace("\\n", "\n");
-                        ui.label(egui::RichText::new(description.trim()).color(MOCHA.text));
+                        let description = crate::infra::normalize_newlines(&task.description);
+                        egui_commonmark::CommonMarkViewer::new().show(
+                            ui,
+                            &mut self.state.markdown_cache,
+                            &description,
+                        );
 
                         // Insight (if any)
                         if let Some(insight) = &task.insight {
@@ -209,11 +213,11 @@ impl LaReviewApp {
                                 ui.label(section_title("AI Insight").color(MOCHA.yellow));
                             });
                             ui.add_space(spacing::SPACING_XS);
-                            let insight_text = insight.replace("\\n", "\n");
-                            ui.label(
-                                egui::RichText::new(insight_text.trim())
-                                    .italics()
-                                    .color(MOCHA.subtext0),
+                            let insight_text = crate::infra::normalize_newlines(insight);
+                            egui_commonmark::CommonMarkViewer::new().show(
+                                ui,
+                                &mut self.state.markdown_cache,
+                                &insight_text,
                             );
                         }
                     });
@@ -295,7 +299,7 @@ impl LaReviewApp {
                     }
                 };
 
-                // ADDED: Determine if the current task has an active line note (for highlighting)
+                // Determine if the current task has an active line note (for highlighting)
                 let active_line_context = self
                     .state
                     .current_line_note

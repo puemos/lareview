@@ -1,3 +1,4 @@
+use egui_commonmark::CommonMarkCache;
 use std::collections::HashMap;
 
 use agent_client_protocol::{Plan, SessionUpdate};
@@ -26,9 +27,13 @@ impl SelectedAgent {
     pub fn new(id: impl Into<String>) -> Self {
         Self { id: id.into() }
     }
+}
 
-    pub fn from_str(id: &str) -> Self {
-        Self { id: id.to_string() }
+impl std::str::FromStr for SelectedAgent {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self { id: s.to_string() })
     }
 }
 
@@ -41,6 +46,7 @@ impl std::fmt::Display for SelectedAgent {
 /// All app state in one struct.
 #[derive(Default)]
 pub struct AppState {
+    pub markdown_cache: CommonMarkCache,
     pub current_view: AppView,
     /// All review tasks fetched from the database, to be filtered by selected PR.
     pub all_tasks: Vec<ReviewTask>,
@@ -75,13 +81,18 @@ pub struct AppState {
     pub selected_task_id: Option<String>,
 
     pub current_note: Option<String>,
+    pub task_line_notes: Vec<crate::domain::Note>,
     pub current_line_note: Option<LineNoteContext>,
     pub review_error: Option<String>,
 
     pub full_diff: Option<FullDiffView>,
 
+    pub export_preview: Option<String>,
+    pub export_assets: HashMap<String, Vec<u8>>,
+
     pub cached_unified_diff: Option<(Vec<crate::domain::DiffRef>, String)>,
 
+    pub is_exporting: bool,
     pub d2_install_output: String,
     pub is_d2_installing: bool,
     pub allow_d2_install: bool,

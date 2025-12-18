@@ -63,6 +63,11 @@ pub enum ReviewAction {
     StartLineNote(LineNoteContext),
     OpenFullDiff(FullDiffView),
     CloseFullDiff,
+    RequestExportPreview,
+    CloseExportPreview,
+    ExportReviewToFile {
+        path: std::path::PathBuf,
+    },
 }
 
 #[derive(Debug)]
@@ -84,12 +89,15 @@ pub enum AsyncAction {
     TaskNoteLoaded {
         task_id: String,
         note: Option<String>,
+        line_notes: Vec<crate::domain::Note>,
     },
     TaskStatusSaved(Result<(), String>),
     NoteSaved(Result<(), String>),
     ReviewDeleted(Result<(), String>),
     D2InstallOutput(String),
     D2InstallComplete,
+    ExportPreviewGenerated(Result<crate::application::review::export::ExportResult, String>),
+    ExportFinished(Result<(), String>),
 }
 
 #[derive(Debug)]

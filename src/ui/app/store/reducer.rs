@@ -216,6 +216,36 @@ fn reduce_review(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
             state.full_diff = None;
             Vec::new()
         }
+        ReviewAction::RequestExportPreview => {
+            if let Some(review_id) = state.selected_review_id.clone()
+                && let Some(run_id) = state.selected_run_id.clone()
+            {
+                state.is_exporting = true;
+                state.review_error = None;
+                vec![Command::GenerateExportPreview { review_id, run_id }]
+            } else {
+                state.review_error = Some("No review or run selected for export".into());
+                vec![]
+            }
+        }
+        ReviewAction::CloseExportPreview => {
+            state.export_preview = None;
+            Vec::new()
+        }
+        ReviewAction::ExportReviewToFile { path } => {
+            if let (Some(review_id), Some(run_id)) =
+                (&state.selected_review_id, &state.selected_run_id)
+            {
+                state.is_exporting = true;
+                vec![Command::ExportReview {
+                    review_id: review_id.clone(),
+                    run_id: run_id.clone(),
+                    path,
+                }]
+            } else {
+                Vec::new()
+            }
+        }
     }
 }
 
@@ -294,9 +324,14 @@ fn reduce_async(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
                 Vec::new()
             }
         },
-        AsyncAction::TaskNoteLoaded { task_id, note } => {
+        AsyncAction::TaskNoteLoaded {
+            task_id,
+            note,
+            line_notes,
+        } => {
             if state.selected_task_id.as_ref() == Some(&task_id) {
                 state.current_note = Some(note.unwrap_or_default());
+                state.task_line_notes = line_notes;
                 state.review_error = None;
             }
             Vec::new()
@@ -344,6 +379,28 @@ fn reduce_async(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
         AsyncAction::D2InstallComplete => {
             state.is_d2_installing = false;
             Vec::new()
+        }
+        AsyncAction::ExportPreviewGenerated(result) => {
+            state.is_exporting = false;
+            match result {
+                Ok(res) => {
+                    state.export_preview = Some(res.markdown);
+                    state.export_assets = res.assets;
+                }
+                Err(err) => {
+                    state.review_error = Some(format!("Failed to generate preview: {}", err));
+                }
+            }
+            Vec::new()
+        }
+        AsyncAction::ExportFinished(result) => {
+            state.is_exporting = false;
+            if let Err(e) = result {
+                state.review_error = Some(format!("Export failed: {}", e));
+            } else {
+                state.export_preview = None;
+            }
+            vec![]
         }
     }
 }
@@ -463,6 +520,7 @@ fn apply_review_data(state: &mut AppState, payload: ReviewDataPayload) -> Vec<Co
     {
         state.selected_task_id = Some(next_open.id.clone());
         state.current_line_note = None;
+        state.task_line_notes.clear();
         state.current_note = Some(String::new());
         commands.push(Command::LoadTaskNote {
             task_id: next_open.id.clone(),
@@ -475,6 +533,7 @@ fn apply_review_data(state: &mut AppState, payload: ReviewDataPayload) -> Vec<Co
 fn select_task(state: &mut AppState, task_id: TaskId) -> Vec<Command> {
     state.selected_task_id = Some(task_id.clone());
     state.current_line_note = None;
+    state.task_line_notes.clear();
     state.cached_unified_diff = None;
     state.current_note = Some(String::new());
     vec![Command::LoadTaskNote { task_id }]
@@ -491,6 +550,7 @@ fn select_default_task_for_current_run(state: &mut AppState) -> Vec<Command> {
 
     state.selected_task_id = Some(next_open.id.clone());
     state.current_line_note = None;
+    state.task_line_notes.clear();
     state.current_note = Some(String::new());
     vec![Command::LoadTaskNote {
         task_id: next_open.id.clone(),

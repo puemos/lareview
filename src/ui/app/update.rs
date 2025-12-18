@@ -10,9 +10,14 @@ impl eframe::App for LaReviewApp {
 
         self.poll_gh_messages();
         self.poll_d2_install_messages();
+        let action_updated = self.poll_action_messages();
         let agent_content_updated = self.poll_generation_messages();
 
-        if agent_content_updated || self.state.is_generating {
+        if action_updated
+            || agent_content_updated
+            || self.state.is_generating
+            || self.state.is_exporting
+        {
             ctx.request_repaint_after(std::time::Duration::from_millis(100));
         }
 
@@ -29,5 +34,6 @@ impl eframe::App for LaReviewApp {
         });
 
         self.render_full_diff_overlay(ctx);
+        self.render_export_preview_overlay(ctx);
     }
 }

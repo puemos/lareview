@@ -30,4 +30,13 @@ impl LaReviewApp {
         }
         agent_content_updated
     }
+
+    pub(super) fn poll_action_messages(&mut self) -> bool {
+        let mut any = false;
+        while let Ok(action) = self.action_rx.try_recv() {
+            self.dispatch(action);
+            any = true;
+        }
+        any
+    }
 }

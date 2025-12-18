@@ -144,7 +144,7 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
                             }
 
                             if item_response.clicked() && is_available {
-                                *selected_agent = SelectedAgent::from_str(&agent.id);
+                                *selected_agent = SelectedAgent::new(&agent.id);
                                 egui::Popup::close_id(ui.ctx(), id);
                             }
 

@@ -81,10 +81,7 @@ impl LaReviewClient {
                 // Don't store raw payload for streaming - validation now works from task objects
                 true
             }
-            Err(err) => {
-                eprintln!("[acp] failed to parse return_task payload: {err:?}");
-                false
-            }
+            Err(_) => false,
         }
     }
 
@@ -252,9 +249,6 @@ impl agent_client_protocol::Client for LaReviewClient {
             })
             .unwrap_or(RequestPermissionOutcome::Cancelled);
 
-        eprintln!(
-            "[acp] permission request: kind={tool_kind:?} title={tool_title:?} outcome={outcome:?}"
-        );
         Ok(RequestPermissionResponse::new(outcome))
     }
 

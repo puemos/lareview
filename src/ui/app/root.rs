@@ -30,4 +30,7 @@ pub struct LaReviewApp {
 
     pub d2_install_tx: mpsc::Sender<String>,
     pub d2_install_rx: mpsc::Receiver<String>,
+
+    pub action_tx: mpsc::Sender<crate::ui::app::Action>,
+    pub action_rx: mpsc::Receiver<crate::ui::app::Action>,
 }

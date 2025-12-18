@@ -66,6 +66,7 @@ impl LaReviewApp {
         let (gen_tx, gen_rx) = mpsc::channel(32);
         let (gh_tx, gh_rx) = mpsc::channel(8);
         let (d2_install_tx, d2_install_rx) = mpsc::channel(32);
+        let (action_tx, action_rx) = mpsc::channel(32);
 
         let mut app = Self {
             state,
@@ -80,6 +81,8 @@ impl LaReviewApp {
             gh_rx,
             d2_install_tx,
             d2_install_rx,
+            action_tx,
+            action_rx,
         };
 
         if let Some(image_bytes) = crate::assets::get_content("assets/icons/icon-512.png")

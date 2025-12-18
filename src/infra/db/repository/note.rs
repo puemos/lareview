@@ -126,4 +126,35 @@ impl NoteRepository {
             Ok(None)
         }
     }
+
+    pub fn find_all_for_tasks(&self, task_ids: &[TaskId]) -> Result<Vec<Note>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT task_id, file_path, line_number, body, updated_at FROM notes WHERE task_id = ?1 ORDER BY task_id, file_path, line_number",
+        )?;
+
+        let mut all_notes = Vec::new();
+        for id in task_ids {
+            let rows = stmt.query_map([id], |row| {
+                let task_id_val: String = row.get(0)?;
+                let file_path_val: Option<String> = row.get(1)?;
+                let line_number_val: Option<i32> = row.get(2)?;
+                let body_val: String = row.get(3)?;
+                let updated_at_val: String = row.get(4)?;
+
+                Ok(Note {
+                    task_id: task_id_val,
+                    file_path: file_path_val,
+                    line_number: line_number_val.map(|n| n as u32),
+                    body: body_val,
+                    updated_at: updated_at_val,
+                })
+            })?;
+            for note in rows {
+                all_notes.push(note?);
+            }
+        }
+
+        Ok(all_notes)
+    }
 }

@@ -1,4 +1,4 @@
-use super::action::{Action, AsyncAction, ReviewDataPayload};
+use super::action::{Action, AsyncAction, ReviewAction, ReviewDataPayload};
 use super::command::{Command, D2Command};
 use crate::domain::ReviewId;
 use crate::infra::acp::{GenerateTasksInput, generate_tasks_with_acp, list_agent_candidates};
@@ -35,6 +35,14 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
             line_number,
         } => save_note(app, task_id, body, file_path, line_number),
         Command::RunD2 { command } => run_d2_command(app, command),
+        Command::GenerateExportPreview { review_id, run_id } => {
+            generate_export_preview(app, review_id, run_id)
+        }
+        Command::ExportReview {
+            review_id,
+            run_id,
+            path,
+        } => export_review(app, review_id, run_id, path),
     }
 }
 
@@ -269,22 +277,44 @@ fn refresh_review_data(app: &mut LaReviewApp, reason: super::command::ReviewData
 }
 
 fn load_task_note(app: &mut LaReviewApp, task_id: crate::domain::TaskId) {
-    let result = app
+    // 1. Fetch main note
+    let main_note_res = app
         .note_repo
         .find_by_task(&task_id)
-        .map(|opt| opt.map(|n| n.body))
-        .map_err(|e| format!("Failed to load note: {e}"));
+        .map(|opt| opt.map(|n| n.body));
 
-    match result {
-        Ok(note) => {
-            app.dispatch(Action::Async(AsyncAction::TaskNoteLoaded { task_id, note }));
+    // 2. Fetch line notes
+    let line_notes_res = app.note_repo.find_line_notes_for_task(&task_id);
+
+    match (main_note_res, line_notes_res) {
+        (Ok(note), Ok(line_notes)) => {
+            app.dispatch(Action::Async(AsyncAction::TaskNoteLoaded {
+                task_id,
+                note,
+                line_notes,
+            }));
         }
-        Err(err) => {
+        (Err(e), _) => {
+            // Main note error
             app.dispatch(Action::Async(AsyncAction::TaskNoteLoaded {
                 task_id: task_id.clone(),
                 note: None,
+                line_notes: vec![],
             }));
-            app.dispatch(Action::Async(AsyncAction::NoteSaved(Err(err))));
+            app.dispatch(Action::Async(AsyncAction::NoteSaved(Err(format!(
+                "Failed to load note: {e}"
+            )))));
+        }
+        (Ok(note), Err(e)) => {
+            // Line notes error - still return main note but report error
+            app.dispatch(Action::Async(AsyncAction::TaskNoteLoaded {
+                task_id: task_id.clone(),
+                note,
+                line_notes: vec![],
+            }));
+            app.dispatch(Action::Async(AsyncAction::NoteSaved(Err(format!(
+                "Failed to load line notes: {e}"
+            )))));
         }
     }
 }
@@ -350,7 +380,7 @@ fn save_note(
     line_number: Option<u32>,
 ) {
     let note = crate::domain::Note {
-        task_id,
+        task_id: task_id.clone(),
         body,
         updated_at: chrono::Utc::now().to_rfc3339(),
         file_path,
@@ -363,6 +393,9 @@ fn save_note(
         .map_err(|e| format!("Failed to save note: {e}"));
 
     app.dispatch(Action::Async(AsyncAction::NoteSaved(result)));
+    app.dispatch(Action::Review(ReviewAction::SelectTask {
+        task_id: task_id.clone(),
+    })); // Reload to get updated list
 }
 
 fn run_d2_command(app: &mut LaReviewApp, command: D2Command) {
@@ -409,6 +442,126 @@ fn run_d2_command(app: &mut LaReviewApp, command: D2Command) {
 
         let _ = d2_install_tx
             .send("___INSTALL_COMPLETE___".to_string())
+            .await;
+    });
+}
+
+fn generate_export_preview(
+    app: &mut LaReviewApp,
+    review_id: crate::domain::ReviewId,
+    run_id: crate::domain::ReviewRunId,
+) {
+    let review_repo = app.review_repo.clone();
+    let run_repo = app.run_repo.clone();
+    let task_repo = app.task_repo.clone();
+    let note_repo = app.note_repo.clone();
+    let action_tx = app.action_tx.clone();
+
+    tokio::spawn(async move {
+        let result = async {
+            let review = review_repo
+                .find_by_id(&review_id)
+                .map_err(|e: anyhow::Error| e.to_string())?
+                .ok_or("Review not found")?;
+            let run = run_repo
+                .find_by_id(&run_id)
+                .map_err(|e: anyhow::Error| e.to_string())?
+                .ok_or("Run not found")?;
+            let tasks = task_repo
+                .find_by_run(&run_id)
+                .map_err(|e: anyhow::Error| e.to_string())?;
+
+            let task_ids: Vec<_> = tasks.iter().map(|t| t.id.clone()).collect();
+            let notes = note_repo
+                .find_all_for_tasks(&task_ids)
+                .map_err(|e: anyhow::Error| e.to_string())?;
+
+            let data = crate::application::review::export::ExportData {
+                review,
+                run,
+                tasks,
+                notes,
+            };
+
+            crate::application::review::export::ReviewExporter::export_to_markdown(&data, true)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        .await;
+
+        let _ = action_tx
+            .send(Action::Async(AsyncAction::ExportPreviewGenerated(result)))
+            .await;
+    });
+}
+
+fn export_review(
+    app: &mut LaReviewApp,
+    review_id: crate::domain::ReviewId,
+    run_id: crate::domain::ReviewRunId,
+    path: std::path::PathBuf,
+) {
+    let review_repo = app.review_repo.clone();
+    let run_repo = app.run_repo.clone();
+    let task_repo = app.task_repo.clone();
+    let note_repo = app.note_repo.clone();
+    let action_tx = app.action_tx.clone();
+
+    tokio::spawn(async move {
+        let result: anyhow::Result<()> = async {
+            let review = review_repo
+                .find_by_id(&review_id)
+                .map_err(|e: anyhow::Error| anyhow::anyhow!(e))?
+                .ok_or_else(|| anyhow::anyhow!("Review not found"))?;
+            let run = run_repo
+                .find_by_id(&run_id)
+                .map_err(|e: anyhow::Error| anyhow::anyhow!(e))?
+                .ok_or_else(|| anyhow::anyhow!("Run not found"))?;
+            let tasks = task_repo
+                .find_by_run(&run_id)
+                .map_err(|e: anyhow::Error| anyhow::anyhow!(e))?;
+
+            let task_ids: Vec<_> = tasks.iter().map(|t| t.id.clone()).collect();
+            let notes = note_repo
+                .find_all_for_tasks(&task_ids)
+                .map_err(|e: anyhow::Error| anyhow::anyhow!(e))?;
+
+            let data = crate::application::review::export::ExportData {
+                review,
+                run,
+                tasks,
+                notes,
+            };
+
+            let export_result =
+                crate::application::review::export::ReviewExporter::export_to_markdown(
+                    &data, false,
+                )
+                .await
+                .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+            // Write Markdown
+            std::fs::write(&path, &export_result.markdown)?;
+
+            // Write Assets
+            if !export_result.assets.is_empty() {
+                let parent_dir = path.parent().unwrap_or_else(|| std::path::Path::new("."));
+                let assets_dir = parent_dir.join("assets");
+                std::fs::create_dir_all(&assets_dir)?;
+
+                for (filename, bytes) in export_result.assets {
+                    std::fs::write(assets_dir.join(filename), bytes)?;
+                }
+            }
+
+            Ok(())
+        }
+        .await;
+
+        let _ = action_tx
+            .send(Action::Async(AsyncAction::ExportFinished(
+                result.map_err(|e: anyhow::Error| e.to_string()),
+            )))
             .await;
     });
 }

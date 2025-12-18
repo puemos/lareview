@@ -181,7 +181,7 @@ impl LaReviewApp {
                                     }
                                 }
                             }
-
+                            
                             // RIGHT: Actions
                             ui.allocate_ui_with_layout(
                                 egui::vec2(ui.available_width(), ui.available_height()),
@@ -201,6 +201,27 @@ impl LaReviewApp {
                                         );
                                         if resp.clicked() {
                                             trigger_delete_review = true;
+                                        }
+
+                                        ui.add_space(spacing::SPACING_SM);
+
+                                        let resp = pill_action_button(
+                                            ui,
+                                            icons::EXPORT,
+                                            "Export",
+                                            review_selected,
+                                            current_theme().border,
+                                        )
+                                        .on_hover_text("Export the review as a markdown file.");
+                                        if resp.clicked() {
+                                            self.dispatch(Action::Review(
+                                                ReviewAction::RequestExportPreview,
+                                            ));
+                                        }
+
+                                        if self.state.is_exporting {
+                                            ui.add_space(spacing::SPACING_SM);
+                                            ui.add(egui::Spinner::new().size(16.0));
                                         }
                                     }
                                 },

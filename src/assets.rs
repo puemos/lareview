@@ -20,6 +20,9 @@ pub fn get_content(path: &str) -> Option<&'static [u8]> {
         "assets/fonts/SpaceMono-Regular.ttf" => {
             Some(include_bytes!("../assets/fonts/SpaceMono-Regular.ttf"))
         }
+        "assets/fonts/Inter-Regular.ttf" => {
+            Some(include_bytes!("../assets/fonts/Inter-Regular.ttf"))
+        }
 
         _ => None,
     }

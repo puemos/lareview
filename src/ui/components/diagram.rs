@@ -1,7 +1,4 @@
-use egui::{
-    Id, Image, Rect, TextureOptions, Ui,
-    load::{Bytes, SizeHint, SizedTexture, TexturePoll},
-};
+use egui::{Id, Image, Rect, TextureOptions, Ui, load::SizedTexture};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::sync::mpsc::{Receiver, channel};
@@ -12,22 +9,17 @@ type DiagramKey = u64;
 
 const SVG_RASTER_SIZE: u32 = 2048;
 
-#[derive(Clone)]
-struct DiagramSvg {
-    image_id: String,
-    bytes: Bytes,
-}
+// DiagramSvg removed - now using PixelsReady(egui::ColorImage)
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct CachedTexture {
-    id: egui::TextureId,
-    size: egui::Vec2,
+    handle: egui::TextureHandle,
 }
 
 #[derive(Clone)]
 enum DiagramState {
     Loading,
-    SvgReady(DiagramSvg),
+    PixelsReady(Box<egui::ColorImage>),
     TextureReady(CachedTexture),
     Error(String),
 }
@@ -52,10 +44,27 @@ impl Default for DiagramMemory {
     }
 }
 
-// Global storage for receivers (can't be stored in egui memory due to Clone/Sync requirements)
+// Global storage for receivers and fonts
 lazy_static::lazy_static! {
     static ref DIAGRAM_RECEIVERS: Arc<Mutex<HashMap<DiagramKey, Receiver<DiagramState>>>> =
         Arc::new(Mutex::new(HashMap::new()));
+
+    static ref FONT_DB: Arc<fontdb::Database> = {
+        let mut db = fontdb::Database::new();
+        if let Some(font_data) = crate::assets::get_content("assets/fonts/SpaceMono-Regular.ttf") {
+            db.load_font_data(font_data.to_vec());
+        }
+        if let Some(font_data) = crate::assets::get_content("assets/fonts/Inter-Regular.ttf") {
+            db.load_font_data(font_data.to_vec());
+        }
+        // Set Inter as the fallback for all generic families, with Space Mono as secondary for monospace
+        db.set_serif_family("Inter");
+        db.set_sans_serif_family("Inter");
+        db.set_monospace_family("Space Mono");
+        db.set_cursive_family("Inter");
+        db.set_fantasy_family("Inter");
+        Arc::new(db)
+    };
 }
 
 /// Renders a D2 diagram using egui Scene for zooming.
@@ -106,19 +115,62 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<String>, is_dark_mode: bool) -
                 receivers.insert(diagram_key, rx);
             }
 
-            // Spawn background task to generate SVG
+            // Spawn background task to generate SVG and rasterize it
             let trimmed_code = trimmed_code.clone();
             let ctx = ui.ctx().clone();
-            let diagram_key_for_thread = diagram_key;
 
             std::thread::spawn(move || {
                 let result = crate::infra::d2::d2_to_svg(&trimmed_code, is_dark_mode);
 
                 let state = match result {
-                    Ok(svg) => DiagramState::SvgReady(DiagramSvg {
-                        image_id: image_id_for_key(diagram_key_for_thread),
-                        bytes: Bytes::from(svg.into_bytes()),
-                    }),
+                    Ok(svg_str) => {
+                        // Replace D2's generated font family with "Inter"
+                        // D2 generates CSS like: font-family: "d2-73211304-font-regular";
+                        // We want: font-family: "Inter";
+                        lazy_static::lazy_static! {
+                            static ref FONT_RE: regex::Regex = regex::Regex::new(r#"font-family:\s*"[^"]+";"#).unwrap();
+                        }
+                        let svg_str = FONT_RE.replace_all(&svg_str, r#"font-family: "Inter";"#);
+
+                        // Background Rasterization using resvg
+                        let opt = usvg::Options {
+                            fontdb: FONT_DB.clone(),
+                            font_family: "Inter".to_string(),
+                            ..Default::default()
+                        };
+                        let rtree = usvg::Tree::from_str(&svg_str, &opt);
+
+                        match rtree {
+                            Ok(rtree) => {
+                                let size = rtree.size();
+
+                                // Calculate scaling to fit SVG_RASTER_SIZE while maintaining aspect ratio
+                                let scale = (SVG_RASTER_SIZE as f32 / size.width())
+                                    .min(SVG_RASTER_SIZE as f32 / size.height());
+
+                                let mut pixmap = tiny_skia::Pixmap::new(
+                                    (size.width() * scale).ceil() as u32,
+                                    (size.height() * scale).ceil() as u32,
+                                )
+                                .unwrap();
+
+                                resvg::render(
+                                    &rtree,
+                                    tiny_skia::Transform::from_scale(scale, scale),
+                                    &mut pixmap.as_mut(),
+                                );
+
+                                let pixels = pixmap.data();
+                                let color_image = egui::ColorImage::from_rgba_unmultiplied(
+                                    [pixmap.width() as usize, pixmap.height() as usize],
+                                    pixels,
+                                );
+
+                                DiagramState::PixelsReady(Box::new(color_image))
+                            }
+                            Err(e) => DiagramState::Error(format!("SVG parsing error: {}", e)),
+                        }
+                    }
                     Err(e) => DiagramState::Error(e),
                 };
 
@@ -130,7 +182,6 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<String>, is_dark_mode: bool) -
             });
         }
 
-        // Check if generation completed in background
         if matches!(memory.cache.get(&diagram_key), Some(DiagramState::Loading))
             && let Ok(mut receivers) = DIAGRAM_RECEIVERS.lock()
             && let Some(rx) = receivers.get(&diagram_key)
@@ -153,46 +204,24 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<String>, is_dark_mode: bool) -
         )
     });
 
-    if let DiagramState::SvgReady(svg) = &state {
-        ui.ctx()
-            .include_bytes(svg.image_id.clone(), svg.bytes.clone());
-        let load = ui.ctx().try_load_texture(
-            svg.image_id.as_str(),
+    if let DiagramState::PixelsReady(color_image) = state {
+        let texture = ui.ctx().load_texture(
+            image_id_for_key(diagram_key),
+            *color_image,
             TextureOptions::LINEAR,
-            SizeHint::Size {
-                width: SVG_RASTER_SIZE,
-                height: SVG_RASTER_SIZE,
-                maintain_aspect_ratio: true,
-            },
         );
 
-        match load {
-            Ok(TexturePoll::Ready { texture }) => {
-                let cached_texture = CachedTexture {
-                    id: texture.id,
-                    size: texture.size,
-                };
-                ui.ctx().memory_mut(|mem| {
-                    let memory = mem.data.get_temp_mut_or_default::<DiagramMemory>(memory_id);
-                    memory
-                        .cache
-                        .insert(diagram_key, DiagramState::TextureReady(cached_texture));
-                });
-                state = DiagramState::TextureReady(cached_texture);
-            }
-            Ok(TexturePoll::Pending { .. }) => {
-                ui.ctx().request_repaint();
-            }
-            Err(e) => {
-                ui.ctx().memory_mut(|mem| {
-                    let memory = mem.data.get_temp_mut_or_default::<DiagramMemory>(memory_id);
-                    memory
-                        .cache
-                        .insert(diagram_key, DiagramState::Error(e.to_string()));
-                });
-                state = DiagramState::Error(e.to_string());
-            }
-        }
+        let cached_texture = CachedTexture { handle: texture };
+
+        ui.ctx().memory_mut(|mem| {
+            let memory = mem.data.get_temp_mut_or_default::<DiagramMemory>(memory_id);
+            memory.cache.insert(
+                diagram_key,
+                DiagramState::TextureReady(cached_texture.clone()),
+            );
+        });
+
+        state = DiagramState::TextureReady(cached_texture);
     }
 
     // If expanded, show in full-screen overlay
@@ -290,7 +319,7 @@ fn render_diagram(
             ui.ctx().request_repaint();
             None
         }
-        DiagramState::SvgReady(_) => {
+        DiagramState::PixelsReady(_) => {
             ui.centered_and_justified(|ui| {
                 ui.vertical_centered(|ui| {
                     ui.spinner();
@@ -311,8 +340,11 @@ fn render_diagram(
                 .max_inner_size(egui::Vec2::splat(10_000.0))
                 .show(ui, scene_rect, |ui| {
                     ui.add(
-                        Image::from_texture(SizedTexture::new(texture.id, texture.size))
-                            .fit_to_exact_size(texture.size),
+                        Image::from_texture(SizedTexture::new(
+                            texture.handle.id(),
+                            texture.handle.size_vec2(),
+                        ))
+                        .fit_to_exact_size(texture.handle.size_vec2()),
                     );
                 });
 

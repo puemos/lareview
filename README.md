@@ -45,13 +45,13 @@ https://github.com/user-attachments/assets/2eef5d53-c3a0-404a-9958-d63944d75809
 
 LaReview is designed for a local-first, secure, and focused review experience.
 
-|                                                                                      | Feature                                                                                                                                                                                                                                   |
-| :----------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <img src="assets/screenshots/generation.png" width="400" alt="Plan Generation View"> | **AI-Powered Plan Generation**<br>Input a GitHub PR reference (e.g., `owner/repo#123`) or paste a raw diff. LaReview uses your local ACP agent to analyze the changes and generate a structured review plan based on the author's intent. |
-| <img src="assets/screenshots/tasks.png" width="400" alt="Structured Review Tree">    | **Structured Task Tree & Notes**<br>Navigate the review as a hierarchical tree. Mark tasks as **To Do**, **In Progress**, or **Done**. Attach contextual notes to specific tasks or lines of code to keep track of your thoughts.         |
-| <img src="assets/screenshots/diff.png" width="400" alt="Task-focused Diff Viewer">   | **Task-Focused Diffs**<br>Stop context switching. When you select a task, the diff viewer only shows the specific hunks relevant to completing that task, isolating the noise.                                                            |
-| <img src="assets/screenshots/diagram.png" width="400" alt="Diagram Viewer">          | **Visual Diagram View**<br>Visualize the structure and flow of changes with automatically generated diagrams, helping you understand complex refactors faster.                                                                            |
-| <img src="assets/screenshots/settings.png" width="400" alt="Settings View">          | **Local-First & Secure**<br>No third-party servers. Review state is stored in a local SQLite DB. PR data is fetched securely via your own GitHub CLI (`gh`), and planning is handled by your local ACP agent.                             |
+|                                                                                      | Feature                                                                                                                                                                                                                                        |
+| :----------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <img src="assets/screenshots/generation.png" width="400" alt="Plan Generation View"> | **AI-Powered Plan Generation**<br>Input a GitHub PR reference (e.g., `owner/repo#123`) or paste a raw diff. LaReview uses your local ACP agent to analyze the changes and generate a structured review plan based on the author's intent.      |
+| <img src="assets/screenshots/tasks.png" width="400" alt="Structured Review Tree">    | **Structured Task Tree & Notes**<br>Navigate the review as a hierarchical tree. Mark tasks as **To Do**, **In Progress**, or **Done**. Attach contextual notes to specific tasks or lines of code to keep track of your thoughts.              |
+| <img src="assets/screenshots/diff.png" width="400" alt="Task-focused Diff Viewer">   | **Task-Focused Diffs**<br>Stop context switching. When you select a task, the diff viewer only shows the specific hunks relevant to completing that task, isolating the noise.                                                                 |
+| <img src="assets/screenshots/diagram.png" width="400" alt="Diagram Viewer">          | **Visual Diagram View**<br>Visualize the structure and flow of changes with automatically generated diagrams, helping you understand complex refactors faster. (Requires D2).                                                                  |
+| <img src="assets/screenshots/settings.png" width="400" alt="Settings View">          | **Export & Local-First**<br>No third-party servers. Review state is stored in a local SQLite DB. Export your summary as Markdown. PR data is fetched securely via your own GitHub CLI (`gh`), and planning is handled by your local ACP agent. |
 
 ## How it works
 
@@ -76,6 +76,7 @@ LaReview is designed for a local-first, secure, and focused review experience.
 - **GitHub CLI** if you want to load PRs:
   - Install: `brew install gh` (or your OS package manager)
   - Auth: `gh auth login`
+- **D2** (optional): For visual diagram rendering. Install: `brew install d2` (or see [d2lang.com](https://d2lang.com/install))
 - **ACP agent** configured on your machine
   - Learn more: https://agentclientprotocol.com/overview/introduction
 
@@ -204,6 +205,12 @@ The review plan is shown as a tree: Intent → Sub-flows → Tasks. Selecting a 
 
 Use **Clean done** to remove completed tasks (and their notes) for the current review.
 
+### EXPORT
+
+Generate a Markdown summary of your review, including stats, metadata, task details, and diagrams. You can preview and edit the Markdown before saving it to a file.
+
+![EXPORT preview](assets/screenshots/export.png)
+
 ## Design goals
 
 - **DX**: review flows, not file lists
@@ -215,9 +222,8 @@ Use **Clean done** to remove completed tasks (and their notes) for the current r
 
 - Status: ALPHA
 - Known limitations:
-  - Big diffs may take a while to process
+  - Complex nested diff structures might require manual confirmation in some agents.
 - Roadmap:
-  - Export review as markdown
   - Sync comments with GitHub
   - Support for repo search
   - Support more ACP agents

@@ -33,6 +33,29 @@ impl ReviewRunRepository {
         Ok(())
     }
 
+    pub fn find_by_id(&self, id: &ReviewRunId) -> Result<Option<ReviewRun>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, review_id, agent_id, input_ref, diff_text, diff_hash, created_at FROM review_runs WHERE id = ?1",
+        )?;
+        let mut rows = stmt.query_map([id], |row| {
+            Ok(ReviewRun {
+                id: row.get::<_, ReviewRunId>(0)?,
+                review_id: row.get(1)?,
+                agent_id: row.get(2)?,
+                input_ref: row.get(3)?,
+                diff_text: row.get(4)?,
+                diff_hash: row.get(5)?,
+                created_at: row.get(6)?,
+            })
+        })?;
+
+        match rows.next() {
+            Some(row) => row.map(Some).map_err(Into::into),
+            None => Ok(None),
+        }
+    }
+
     pub fn find_by_review_id(&self, review_id: &ReviewId) -> Result<Vec<ReviewRun>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(

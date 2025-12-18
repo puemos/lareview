@@ -1,18 +1,8 @@
 //! Main entry point for the LaReview application
 //! Initializes the egui application framework and sets up the Tokio runtime.
 
-mod application;
-mod assets;
-mod domain;
-mod infra;
-mod prompts;
-mod ui;
-
 use eframe::egui;
-use std::sync::OnceLock;
-
-/// Global Tokio runtime handle for async operations throughout the application
-static RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
+use lareview::{RUNTIME, assets, infra, ui};
 
 /// Main entry point for the LaReview application
 /// Sets up the Tokio runtime and initializes the egui UI framework
