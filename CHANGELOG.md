@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.5] - 2025-12-18
+
+### Added
+
+- Markdown export with interactive preview and asset (SVG) support.
+- Asynchronous D2 diagram rendering to prevent UI freezes.
+- Redesigned Agent Selector as a custom dropdown with logos and availability checks.
+- Inline note highlighting in the diff viewer.
+- Full Markdown support for task descriptions and AI insights.
+
+### Changed
+
+- Horizontally centered main navigation buttons for better visual balance.
+- Improved rendering quality using `resvg` for background rasterization.
+
+### Fixed
+
+- Cleaned up debug logs and fixed several Clippy lints across the codebase.
+
 ## [0.0.4] - 2025-12-17
 
 ### Added

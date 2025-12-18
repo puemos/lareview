@@ -181,7 +181,7 @@ impl LaReviewApp {
                                     }
                                 }
                             }
-                            
+
                             // RIGHT: Actions
                             ui.allocate_ui_with_layout(
                                 egui::vec2(ui.available_width(), ui.available_height()),
