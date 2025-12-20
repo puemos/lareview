@@ -120,11 +120,7 @@ impl LaReviewApp {
                     path_sep
                 ));
                 ui.add_space(spacing::SPACING_SM);
-                self.ui_copyable_command(
-                    ui,
-                    "Show PATH in terminal",
-                    "echo $PATH | tr ':' '\\n'",
-                );
+                self.ui_copyable_command(ui, "Show PATH in terminal", "echo $PATH | tr ':' '\\n'");
                 ui.add_space(spacing::SPACING_SM);
 
                 let mut extra_path = self.state.extra_path.clone();
@@ -136,7 +132,9 @@ impl LaReviewApp {
                     )
                     .changed()
                 {
-                    self.dispatch(Action::Settings(SettingsAction::UpdateExtraPath(extra_path)));
+                    self.dispatch(Action::Settings(SettingsAction::UpdateExtraPath(
+                        extra_path,
+                    )));
                 }
 
                 ui.add_space(spacing::SPACING_SM);

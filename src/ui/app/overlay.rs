@@ -226,7 +226,7 @@ impl LaReviewApp {
 
                         for agent in &agents {
                             let label = format!("Agent: {}", agent.label);
-                            let path = agent.command.as_ref().map(|p| std::path::PathBuf::from(p));
+                            let path = agent.command.as_ref().map(std::path::PathBuf::from);
                             render_requirement_row(ui, &label, &path, theme);
                         }
                     });

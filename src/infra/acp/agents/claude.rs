@@ -9,8 +9,8 @@ fn is_command_available(command: &str) -> bool {
 
 /// Claude candidate (static for now).
 pub fn claude_candidate() -> AgentCandidate {
-    let command = crate::infra::brew::find_bin("claude")
-        .map(|path| path.to_string_lossy().to_string());
+    let command =
+        crate::infra::brew::find_bin("claude").map(|path| path.to_string_lossy().to_string());
 
     let available = command.is_some();
 

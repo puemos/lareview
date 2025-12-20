@@ -8,8 +8,8 @@ fn is_command_available(command: &str) -> bool {
 }
 
 pub fn qwen_candidate() -> AgentCandidate {
-    let command = crate::infra::brew::find_bin("qwen")
-        .map(|path| path.to_string_lossy().to_string());
+    let command =
+        crate::infra::brew::find_bin("qwen").map(|path| path.to_string_lossy().to_string());
     let available = command.is_some();
 
     AgentCandidate {

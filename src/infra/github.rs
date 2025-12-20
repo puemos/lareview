@@ -1,9 +1,9 @@
+use crate::infra::brew;
 use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::Deserialize;
 use tokio::process::Command;
-use crate::infra::brew;
 
 #[derive(Debug, Clone)]
 pub struct GitHubPrRef {

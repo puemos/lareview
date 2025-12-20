@@ -9,8 +9,8 @@ fn is_command_available(command: &str) -> bool {
 
 /// Gemini candidate (static for now).
 pub fn gemini_candidate() -> AgentCandidate {
-    let command = crate::infra::brew::find_bin("gemini")
-        .map(|path| path.to_string_lossy().to_string());
+    let command =
+        crate::infra::brew::find_bin("gemini").map(|path| path.to_string_lossy().to_string());
     let available = command.is_some();
 
     AgentCandidate {

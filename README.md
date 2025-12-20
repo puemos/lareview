@@ -92,14 +92,10 @@ LaReview is designed for a local-first, secure, and focused review experience.
 
 #### macOS
 
-On macOS, you will need to grant permission to run the application since it is not yet signed by Apple.
+Download the `lareview-macos-*.zip` asset and unzip it. You should see `LaReview.app`.
 
-1.  Download the `lareview-macos.zip` file and unzip it.
-2.  Make the binary executable and move it to your path.
-    ```sh
-    chmod +x ./lareview
-    mv ./lareview /usr/local/bin/lareview
-    ```
+- Drag `LaReview.app` into `/Applications`.
+- If macOS blocks it on first run, open **System Settings → Privacy & Security** and allow it.
 
 #### Linux
 
@@ -122,6 +118,12 @@ On macOS, you will need to grant permission to run the application since it is n
 
 ```bash
 cargo run
+```
+
+### Option C: Build a local macOS .app (dev)
+
+```bash
+scripts/build_macos_app.sh
 ```
 
 #### Linux dependencies
@@ -177,17 +179,23 @@ index 123..456 100644
 
 LaReview stores review state locally.
 
-- DB: `.lareview/db.sqlite` (in the current working directory)
-- Logs (ACP/MCP): `.lareview/logs/`
+- macOS DB: `~/Library/Application Support/LaReview/db.sqlite`
+- Windows DB: `%APPDATA%\LaReview\db.sqlite`
+- Linux DB: `$XDG_DATA_HOME/lareview/db.sqlite` or `~/.local/share/lareview/db.sqlite`
 - Override DB path:
 
   ```bash
   LAREVIEW_DB_PATH=/path/to/db.sqlite <RUN_COMMAND>
   ```
 
+Executable discovery (GUI apps can start with a minimal PATH):
+
+- Add custom paths in **Settings → Executable Search Paths**, or
+- Use `LAREVIEW_EXTRA_PATH=/custom/bin:/other/bin`
+
 Wipe local state:
 
-- Delete `.lareview/db.sqlite` (and optionally `.lareview/logs/`)
+- Delete the DB file listed above.
 
 ## UI overview
 

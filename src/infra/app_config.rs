@@ -1,19 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
     pub extra_path: Option<String>,
     pub has_seen_requirements: bool,
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            extra_path: None,
-            has_seen_requirements: false,
-        }
-    }
 }
 
 pub fn load_config() -> AppConfig {

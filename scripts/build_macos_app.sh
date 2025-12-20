@@ -12,7 +12,8 @@ cargo build --release --target "${TARGET}"
 
 BIN_SRC="target/${TARGET}/release/lareview"
 APP_DIR="target/${TARGET}/release/${APP_NAME}.app"
-BIN_DST="${APP_DIR}/Contents/MacOS/${APP_NAME}"
+BIN_DST="${APP_DIR}/Contents/MacOS/${APP_NAME}-bin"
+WRAPPER_DST="${APP_DIR}/Contents/MacOS/${APP_NAME}"
 RES_DIR="${APP_DIR}/Contents/Resources"
 
 rm -rf "${APP_DIR}"
@@ -20,6 +21,21 @@ mkdir -p "$(dirname "${BIN_DST}")" "${RES_DIR}"
 
 cp "${BIN_SRC}" "${BIN_DST}"
 chmod +x "${BIN_DST}"
+
+cat > "${WRAPPER_DST}" << 'EOF_WRAPPER'
+#!/bin/sh
+DIR="$(cd "$(dirname "$0")" && pwd)"
+PATH="$(/usr/libexec/path_helper -s | awk -F'"' '/PATH=/{print $2}')"
+if [ -z "$PATH" ]; then
+  PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+fi
+if [ -n "${LAREVIEW_EXTRA_PATH:-}" ]; then
+  PATH="${LAREVIEW_EXTRA_PATH}:$PATH"
+fi
+export PATH
+exec "$DIR/LaReview-bin" "$@"
+EOF_WRAPPER
+chmod +x "${WRAPPER_DST}"
 
 VERSION="$(cargo pkgid | sed 's/.*#//')"
 
