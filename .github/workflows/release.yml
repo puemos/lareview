@@ -19,24 +19,22 @@ jobs:
           - os: macos-latest
             target: aarch64-apple-darwin
             platform_name: macOS-ARM64
-            app_zip: lareview-macos-ARM64.zip
-            cli_tgz: lareview-macos-ARM64.tar.gz
+            artifact_name: lareview-macos-aarch64.zip
 
           - os: macos-latest
             target: x86_64-apple-darwin
             platform_name: macOS-Intel
-            app_zip: lareview-macos-Intel.zip
-            cli_tgz: lareview-macos-Intel.tar.gz
+            artifact_name: lareview-macos-x86_64.zip
 
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             platform_name: Linux-x64
-            cli_tgz: lareview-linux-x86_64.tar.gz
+            artifact_name: lareview-linux-x86_64.tar.gz
 
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             platform_name: Windows-x64
-            win_zip: lareview-windows-x86_64.zip
+            artifact_name: lareview-windows-x86_64.zip
 
     steps:
       - name: Checkout repository
@@ -59,20 +57,18 @@ jobs:
 
       - name: Build
         shell: bash
-        env:
-          MACOSX_DEPLOYMENT_TARGET: "10.15"
-        run: |
-          set -euxo pipefail
-          cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Strip (Unix)
+        if: runner.os != 'Windows'
+        run: strip "target/${{ matrix.target }}/release/lareview"
 
       - name: Import macOS signing certificate
         if: runner.os == 'macOS'
-        shell: bash
         env:
           MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
           MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
         run: |
-          set -euxo pipefail
           echo "$MACOS_CERTIFICATE" | base64 -d > cert.p12
           security create-keychain -p "$MACOS_CERTIFICATE_PWD" build.keychain
           security default-keychain -s build.keychain
@@ -80,172 +76,151 @@ jobs:
           security import cert.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k "$MACOS_CERTIFICATE_PWD" build.keychain
 
-      - name: Strip binary (Unix)
-        if: runner.os != 'Windows'
-        shell: bash
-        run: |
-          set -euxo pipefail
-          strip target/${{ matrix.target }}/release/lareview
-
       - name: Create macOS .app bundle
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          set -euxo pipefail
+          APP_NAME="LaReview"
+          BUNDLE_ID="io.github.puemos.lareview"
+          APP_BUNDLE="${APP_NAME}.app"
 
-          APP_DISPLAY_NAME="LaReview"
-          APP_BUNDLE="${APP_DISPLAY_NAME}.app"
-          OUTDIR="target/${{ matrix.target }}/release"
-          BUNDLE_DIR="${OUTDIR}/${APP_BUNDLE}"
+          BIN_SRC="target/${{ matrix.target }}/release/lareview"
+          APP_DIR="target/${{ matrix.target }}/release/${APP_BUNDLE}"
+          BIN_DST="${APP_DIR}/Contents/MacOS/${APP_NAME}"
+          RES_DIR="${APP_DIR}/Contents/Resources"
 
-          VERSION="${GITHUB_REF_NAME#v}"
+          rm -rf "${APP_DIR}"
+          mkdir -p "$(dirname "${BIN_DST}")" "${RES_DIR}"
 
-          rm -rf "$BUNDLE_DIR"
-          mkdir -p "$BUNDLE_DIR/Contents/MacOS"
-          mkdir -p "$BUNDLE_DIR/Contents/Resources"
+          cp "${BIN_SRC}" "${BIN_DST}"
+          chmod +x "${BIN_DST}"
 
-          # Copy and rename the executable to match CFBundleExecutable
-          install -m 755 "${OUTDIR}/lareview" "$BUNDLE_DIR/Contents/MacOS/${APP_DISPLAY_NAME}"
+          VERSION="${GITHUB_REF#refs/tags/v}"
 
-          cat > "$BUNDLE_DIR/Contents/Info.plist" <<EOF
+          cat > "${APP_DIR}/Contents/Info.plist" << EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
-              <key>CFBundleDevelopmentRegion</key>
-              <string>en</string>
-              <key>CFBundleExecutable</key>
-              <string>${APP_DISPLAY_NAME}</string>
-              <key>CFBundleIdentifier</key>
-              <string>io.github.puemos.lareview</string>
-              <key>CFBundleInfoDictionaryVersion</key>
-              <string>6.0</string>
-              <key>CFBundleName</key>
-              <string>${APP_DISPLAY_NAME}</string>
-              <key>CFBundlePackageType</key>
-              <string>APPL</string>
-              <key>CFBundleShortVersionString</key>
-              <string>${VERSION}</string>
-              <key>CFBundleVersion</key>
-              <string>${VERSION}</string>
-              <key>LSMinimumSystemVersion</key>
-              <string>10.15</string>
-              <key>NSHighResolutionCapable</key>
-              <true/>
+            <key>CFBundleDevelopmentRegion</key>
+            <string>en</string>
+
+            <key>CFBundleDisplayName</key>
+            <string>${APP_NAME}</string>
+
+            <key>CFBundleExecutable</key>
+            <string>${APP_NAME}</string>
+
+            <key>CFBundleIdentifier</key>
+            <string>${BUNDLE_ID}</string>
+
+            <key>CFBundleInfoDictionaryVersion</key>
+            <string>6.0</string>
+
+            <key>CFBundleName</key>
+            <string>${APP_NAME}</string>
+
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+
+            <key>CFBundleShortVersionString</key>
+            <string>${VERSION}</string>
+
+            <key>CFBundleVersion</key>
+            <string>${VERSION}</string>
+
+            <key>LSMinimumSystemVersion</key>
+            <string>10.15</string>
+
+            <key>NSHighResolutionCapable</key>
+            <true/>
+
+            <key>CFBundleIconFile</key>
+            <string>${APP_NAME}</string>
           </dict>
           </plist>
           EOF
 
-      - name: Codesign .app bundle (macOS)
+          ICON_PNG="assets/icons/icon-512.png"
+          ICONSET="$(mktemp -d)/${APP_NAME}.iconset"
+          mkdir -p "${ICONSET}"
+
+          sips -z 16 16     "${ICON_PNG}" --out "${ICONSET}/icon_16x16.png"
+          sips -z 32 32     "${ICON_PNG}" --out "${ICONSET}/icon_16x16@2x.png"
+          sips -z 32 32     "${ICON_PNG}" --out "${ICONSET}/icon_32x32.png"
+          sips -z 64 64     "${ICON_PNG}" --out "${ICONSET}/icon_32x32@2x.png"
+          sips -z 128 128   "${ICON_PNG}" --out "${ICONSET}/icon_128x128.png"
+          sips -z 256 256   "${ICON_PNG}" --out "${ICONSET}/icon_128x128@2x.png"
+          sips -z 256 256   "${ICON_PNG}" --out "${ICONSET}/icon_256x256.png"
+          sips -z 512 512   "${ICON_PNG}" --out "${ICONSET}/icon_256x256@2x.png"
+          sips -z 512 512   "${ICON_PNG}" --out "${ICONSET}/icon_512x512.png"
+          cp "${ICON_PNG}" "${ICONSET}/icon_512x512@2x.png"
+
+          iconutil -c icns "${ICONSET}" -o "${RES_DIR}/${APP_NAME}.icns"
+
+      - name: Codesign .app (macOS)
         if: runner.os == 'macOS'
-        shell: bash
         env:
           MACOS_IDENTITY: ${{ secrets.MACOS_IDENTITY }}
-        run: |
-          set -euxo pipefail
-
-          APP_DISPLAY_NAME="LaReview"
-          APP_BUNDLE="${APP_DISPLAY_NAME}.app"
-          BUNDLE_DIR="target/${{ matrix.target }}/release/${APP_BUNDLE}"
-
-          # Sign main executable first
-          codesign --force --options runtime --timestamp \
-            --sign "$MACOS_IDENTITY" \
-            "$BUNDLE_DIR/Contents/MacOS/${APP_DISPLAY_NAME}"
-
-          # Then sign the bundle
-          codesign --force --options runtime --timestamp \
-            --sign "$MACOS_IDENTITY" \
-            "$BUNDLE_DIR"
-
-          # Verify
-          codesign --verify --strict --verbose=2 "$BUNDLE_DIR"
-
-      - name: Notarize and staple .app (macOS)
-        if: runner.os == 'macOS'
         shell: bash
+        run: |
+          APP_NAME="LaReview"
+          APP_BUNDLE="target/${{ matrix.target }}/release/${APP_NAME}.app"
+
+          codesign --force --options runtime --timestamp \
+            --sign "$MACOS_IDENTITY" \
+            "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+
+          codesign --force --options runtime --timestamp \
+            --sign "$MACOS_IDENTITY" \
+            "$APP_BUNDLE"
+
+          codesign -vvv --deep --strict "$APP_BUNDLE"
+
+      - name: Notarize and staple (macOS)
+        if: runner.os == 'macOS'
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        shell: bash
         run: |
-          set -euxo pipefail
-
-          APP_DISPLAY_NAME="LaReview"
-          APP_BUNDLE="${APP_DISPLAY_NAME}.app"
           cd "target/${{ matrix.target }}/release"
+          APP_NAME="LaReview"
+          APP_BUNDLE="${APP_NAME}.app"
 
-          rm -f lareview-notarize.zip
-          /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$APP_BUNDLE" lareview-notarize.zip
-
-          xcrun notarytool submit lareview-notarize.zip \
+          ditto -c -k --keepParent "$APP_BUNDLE" "notarize.zip"
+          xcrun notarytool submit "notarize.zip" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
             --wait
-
           xcrun stapler staple "$APP_BUNDLE"
-          xcrun stapler validate "$APP_BUNDLE"
+          rm "notarize.zip"
 
-          spctl --assess --type execute --verbose=2 "$APP_BUNDLE"
-
-          rm -f lareview-notarize.zip
-
-      - name: Package macOS artifacts
+      - name: Package (macOS)
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          set -euxo pipefail
-
-          mkdir -p dist
           cd "target/${{ matrix.target }}/release"
+          ditto -c -k --keepParent "LaReview.app" "../../../${{ matrix.artifact_name }}"
 
-          APP_DISPLAY_NAME="LaReview"
-          APP_BUNDLE="${APP_DISPLAY_NAME}.app"
-
-          # Ship a zip for cask (preferred for .app distribution)
-          /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$APP_BUNDLE" \
-            "$GITHUB_WORKSPACE/dist/${{ matrix.app_zip }}"
-
-          # Also ship a CLI tarball for a brew formula
-          mkdir -p "$GITHUB_WORKSPACE/dist/cli"
-          install -m 755 "$APP_BUNDLE/Contents/MacOS/${APP_DISPLAY_NAME}" "$GITHUB_WORKSPACE/dist/cli/lareview"
-          (cd "$GITHUB_WORKSPACE/dist/cli" && tar czf "$GITHUB_WORKSPACE/dist/${{ matrix.cli_tgz }}" lareview)
-          rm -rf "$GITHUB_WORKSPACE/dist/cli"
-
-      - name: Package Linux artifact
+      - name: Package (Linux)
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          set -euxo pipefail
-          mkdir -p dist
-          cd target/${{ matrix.target }}/release
-          tar czf "$GITHUB_WORKSPACE/dist/${{ matrix.cli_tgz }}" lareview
+          cd "target/${{ matrix.target }}/release"
+          tar czf "../../../${{ matrix.artifact_name }}" lareview
 
-      - name: Package Windows artifact
+      - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
-          Set-Location target\${{ matrix.target }}\release
-          Compress-Archive -Force -Path lareview.exe -DestinationPath "$env:GITHUB_WORKSPACE\dist\${{ matrix.win_zip }}"
+          cd "target/${{ matrix.target }}/release"
+          Compress-Archive -Path lareview.exe -DestinationPath ..\..\..\${{ matrix.artifact_name }}
 
-      - name: Upload Release Assets (macOS)
-        if: runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/')
+      - name: Upload Release Asset
         uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: |
-            dist/${{ matrix.app_zip }}
-            dist/${{ matrix.cli_tgz }}
-
-      - name: Upload Release Asset (Linux)
-        if: runner.os == 'Linux' && startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: dist/${{ matrix.cli_tgz }}
-
-      - name: Upload Release Asset (Windows)
-        if: runner.os == 'Windows' && startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: dist/${{ matrix.win_zip }}
+          files: ${{ matrix.artifact_name }}

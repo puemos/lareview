@@ -47,8 +47,42 @@ impl Database {
             return PathBuf::from(path);
         }
 
-        let cwd = std::env::current_dir().unwrap_or_default();
-        cwd.join(".lareview").join("db.sqlite")
+        #[cfg(target_os = "macos")]
+        {
+            if let Some(home) = home::home_dir() {
+                return home
+                    .join("Library")
+                    .join("Application Support")
+                    .join("LaReview")
+                    .join("db.sqlite");
+            }
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            if let Some(appdata) = std::env::var_os("APPDATA") {
+                return PathBuf::from(appdata).join("LaReview").join("db.sqlite");
+            }
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            if let Some(xdg) = std::env::var_os("XDG_DATA_HOME") {
+                return PathBuf::from(xdg).join("lareview").join("db.sqlite");
+            }
+            if let Some(home) = home::home_dir() {
+                return home
+                    .join(".local")
+                    .join("share")
+                    .join("lareview")
+                    .join("db.sqlite");
+            }
+        }
+
+        std::env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join(".lareview")
+            .join("db.sqlite")
     }
 
     /// Initialize database schema
