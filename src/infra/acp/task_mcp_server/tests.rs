@@ -52,7 +52,7 @@ async fn test_return_task_tool_writes_file() {
         "title": "test",
         "description": "test task",
         "stats": { "risk": "LOW", "tags": ["test"] },
-        "diagram": "Flow: { shape: sequence_diagram Reviewer -> Code: \"review\" }",
+        "diagram": "sequence_diagram: { Reviewer -> Code: \"review\" }",
         "diff_refs": [
             {
                 "file": "src/a.rs",
@@ -139,7 +139,7 @@ async fn test_return_task_tool_persists_to_db() {
         "title": "DB Task",
         "description": "persist me",
         "stats": { "risk": "HIGH", "tags": ["database"] },
-        "diagram": "Flow: { shape: sequence_diagram Reviewer -> DB: \"check\" }",
+        "diagram": "sequence_diagram: { Reviewer -> DB: \"check\" }",
         "diff_refs": [
             {
                 "file": "src/a.rs",
@@ -287,7 +287,7 @@ async fn test_multiple_tasks_and_finalize_persists_correctly() {
         "title": "First Task",
         "description": "First task description",
         "stats": { "risk": "LOW", "tags": ["one"] },
-        "diagram": "Flow: { shape: sequence_diagram Reviewer -> Code: \"review\" }",
+        "diagram": "sequence_diagram: { Reviewer -> Code: \"review\" }",
         "diff_refs": [
             {
                 "file": "src/a.rs",
@@ -319,7 +319,7 @@ async fn test_multiple_tasks_and_finalize_persists_correctly() {
         "title": "Second Task",
         "description": "Second task description",
         "stats": { "risk": "MEDIUM", "tags": ["two"] },
-        "diagram": "Flow: { shape: sequence_diagram Reviewer -> Code: \"verify\" }",
+        "diagram": "sequence_diagram: { Reviewer -> Code: \"verify\" }",
         "diff_refs": [
             {
                 "file": "src/a.rs",
