@@ -1,6 +1,6 @@
+use crate::infra::brew;
 use std::io::Write;
 use std::process::{Command, Stdio};
-use crate::infra::brew;
 
 pub fn d2_to_svg(d2_code: &str, is_dark_mode: bool) -> Result<String, String> {
     let d2_path = brew::find_bin("d2").ok_or_else(|| {
