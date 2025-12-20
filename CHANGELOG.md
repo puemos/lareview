@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.7] - 2025-12-20
+
+### Added
+
+- Review thread detail view with comment timelines and inline actions.
+
+### Changed
+
+- Replaced note-based review persistence with threads and comments, updating exports and timeline/task detail views.
+
 ## [0.0.6] - 2025-12-20
 
 ### Added
