@@ -45,8 +45,10 @@ impl std::fmt::Display for SelectedAgent {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ThreadContext {
-    pub file_path: String,
-    pub line_number: u32,
+    pub thread_id: Option<String>,
+    pub task_id: String,
+    pub file_path: Option<String>,
+    pub line_number: Option<u32>,
 }
 
 /// All app state in one struct.
@@ -86,10 +88,10 @@ pub struct AppState {
 
     pub selected_task_id: Option<String>,
 
-    pub current_note: Option<String>,
-    pub task_line_notes: Vec<crate::domain::Note>,
-    pub current_line_note: Option<LineNoteContext>,
     pub review_error: Option<String>,
+
+    pub threads: Vec<crate::domain::Thread>,
+    pub thread_comments: HashMap<String, Vec<crate::domain::Comment>>,
 
     pub full_diff: Option<FullDiffView>,
 
@@ -113,6 +115,12 @@ pub struct AppState {
     // UI state for Generate view
     pub agent_panel_collapsed: bool,
     pub plan_panel_collapsed: bool,
+
+    // UI state for Thread editing
+    /// Draft text for the title being edited in ThreadDetailView
+    pub thread_title_draft: String,
+    /// Draft text for the reply composer in ThreadDetailView
+    pub thread_reply_draft: String,
 }
 
 #[derive(Debug, Clone)]
@@ -131,18 +139,6 @@ pub struct GitHubPreview {
 pub struct FullDiffView {
     pub title: String,
     pub text: String,
-}
-
-/// Context for tracking an active line note being created.
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct LineNoteContext {
-    pub task_id: String,
-    pub file_idx: usize,
-    pub line_idx: usize,
-    pub line_number: usize,
-    pub file_path: String,
-    pub note_text: String,
 }
 
 impl AppState {

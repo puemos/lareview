@@ -1,11 +1,12 @@
-use super::action::{Action, AsyncAction, ReviewAction, ReviewDataPayload};
+use super::action::{Action, AsyncAction, ReviewAction, ReviewDataPayload, ReviewThreadsPayload};
 use super::command::{Command, D2Command};
-use crate::domain::ReviewId;
+use crate::domain::{Comment, ReviewId, Thread, ThreadAnchor, ThreadImpact, ThreadStatus};
 use crate::infra::acp::{GenerateTasksInput, generate_tasks_with_acp, list_agent_candidates};
 use crate::ui::app::{GenMsg, GenResultPayload};
 use crate::ui::app::{GhMsg, GhStatusPayload};
 
 use super::super::LaReviewApp;
+use std::collections::HashMap;
 
 pub fn run(app: &mut LaReviewApp, command: Command) {
     match command {
@@ -25,26 +26,27 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
             selected_agent_id,
         } => start_generation(app, *run_context, selected_agent_id),
         Command::RefreshReviewData { reason } => refresh_review_data(app, reason),
-        Command::LoadTaskNote { task_id } => load_task_note(app, task_id),
+        Command::LoadReviewThreads { review_id } => load_review_threads(app, review_id),
         Command::UpdateTaskStatus { task_id, status } => update_task_status(app, task_id, status),
         Command::DeleteReview { review_id } => delete_review(app, review_id),
-        Command::SaveNote {
+        Command::CreateThreadComment {
+            review_id,
             task_id,
-            body,
+            thread_id,
             file_path,
             line_number,
-            parent_id,
-            root_id,
-        } => save_note(
+            title,
+            body,
+        } => create_thread_comment(
             app,
+            review_id,
             task_id,
-            body,
+            thread_id,
             file_path,
             line_number,
-            parent_id,
-            root_id,
+            title,
+            body,
         ),
-        Command::ResolveThread { task_id, root_id } => resolve_thread(app, task_id, root_id),
         Command::RunD2 { command } => run_d2_command(app, command),
         Command::GenerateExportPreview { review_id, run_id } => {
             generate_export_preview(app, review_id, run_id)
@@ -54,11 +56,15 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
             run_id,
             path,
         } => export_review(app, review_id, run_id, path),
-        Command::UpdateNote {
-            note_id,
-            title,
-            severity,
-        } => update_note(app, note_id, title, severity),
+        Command::UpdateThreadStatus { thread_id, status } => {
+            update_thread_status(app, thread_id, status)
+        }
+        Command::UpdateThreadImpact { thread_id, impact } => {
+            update_thread_impact(app, thread_id, impact)
+        }
+        Command::UpdateThreadTitle { thread_id, title } => {
+            update_thread_title(app, thread_id, title)
+        }
         Command::SaveRepo { repo } => save_repo(app, repo),
         Command::DeleteRepo { repo_id } => delete_repo(app, repo_id),
         Command::PickFolderForLink => pick_folder_for_link(app),
@@ -302,47 +308,28 @@ fn refresh_review_data(app: &mut LaReviewApp, reason: super::command::ReviewData
     }));
 }
 
-fn load_task_note(app: &mut LaReviewApp, task_id: crate::domain::TaskId) {
-    // 1. Fetch main note
-    let main_note_res = app
-        .note_repo
-        .find_by_task(&task_id)
-        .map(|opt| opt.map(|n| n.body));
+fn load_review_threads(app: &mut LaReviewApp, review_id: ReviewId) {
+    let result = (|| -> Result<ReviewThreadsPayload, String> {
+        let threads = app
+            .thread_repo
+            .find_by_review(&review_id)
+            .map_err(|e| format!("Failed to load threads: {e}"))?;
+        let mut comments = HashMap::new();
+        for thread in &threads {
+            let thread_comments = app
+                .comment_repo
+                .list_for_thread(&thread.id)
+                .map_err(|e| format!("Failed to load comments: {e}"))?;
+            comments.insert(thread.id.clone(), thread_comments);
+        }
+        Ok(ReviewThreadsPayload {
+            review_id,
+            threads,
+            comments,
+        })
+    })();
 
-    // 2. Fetch line notes
-    let line_notes_res = app.note_repo.find_line_notes_for_task(&task_id);
-
-    match (main_note_res, line_notes_res) {
-        (Ok(note), Ok(line_notes)) => {
-            app.dispatch(Action::Async(AsyncAction::TaskNoteLoaded {
-                task_id,
-                note,
-                line_notes,
-            }));
-        }
-        (Err(e), _) => {
-            // Main note error
-            app.dispatch(Action::Async(AsyncAction::TaskNoteLoaded {
-                task_id: task_id.clone(),
-                note: None,
-                line_notes: vec![],
-            }));
-            app.dispatch(Action::Async(AsyncAction::NoteSaved(Err(format!(
-                "Failed to load note: {e}"
-            )))));
-        }
-        (Ok(note), Err(e)) => {
-            // Line notes error - still return main note but report error
-            app.dispatch(Action::Async(AsyncAction::TaskNoteLoaded {
-                task_id: task_id.clone(),
-                note,
-                line_notes: vec![],
-            }));
-            app.dispatch(Action::Async(AsyncAction::NoteSaved(Err(format!(
-                "Failed to load line notes: {e}"
-            )))));
-        }
-    }
+    app.dispatch(Action::Async(AsyncAction::ReviewThreadsLoaded(result)));
 }
 
 fn update_task_status(
@@ -375,10 +362,6 @@ fn delete_review(app: &mut LaReviewApp, review_id: ReviewId) {
             if !tasks.is_empty() {
                 let task_ids: Vec<_> = tasks.iter().map(|t| t.id.clone()).collect();
 
-                app.note_repo
-                    .delete_by_task_ids(&task_ids)
-                    .map_err(|e| format!("Failed to delete notes: {e}"))?;
-
                 app.task_repo
                     .delete_by_ids(&task_ids)
                     .map_err(|e| format!("Failed to delete tasks: {e}"))?;
@@ -398,52 +381,151 @@ fn delete_review(app: &mut LaReviewApp, review_id: ReviewId) {
     app.dispatch(Action::Async(AsyncAction::ReviewDeleted(result)));
 }
 
-fn save_note(
+#[allow(clippy::too_many_arguments)]
+fn create_thread_comment(
     app: &mut LaReviewApp,
+    review_id: ReviewId,
     task_id: crate::domain::TaskId,
-    body: String,
+    thread_id: Option<String>,
     file_path: Option<String>,
     line_number: Option<u32>,
-    parent_id: Option<String>,
-    root_id: Option<String>,
+    title: Option<String>,
+    body: String,
 ) {
-    let id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
-    let note = crate::domain::Note {
-        id: id.clone(),
-        task_id: task_id.clone(),
-        author: "User".to_string(),
-        body,
-        created_at: now.clone(),
-        updated_at: now,
-        file_path,
-        line_number,
-        parent_id,
-        root_id: root_id.or(Some(id)), // Use provided root_id or self if root
-        status: crate::domain::NoteStatus::Open,
-        title: None,
-        severity: None,
-    };
+    let is_new_thread = thread_id.is_none();
+    let thread_id = thread_id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
-    let result = app
-        .note_repo
-        .save(&note)
-        .map_err(|e| format!("Failed to save note: {e}"));
+    let result = (|| -> Result<(), String> {
+        if is_new_thread {
+            let title = title.unwrap_or_else(|| default_thread_title(&body));
+            let anchor = if file_path.is_some() || line_number.is_some() {
+                Some(ThreadAnchor {
+                    file_path: file_path.clone(),
+                    line_number,
+                    side: None,
+                    hunk_ref: None,
+                    head_sha: None,
+                })
+            } else {
+                None
+            };
 
-    app.dispatch(Action::Async(AsyncAction::NoteSaved(result)));
-    app.dispatch(Action::Review(ReviewAction::SelectTask {
-        task_id: task_id.clone(),
-    })); // Reload to get updated list
+            let thread = Thread {
+                id: thread_id.clone(),
+                review_id: review_id.clone(),
+                task_id: Some(task_id.clone()),
+                title,
+                status: ThreadStatus::Todo,
+                impact: ThreadImpact::Nitpick,
+                anchor,
+                author: "User".to_string(),
+                created_at: now.clone(),
+                updated_at: now.clone(),
+            };
+
+            app.thread_repo
+                .save(&thread)
+                .map_err(|e| format!("Failed to save thread: {e}"))?;
+        } else {
+            app.thread_repo
+                .touch(&thread_id)
+                .map_err(|e| format!("Failed to update thread timestamp: {e}"))?;
+        }
+
+        let comment = Comment {
+            id: uuid::Uuid::new_v4().to_string(),
+            thread_id: thread_id.clone(),
+            author: "User".to_string(),
+            body,
+            parent_id: None,
+            created_at: now.clone(),
+            updated_at: now,
+        };
+
+        app.comment_repo
+            .save(&comment)
+            .map_err(|e| format!("Failed to save comment: {e}"))?;
+
+        Ok(())
+    })();
+
+    app.dispatch(Action::Async(AsyncAction::ThreadCommentSaved(
+        result.clone(),
+    )));
+
+    if result.is_ok() {
+        load_review_threads(app, review_id.clone());
+        app.dispatch(Action::Review(ReviewAction::OpenThread {
+            task_id,
+            thread_id: Some(thread_id),
+            file_path,
+            line_number,
+        }));
+    }
 }
 
-fn resolve_thread(app: &mut LaReviewApp, task_id: crate::domain::TaskId, root_id: String) {
+fn update_thread_status(app: &mut LaReviewApp, thread_id: String, status: ThreadStatus) {
+    let review_id = app.state.selected_review_id.clone();
     let result = app
-        .note_repo
-        .resolve_thread(&task_id, &root_id)
-        .map_err(|e| format!("Failed to resolve thread: {e}"));
+        .thread_repo
+        .update_status(&thread_id, status)
+        .map(|_| ())
+        .map_err(|e| format!("Failed to update thread status: {e}"));
 
-    app.dispatch(Action::Async(AsyncAction::NoteSaved(result)));
-    app.dispatch(Action::Review(ReviewAction::SelectTask { task_id }));
+    app.dispatch(Action::Async(AsyncAction::ThreadCommentSaved(
+        result.clone(),
+    )));
+
+    if let (Ok(_), Some(review_id)) = (result, review_id) {
+        load_review_threads(app, review_id);
+    }
+}
+
+fn update_thread_impact(app: &mut LaReviewApp, thread_id: String, impact: ThreadImpact) {
+    let review_id = app.state.selected_review_id.clone();
+    let result = app
+        .thread_repo
+        .update_impact(&thread_id, impact)
+        .map(|_| ())
+        .map_err(|e| format!("Failed to update thread impact: {e}"));
+
+    app.dispatch(Action::Async(AsyncAction::ThreadCommentSaved(
+        result.clone(),
+    )));
+
+    if let (Ok(_), Some(review_id)) = (result, review_id) {
+        load_review_threads(app, review_id);
+    }
+}
+
+fn update_thread_title(app: &mut LaReviewApp, thread_id: String, title: String) {
+    let review_id = app.state.selected_review_id.clone();
+    let result = app
+        .thread_repo
+        .update_title(&thread_id, &title)
+        .map(|_| ())
+        .map_err(|e| format!("Failed to update thread title: {e}"));
+
+    app.dispatch(Action::Async(AsyncAction::ThreadCommentSaved(
+        result.clone(),
+    )));
+
+    if let (Ok(_), Some(review_id)) = (result, review_id) {
+        load_review_threads(app, review_id);
+    }
+}
+
+fn default_thread_title(body: &str) -> String {
+    let first_line = body.lines().next().unwrap_or("").trim();
+    if first_line.is_empty() {
+        return "Untitled thread".to_string();
+    }
+    if first_line.len() > 80 {
+        format!("{}...", &first_line[..77])
+    } else {
+        first_line.to_string()
+    }
 }
 
 fn run_d2_command(app: &mut LaReviewApp, command: D2Command) {
@@ -502,7 +584,8 @@ fn generate_export_preview(
     let review_repo = app.review_repo.clone();
     let run_repo = app.run_repo.clone();
     let task_repo = app.task_repo.clone();
-    let note_repo = app.note_repo.clone();
+    let thread_repo = app.thread_repo.clone();
+    let comment_repo = app.comment_repo.clone();
     let action_tx = app.action_tx.clone();
 
     tokio::spawn(async move {
@@ -519,16 +602,23 @@ fn generate_export_preview(
                 .find_by_run(&run_id)
                 .map_err(|e: anyhow::Error| e.to_string())?;
 
-            let task_ids: Vec<_> = tasks.iter().map(|t| t.id.clone()).collect();
-            let notes = note_repo
-                .find_all_for_tasks(&task_ids)
+            let threads = thread_repo
+                .find_by_review(&review_id)
                 .map_err(|e: anyhow::Error| e.to_string())?;
+            let mut comments = Vec::new();
+            for thread in &threads {
+                let mut thread_comments = comment_repo
+                    .list_for_thread(&thread.id)
+                    .map_err(|e: anyhow::Error| e.to_string())?;
+                comments.append(&mut thread_comments);
+            }
 
             let data = crate::application::review::export::ExportData {
                 review,
                 run,
                 tasks,
-                notes,
+                threads,
+                comments,
             };
 
             crate::application::review::export::ReviewExporter::export_to_markdown(&data, true)
@@ -552,7 +642,8 @@ fn export_review(
     let review_repo = app.review_repo.clone();
     let run_repo = app.run_repo.clone();
     let task_repo = app.task_repo.clone();
-    let note_repo = app.note_repo.clone();
+    let thread_repo = app.thread_repo.clone();
+    let comment_repo = app.comment_repo.clone();
     let action_tx = app.action_tx.clone();
 
     tokio::spawn(async move {
@@ -569,16 +660,23 @@ fn export_review(
                 .find_by_run(&run_id)
                 .map_err(|e: anyhow::Error| anyhow::anyhow!(e))?;
 
-            let task_ids: Vec<_> = tasks.iter().map(|t| t.id.clone()).collect();
-            let notes = note_repo
-                .find_all_for_tasks(&task_ids)
+            let threads = thread_repo
+                .find_by_review(&review_id)
                 .map_err(|e: anyhow::Error| anyhow::anyhow!(e))?;
+            let mut comments = Vec::new();
+            for thread in &threads {
+                let mut thread_comments = comment_repo
+                    .list_for_thread(&thread.id)
+                    .map_err(|e: anyhow::Error| anyhow::anyhow!(e))?;
+                comments.append(&mut thread_comments);
+            }
 
             let data = crate::application::review::export::ExportData {
                 review,
                 run,
                 tasks,
-                notes,
+                threads,
+                comments,
             };
 
             let export_result =
@@ -612,23 +710,6 @@ fn export_review(
             )))
             .await;
     });
-}
-
-fn update_note(
-    app: &mut LaReviewApp,
-    note_id: String,
-    title: Option<String>,
-    severity: Option<crate::domain::NoteSeverity>,
-) {
-    let result = app
-        .note_repo
-        .update_metadata(&note_id, title, severity)
-        .map_err(|e| format!("Failed to update note: {e}"));
-
-    app.dispatch(Action::Async(AsyncAction::NoteSaved(result)));
-    app.dispatch(Action::Review(super::action::ReviewAction::RefreshFromDb {
-        reason: super::command::ReviewDataRefreshReason::Manual,
-    }));
 }
 
 fn save_repo(app: &mut LaReviewApp, repo: crate::domain::LinkedRepo) {

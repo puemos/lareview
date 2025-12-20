@@ -1,6 +1,7 @@
+use super::format_timestamp;
 use crate::ui::app::{Action, FullDiffView, LaReviewApp, ReviewAction};
-use crate::ui::components::badge::badge;
-use crate::ui::components::{DiffAction, LineContext};
+use crate::ui::components::DiffAction;
+use crate::ui::components::pills::pill_action_button;
 use crate::ui::spacing::{self, SPACING_XL};
 use crate::ui::theme::current_theme;
 use eframe::egui;
@@ -213,6 +214,18 @@ impl LaReviewApp {
             active_tab = ReviewTab::Discussion;
         }
 
+        let note_count = self
+            .state
+            .threads
+            .iter()
+            .filter(|thread| thread.task_id.as_ref() == Some(&task.id))
+            .count();
+        let discussion_label = if note_count > 0 {
+            format!("Discussion ({})", note_count)
+        } else {
+            "Discussion".to_string()
+        };
+
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = spacing::SPACING_MD;
 
@@ -240,6 +253,9 @@ impl LaReviewApp {
                 let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
 
                 if resp.clicked() {
+                    if self.state.active_thread.is_some() {
+                        self.dispatch(Action::Review(ReviewAction::CloseThread));
+                    }
                     active_tab = tab;
                     ui.ctx()
                         .data_mut(|d| d.insert_temp(egui::Id::new(("active_tab", &task.id)), tab));
@@ -254,18 +270,6 @@ impl LaReviewApp {
                 tab_button(ui, ReviewTab::Changes, "Changes", icons::GIT_DIFF);
             }
 
-            // Discussion tab with note count
-            let note_count = self
-                .state
-                .task_line_notes
-                .iter()
-                .filter(|n| n.task_id == task.id)
-                .count();
-            let discussion_label = if note_count > 0 {
-                format!("Discussion ({})", note_count)
-            } else {
-                "Discussion".to_string()
-            };
             tab_button(
                 ui,
                 ReviewTab::Discussion,
@@ -470,17 +474,6 @@ impl LaReviewApp {
         };
 
         // Determine if the current task has an active line note (for highlighting)
-        let active_line_context = self
-            .state
-            .current_line_note
-            .as_ref()
-            .filter(|ctx| ctx.task_id == task.id)
-            .map(|ctx| LineContext {
-                file_idx: ctx.file_idx,
-                line_idx: ctx.line_idx,
-                file_path: ctx.file_path.clone(),
-            });
-
         // REMOVED: Frame wrapper for simpler look
         ui.vertical(|ui| {
             ui.set_min_height(300.0);
@@ -492,7 +485,7 @@ impl LaReviewApp {
                     &unified_diff,
                     "diff",
                     true,
-                    active_line_context.clone(),
+                    None,
                     None,
                 );
 
@@ -509,17 +502,33 @@ impl LaReviewApp {
                         ..
                     } => {
                         self.dispatch(Action::Review(ReviewAction::OpenThread {
-                            file_path,
-                            line_number: line_number as u32,
+                            task_id: task.id.clone(),
+                            thread_id: None,
+                            file_path: Some(file_path),
+                            line_number: Some(line_number as u32),
                         }));
                     }
                     DiffAction::ViewNotes {
                         file_path,
                         line_number,
                     } => {
+                        let thread_id = self
+                            .state
+                            .threads
+                            .iter()
+                            .find(|thread| {
+                                thread.task_id.as_ref() == Some(&task.id)
+                                    && thread.anchor.as_ref().and_then(|a| a.file_path.as_ref())
+                                        == Some(&file_path)
+                                    && thread.anchor.as_ref().and_then(|a| a.line_number)
+                                        == Some(line_number)
+                            })
+                            .map(|thread| thread.id.clone());
                         self.dispatch(Action::Review(ReviewAction::OpenThread {
-                            file_path,
-                            line_number,
+                            task_id: task.id.clone(),
+                            thread_id,
+                            file_path: Some(file_path),
+                            line_number: Some(line_number),
                         }));
                     }
                     _ => {}
@@ -532,35 +541,67 @@ impl LaReviewApp {
         // Check for active thread first (Inline Thread View)
         if let Some(thread_ctx) = &self.state.active_thread {
             let view = crate::ui::views::review::thread_detail::ThreadDetailView {
+                task_id: task.id.clone(),
+                thread_id: thread_ctx.thread_id.clone(),
                 file_path: thread_ctx.file_path.clone(),
                 line_number: thread_ctx.line_number,
-                task_id: task.id.clone(),
             };
             self.render_thread_detail(ui, &view);
             return;
         }
 
         let theme = current_theme();
-        let task_notes: Vec<_> = self
+        let mut task_threads: Vec<crate::domain::Thread> = self
             .state
-            .task_line_notes
+            .threads
             .iter()
-            .filter(|n| n.task_id == task.id)
+            .filter(|thread| thread.task_id.as_ref() == Some(&task.id))
+            .cloned()
             .collect();
 
-        if task_notes.is_empty() {
+        let mut start_new_thread = false;
+        ui.horizontal(|ui| {
+            ui.label(
+                egui::RichText::new("Threads")
+                    .size(13.0)
+                    .color(theme.text_muted),
+            );
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if pill_action_button(ui, icons::PLUS, "New", true, current_theme().border)
+                    .clicked()
+                {
+                    start_new_thread = true;
+                }
+            });
+        });
+
+        if start_new_thread {
+            self.dispatch(Action::Review(ReviewAction::OpenThread {
+                task_id: task.id.clone(),
+                thread_id: None,
+                file_path: None,
+                line_number: None,
+            }));
+            return;
+        }
+
+        ui.add_space(spacing::SPACING_SM);
+        ui.separator();
+        ui.add_space(spacing::SPACING_MD);
+
+        if task_threads.is_empty() {
             ui.vertical_centered(|ui| {
-                ui.add_space(60.0);
+                ui.add_space(40.0);
                 ui.label(
                     egui::RichText::new(icons::CHAT_CIRCLE)
-                        .size(48.0)
+                        .size(44.0)
                         .color(theme.text_disabled),
                 );
                 ui.add_space(spacing::SPACING_MD);
                 ui.heading("No discussions yet");
                 ui.label(
                     egui::RichText::new(
-                        "Add notes directly in the 'Changes' tab to start a discussion.",
+                        "Add comments in the 'Changes' tab or start a general thread.",
                     )
                     .color(theme.text_muted),
                 );
@@ -568,117 +609,134 @@ impl LaReviewApp {
             return;
         }
 
-        // Group by file and line to create "threads"
-        use std::collections::BTreeMap;
-        let mut threads: BTreeMap<(String, u32), Vec<crate::domain::Note>> = BTreeMap::new();
-        for note in &task_notes {
-            if let (Some(path), Some(line)) = (&note.file_path, note.line_number) {
-                threads
-                    .entry((path.clone(), line))
-                    .or_default()
-                    .push((*note).clone());
-            }
-        }
+        task_threads.sort_by(|a, b| {
+            b.updated_at
+                .cmp(&a.updated_at)
+                .then_with(|| b.created_at.cmp(&a.created_at))
+        });
 
-        for ((path, line), notes) in threads {
-            let display_path = path.split('/').next_back().unwrap_or(&path);
+        for (index, thread) in task_threads.iter().enumerate() {
+            let (path, line) = thread
+                .anchor
+                .as_ref()
+                .map(|a| {
+                    (
+                        a.file_path.clone().unwrap_or_default(),
+                        a.line_number.unwrap_or(0),
+                    )
+                })
+                .unwrap_or_default();
 
-            egui::Frame::NONE
-                .fill(theme.bg_tertiary)
-                .stroke(egui::Stroke::new(1.0, theme.border_secondary))
-                .corner_radius(crate::ui::spacing::RADIUS_LG)
-                .inner_margin(egui::Margin::same(spacing::SPACING_MD as i8))
+            let title = if thread.title.is_empty() {
+                "Untitled thread".to_string()
+            } else {
+                thread.title.clone()
+            };
+
+            let status_text = match thread.status {
+                crate::domain::ThreadStatus::Todo => "Todo",
+                crate::domain::ThreadStatus::Wip => "WIP",
+                crate::domain::ThreadStatus::Done => "Done",
+                crate::domain::ThreadStatus::Reject => "Reject",
+            };
+
+            let impact_text = match thread.impact {
+                crate::domain::ThreadImpact::Blocking => "Blocking",
+                crate::domain::ThreadImpact::NiceToHave => "Nice to have",
+                crate::domain::ThreadImpact::Nitpick => "Nitpick",
+            };
+
+            let comments = self.state.thread_comments.get(&thread.id);
+            let reply_count = comments.map(|items| items.len()).unwrap_or(0);
+            let updated_label = format_timestamp(&thread.updated_at);
+
+            let frame = egui::Frame::NONE
+                .inner_margin(egui::Margin::symmetric(
+                    spacing::SPACING_SM as i8,
+                    spacing::SPACING_SM as i8,
+                ))
                 .show(ui, |ui| {
-                    ui.set_width(ui.available_width());
-
-                    ui.horizontal(|ui| {
-                        let root_note = notes.first();
-                        let title = root_note
-                            .and_then(|n| n.title.clone())
-                            .or_else(|| {
-                                root_note.map(|n| {
-                                    let body = &n.body;
-                                    if body.len() > 50 {
-                                        format!("{}...", &body[0..50])
-                                    } else {
-                                        body.clone()
-                                    }
-                                })
-                            })
-                            .unwrap_or_else(|| "Untitled Discussion".to_string());
-
-                        // Severity badge
-                        let severity = root_note
-                            .and_then(|n| n.severity)
-                            .unwrap_or(crate::domain::NoteSeverity::NonBlocking); // Default
-
-                        let (sev_text, sev_bg, sev_fg) = match severity {
-                            crate::domain::NoteSeverity::Blocking => (
-                                "Blocking",
-                                theme.destructive.gamma_multiply(0.1),
-                                theme.destructive,
-                            ),
-                            crate::domain::NoteSeverity::NonBlocking => (
-                                "Non-Blocking",
-                                theme.success.gamma_multiply(0.1),
-                                theme.success,
-                            ),
-                        };
-
-                        badge(ui, sev_text, sev_bg, sev_fg);
-                        ui.add_space(spacing::SPACING_SM);
-
-                        // File/Line or just Title
-                        ui.vertical(|ui| {
+                    ui.vertical(|ui| {
+                        ui.horizontal(|ui| {
                             ui.label(
-                                egui::RichText::new(title)
+                                egui::RichText::new(&title)
                                     .strong()
                                     .color(theme.text_primary),
                             );
-                            ui.label(
-                                egui::RichText::new(format!(
-                                    "{}:{} • {} replies",
-                                    display_path,
-                                    line,
-                                    notes.len()
-                                ))
-                                .size(11.0)
-                                .color(theme.text_muted),
+
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    ui.label(
+                                        egui::RichText::new(updated_label)
+                                            .size(11.0)
+                                            .color(theme.text_muted),
+                                    );
+                                    if reply_count > 0 {
+                                        ui.label(
+                                            egui::RichText::new(format!("{reply_count} replies"))
+                                                .size(11.0)
+                                                .color(theme.text_muted),
+                                        );
+                                    }
+                                },
                             );
                         });
 
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui
-                                .button(
-                                    egui::RichText::new(format!("{} Open", icons::CARET_RIGHT))
-                                        .size(12.0),
-                                )
-                                .clicked()
-                            {
-                                self.dispatch(Action::Review(ReviewAction::OpenThread {
-                                    file_path: path.clone(),
-                                    line_number: line,
-                                }));
+                        ui.add_space(2.0);
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                egui::RichText::new(status_text)
+                                    .size(11.0)
+                                    .color(theme.text_muted),
+                            );
+                            ui.label(egui::RichText::new("•").color(theme.text_disabled));
+                            ui.label(
+                                egui::RichText::new(impact_text)
+                                    .size(11.0)
+                                    .color(theme.text_muted),
+                            );
+                            if !path.is_empty() && line > 0 {
+                                ui.label(egui::RichText::new("•").color(theme.text_disabled));
+                                ui.label(
+                                    egui::RichText::new(format!(
+                                        "{}:{}",
+                                        path.split('/').next_back().unwrap_or(&path),
+                                        line
+                                    ))
+                                    .size(11.0)
+                                    .color(theme.text_muted),
+                                );
                             }
                         });
                     });
-
-                    // Make the whole frame clickable
-                    if ui
-                        .interact(
-                            ui.min_rect(),
-                            ui.id().with(("thread", &path, line)),
-                            egui::Sense::click(),
-                        )
-                        .clicked()
-                    {
-                        self.dispatch(Action::Review(ReviewAction::OpenThread {
-                            file_path: path.clone(),
-                            line_number: line,
-                        }));
-                    }
                 });
-            ui.add_space(spacing::SPACING_MD);
+
+            let row_response = ui.interact(
+                frame.response.rect,
+                ui.id().with(("thread_row", &thread.id)),
+                egui::Sense::click(),
+            );
+            let row_response = row_response.on_hover_cursor(egui::CursorIcon::PointingHand);
+
+            if row_response.clicked() {
+                self.dispatch(Action::Review(ReviewAction::OpenThread {
+                    task_id: task.id.clone(),
+                    thread_id: Some(thread.id.clone()),
+                    file_path: if path.is_empty() {
+                        None
+                    } else {
+                        Some(path.clone())
+                    },
+                    line_number: if line == 0 { None } else { Some(line) },
+                }));
+            }
+
+            if index + 1 < task_threads.len() {
+                ui.add_space(spacing::SPACING_XS);
+                ui.separator();
+                ui.add_space(spacing::SPACING_XS);
+            }
         }
     }
 }

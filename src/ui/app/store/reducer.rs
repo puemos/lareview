@@ -6,6 +6,7 @@ use super::action::{
 use super::command::{Command, D2Command, ReviewDataRefreshReason};
 use crate::domain::{TaskId, TaskStatus};
 use crate::ui::app::GenMsg;
+use chrono::Utc;
 
 pub fn reduce(state: &mut AppState, action: Action) -> Vec<Command> {
     match action {
@@ -20,6 +21,7 @@ pub fn reduce(state: &mut AppState, action: Action) -> Vec<Command> {
 fn reduce_navigation(state: &mut AppState, action: NavigationAction) -> Vec<Command> {
     match action {
         NavigationAction::SwitchTo(view) => {
+            state.active_thread = None;
             state.current_view = view;
             if matches!(view, AppView::Review) {
                 return vec![Command::RefreshReviewData {
@@ -152,18 +154,22 @@ fn reduce_review(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
                 .and_then(|r| r.active_run_id.clone());
 
             state.selected_task_id = None;
-            state.current_note = None;
-            state.current_line_note = None;
             state.cached_unified_diff = None;
+            state.active_thread = None;
+            state.thread_title_draft.clear();
+            state.thread_reply_draft.clear();
 
-            select_default_task_for_current_run(state)
+            let mut commands = select_default_task_for_current_run(state);
+            commands.push(Command::LoadReviewThreads { review_id });
+            commands
         }
         ReviewAction::SelectRun { run_id } => {
             state.selected_run_id = Some(run_id);
             state.selected_task_id = None;
-            state.current_note = None;
-            state.current_line_note = None;
             state.cached_unified_diff = None;
+            state.active_thread = None;
+            state.thread_title_draft.clear();
+            state.thread_reply_draft.clear();
             select_default_task_for_current_run(state)
         }
         ReviewAction::SelectTask { task_id } => select_task(state, task_id),
@@ -176,9 +182,10 @@ fn reduce_review(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
         }
         ReviewAction::ClearSelection => {
             state.selected_task_id = None;
-            state.current_note = None;
-            state.current_line_note = None;
             state.cached_unified_diff = None;
+            state.active_thread = None;
+            state.thread_title_draft.clear();
+            state.thread_reply_draft.clear();
             Vec::new()
         }
         ReviewAction::UpdateTaskStatus { task_id, status } => {
@@ -193,83 +200,92 @@ fn reduce_review(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
                 Vec::new()
             }
         }
-        ReviewAction::SaveCurrentNote => {
-            let Some(task_id) = state.selected_task_id.clone() else {
-                return Vec::new();
-            };
-            let body = state.current_note.clone().unwrap_or_default();
-            state.review_error = None;
-            vec![Command::SaveNote {
-                task_id,
-                body,
-                file_path: None,
-                line_number: None,
-                parent_id: None,
-                root_id: None,
-            }]
-        }
-        ReviewAction::SaveLineNote {
+        ReviewAction::CreateThreadComment {
             task_id,
+            thread_id,
             file_path,
             line_number,
+            title,
             body,
         } => {
-            state.current_line_note = None;
+            let review_id = match state.selected_review_id.clone() {
+                Some(id) => id,
+                None => return Vec::new(),
+            };
             state.review_error = None;
-            vec![Command::SaveNote {
+            vec![Command::CreateThreadComment {
+                review_id,
                 task_id,
+                thread_id,
+                file_path,
+                line_number,
+                title,
                 body,
-                file_path: Some(file_path),
-                line_number: Some(line_number),
-                parent_id: None,
-                root_id: None,
             }]
         }
-        ReviewAction::SaveReply {
-            task_id,
-            parent_id,
-            root_id,
-            body,
-        } => {
+        ReviewAction::UpdateThreadStatus { thread_id, status } => {
             state.review_error = None;
-            vec![Command::SaveNote {
-                task_id,
-                body,
-                file_path: None, // Replies are linked by parent_id/root_id
-                line_number: None,
-                parent_id: Some(parent_id),
-                root_id: Some(root_id),
-            }]
+            update_thread_in_state(state, &thread_id, |thread| {
+                thread.status = status;
+                thread.updated_at = Utc::now().to_rfc3339();
+            });
+            vec![Command::UpdateThreadStatus { thread_id, status }]
         }
-        ReviewAction::ResolveThread { task_id, root_id } => {
+        ReviewAction::UpdateThreadImpact { thread_id, impact } => {
             state.review_error = None;
-            vec![Command::ResolveThread { task_id, root_id }]
+            update_thread_in_state(state, &thread_id, |thread| {
+                thread.impact = impact;
+                thread.updated_at = Utc::now().to_rfc3339();
+            });
+            vec![Command::UpdateThreadImpact { thread_id, impact }]
         }
-        ReviewAction::SetCurrentNoteText(text) => {
-            state.current_note = Some(text);
-            Vec::new()
-        }
-        ReviewAction::StartLineNote(ctx) => {
-            state.current_line_note = Some(ctx);
-            state.current_note = None;
-            Vec::new()
+        ReviewAction::UpdateThreadTitle { thread_id, title } => {
+            state.review_error = None;
+            update_thread_in_state(state, &thread_id, |thread| {
+                thread.title = title.clone();
+                thread.updated_at = Utc::now().to_rfc3339();
+            });
+            vec![Command::UpdateThreadTitle { thread_id, title }]
         }
         ReviewAction::OpenThread {
+            task_id,
+            thread_id,
             file_path,
             line_number,
         } => {
+            // Initialize title draft from existing thread data
+            let existing_title = thread_id
+                .as_ref()
+                .and_then(|tid| state.threads.iter().find(|t| &t.id == tid))
+                .map(|t| t.title.clone())
+                .unwrap_or_default();
+            state.thread_title_draft = existing_title;
+            state.thread_reply_draft.clear();
+
             state.active_thread = Some(crate::ui::app::ThreadContext {
+                thread_id,
+                task_id,
                 file_path,
                 line_number,
             });
             Vec::new()
         }
-        ReviewAction::OpenAllNotes => {
-            // Deprecated/Removed functionality
+        ReviewAction::CloseThread => {
+            state.thread_title_draft.clear();
+            state.thread_reply_draft.clear();
+            state.active_thread = None;
             Vec::new()
         }
-        ReviewAction::CloseThread => {
-            state.active_thread = None;
+        ReviewAction::SetThreadTitleDraft { text } => {
+            state.thread_title_draft = text;
+            Vec::new()
+        }
+        ReviewAction::SetThreadReplyDraft { text } => {
+            state.thread_reply_draft = text;
+            Vec::new()
+        }
+        ReviewAction::ClearThreadReplyDraft => {
+            state.thread_reply_draft.clear();
             Vec::new()
         }
         ReviewAction::OpenFullDiff(view) => {
@@ -309,17 +325,6 @@ fn reduce_review(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
             } else {
                 Vec::new()
             }
-        }
-        ReviewAction::UpdateNote {
-            note_id,
-            title,
-            severity,
-        } => {
-            vec![Command::UpdateNote {
-                note_id,
-                title,
-                severity,
-            }]
         }
     }
 }
@@ -405,15 +410,18 @@ fn reduce_async(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
                 Vec::new()
             }
         },
-        AsyncAction::TaskNoteLoaded {
-            task_id,
-            note,
-            line_notes,
-        } => {
-            if state.selected_task_id.as_ref() == Some(&task_id) {
-                state.current_note = Some(note.unwrap_or_default());
-                state.task_line_notes = line_notes;
-                state.review_error = None;
+        AsyncAction::ReviewThreadsLoaded(result) => {
+            match result {
+                Ok(payload) => {
+                    if state.selected_review_id.as_ref() == Some(&payload.review_id) {
+                        state.threads = payload.threads;
+                        state.thread_comments = payload.comments;
+                        state.review_error = None;
+                    }
+                }
+                Err(err) => {
+                    state.review_error = Some(err);
+                }
             }
             Vec::new()
         }
@@ -428,7 +436,7 @@ fn reduce_async(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
                 }]
             }
         }
-        AsyncAction::NoteSaved(result) => {
+        AsyncAction::ThreadCommentSaved(result) => {
             if let Err(err) = result {
                 state.review_error = Some(err);
             } else {
@@ -445,8 +453,8 @@ fn reduce_async(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
                 state.selected_review_id = None;
                 state.selected_run_id = None;
                 state.selected_task_id = None;
-                state.current_note = None;
-                state.current_line_note = None;
+                state.threads.clear();
+                state.thread_comments.clear();
                 vec![Command::RefreshReviewData {
                     reason: ReviewDataRefreshReason::AfterReviewDelete,
                 }]
@@ -620,6 +628,8 @@ fn apply_review_data(state: &mut AppState, payload: ReviewDataPayload) -> Vec<Co
         }
     } else {
         state.selected_run_id = None;
+        state.threads.clear();
+        state.thread_comments.clear();
     }
 
     let current_tasks = state.tasks();
@@ -628,27 +638,19 @@ fn apply_review_data(state: &mut AppState, payload: ReviewDataPayload) -> Vec<Co
         && !current_tasks.iter().any(|t| &t.id == selected_task_id)
     {
         state.selected_task_id = None;
-        state.current_note = None;
-        state.current_line_note = None;
     }
 
     let mut commands = Vec::new();
 
-    if let Some(task_id) = &state.selected_task_id {
-        commands.push(Command::LoadTaskNote {
-            task_id: task_id.clone(),
-        });
-    } else if let Some(next_open) = current_tasks
+    if let Some(review_id) = state.selected_review_id.clone() {
+        commands.push(Command::LoadReviewThreads { review_id });
+    }
+
+    if let Some(next_open) = current_tasks
         .iter()
         .find(|t| matches!(t.status, TaskStatus::Pending | TaskStatus::InProgress))
     {
         state.selected_task_id = Some(next_open.id.clone());
-        state.current_line_note = None;
-        state.task_line_notes.clear();
-        state.current_note = Some(String::new());
-        commands.push(Command::LoadTaskNote {
-            task_id: next_open.id.clone(),
-        });
     }
 
     commands
@@ -656,11 +658,12 @@ fn apply_review_data(state: &mut AppState, payload: ReviewDataPayload) -> Vec<Co
 
 fn select_task(state: &mut AppState, task_id: TaskId) -> Vec<Command> {
     state.selected_task_id = Some(task_id.clone());
-    state.current_line_note = None;
-    state.task_line_notes.clear();
     state.cached_unified_diff = None;
-    state.current_note = Some(String::new());
-    vec![Command::LoadTaskNote { task_id }]
+    state.active_thread = None;
+    state.thread_title_draft.clear();
+    state.thread_reply_draft.clear();
+    let _ = task_id;
+    Vec::new()
 }
 
 fn select_default_task_for_current_run(state: &mut AppState) -> Vec<Command> {
@@ -673,18 +676,25 @@ fn select_default_task_for_current_run(state: &mut AppState) -> Vec<Command> {
     };
 
     state.selected_task_id = Some(next_open.id.clone());
-    state.current_line_note = None;
-    state.task_line_notes.clear();
-    state.current_note = Some(String::new());
-    vec![Command::LoadTaskNote {
-        task_id: next_open.id.clone(),
-    }]
+    Vec::new()
+}
+
+fn update_thread_in_state<F>(state: &mut AppState, thread_id: &str, mut updater: F)
+where
+    F: FnMut(&mut crate::domain::Thread),
+{
+    if let Some(thread) = state.threads.iter_mut().find(|t| t.id == thread_id) {
+        updater(thread);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{ReviewTask, TaskStats, TaskStatus};
+    use crate::domain::{
+        Comment, ReviewTask, TaskStats, TaskStatus, Thread, ThreadImpact, ThreadStatus,
+    };
+    use crate::ui::app::store::action::ReviewThreadsPayload;
     use crate::ui::app::{GenMsg, GenResultPayload, SelectedAgent};
 
     fn pending_task(id: &str, run_id: &str) -> ReviewTask {
@@ -789,10 +799,10 @@ mod tests {
         assert!(
             matches!(
                 commands.as_slice(),
-                [Command::LoadTaskNote { task_id }]
-                if task_id == "t1"
+                [Command::LoadReviewThreads { review_id }]
+                if review_id == "rev1"
             ),
-            "expected note load for first pending task"
+            "expected thread load for selected review"
         );
     }
 
@@ -918,13 +928,105 @@ mod tests {
     }
 
     #[test]
-    fn set_current_note_text_updates_state_only() {
+    fn create_thread_comment_emits_command() {
+        let mut state = AppState {
+            selected_review_id: Some("review-1".into()),
+            ..AppState::default()
+        };
+
+        let commands = reduce(
+            &mut state,
+            Action::Review(ReviewAction::CreateThreadComment {
+                task_id: "task-1".into(),
+                thread_id: None,
+                file_path: Some("src/main.rs".into()),
+                line_number: Some(42),
+                title: Some("Title".into()),
+                body: "Hello".into(),
+            }),
+        );
+
+        assert!(
+            matches!(
+                commands.as_slice(),
+                [Command::CreateThreadComment { review_id, task_id, .. }]
+                if review_id == "review-1" && task_id == "task-1"
+            ),
+            "expected CreateThreadComment command"
+        );
+    }
+
+    #[test]
+    fn update_thread_status_emits_command() {
         let mut state = AppState::default();
         let commands = reduce(
             &mut state,
-            Action::Review(ReviewAction::SetCurrentNoteText("hello".into())),
+            Action::Review(ReviewAction::UpdateThreadStatus {
+                thread_id: "thread-1".into(),
+                status: ThreadStatus::Wip,
+            }),
         );
-        assert_eq!(state.current_note.as_deref(), Some("hello"));
+
+        assert!(
+            matches!(
+                commands.as_slice(),
+                [Command::UpdateThreadStatus { thread_id, status }]
+                if thread_id == "thread-1" && *status == ThreadStatus::Wip
+            ),
+            "expected UpdateThreadStatus command"
+        );
+    }
+
+    #[test]
+    fn review_threads_loaded_updates_state_for_selected_review() {
+        let mut state = AppState {
+            selected_review_id: Some("review-1".into()),
+            ..AppState::default()
+        };
+
+        let thread = Thread {
+            id: "thread-1".into(),
+            review_id: "review-1".into(),
+            task_id: Some("task-1".into()),
+            title: "Thread".into(),
+            status: ThreadStatus::Todo,
+            impact: ThreadImpact::Nitpick,
+            anchor: None,
+            author: "User".into(),
+            created_at: "2025-01-01T00:00:00Z".into(),
+            updated_at: "2025-01-01T00:00:00Z".into(),
+        };
+
+        let comment = Comment {
+            id: "comment-1".into(),
+            thread_id: "thread-1".into(),
+            author: "User".into(),
+            body: "Hello".into(),
+            parent_id: None,
+            created_at: "2025-01-01T00:00:00Z".into(),
+            updated_at: "2025-01-01T00:00:00Z".into(),
+        };
+
+        let mut comments = std::collections::HashMap::new();
+        comments.insert("thread-1".into(), vec![comment]);
+
+        let commands = reduce(
+            &mut state,
+            Action::Async(AsyncAction::ReviewThreadsLoaded(Ok(ReviewThreadsPayload {
+                review_id: "review-1".into(),
+                threads: vec![thread],
+                comments,
+            }))),
+        );
+
         assert!(commands.is_empty());
+        assert_eq!(state.threads.len(), 1);
+        assert_eq!(
+            state
+                .thread_comments
+                .get("thread-1")
+                .map(|items| items.len()),
+            Some(1)
+        );
     }
 }

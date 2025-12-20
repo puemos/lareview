@@ -1,6 +1,6 @@
 use crate::domain::{TaskId, TaskStatus};
 use crate::ui::app::state::AppView;
-use crate::ui::app::{FullDiffView, GenMsg, LineNoteContext, SelectedAgent};
+use crate::ui::app::{FullDiffView, GenMsg, SelectedAgent};
 
 use super::command::ReviewDataRefreshReason;
 
@@ -55,36 +55,43 @@ pub enum ReviewAction {
         status: TaskStatus,
     },
     DeleteReview,
-    SaveCurrentNote,
-    SaveLineNote {
+    CreateThreadComment {
         task_id: TaskId,
-        file_path: String,
-        line_number: u32,
-        body: String,
-    },
-    UpdateNote {
-        note_id: String,
+        thread_id: Option<String>,
+        file_path: Option<String>,
+        line_number: Option<u32>,
         title: Option<String>,
-        severity: Option<crate::domain::NoteSeverity>,
-    },
-    SaveReply {
-        task_id: TaskId,
-        parent_id: String,
-        root_id: String,
         body: String,
     },
-    ResolveThread {
-        task_id: TaskId,
-        root_id: String,
+    UpdateThreadStatus {
+        thread_id: String,
+        status: crate::domain::ThreadStatus,
     },
-    SetCurrentNoteText(String),
-    StartLineNote(LineNoteContext),
+    UpdateThreadImpact {
+        thread_id: String,
+        impact: crate::domain::ThreadImpact,
+    },
+    UpdateThreadTitle {
+        thread_id: String,
+        title: String,
+    },
     OpenThread {
-        file_path: String,
-        line_number: u32,
+        task_id: TaskId,
+        thread_id: Option<String>,
+        file_path: Option<String>,
+        line_number: Option<u32>,
     },
-    OpenAllNotes,
     CloseThread,
+    /// User is typing in the thread title field
+    SetThreadTitleDraft {
+        text: String,
+    },
+    /// User is typing in the reply composer
+    SetThreadReplyDraft {
+        text: String,
+    },
+    /// Clear the reply draft after sending
+    ClearThreadReplyDraft,
     OpenFullDiff(FullDiffView),
     CloseFullDiff,
     RequestExportPreview,
@@ -112,13 +119,9 @@ pub enum AsyncAction {
         reason: ReviewDataRefreshReason,
         result: Result<ReviewDataPayload, String>,
     },
-    TaskNoteLoaded {
-        task_id: String,
-        note: Option<String>,
-        line_notes: Vec<crate::domain::Note>,
-    },
+    ReviewThreadsLoaded(Result<ReviewThreadsPayload, String>),
+    ThreadCommentSaved(Result<(), String>),
     TaskStatusSaved(Result<(), String>),
-    NoteSaved(Result<(), String>),
     ReviewDeleted(Result<(), String>),
     D2InstallOutput(String),
     D2InstallComplete,
@@ -135,4 +138,11 @@ pub struct ReviewDataPayload {
     pub reviews: Vec<crate::domain::Review>,
     pub runs: Vec<crate::domain::ReviewRun>,
     pub tasks: Vec<crate::domain::ReviewTask>,
+}
+
+#[derive(Debug)]
+pub struct ReviewThreadsPayload {
+    pub review_id: String,
+    pub threads: Vec<crate::domain::Thread>,
+    pub comments: std::collections::HashMap<String, Vec<crate::domain::Comment>>,
 }

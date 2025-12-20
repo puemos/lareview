@@ -4,4 +4,6 @@ pub mod database;
 pub mod repository;
 
 pub use database::Database;
-pub use repository::{NoteRepository, ReviewRepository, ReviewRunRepository, TaskRepository};
+pub use repository::{
+    CommentRepository, ReviewRepository, ReviewRunRepository, TaskRepository, ThreadRepository,
+};

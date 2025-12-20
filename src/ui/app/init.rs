@@ -6,7 +6,8 @@ use egui::{FontData, FontFamily};
 use tokio::sync::mpsc;
 
 use crate::infra::db::{
-    Database, NoteRepository, ReviewRepository, ReviewRunRepository, TaskRepository,
+    CommentRepository, Database, ReviewRepository, ReviewRunRepository, TaskRepository,
+    ThreadRepository,
 };
 
 use super::LaReviewApp;
@@ -55,7 +56,8 @@ impl LaReviewApp {
 
         let conn = db.connection();
         let task_repo = Arc::new(TaskRepository::new(conn.clone()));
-        let note_repo = Arc::new(NoteRepository::new(conn.clone()));
+        let thread_repo = Arc::new(ThreadRepository::new(conn.clone()));
+        let comment_repo = Arc::new(CommentRepository::new(conn.clone()));
         let review_repo = Arc::new(ReviewRepository::new(conn.clone()));
         let run_repo = Arc::new(ReviewRunRepository::new(conn.clone()));
         let repo_repo = Arc::new(crate::infra::db::repository::RepoRepository::new(
@@ -91,7 +93,8 @@ impl LaReviewApp {
         let mut app = Self {
             state,
             task_repo,
-            note_repo,
+            thread_repo,
+            comment_repo,
             review_repo,
             run_repo,
             repo_repo,

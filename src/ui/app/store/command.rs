@@ -38,8 +38,8 @@ pub enum Command {
     RefreshReviewData {
         reason: ReviewDataRefreshReason,
     },
-    LoadTaskNote {
-        task_id: TaskId,
+    LoadReviewThreads {
+        review_id: ReviewId,
     },
     UpdateTaskStatus {
         task_id: TaskId,
@@ -48,17 +48,26 @@ pub enum Command {
     DeleteReview {
         review_id: ReviewId,
     },
-    SaveNote {
+    CreateThreadComment {
+        review_id: ReviewId,
         task_id: TaskId,
-        body: String,
+        thread_id: Option<String>,
         file_path: Option<String>,
         line_number: Option<u32>,
-        parent_id: Option<String>,
-        root_id: Option<String>,
+        title: Option<String>,
+        body: String,
     },
-    ResolveThread {
-        task_id: TaskId,
-        root_id: String,
+    UpdateThreadStatus {
+        thread_id: String,
+        status: crate::domain::ThreadStatus,
+    },
+    UpdateThreadImpact {
+        thread_id: String,
+        impact: crate::domain::ThreadImpact,
+    },
+    UpdateThreadTitle {
+        thread_id: String,
+        title: String,
     },
     RunD2 {
         command: D2Command,
@@ -71,11 +80,6 @@ pub enum Command {
         review_id: ReviewId,
         run_id: crate::domain::ReviewRunId,
         path: std::path::PathBuf,
-    },
-    UpdateNote {
-        note_id: String,
-        title: Option<String>,
-        severity: Option<crate::domain::NoteSeverity>,
     },
     SaveRepo {
         repo: crate::domain::LinkedRepo,

@@ -12,7 +12,7 @@ pub(super) fn render_plan_panel(ui: &mut egui::Ui, plan: &Plan) {
     egui::Frame::group(ui.style())
         .fill(current_theme().bg_secondary)
         .stroke(egui::Stroke::new(1.0, current_theme().border))
-        .corner_radius(egui::CornerRadius::ZERO)
+        .corner_radius(egui::CornerRadius::same(spacing::RADIUS_MD))
         .inner_margin(egui::Margin::symmetric(
             spacing::SPACING_MD as i8,
             spacing::SPACING_SM as i8,
@@ -98,9 +98,9 @@ pub(super) fn render_plan_timeline_item(ui: &mut egui::Ui, plan: &Plan) {
 fn render_plan_entries(ui: &mut egui::Ui, plan: &Plan, dense: bool) {
     for (idx, entry) in plan.entries.iter().enumerate() {
         let status = entry.status.clone();
-        let (icon, color, label) = plan_entry_style(status.clone());
+        let (icon, color, _label) = plan_entry_style(status.clone());
 
-        ui.horizontal(|ui| {
+        ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
             ui.spacing_mut().item_spacing = egui::vec2(spacing::SPACING_SM, 0.0); // 8.0, 0.0
 
             ui.label(egui::RichText::new(icon).size(14.0).color(color));
@@ -120,14 +120,6 @@ fn render_plan_entries(ui: &mut egui::Ui, plan: &Plan, dense: bool) {
                 )
                 .wrap(),
             );
-
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.label(
-                    egui::RichText::new(label)
-                        .size(10.5)
-                        .color(current_theme().text_muted),
-                );
-            });
         });
 
         if !dense && idx + 1 < plan.entries.len() {

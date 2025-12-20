@@ -5,8 +5,6 @@ use eframe::egui::collapsing_header::CollapsingState;
 
 use agent_client_protocol::{ContentBlock, SessionUpdate, ToolCallStatus};
 
-// Unused helpers removed
-
 pub(super) fn render_timeline_item(ui: &mut egui::Ui, item: &TimelineItem) {
     ui.set_max_width(ui.available_width());
 
@@ -69,37 +67,31 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                         ui.set_max_width(ui.available_width());
 
                         let (status_color, status_label) = get_status_style(&call.status);
+                        let tool_label =
+                            tool_label_from_parts(Some(&call.title), call.raw_input.as_ref());
 
                         let id = ui.make_persistent_id("collapsing");
-                        let default_open = call.status == ToolCallStatus::InProgress;
+                        let default_open = false;
 
                         CollapsingState::load_with_default_open(ui.ctx(), id, default_open)
                             .show_header(ui, |ui| {
                                 ui.horizontal(|ui| {
                                     ui.label(
-                                        egui::RichText::new(egui_phosphor::regular::WRENCH)
-                                            .color(current_theme().accent),
+                                        egui::RichText::new(format!(
+                                            "{}: {}",
+                                            tool_label.server, tool_label.tool
+                                        ))
+                                        .monospace()
+                                        .strong()
+                                        .color(current_theme().text_primary),
                                     );
-
-                                    let full_title = &call.title;
-                                    let display_title = if full_title.len() > 50 {
-                                        format!("{}...", &full_title[..47])
-                                    } else {
-                                        full_title.clone()
-                                    };
-
-                                    ui.label(
-                                        egui::RichText::new(display_title)
-                                            .strong()
-                                            .color(current_theme().text_primary),
-                                    )
-                                    .on_hover_text(full_title);
 
                                     ui.with_layout(
                                         egui::Layout::right_to_left(egui::Align::Center),
                                         |ui| {
                                             ui.label(
-                                                egui::RichText::new(status_label)
+                                                egui::RichText::new(format!("[{}]", status_label))
+                                                    .monospace()
                                                     .color(status_color)
                                                     .size(11.0),
                                             );
@@ -109,26 +101,6 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                             })
                             .body(|ui| {
                                 ui.add_space(4.0);
-
-                                // Show full title if it was truncated
-                                if call.title.len() > 50 {
-                                    ui.label(
-                                        egui::RichText::new("Command:")
-                                            .size(11.0)
-                                            .color(current_theme().text_muted)
-                                            .strong(),
-                                    );
-                                    ui.add(
-                                        egui::Label::new(
-                                            egui::RichText::new(&call.title)
-                                                .monospace()
-                                                .size(11.0)
-                                                .color(current_theme().text_primary),
-                                        )
-                                        .wrap(),
-                                    );
-                                    ui.add_space(4.0);
-                                }
 
                                 if let Some(input) = &call.raw_input {
                                     render_kv_json(ui, "Input", input);
@@ -144,18 +116,22 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
             // Compact status update
             let status = update.fields.status.unwrap_or(ToolCallStatus::Pending);
             let (color, label) = get_status_style(&status);
-            let title = update.fields.title.as_deref().unwrap_or("Tool");
+            let tool_label = tool_label_from_parts(
+                update.fields.title.as_deref(),
+                update.fields.raw_input.as_ref(),
+            );
 
             ui.horizontal(|ui| {
-                let icon = match status {
-                    ToolCallStatus::Completed => egui_phosphor::regular::CHECK_CIRCLE,
-                    ToolCallStatus::Failed => egui_phosphor::regular::WARNING_CIRCLE,
-                    _ => egui_phosphor::regular::GEAR,
-                };
-                ui.label(egui::RichText::new(icon).color(color).size(12.0));
                 ui.label(
-                    egui::RichText::new(format!("{} -> {}", title, label))
+                    egui::RichText::new(format!("{}: {}", tool_label.server, tool_label.tool))
+                        .monospace()
                         .color(current_theme().text_muted)
+                        .size(12.0),
+                );
+                ui.label(
+                    egui::RichText::new(format!("[{}]", label))
+                        .monospace()
+                        .color(color)
                         .size(12.0),
                 );
             });
@@ -168,6 +144,7 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                     ui.horizontal(|ui| {
                         ui.label(
                             egui::RichText::new(egui_phosphor::regular::LIST_CHECKS)
+                                .monospace()
                                 .color(current_theme().text_accent),
                         );
                         ui.label(
@@ -175,6 +152,7 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                                 "Review Plan ({} steps)",
                                 plan.entries.len()
                             ))
+                            .monospace()
                             .strong()
                             .color(current_theme().text_primary),
                         );
@@ -189,6 +167,7 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
             ui.label(
                 egui::RichText::new("System: Commands updated")
                     .color(current_theme().text_muted)
+                    .monospace()
                     .italics()
                     .size(10.0),
             );
@@ -197,6 +176,7 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
             ui.horizontal(|ui| {
                 ui.label(
                     egui::RichText::new("Mode switch:")
+                        .monospace()
                         .color(current_theme().text_muted)
                         .size(11.0),
                 );
@@ -231,7 +211,10 @@ fn render_content_chunk(
 ) {
     match &chunk.content {
         ContentBlock::Text(text) => {
-            let mut rt = egui::RichText::new(&text.text).color(color).size(13.0); // Slightly larger
+            let mut rt = egui::RichText::new(&text.text)
+                .monospace()
+                .color(color)
+                .size(13.0); // Slightly larger
             if italics {
                 rt = rt.italics();
             }
@@ -247,6 +230,122 @@ fn render_content_chunk(
             }
             ui.add(egui::Label::new(rt).wrap());
         }
+    }
+}
+
+struct ToolLabel {
+    server: String,
+    tool: String,
+}
+
+fn tool_label_from_parts(title: Option<&str>, raw_input: Option<&serde_json::Value>) -> ToolLabel {
+    if let Some(input) = raw_input.and_then(parse_tool_label_from_payload) {
+        return input;
+    }
+
+    if let Some(title) = title {
+        if let Some(label) = parse_tool_label_from_title(title) {
+            return label;
+        }
+
+        let trimmed = title.trim();
+        if !trimmed.is_empty() {
+            let server = fallback_server_for_tool(trimmed).unwrap_or("local");
+            return ToolLabel {
+                server: server.to_string(),
+                tool: trimmed.to_string(),
+            };
+        }
+    }
+
+    ToolLabel {
+        server: "local".to_string(),
+        tool: "tool".to_string(),
+    }
+}
+
+fn parse_tool_label_from_payload(payload: &serde_json::Value) -> Option<ToolLabel> {
+    let parsed = if let Some(raw) = payload.as_str() {
+        serde_json::from_str::<serde_json::Value>(raw).ok()?
+    } else {
+        payload.clone()
+    };
+
+    let tool = parsed
+        .get("tool")
+        .or_else(|| parsed.get("name"))
+        .and_then(|value| value.as_str());
+    let server = parsed.get("server").and_then(|value| value.as_str());
+
+    if let Some(tool) = tool {
+        let server = server.or_else(|| fallback_server_for_tool(tool))?;
+        return Some(ToolLabel {
+            server: server.to_string(),
+            tool: tool.to_string(),
+        });
+    }
+
+    None
+}
+
+fn parse_tool_label_from_title(title: &str) -> Option<ToolLabel> {
+    let trimmed = title.trim();
+    if trimmed.is_empty() || trimmed.starts_with('{') || trimmed.starts_with('[') {
+        return None;
+    }
+
+    // Example: "return_task (lareview-tasks MCP Server): {...}"
+    if let Some((tool_part, rest)) = trimmed.split_once('(')
+        && let Some((server_part, _after_paren)) = rest.split_once(')')
+    {
+        let tool = tool_part.trim();
+
+        // Normalize server: strip common suffixes like "MCP Server"
+        let server = server_part
+            .trim()
+            .strip_suffix("MCP Server")
+            .unwrap_or(server_part.trim())
+            .trim();
+
+        if !tool.is_empty() && !server.is_empty() {
+            return Some(ToolLabel {
+                server: server.to_string(),
+                tool: tool.to_string(),
+            });
+        }
+    }
+
+    if let Some((server, tool)) = trimmed.split_once('/') {
+        return Some(ToolLabel {
+            server: server.trim().to_string(),
+            tool: tool.trim().to_string(),
+        });
+    }
+
+    if let Some((server, tool)) = trimmed.split_once(':') {
+        let server = server.trim();
+        let tool = tool.trim();
+        if !server.is_empty() && !tool.is_empty() {
+            return Some(ToolLabel {
+                server: server.to_string(),
+                tool: tool.to_string(),
+            });
+        }
+    }
+
+    let server = fallback_server_for_tool(trimmed)?;
+    Some(ToolLabel {
+        server: server.to_string(),
+        tool: trimmed.to_string(),
+    })
+}
+
+fn fallback_server_for_tool(tool: &str) -> Option<&'static str> {
+    match tool {
+        "return_task" | "return_plans" | "finalize_review" | "repo_search" | "repo_list_files" => {
+            Some("lareview-tasks")
+        }
+        _ => None,
     }
 }
 

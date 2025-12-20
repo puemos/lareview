@@ -262,57 +262,95 @@ pub struct Plan {
     pub meta: Option<serde_json::Value>,
 }
 
-/// Status of a review note
+/// Status of a feedback thread
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum NoteStatus {
+pub enum ThreadStatus {
+    /// Work to do
     #[default]
-    Open,
-    Resolved,
+    Todo,
+    /// Work in progress
+    Wip,
+    /// Work completed
+    Done,
+    /// Declined or won't fix (can be reopened)
+    Reject,
 }
 
-/// Review note stored per task
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Note {
-    /// Unique identifier for the note
-    pub id: String,
-    /// ID of the task this note belongs to
-    pub task_id: TaskId,
-    /// Content of the note
-    pub body: String,
-    /// Author of the note (e.g., "User", "AI", or GitHub username)
-    pub author: String,
-    /// Timestamp when the note was created
-    pub created_at: String,
-    /// Timestamp when the note was last updated
-    pub updated_at: String,
-    /// Optional file path for line-specific comments
+/// Impact/severity level for a thread
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ThreadImpact {
+    /// Optional/nit-level feedback
+    #[default]
+    Nitpick,
+    /// Must address before merge
+    Blocking,
+    /// Nice to have before/after merge
+    #[serde(alias = "nice-to-have")]
+    NiceToHave,
+}
+
+/// Side of a diff line
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ThreadSide {
+    Old,
+    New,
+}
+
+/// Optional anchor tying a thread to a file/line/hunk
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct ThreadAnchor {
     #[serde(default)]
     pub file_path: Option<String>,
-    /// Optional line number for line-specific comments
     #[serde(default)]
     pub line_number: Option<u32>,
-    /// Optional parent note ID for threading
     #[serde(default)]
-    pub parent_id: Option<String>,
-    /// Optional root note ID to identify the entire thread
+    pub side: Option<ThreadSide>,
     #[serde(default)]
-    pub root_id: Option<String>,
-    /// Current status of the note thread (if this is a root note)
+    pub hunk_ref: Option<HunkRef>,
     #[serde(default)]
-    pub status: NoteStatus,
-    /// Optional title for the note thread (if this is a root note)
-    #[serde(default)]
-    pub title: Option<String>,
-    /// Optional severity/blocking status of the thread
-    #[serde(default)]
-    pub severity: Option<NoteSeverity>,
+    pub head_sha: Option<String>,
 }
 
-/// Severity level of a note thread
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum NoteSeverity {
-    Blocking,
-    NonBlocking,
+/// Feedback thread spanning one or more comments
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Thread {
+    pub id: String,
+    pub review_id: ReviewId,
+    #[serde(default)]
+    pub task_id: Option<TaskId>,
+    pub title: String,
+    pub status: ThreadStatus,
+    pub impact: ThreadImpact,
+    #[serde(default)]
+    pub anchor: Option<ThreadAnchor>,
+    pub author: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Comment within a feedback thread
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Comment {
+    pub id: String,
+    pub thread_id: String,
+    pub author: String,
+    pub body: String,
+    #[serde(default)]
+    pub parent_id: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Mapping to an external provider thread (e.g., GitHub)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThreadLink {
+    pub id: String,
+    pub thread_id: String,
+    pub provider: String,
+    pub provider_thread_id: String,
+    pub provider_root_comment_id: String,
+    pub last_synced_at: String,
 }

@@ -1,4 +1,7 @@
-use crate::domain::{Note, Review, ReviewRun, ReviewTask, RiskLevel, TaskStatus};
+use crate::domain::{
+    Comment, Review, ReviewRun, ReviewTask, RiskLevel, TaskStatus, Thread, ThreadImpact,
+    ThreadStatus,
+};
 use crate::infra::d2::d2_to_svg_async;
 use anyhow::Result;
 use futures::future::join_all;
@@ -8,7 +11,8 @@ pub struct ExportData {
     pub review: Review,
     pub run: ReviewRun,
     pub tasks: Vec<ReviewTask>,
-    pub notes: Vec<Note>,
+    pub threads: Vec<Thread>,
+    pub comments: Vec<Comment>,
 }
 
 #[derive(Debug, Clone)]
@@ -259,16 +263,44 @@ impl ReviewExporter {
                     }
                 }
 
-                // Notes for this task
-                let task_notes: Vec<_> =
-                    data.notes.iter().filter(|n| n.task_id == task.id).collect();
-                if !task_notes.is_empty() {
-                    md.push_str("##### Notes\n\n");
-                    for note in task_notes {
-                        if let (Some(file), Some(line)) = (&note.file_path, note.line_number) {
-                            md.push_str(&format!("- **{}:{}**: {}\n", file, line, note.body));
-                        } else {
-                            md.push_str(&format!("- {}\n", note.body));
+                // Threads for this task
+                let task_threads: Vec<_> = data
+                    .threads
+                    .iter()
+                    .filter(|t| t.task_id.as_ref() == Some(&task.id))
+                    .collect();
+                if !task_threads.is_empty() {
+                    let mut comments_by_thread: HashMap<&str, Vec<&Comment>> = HashMap::new();
+                    for comment in &data.comments {
+                        comments_by_thread
+                            .entry(comment.thread_id.as_str())
+                            .or_default()
+                            .push(comment);
+                    }
+
+                    md.push_str("##### Discussion\n\n");
+                    for thread in task_threads {
+                        md.push_str(&format!(
+                            "- [{}][{}] {}\n",
+                            thread_status_label(thread.status),
+                            thread_impact_label(thread.impact),
+                            thread.title
+                        ));
+
+                        if let Some(anchor) = &thread.anchor
+                            && let Some(path) = anchor.file_path.as_deref()
+                            && let Some(line) = anchor.line_number
+                        {
+                            md.push_str(&format!("  - Anchor: {}:{}\n", path, line));
+                        }
+
+                        if let Some(comments) = comments_by_thread.get(thread.id.as_str()) {
+                            for comment in comments {
+                                md.push_str(&format!(
+                                    "  - {} ({}): {}\n",
+                                    comment.author, comment.created_at, comment.body
+                                ));
+                            }
                         }
                     }
                     md.push('\n');
@@ -281,5 +313,22 @@ impl ReviewExporter {
             markdown: md,
             assets,
         })
+    }
+}
+
+fn thread_status_label(status: ThreadStatus) -> &'static str {
+    match status {
+        ThreadStatus::Todo => "todo",
+        ThreadStatus::Wip => "wip",
+        ThreadStatus::Done => "done",
+        ThreadStatus::Reject => "reject",
+    }
+}
+
+fn thread_impact_label(impact: ThreadImpact) -> &'static str {
+    match impact {
+        ThreadImpact::Blocking => "blocking",
+        ThreadImpact::NiceToHave => "nice_to_have",
+        ThreadImpact::Nitpick => "nitpick",
     }
 }

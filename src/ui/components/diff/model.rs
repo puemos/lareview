@@ -16,7 +16,7 @@ pub enum DiffAction {
         line_number: usize,
         file_path: String,
     },
-    /// View existing notes for a line.
+    /// View existing threads for a line.
     ViewNotes { file_path: String, line_number: u32 },
     /// Save a note for a line.
     SaveNote {

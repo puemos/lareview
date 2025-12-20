@@ -25,7 +25,7 @@ pub const SPACING_LG: f32 = 16.0;
 pub const SPACING_XL: f32 = 24.0;
 
 /// Button padding (8px horizontal, 4px vertical) - for temporary UI changes
-pub const BUTTON_PADDING: (f32, f32) = (8.0, 4.0);
+pub const BUTTON_PADDING: (f32, f32) = (12.0, 4.0);
 
 /// Standard item spacing (8px horizontal, 6px vertical) - for temporary UI changes
 pub const ITEM_SPACING: (f32, f32) = (8.0, 6.0);

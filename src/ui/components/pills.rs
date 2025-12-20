@@ -53,7 +53,7 @@ pub fn pill_action_button(
         egui::Button::new(text)
             .fill(fill)
             .stroke(egui::Stroke::new(1.0, stroke))
-            .corner_radius(egui::CornerRadius::same(255))
+            .corner_radius(egui::CornerRadius::same(5))
             .min_size(egui::vec2(0.0, 28.0)),
     );
 

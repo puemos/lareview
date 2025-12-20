@@ -468,7 +468,6 @@ impl LaReviewApp {
                 for task in tasks_in_sub_flow_display_order(tasks) {
                     self.render_nav_item(ui, task);
                 }
-                ui.add_space(spacing::SPACING_SM);
             });
         }
     }

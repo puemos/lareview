@@ -35,7 +35,7 @@ UI logic now goes through a reducer-style store in `src/ui/app/store/` so state 
 
 Flow highlights:
 - Generate: `RunRequested` validates diff input, flips `is_generating`, clears the timeline, and emits `StartGeneration {pull_request, diff_text, selected_agent_id}`. Async ACP messages update the timeline; `Done(Ok)` triggers `RefreshReviewData::AfterGeneration` and view switching.
-- Review: `RefreshFromDb` emits `RefreshReviewData`, applied in `Async::ReviewDataLoaded` which reselects PR/task invariants and loads the first open task note. Status/note actions clear errors and enqueue DB commands; cleanup removes DONE tasks + notes and refreshes.
+- Review: `RefreshFromDb` emits `RefreshReviewData`, applied in `Async::ReviewDataLoaded` which reselects PR/task invariants and refreshes threads. Status actions clear errors and enqueue DB commands; cleanup removes DONE tasks and refreshes.
 - Settings: D2 install/uninstall requests gate on `allow_d2_install`/`is_d2_installing` and emit `RunD2` commands; async output is streamed back.
 
 Add new UI behaviors by introducing an `Action` variant, handling it in `reducer.rs` (with tests there), and emitting a `Command` that the runtime can execute.

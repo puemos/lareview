@@ -153,12 +153,13 @@ pub fn render_diff_editor_with_options(
         .unwrap_or_default();
 
     let new_hash = egui::util::hash(diff_text.as_bytes());
+    let diff_changed = view_state.last_hash != new_hash;
 
     // Create the DiffDoc (for now, keeping indexing on UI thread for simplicity)
     // In a complete implementation, indexing would happen in background
     let doc = Arc::new(super::indexer::index_diff(diff_text));
 
-    if view_state.last_hash != new_hash {
+    if diff_changed {
         // Reset UI state for new diff
         view_state.last_hash = new_hash;
         view_state.parse_error = None;
@@ -263,10 +264,13 @@ pub fn render_diff_editor_with_options(
 
     // Set up caches
     let cache_id = ui.id().with("line_cache");
-    let mut cache = ui
-        .ctx()
-        .memory_mut(|mem| mem.data.get_temp::<LineCache>(cache_id))
-        .unwrap_or_else(|| LineCache::new(2000)); // Cache up to 2000 lines
+    let mut cache = if diff_changed {
+        LineCache::new(2000)
+    } else {
+        ui.ctx()
+            .memory_mut(|mem| mem.data.get_temp::<LineCache>(cache_id))
+            .unwrap_or_else(|| LineCache::new(2000))
+    }; // Cache up to 2000 lines
 
     // Calculate overscan range
     // In a real implementation, this would be computed from the scroll area state
@@ -943,8 +947,11 @@ fn render_unified_row(
             egui::TextEdit::multiline(&mut comment_text)
                 .id_salt(text_edit_id)
                 .hint_text("Enter your comment...")
+                .font(egui::TextStyle::Monospace)
+                .frame(false)
                 .desired_rows(3)
-                .desired_width(ui.available_width()),
+                .desired_width(ui.available_width())
+                .lock_focus(true),
         );
 
         ui.memory_mut(|mem| mem.data.insert_temp(text_edit_id, comment_text.clone()));
