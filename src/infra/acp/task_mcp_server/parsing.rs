@@ -20,6 +20,8 @@ struct SingleTaskPayload {
     diagram: Option<String>,
     #[serde(default)]
     sub_flow: Option<String>,
+    #[serde(default)]
+    insight: Option<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -203,7 +205,7 @@ pub(crate) fn parse_task(args: Value) -> Result<ReviewTask> {
             tags: stats.tags,
         },
         diff_refs: task.diff_refs,
-        insight: None,
+        insight: task.insight,
         diagram,
         ai_generated: true,
         status: TaskStatus::Pending,

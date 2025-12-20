@@ -6,6 +6,7 @@ use std::{
 };
 
 use crate::ui::app::SelectedAgent;
+use crate::ui::spacing::SPACING_XS;
 use crate::ui::theme::current_theme;
 
 static LOGO_BYTES_CACHE: Lazy<Mutex<HashMap<String, Arc<[u8]>>>> =
@@ -73,7 +74,7 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
 
         ui.painter().rect(
             rect,
-            egui::CornerRadius::ZERO,
+            crate::ui::spacing::RADIUS_MD,
             bg_fill,
             stroke,
             egui::StrokeKind::Middle,
@@ -95,7 +96,7 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
                         .fit_to_exact_size(egui::vec2(16.0, 16.0))
                         .corner_radius(2.0);
                     ui.add(image);
-                    ui.add_space(4.0);
+                    ui.add_space(6.0);
                 }
 
                 // Text
@@ -131,23 +132,34 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
                     .max_height(300.0)
                     .show(ui, |ui| {
                         ui.set_width(width);
+                        let item_spacing_x = ui.spacing().item_spacing.x;
+                        ui.spacing_mut().item_spacing = egui::vec2(item_spacing_x, 0.0);
+
+                        let item_height = 24.0;
+                        let item_gap = SPACING_XS;
+                        let row_height = item_height + item_gap;
+                        let item_inset = item_gap * 0.5;
+                        let selected_bg = current_theme().brand.gamma_multiply(0.25);
+                        let selected_text = current_theme().text_primary;
 
                         for agent in &candidates {
                             let is_selected = selected_agent.to_string() == agent.id;
                             let is_available = agent.available;
 
                             // Selection Logic - now with proper hover detection
-                            let item_height = 28.0;
-
-                            let (item_rect, item_response) = ui.allocate_exact_size(
-                                egui::vec2(ui.available_width(), item_height),
-                                egui::Sense::click(),
+                            let (item_row_rect, _) = ui.allocate_exact_size(
+                                egui::vec2(ui.available_width(), row_height),
+                                egui::Sense::hover(),
                             );
+                            let item_rect = item_row_rect.shrink2(egui::vec2(0.0, item_inset));
+                            let item_id =
+                                ui.make_persistent_id(format!("agent_item_{}", agent.id));
+                            let mut item_response =
+                                ui.interact(item_rect, item_id, egui::Sense::click());
 
                             if is_available {
-                                item_response
-                                    .clone()
-                                    .on_hover_cursor(egui::CursorIcon::PointingHand);
+                                item_response =
+                                    item_response.on_hover_cursor(egui::CursorIcon::PointingHand);
                             }
 
                             if item_response.clicked() && is_available {
@@ -161,18 +173,20 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
                             let mut text_color = theme.text_primary;
 
                             if is_selected {
-                                item_bg = theme.brand;
-                                text_color = theme.brand_fg;
+                                item_bg = selected_bg;
+                                text_color = selected_text;
                             } else if item_response.hovered() && is_available {
                                 item_bg = theme.bg_secondary;
                             }
 
-                            ui.painter().rect_filled(item_rect, egui::CornerRadius::ZERO, item_bg);
+                            ui.painter()
+                                .rect_filled(item_rect, crate::ui::spacing::RADIUS_MD, item_bg);
 
                             // Content - with better padding
                             let content_rect = item_rect.shrink2(egui::vec2(8.0, 4.0));
                             let item_ui = egui::UiBuilder::new().max_rect(content_rect);
                             ui.scope_builder(item_ui, |ui| {
+                                ui.style_mut().interaction.selectable_labels = false;
                                 ui.horizontal_centered(|ui| {
                                     // Logo
                                     if let Some(logo_path) = &agent.logo
@@ -206,7 +220,7 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
                                     } else {
                                         egui::RichText::new(&agent.label).color(final_text_color)
                                     };
-                                    ui.label(label);
+                                    ui.add(egui::Label::new(label).selectable(false));
                                 });
                             });
 
@@ -215,6 +229,7 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
                                     "Agent not available. Please install it or add it to your PATH.",
                                 );
                             }
+
                         }
                     });
             });

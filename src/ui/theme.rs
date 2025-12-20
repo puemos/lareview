@@ -99,49 +99,49 @@ impl Theme {
     pub fn mocha() -> Self {
         Self {
             // Background-text pairs for accessibility
-            bg_primary: MOCHA.crust, // Main application backdrop (Extreme Dark)
-            text_primary: MOCHA.text,
+            bg_primary: MOCHA.base, // Standard dark background (Lighter than crust)
+            text_primary: egui::Color32::from_rgb(230, 233, 239), // Brighter white (Mocha text is slightly muted)
 
-            bg_secondary: MOCHA.mantle, // Sidebars, Header
-            text_secondary: MOCHA.text,
+            bg_secondary: MOCHA.mantle, // Elevated surfaces (Sidebars, Header)
+            text_secondary: egui::Color32::from_rgb(230, 233, 239),
 
-            bg_tertiary: MOCHA.base, // Panels, Cards sitting on secondary surfaces
-            text_tertiary: MOCHA.text,
+            bg_tertiary: MOCHA.surface0, // Elevated surfaces (Cards, focus areas)
+            text_tertiary: egui::Color32::from_rgb(230, 233, 239),
 
-            bg_surface: MOCHA.base, // Dialogs and dropdowns
-            text_surface: MOCHA.text,
+            bg_surface: MOCHA.mantle, // Dialogs and dropdowns
+            text_surface: egui::Color32::from_rgb(230, 233, 239),
 
-            bg_muted: MOCHA.surface0, // Muted surfaces (Gray)
+            bg_muted: MOCHA.surface0, // Muted surfaces
             text_muted: MOCHA.subtext0,
 
-            bg_card: MOCHA.base, // Individual cards
-            text_card: MOCHA.text,
+            bg_card: MOCHA.mantle, // Individual cards
+            text_card: egui::Color32::from_rgb(230, 233, 239),
 
             // Brand colors
-            brand: MOCHA.mauve,    // Primary terminal brand color
-            brand_fg: MOCHA.crust, // Dark text on light brand background
+            brand: MOCHA.mauve, // Primary terminal brand color
+            brand_fg: MOCHA.base,
 
             // Status colors
             success: MOCHA.green,
-            success_fg: MOCHA.crust,
+            success_fg: MOCHA.base,
 
             warning: MOCHA.yellow,
-            warning_fg: MOCHA.crust,
+            warning_fg: MOCHA.base,
 
             destructive: MOCHA.red,
-            destructive_fg: MOCHA.crust,
+            destructive_fg: MOCHA.base,
 
             accent: MOCHA.blue,
-            accent_fg: MOCHA.crust,
+            accent_fg: MOCHA.base,
 
             // Text hierarchy
             text_inverse: egui::Color32::from_rgb(255, 255, 255),
-            text_disabled: MOCHA.overlay2,
+            text_disabled: MOCHA.overlay1,
             text_on_muted: MOCHA.subtext1,
 
             // Border colors
-            border: MOCHA.overlay0,           // Strong TUI-style borders
-            border_secondary: MOCHA.surface1, // Subtle borders
+            border: MOCHA.surface1,           // Subtle borders
+            border_secondary: MOCHA.surface0, // Very subtle borders
 
             // Special colors
             transparent: egui::Color32::TRANSPARENT,

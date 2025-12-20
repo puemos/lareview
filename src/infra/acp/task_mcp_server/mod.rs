@@ -32,6 +32,11 @@ pub async fn run_task_mcp_server() -> pmcp::Result<()> {
         .capabilities(ServerCapabilities::tools_only())
         // New streaming tools
         .tool("return_task", tool::create_return_task_tool(config.clone()))
+        .tool("repo_search", tool::create_repo_search_tool(config.clone()))
+        .tool(
+            "repo_list_files",
+            tool::create_repo_list_files_tool(config.clone()),
+        )
         .tool(
             "finalize_review",
             tool::create_finalize_review_tool(config.clone()),

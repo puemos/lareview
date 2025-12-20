@@ -3,6 +3,9 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod repo;
+pub use repo::*;
+
 /// Unique identifier for a pull request
 pub type ReviewId = String;
 
@@ -259,13 +262,28 @@ pub struct Plan {
     pub meta: Option<serde_json::Value>,
 }
 
+/// Status of a review note
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum NoteStatus {
+    #[default]
+    Open,
+    Resolved,
+}
+
 /// Review note stored per task
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Note {
+    /// Unique identifier for the note
+    pub id: String,
     /// ID of the task this note belongs to
     pub task_id: TaskId,
     /// Content of the note
     pub body: String,
+    /// Author of the note (e.g., "User", "AI", or GitHub username)
+    pub author: String,
+    /// Timestamp when the note was created
+    pub created_at: String,
     /// Timestamp when the note was last updated
     pub updated_at: String,
     /// Optional file path for line-specific comments
@@ -274,4 +292,27 @@ pub struct Note {
     /// Optional line number for line-specific comments
     #[serde(default)]
     pub line_number: Option<u32>,
+    /// Optional parent note ID for threading
+    #[serde(default)]
+    pub parent_id: Option<String>,
+    /// Optional root note ID to identify the entire thread
+    #[serde(default)]
+    pub root_id: Option<String>,
+    /// Current status of the note thread (if this is a root note)
+    #[serde(default)]
+    pub status: NoteStatus,
+    /// Optional title for the note thread (if this is a root note)
+    #[serde(default)]
+    pub title: Option<String>,
+    /// Optional severity/blocking status of the thread
+    #[serde(default)]
+    pub severity: Option<NoteSeverity>,
+}
+
+/// Severity level of a note thread
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum NoteSeverity {
+    Blocking,
+    NonBlocking,
 }

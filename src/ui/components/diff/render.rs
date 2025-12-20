@@ -180,6 +180,14 @@ pub fn render_diff_editor_with_options(
     let mut open_full = false;
 
     let theme = theme::current_theme();
+
+    // Calculate total stats
+    let total_additions: u32 = doc.files.iter().map(|f| f.additions).sum();
+    let total_deletions: u32 = doc.files.iter().map(|f| f.deletions).sum();
+
+    // Determine collapse/expand all state
+    let all_collapsed = !view_state.collapsed.is_empty() && view_state.collapsed.iter().all(|&c| c);
+
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new("Diff").color(theme.text_primary));
 
@@ -189,9 +197,25 @@ pub fn render_diff_editor_with_options(
             doc.files.len()
         )));
 
-        if show_full_window_button {
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui
+        // Total stats
+        if total_additions > 0 {
+            ui.label(
+                egui::RichText::new(format!("+{}", total_additions))
+                    .color(theme.success)
+                    .size(DIFF_FONT_SIZE),
+            );
+        }
+        if total_deletions > 0 {
+            ui.label(
+                egui::RichText::new(format!("-{}", total_deletions))
+                    .color(theme.destructive)
+                    .size(DIFF_FONT_SIZE),
+            );
+        }
+
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if show_full_window_button
+                && ui
                     .button(
                         egui::RichText::new(format!(
                             "{} Open",
@@ -200,11 +224,35 @@ pub fn render_diff_editor_with_options(
                         .color(theme.brand),
                     )
                     .clicked()
-                {
-                    open_full = true;
-                }
-            });
-        }
+            {
+                open_full = true;
+            }
+
+            // Collapse/Expand All Button
+            let toggle_icon = if all_collapsed {
+                egui_phosphor::regular::ARROWS_OUT_SIMPLE
+            } else {
+                egui_phosphor::regular::ARROWS_IN_SIMPLE
+            };
+            let toggle_text = if all_collapsed {
+                "Expand All"
+            } else {
+                "Collapse All"
+            };
+
+            if ui
+                .button(
+                    egui::RichText::new(format!("{} {}", toggle_icon, toggle_text))
+                        .color(theme.text_secondary),
+                )
+                .clicked()
+            {
+                let new_state = !all_collapsed;
+                view_state.collapsed = vec![new_state; doc.files.len()];
+                ui.ctx()
+                    .memory_mut(|mem| mem.data.insert_persisted(state_id, view_state.clone()));
+            }
+        });
     });
 
     ui.add_space(4.0);
@@ -361,12 +409,21 @@ pub fn render_diff_editor_with_options(
                                 }
                             };
 
+                            let file = &doc.files[file_idx];
+                            let file_path = if file.new_path != "/dev/null" {
+                                strip_git_prefix(&file.new_path)
+                            } else {
+                                strip_git_prefix(&file.old_path)
+                            };
+
                             let ctx = LineContext {
                                 file_idx,
                                 line_idx: line_idx as usize,
+                                file_path,
                             };
 
                             let is_active = active_line
+                                .as_ref()
                                 .map(|ctx| {
                                     ctx.file_idx == file_idx && ctx.line_idx == line_idx as usize
                                 })
@@ -378,7 +435,7 @@ pub fn render_diff_editor_with_options(
                                 ctx,
                                 is_active,
                                 on_comment_requested,
-                                active_line,
+                                active_line.clone(),
                             );
 
                             if let DiffAction::None = action {
@@ -853,6 +910,7 @@ fn render_unified_row(
                     file_idx: ctx.file_idx,
                     line_idx: ctx.line_idx,
                     line_number: num,
+                    file_path: ctx.file_path.clone(),
                 };
             }
         }

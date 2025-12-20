@@ -14,7 +14,10 @@ pub enum DiffAction {
         file_idx: usize,
         line_idx: usize,
         line_number: usize,
+        file_path: String,
     },
+    /// View existing notes for a line.
+    ViewNotes { file_path: String, line_number: u32 },
     /// Save a note for a line.
     SaveNote {
         file_idx: usize,
@@ -24,10 +27,11 @@ pub enum DiffAction {
     },
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct LineContext {
     pub file_idx: usize,
     pub line_idx: usize,
+    pub file_path: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

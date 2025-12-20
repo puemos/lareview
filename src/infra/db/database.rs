@@ -54,7 +54,7 @@ impl Database {
     /// Initialize database schema
     fn init(&self) -> Result<()> {
         let conn = self.conn.lock().unwrap();
-        const SCHEMA_VERSION: i32 = 3;
+        const SCHEMA_VERSION: i32 = 6;
 
         conn.execute_batch("PRAGMA foreign_keys = ON;")?;
 
@@ -65,6 +65,8 @@ impl Database {
             // Unreleased app: reset schema to the current Review-centric model.
             conn.execute_batch(
                 r#"
+                DROP TABLE IF EXISTS repos;
+                DROP TABLE IF EXISTS repo_remotes;
                 DROP TABLE IF EXISTS diffs;
                 DROP TABLE IF EXISTS plans;
                 DROP TABLE IF EXISTS tasks;
@@ -72,6 +74,20 @@ impl Database {
                 DROP TABLE IF EXISTS review_runs;
                 DROP TABLE IF EXISTS reviews;
                 DROP TABLE IF EXISTS pull_requests;
+
+                CREATE TABLE repos (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    path TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE TABLE repo_remotes (
+                    repo_id TEXT NOT NULL,
+                    url TEXT NOT NULL,
+                    PRIMARY KEY(repo_id, url),
+                    FOREIGN KEY(repo_id) REFERENCES repos(id) ON DELETE CASCADE
+                );
 
                 CREATE TABLE reviews (
                     id TEXT PRIMARY KEY,
@@ -111,12 +127,21 @@ impl Database {
                 );
 
                 CREATE TABLE notes (
-                    task_id TEXT,
+                    id TEXT PRIMARY KEY,
+                    task_id TEXT NOT NULL,
+                    author TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
                     file_path TEXT,
                     line_number INTEGER,
-                    body TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    PRIMARY KEY (task_id, file_path, line_number)
+                    parent_id TEXT,
+                    root_id TEXT,
+                    status TEXT NOT NULL DEFAULT 'open',
+                    title TEXT,
+                    severity TEXT,
+                    FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+                    FOREIGN KEY(parent_id) REFERENCES notes(id) ON DELETE CASCADE
                 );
                 "#,
             )?;

@@ -38,12 +38,17 @@ impl eframe::App for LaReviewApp {
         visuals.selection.stroke = egui::Stroke::new(1.0, theme.brand);
 
         // Corner Radii
-        visuals.window_corner_radius = egui::CornerRadius::ZERO;
-        visuals.widgets.noninteractive.corner_radius = egui::CornerRadius::ZERO;
-        visuals.widgets.inactive.corner_radius = egui::CornerRadius::ZERO;
-        visuals.widgets.hovered.corner_radius = egui::CornerRadius::ZERO;
-        visuals.widgets.active.corner_radius = egui::CornerRadius::ZERO;
-        visuals.widgets.open.corner_radius = egui::CornerRadius::ZERO;
+        visuals.window_corner_radius = egui::CornerRadius::same(crate::ui::spacing::RADIUS_LG);
+        visuals.widgets.noninteractive.corner_radius =
+            egui::CornerRadius::same(crate::ui::spacing::RADIUS_MD);
+        visuals.widgets.inactive.corner_radius =
+            egui::CornerRadius::same(crate::ui::spacing::RADIUS_MD);
+        visuals.widgets.hovered.corner_radius =
+            egui::CornerRadius::same(crate::ui::spacing::RADIUS_MD);
+        visuals.widgets.active.corner_radius =
+            egui::CornerRadius::same(crate::ui::spacing::RADIUS_MD);
+        visuals.widgets.open.corner_radius =
+            egui::CornerRadius::same(crate::ui::spacing::RADIUS_MD);
 
         ctx.set_visuals(visuals);
 

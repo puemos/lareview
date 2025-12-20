@@ -9,10 +9,14 @@ pub(super) fn build_prompt(run: &RunContext, repo_root: Option<&PathBuf>) -> Str
     let source_json = serde_json::to_string(&run.source).unwrap_or_default();
 
     // Generate a hunk manifest to help agents accurately reference hunks
-    let hunk_manifest = match crate::infra::diff_index::DiffIndex::new(&run.diff_text) {
-        Ok(index) => index.generate_hunk_manifest(),
-        Err(_) => String::new(),
-    };
+    let (hunk_manifest, hunk_manifest_json) =
+        match crate::infra::diff_index::DiffIndex::new(&run.diff_text) {
+            Ok(index) => (
+                index.generate_hunk_manifest(),
+                index.generate_hunk_manifest_json(),
+            ),
+            Err(_) => (String::new(), String::new()),
+        };
 
     prompts::render(
         "generate_tasks",
@@ -22,6 +26,7 @@ pub(super) fn build_prompt(run: &RunContext, repo_root: Option<&PathBuf>) -> Str
             "initial_title": run.initial_title,
             "diff": run.diff_text,
             "hunk_manifest": hunk_manifest,
+            "hunk_manifest_json": hunk_manifest_json,
             "has_repo_access": has_repo_access,
             "repo_root": repo_root.map(|p| p.display().to_string()),
             "repo_access_note": if has_repo_access { "read-only" } else { "none" }
@@ -61,6 +66,9 @@ pub(super) fn build_client_capabilities(has_repo_access: bool) -> ClientCapabili
                             "risk": "LOW|MEDIUM|HIGH",
                             "tags": ["string"]
                         },
+                        "insight": "string",
+                        "diagram": "string (required D2 diagram)",
+                        "sub_flow": "string (optional grouping)",
                         "diff_refs": [{
                             "file": "string",
                             "hunks": [{

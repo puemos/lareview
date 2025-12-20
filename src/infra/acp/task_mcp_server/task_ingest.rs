@@ -1,5 +1,4 @@
 use super::config::ServerConfig;
-use super::logging;
 use super::parsing::parse_task;
 use super::run_context::RunContext;
 use crate::domain::ReviewTask;
@@ -9,49 +8,113 @@ use anyhow::{Context, Result};
 use chrono::Utc;
 use serde_json::Value;
 
-/// Sanitize the `diff_refs` in a raw task JSON value. This function iterates
-/// through the hunks in each diff_ref and removes any that are not valid objects
-/// with all required fields. This prevents deserialization errors later on.
-fn clean_raw_task_hunks(raw_task: &mut Value, config: &ServerConfig) {
-    if let Some(diff_refs) = raw_task.get_mut("diff_refs").and_then(|v| v.as_array_mut()) {
-        for diff_ref in diff_refs.iter_mut() {
-            if let Some(hunks) = diff_ref.get_mut("hunks").and_then(|v| v.as_array_mut()) {
-                hunks.retain(|hunk| {
-                    if let Some(obj) = hunk.as_object() {
-                        let is_valid = obj.contains_key("old_start")
-                            && obj.contains_key("old_lines")
-                            && obj.contains_key("new_start")
-                            && obj.contains_key("new_lines");
-                        if !is_valid {
-                            logging::log_to_file(
-                                config,
-                                &format!("clean_raw_task_hunks: removing incomplete hunk object: {hunk:?}"),
-                            );
-                        }
-                        is_valid
-                    } else {
-                        // Not an object, remove it
-                        logging::log_to_file(
-                            config,
-                            &format!("clean_raw_task_hunks: removing non-object hunk: {hunk:?}"),
-                        );
-                        false
-                    }
-                });
+/// Validate raw hunk objects before parsing so we fail fast on malformed payloads.
+fn validate_raw_task_hunks(raw_task: &Value) -> Result<()> {
+    let diff_refs = match raw_task.get("diff_refs").and_then(|v| v.as_array()) {
+        Some(diff_refs) => diff_refs,
+        None => return Ok(()),
+    };
+
+    for diff_ref in diff_refs {
+        let hunks = match diff_ref.get("hunks") {
+            Some(hunks) => hunks
+                .as_array()
+                .ok_or_else(|| anyhow::anyhow!("diff_refs.hunks must be an array of objects"))?,
+            None => continue,
+        };
+
+        for hunk in hunks {
+            let obj = hunk
+                .as_object()
+                .ok_or_else(|| anyhow::anyhow!("diff_refs.hunks entries must be objects"))?;
+            let has_fields = obj.contains_key("old_start")
+                && obj.contains_key("old_lines")
+                && obj.contains_key("new_start")
+                && obj.contains_key("new_lines");
+            if !has_fields {
+                anyhow::bail!(
+                    "diff_refs.hunks entries must include old_start, old_lines, new_start, new_lines"
+                );
             }
         }
+    }
+
+    Ok(())
+}
+
+fn validate_task_diff_refs(task: &ReviewTask, diff_index: &DiffIndex) -> Result<()> {
+    if task.diff_refs.is_empty() {
+        anyhow::bail!(
+            "Task {} missing diff_refs. Use hunk_manifest_json to populate diff_refs.",
+            task.id
+        );
+    }
+
+    for diff_ref in &task.diff_refs {
+        let file = diff_ref.file.as_str();
+        if file.trim().is_empty() {
+            anyhow::bail!(
+                "Task {} has an empty diff_ref file. Use file paths from hunk_manifest_json.",
+                task.id
+            );
+        }
+        if file != file.trim() {
+            anyhow::bail!(
+                "Task {} has whitespace in diff_ref file '{}'. Copy file paths exactly from hunk_manifest_json.",
+                task.id,
+                file
+            );
+        }
+        if file.starts_with("a/") || file.starts_with("b/") {
+            anyhow::bail!(
+                "Task {} diff_ref file '{}' must not include a/ or b/ prefixes. Use file paths from hunk_manifest_json.",
+                task.id,
+                file
+            );
+        }
+
+        if diff_ref.hunks.is_empty() {
+            diff_index.validate_file_exists(file)?;
+            continue;
+        }
+
+        for hunk_ref in &diff_ref.hunks {
+            diff_index.validate_hunk_exists(file, hunk_ref)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_task_diagram(task: &ReviewTask) -> Result<()> {
+    let has_diagram = task
+        .diagram
+        .as_ref()
+        .is_some_and(|diagram| !diagram.trim().is_empty());
+    if !has_diagram {
+        anyhow::bail!(
+            "Task {} missing D2 diagram. Every task must include a diagram.",
+            task.id
+        );
+    }
+    Ok(())
+}
+
+fn open_database(config: &ServerConfig) -> Result<Database> {
+    if let Some(path) = &config.db_path {
+        Database::open_at(path.clone()).context("open database")
+    } else {
+        Database::open().context("open database")
     }
 }
 
 pub(super) fn save_task(config: &ServerConfig, raw_task: Value) -> Result<ReviewTask> {
     let ctx = load_run_context(config);
 
-    // Sanitize the raw task before parsing to avoid deserialization errors
-    // due to potentially malformed hunk objects from the agent.
-    let mut cleaned_raw_task = raw_task;
-    clean_raw_task_hunks(&mut cleaned_raw_task, config);
+    // Fail fast on malformed hunks to avoid silently changing scope.
+    validate_raw_task_hunks(&raw_task)?;
 
-    let db = Database::open().context("open database")?;
+    let db = open_database(config)?;
     let conn = db.connection();
     let task_repo = TaskRepository::new(conn.clone());
     let review_run_repo = crate::infra::db::ReviewRunRepository::new(conn.clone());
@@ -100,45 +163,25 @@ pub(super) fn save_task(config: &ServerConfig, raw_task: Value) -> Result<Review
         .save(&review_run)
         .with_context(|| format!("save review run {}", ctx.run_id))?;
 
-    let mut task = parse_task(cleaned_raw_task.clone())?;
+    let mut task = parse_task(raw_task.clone())?;
     task.run_id = ctx.run_id.clone();
 
-    if !task.diff_refs.is_empty() {
-        // Always set files from the provided diff_refs
-        let mut files = Vec::new();
-        for diff_ref in &task.diff_refs {
-            if !files.contains(&diff_ref.file) {
-                files.push(diff_ref.file.clone());
-            }
-        }
-        task.files = files;
+    let diff_index = DiffIndex::new(&ctx.diff_text)?;
+    validate_task_diff_refs(&task, &diff_index)?;
+    validate_task_diagram(&task)?;
 
-        // Best-effort stats calculation.
-        match DiffIndex::new(&ctx.diff_text) {
-            Ok(diff_index) => match diff_index.task_stats(&task.diff_refs) {
-                Ok((additions, deletions)) => {
-                    task.stats.additions = additions;
-                    task.stats.deletions = deletions;
-                }
-                Err(err) => {
-                    logging::log_to_file(
-                        config,
-                        &format!(
-                            "return_task: diff_refs mismatch; using agent-provided stats. Error: {err:?}"
-                        ),
-                    );
-                }
-            },
-            Err(err) => {
-                logging::log_to_file(
-                    config,
-                    &format!(
-                        "return_task: failed to build DiffIndex; using agent-provided stats. Error: {err:?}"
-                    ),
-                );
-            }
+    // Always set files from the provided diff_refs
+    let mut files = Vec::new();
+    for diff_ref in &task.diff_refs {
+        if !files.contains(&diff_ref.file) {
+            files.push(diff_ref.file.clone());
         }
     }
+    task.files = files;
+
+    let (additions, deletions) = diff_index.task_stats(&task.diff_refs)?;
+    task.stats.additions = additions;
+    task.stats.deletions = deletions;
 
     task_repo
         .save(&task)
@@ -162,7 +205,7 @@ pub(super) fn update_review_metadata(config: &ServerConfig, args: Value) -> Resu
     }
 
     let ctx = load_run_context(config);
-    let db = Database::open().context("open database")?;
+    let db = open_database(config)?;
     let conn = db.connection();
     let review_repo = ReviewRepository::new(conn.clone());
     let review_run_repo = crate::infra::db::ReviewRunRepository::new(conn.clone());

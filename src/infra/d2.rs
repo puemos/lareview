@@ -124,7 +124,7 @@ pub fn d2_to_ascii(d2_code: &str) -> Result<String, String> {
     }
 }
 
-/// Validate D2 code by running `d2 fmt --check`.
+/// Validate D2 code by compiling it with `d2`.
 /// Returns Ok(()) if valid or if d2 is not installed (skip validation).
 /// Returns Err(msg) if d2 is installed and validation fails.
 pub fn validate_d2(d2_code: &str) -> Result<(), String> {
@@ -134,12 +134,13 @@ pub fn validate_d2(d2_code: &str) -> Result<(), String> {
     };
 
     let mut command = Command::new(d2_path);
-    command.arg("fmt");
-    command.arg("-"); // Input from stdin
+    // Compile to ensure semantic validation (unknown shapes, etc).
+    command.arg("-");
+    command.arg("-");
 
     let mut child = command
         .stdin(Stdio::piped())
-        .stdout(Stdio::null()) // We don't care about formatted output
+        .stdout(Stdio::null()) // We don't need rendered output
         .stderr(Stdio::piped()) // We want errors
         .spawn()
         .map_err(|e| format!("Failed to spawn d2: {}", e))?;

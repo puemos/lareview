@@ -53,6 +53,12 @@ pub enum Command {
         body: String,
         file_path: Option<String>,
         line_number: Option<u32>,
+        parent_id: Option<String>,
+        root_id: Option<String>,
+    },
+    ResolveThread {
+        task_id: TaskId,
+        root_id: String,
     },
     RunD2 {
         command: D2Command,
@@ -66,4 +72,16 @@ pub enum Command {
         run_id: crate::domain::ReviewRunId,
         path: std::path::PathBuf,
     },
+    UpdateNote {
+        note_id: String,
+        title: Option<String>,
+        severity: Option<crate::domain::NoteSeverity>,
+    },
+    SaveRepo {
+        repo: crate::domain::LinkedRepo,
+    },
+    DeleteRepo {
+        repo_id: String,
+    },
+    PickFolderForLink,
 }

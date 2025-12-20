@@ -102,6 +102,12 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
         }
     };
 
+    if let Some(root) = &repo_root {
+        log_fn(format!("repo access: enabled ({})", root.display()));
+    } else {
+        log_fn("repo access: disabled (diff-only)".to_string());
+    }
+
     log_fn(format!("spawn: {} {}", agent_command, agent_args.join(" ")));
 
     let mut child = Command::new(&agent_command)
@@ -215,11 +221,19 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
     )
     .context("write run context file")?;
 
-    let mcp_args = vec![
+    let mut mcp_args = vec![
         "--task-mcp-server".to_string(),
         "--pr-context".to_string(),
         pr_context_file.path().to_string_lossy().to_string(),
     ];
+    if let Ok(db_path) = std::env::var("LAREVIEW_DB_PATH") {
+        mcp_args.push("--db-path".to_string());
+        mcp_args.push(db_path);
+    }
+    if let Some(root) = &repo_root {
+        mcp_args.push("--repo-root".to_string());
+        mcp_args.push(root.to_string_lossy().to_string());
+    }
 
     let mcp_servers = vec![McpServer::Stdio(
         McpServerStdio::new("lareview-tasks", task_mcp_server_path.clone()).args(mcp_args),

@@ -9,6 +9,10 @@ pub struct ServerConfig {
     pub log_file: Option<PathBuf>,
     /// Optional path to review/run context JSON file.
     pub run_context: Option<PathBuf>,
+    /// Optional repo root for read-only tooling (search).
+    pub repo_root: Option<PathBuf>,
+    /// Optional database path override.
+    pub db_path: Option<PathBuf>,
 }
 
 impl ServerConfig {
@@ -21,6 +25,14 @@ impl ServerConfig {
         }
         if let Ok(path) = std::env::var("TASK_MCP_RUN_CONTEXT") {
             config.run_context = Some(PathBuf::from(path));
+        }
+        if let Ok(path) = std::env::var("TASK_MCP_REPO_ROOT") {
+            config.repo_root = Some(PathBuf::from(path));
+        }
+        if let Ok(path) =
+            std::env::var("TASK_MCP_DB_PATH").or_else(|_| std::env::var("LAREVIEW_DB_PATH"))
+        {
+            config.db_path = Some(PathBuf::from(path));
         }
 
         let args: Vec<String> = std::env::args().collect();
@@ -47,6 +59,22 @@ impl ServerConfig {
                 "--pr-context" => {
                     if i + 1 < args.len() {
                         config.run_context = Some(PathBuf::from(&args[i + 1]));
+                        i += 2;
+                    } else {
+                        i += 1;
+                    }
+                }
+                "--repo-root" => {
+                    if i + 1 < args.len() {
+                        config.repo_root = Some(PathBuf::from(&args[i + 1]));
+                        i += 2;
+                    } else {
+                        i += 1;
+                    }
+                }
+                "--db-path" => {
+                    if i + 1 < args.len() {
+                        config.db_path = Some(PathBuf::from(&args[i + 1]));
                         i += 2;
                     } else {
                         i += 1;

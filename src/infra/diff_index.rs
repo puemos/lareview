@@ -7,7 +7,7 @@
 use crate::domain::{DiffRef, HunkRef};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use unidiff::{Hunk, PatchSet};
 
 // serde_json is used for error serialization
@@ -134,10 +134,16 @@ impl DiffIndex {
         let mut files = HashMap::new();
 
         for file in patch_set.files() {
-            let file_path = file
+            let mut file_path = file
                 .target_file
                 .strip_prefix("b/")
                 .unwrap_or(&file.target_file);
+            if file_path == "dev/null" || file_path == "/dev/null" {
+                file_path = file
+                    .source_file
+                    .strip_prefix("a/")
+                    .unwrap_or(&file.source_file);
+            }
 
             let mut hunks = HashMap::new();
             let mut hunks_by_id = HashMap::new();
@@ -240,6 +246,18 @@ impl DiffIndex {
         Ok(())
     }
 
+    /// Checks if a file exists in the diff index.
+    pub fn validate_file_exists(&self, file_path: &str) -> Result<()> {
+        if self.files.contains_key(file_path) {
+            Ok(())
+        } else {
+            Err(DiffIndexError::FileNotFound {
+                file: file_path.to_string(),
+            }
+            .into())
+        }
+    }
+
     /// Generate a manifest of all hunks with their coordinates.
     /// This helps agents reference hunks accurately by providing exact coordinates to copy.
     pub fn generate_hunk_manifest(&self) -> String {
@@ -288,6 +306,38 @@ impl DiffIndex {
         result
     }
 
+    /// Generate a JSON manifest of all hunks with their coordinates.
+    /// This is machine-readable and can be copied directly into diff_refs.hunks.
+    pub fn generate_hunk_manifest_json(&self) -> String {
+        let mut manifest: BTreeMap<String, Vec<serde_json::Value>> = BTreeMap::new();
+
+        let mut sorted_files: Vec<_> = self.files.keys().cloned().collect();
+        sorted_files.sort();
+
+        for file_path in sorted_files {
+            let file_index = self.files.get(&file_path).unwrap();
+            if file_index.all_hunks.is_empty() {
+                continue;
+            }
+
+            let mut hunks = Vec::new();
+            for indexed_hunk in &file_index.all_hunks {
+                let hunk = &indexed_hunk.hunk;
+                let coords = &indexed_hunk.coords;
+                hunks.push(serde_json::json!({
+                    "old_start": coords.0,
+                    "old_lines": hunk.source_length,
+                    "new_start": coords.1,
+                    "new_lines": hunk.target_length
+                }));
+            }
+
+            manifest.insert(file_path.clone(), hunks);
+        }
+
+        serde_json::to_string_pretty(&manifest).unwrap_or_default()
+    }
+
     /// Renders a unified diff snippet for the given `DiffRef`s.
     /// Returns the diff string and a list of ordered file paths.
     pub fn render_unified_diff(&self, diff_refs: &[DiffRef]) -> Result<(String, Vec<String>)> {
@@ -309,7 +359,6 @@ impl DiffIndex {
             );
             ordered_files.push(diff_ref.file.clone());
             result.push_str(&header);
-
             let hunks_to_render = if diff_ref.hunks.is_empty() {
                 // If hunks are empty, render all available hunks for the file
                 file_index
@@ -341,9 +390,13 @@ impl DiffIndex {
                 }
                 hunks
             };
-
             for hunk in hunks_to_render {
-                result.push_str(&hunk.to_string());
+                let hunk_text = hunk.to_string();
+                let ends_with_newline = hunk_text.ends_with('\n');
+                result.push_str(&hunk_text);
+                if !ends_with_newline {
+                    result.push('\n');
+                }
             }
         }
 
@@ -406,6 +459,15 @@ index 0000000..abcdefg
         assert_eq!(index.files.len(), 2);
         assert!(index.files.contains_key("src/main.rs"));
         assert!(index.files.contains_key("src/lib.rs"));
+    }
+
+    #[test]
+    fn test_generate_hunk_manifest_json() {
+        let index = DiffIndex::new(TEST_DIFF).unwrap();
+        let manifest = index.generate_hunk_manifest_json();
+        assert!(manifest.contains("\"src/main.rs\""));
+        assert!(manifest.contains("\"old_start\": 1"));
+        assert!(manifest.contains("\"new_start\": 1"));
     }
 
     #[test]

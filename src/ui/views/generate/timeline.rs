@@ -63,7 +63,7 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                 egui::Frame::group(ui.style())
                     .fill(current_theme().bg_secondary)
                     .stroke(egui::Stroke::new(1.0, current_theme().border))
-                    .corner_radius(egui::CornerRadius::ZERO)
+                    .corner_radius(crate::ui::spacing::RADIUS_MD)
                     .inner_margin(8.0)
                     .show(ui, |ui| {
                         ui.set_max_width(ui.available_width());

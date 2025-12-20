@@ -9,6 +9,9 @@
 /// Extra small spacing value (4px)
 pub const SPACING_XS: f32 = 4.0;
 
+/// Thin resize handle width (2px)
+pub const RESIZE_HANDLE_WIDTH: f32 = 2.0;
+
 /// Small spacing value (8px)
 pub const SPACING_SM: f32 = 8.0;
 
@@ -33,3 +36,12 @@ pub const DIFF_ITEM_SPACING: (f32, f32) = (0.0, 2.0);
 
 /// Tight item spacing (4px horizontal, 4px vertical) - for temporary UI changes
 pub const TIGHT_ITEM_SPACING: (f32, f32) = (4.0, 4.0);
+
+/// Standard corner radius for small elements (chips, badges, etc.)
+pub const RADIUS_SM: u8 = 4;
+
+/// Standard corner radius for medium elements (buttons, smaller cards, etc.)
+pub const RADIUS_MD: u8 = 6;
+
+/// Standard corner radius for large elements (main cards, sections, etc.)
+pub const RADIUS_LG: u8 = 8;

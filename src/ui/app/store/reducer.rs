@@ -26,6 +26,16 @@ fn reduce_navigation(state: &mut AppState, action: NavigationAction) -> Vec<Comm
                     reason: ReviewDataRefreshReason::Navigation,
                 }];
             }
+            if matches!(view, AppView::Settings) {
+                // If we haven't checked GitHub status yet, trigger it
+                if state.gh_status.is_none()
+                    && state.gh_status_error.is_none()
+                    && !state.is_gh_status_checking
+                {
+                    state.is_gh_status_checking = true;
+                    return vec![Command::CheckGitHubStatus];
+                }
+            }
             Vec::new()
         }
     }
@@ -89,6 +99,18 @@ fn reduce_generate(state: &mut AppState, action: GenerateAction) -> Vec<Command>
         }
         GenerateAction::ClearTimeline => {
             state.reset_agent_timeline();
+            Vec::new()
+        }
+        GenerateAction::SelectRepo(repo_id) => {
+            state.selected_repo_id = repo_id;
+            Vec::new()
+        }
+        GenerateAction::ToggleAgentPanel => {
+            state.agent_panel_collapsed = !state.agent_panel_collapsed;
+            Vec::new()
+        }
+        GenerateAction::TogglePlanPanel => {
+            state.plan_panel_collapsed = !state.plan_panel_collapsed;
             Vec::new()
         }
     }
@@ -182,6 +204,8 @@ fn reduce_review(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
                 body,
                 file_path: None,
                 line_number: None,
+                parent_id: None,
+                root_id: None,
             }]
         }
         ReviewAction::SaveLineNote {
@@ -197,7 +221,29 @@ fn reduce_review(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
                 body,
                 file_path: Some(file_path),
                 line_number: Some(line_number),
+                parent_id: None,
+                root_id: None,
             }]
+        }
+        ReviewAction::SaveReply {
+            task_id,
+            parent_id,
+            root_id,
+            body,
+        } => {
+            state.review_error = None;
+            vec![Command::SaveNote {
+                task_id,
+                body,
+                file_path: None, // Replies are linked by parent_id/root_id
+                line_number: None,
+                parent_id: Some(parent_id),
+                root_id: Some(root_id),
+            }]
+        }
+        ReviewAction::ResolveThread { task_id, root_id } => {
+            state.review_error = None;
+            vec![Command::ResolveThread { task_id, root_id }]
         }
         ReviewAction::SetCurrentNoteText(text) => {
             state.current_note = Some(text);
@@ -206,6 +252,24 @@ fn reduce_review(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
         ReviewAction::StartLineNote(ctx) => {
             state.current_line_note = Some(ctx);
             state.current_note = None;
+            Vec::new()
+        }
+        ReviewAction::OpenThread {
+            file_path,
+            line_number,
+        } => {
+            state.active_thread = Some(crate::ui::app::ThreadContext {
+                file_path,
+                line_number,
+            });
+            Vec::new()
+        }
+        ReviewAction::OpenAllNotes => {
+            // Deprecated/Removed functionality
+            Vec::new()
+        }
+        ReviewAction::CloseThread => {
+            state.active_thread = None;
             Vec::new()
         }
         ReviewAction::OpenFullDiff(view) => {
@@ -246,6 +310,17 @@ fn reduce_review(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
                 Vec::new()
             }
         }
+        ReviewAction::UpdateNote {
+            note_id,
+            title,
+            severity,
+        } => {
+            vec![Command::UpdateNote {
+                note_id,
+                title,
+                severity,
+            }]
+        }
     }
 }
 
@@ -282,6 +357,12 @@ fn reduce_settings(state: &mut AppState, action: SettingsAction) -> Vec<Command>
             vec![Command::RunD2 {
                 command: D2Command::Uninstall,
             }]
+        }
+        SettingsAction::LinkRepository => {
+            vec![Command::PickFolderForLink]
+        }
+        SettingsAction::UnlinkRepository(repo_id) => {
+            vec![Command::DeleteRepo { repo_id }]
         }
     }
 }
@@ -402,6 +483,37 @@ fn reduce_async(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
             }
             vec![]
         }
+        AsyncAction::ReposLoaded(result) => {
+            match result {
+                Ok(repos) => state.linked_repos = repos,
+                Err(err) => state.review_error = Some(format!("Failed to load repos: {}", err)),
+            }
+            Vec::new()
+        }
+        AsyncAction::RepoSaved(result) => {
+            match result {
+                Ok(repo) => {
+                    state.linked_repos.push(repo);
+                }
+                Err(err) => state.review_error = Some(format!("Failed to save repo: {}", err)),
+            }
+            Vec::new()
+        }
+        AsyncAction::RepoDeleted(result) => {
+            match result {
+                Ok(repo_id) => {
+                    state.linked_repos.retain(|r| r.id != repo_id);
+                    if state.selected_repo_id.as_ref() == Some(&repo_id) {
+                        state.selected_repo_id = None;
+                    }
+                }
+                Err(err) => state.review_error = Some(format!("Failed to delete repo: {}", err)),
+            }
+            Vec::new()
+        }
+        AsyncAction::NewRepoPicked(repo) => {
+            vec![Command::SaveRepo { repo }]
+        }
     }
 }
 
@@ -414,8 +526,20 @@ fn reduce_generation_msg(state: &mut AppState, msg: GenMsg) -> Vec<Command> {
             }
             match result {
                 Ok(preview) => {
-                    state.generate_preview = Some(preview);
+                    state.generate_preview = Some(preview.clone());
                     state.generation_error = None;
+
+                    if let Some(github) = &preview.github {
+                        // Try to auto-select repo by matching "owner/repo" in remotes
+                        let search_pattern = format!("{}/{}", github.pr.owner, github.pr.repo);
+                        if let Some(matched_repo) = state.linked_repos.iter().find(|r| {
+                            r.remotes
+                                .iter()
+                                .any(|remote| remote.contains(&search_pattern))
+                        }) {
+                            state.selected_repo_id = Some(matched_repo.id.clone());
+                        }
+                    }
                 }
                 Err(err) => {
                     state.generate_preview = None;

@@ -17,12 +17,8 @@ pub fn get_content(path: &str) -> Option<&'static [u8]> {
         "assets/icons/icon-512.png" => Some(include_bytes!("../assets/icons/icon-512.png")),
 
         // Fonts
-        "assets/fonts/SpaceMono-Regular.ttf" => {
-            Some(include_bytes!("../assets/fonts/SpaceMono-Regular.ttf"))
-        }
-        "assets/fonts/Inter-Regular.ttf" => {
-            Some(include_bytes!("../assets/fonts/Inter-Regular.ttf"))
-        }
+        "assets/fonts/Geist.ttf" => Some(include_bytes!("../assets/fonts/Geist.ttf")),
+        "assets/fonts/GeistMono.ttf" => Some(include_bytes!("../assets/fonts/GeistMono.ttf")),
 
         _ => None,
     }

@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use tokio::sync::mpsc;
 
+use crate::infra::db::repository::RepoRepository;
 use crate::infra::db::{
     Database, NoteRepository, ReviewRepository, ReviewRunRepository, TaskRepository,
 };
@@ -19,6 +20,7 @@ pub struct LaReviewApp {
     pub note_repo: Arc<NoteRepository>,
     pub review_repo: Arc<ReviewRepository>,
     pub run_repo: Arc<ReviewRunRepository>,
+    pub repo_repo: Arc<RepoRepository>,
 
     pub _db: Database,
 

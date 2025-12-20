@@ -25,6 +25,9 @@ pub enum GenerateAction {
     FetchPrContext(String),
     SelectAgent(SelectedAgent),
     ClearTimeline,
+    SelectRepo(Option<String>),
+    ToggleAgentPanel,
+    TogglePlanPanel,
 }
 
 #[derive(Debug)]
@@ -59,8 +62,29 @@ pub enum ReviewAction {
         line_number: u32,
         body: String,
     },
+    UpdateNote {
+        note_id: String,
+        title: Option<String>,
+        severity: Option<crate::domain::NoteSeverity>,
+    },
+    SaveReply {
+        task_id: TaskId,
+        parent_id: String,
+        root_id: String,
+        body: String,
+    },
+    ResolveThread {
+        task_id: TaskId,
+        root_id: String,
+    },
     SetCurrentNoteText(String),
     StartLineNote(LineNoteContext),
+    OpenThread {
+        file_path: String,
+        line_number: u32,
+    },
+    OpenAllNotes,
+    CloseThread,
     OpenFullDiff(FullDiffView),
     CloseFullDiff,
     RequestExportPreview,
@@ -76,6 +100,8 @@ pub enum SettingsAction {
     RequestD2Install,
     RequestD2Uninstall,
     CheckGitHubStatus,
+    LinkRepository,
+    UnlinkRepository(String),
 }
 
 #[derive(Debug)]
@@ -98,6 +124,10 @@ pub enum AsyncAction {
     D2InstallComplete,
     ExportPreviewGenerated(Result<crate::application::review::export::ExportResult, String>),
     ExportFinished(Result<(), String>),
+    ReposLoaded(Result<Vec<crate::domain::LinkedRepo>, String>),
+    RepoSaved(Result<crate::domain::LinkedRepo, String>),
+    RepoDeleted(Result<String, String>),
+    NewRepoPicked(crate::domain::LinkedRepo),
 }
 
 #[derive(Debug)]

@@ -19,33 +19,69 @@ pub(super) fn validate_tasks_payload(
             "LOW" | "MEDIUM" | "HIGH" => {} // Valid risk level
             other => anyhow::bail!("Task {idx} has invalid stats.risk '{other}'"),
         }
+
+        let has_diagram = task
+            .diagram
+            .as_ref()
+            .is_some_and(|diagram| !diagram.trim().is_empty());
+        if !has_diagram {
+            anyhow::bail!(
+                "Task {} is missing a D2 diagram. Every task must include a diagram.",
+                task.id
+            );
+        }
     }
 
     // Validate diff_refs point to valid hunks in the canonical diff
     let diff_index = DiffIndex::new(diff_text)?;
-    let mut warnings = Vec::new();
+    let warnings = Vec::new();
 
     for task in tasks {
-        // Validate each diff_ref points to a real hunk
         for diff_ref in &task.diff_refs {
+            if diff_ref.hunks.is_empty() {
+                if let Err(err) = diff_index.validate_file_exists(diff_ref.file.as_str()) {
+                    if let Some(diff_index_err) =
+                        err.downcast_ref::<crate::infra::diff_index::DiffIndexError>()
+                    {
+                        anyhow::bail!(
+                            "Task {} references file {} that does not exist in diff. Error: {}. Use file paths from the hunk manifest.",
+                            task.id,
+                            diff_ref.file,
+                            diff_index_err
+                        );
+                    } else {
+                        anyhow::bail!(
+                            "Task {} references file {} that does not exist in diff. Use file paths from the hunk manifest.",
+                            task.id,
+                            diff_ref.file
+                        );
+                    }
+                }
+                continue;
+            }
+
             for hunk_ref in &diff_ref.hunks {
-                match diff_index.validate_hunk_exists(diff_ref.file.as_str(), hunk_ref) {
-                    Ok(_) => {} // Valid hunk reference
-                    Err(err) => {
-                        // If this is a DiffIndexError, we can get more details
-                        if let Some(diff_index_err) =
-                            err.downcast_ref::<crate::infra::diff_index::DiffIndexError>()
-                        {
-                            warnings.push(format!(
-                                "Task {} references hunk in file {} that does not exist in diff. Nearest hunks: {:?}",
-                                task.id, diff_ref.file, diff_index_err.nearest()
-                            ));
-                        } else {
-                            warnings.push(format!(
-                                "Task {} references hunk in file {} that does not exist in diff",
-                                task.id, diff_ref.file
-                            ));
-                        }
+                if let Err(err) = diff_index.validate_hunk_exists(diff_ref.file.as_str(), hunk_ref)
+                {
+                    if let Some(diff_index_err) =
+                        err.downcast_ref::<crate::infra::diff_index::DiffIndexError>()
+                    {
+                        anyhow::bail!(
+                            "Task {} references invalid hunk in {} at old_start={}, new_start={}. Nearest hunk: {:?}. Copy coordinates from the hunk manifest.",
+                            task.id,
+                            diff_ref.file,
+                            hunk_ref.old_start,
+                            hunk_ref.new_start,
+                            diff_index_err.nearest()
+                        );
+                    } else {
+                        anyhow::bail!(
+                            "Task {} references invalid hunk in {} at old_start={}, new_start={}. Copy coordinates from the hunk manifest.",
+                            task.id,
+                            diff_ref.file,
+                            hunk_ref.old_start,
+                            hunk_ref.new_start
+                        );
                     }
                 }
             }

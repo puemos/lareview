@@ -10,7 +10,10 @@ impl LaReviewApp {
         let is_selected = self.state.selected_task_id.as_ref() == Some(&task.id);
 
         let (bg_color, text_color) = if is_selected {
-            (current_theme().bg_secondary, current_theme().text_primary)
+            (
+                current_theme().bg_secondary.gamma_multiply(0.5),
+                current_theme().text_primary,
+            )
         } else {
             (egui::Color32::TRANSPARENT, current_theme().text_muted)
         };
@@ -40,19 +43,19 @@ impl LaReviewApp {
 
         let response = egui::Frame::NONE
             .fill(bg_color)
-            .corner_radius(egui::CornerRadius::ZERO)
+            .corner_radius(crate::ui::spacing::RADIUS_MD)
             .inner_margin(egui::Margin::symmetric(
                 spacing::SPACING_SM as i8,
-                (spacing::SPACING_XS + 2.0) as i8,
+                (spacing::SPACING_XS + 1.0) as i8,
             ))
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
                     // Navigation: risk + crossed title (when closed)
-                    ui.label(egui::RichText::new(risk_icon).size(16.0).color(risk_color))
+                    ui.label(egui::RichText::new(risk_icon).size(15.0).color(risk_color))
                         .on_hover_text(risk_label);
 
-                    ui.add_space(6.0); // Keep 6.0 as this is a custom spacing value
+                    ui.add_space(4.0);
 
                     ui.add(
                         egui::Label::new(title_text)

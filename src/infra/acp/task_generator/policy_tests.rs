@@ -1,4 +1,4 @@
-use crate::domain::ReviewSource;
+use crate::domain::{DiffRef, HunkRef, ReviewSource};
 use crate::infra::acp::RunContext;
 
 fn sample_run(diff_text: &str) -> RunContext {
@@ -31,7 +31,7 @@ fn sample_task(id: &str, files: &[&str]) -> crate::domain::ReviewTask {
         },
         diff_refs: vec![],
         insight: None,
-        diagram: None,
+        diagram: Some("Flow: { shape: sequence_diagram Reviewer -> Code: \"review\" }".to_string()),
         ai_generated: true,
         status: crate::domain::TaskStatus::Pending,
         sub_flow: None,
@@ -126,6 +126,46 @@ async fn permission_allows_return_task_even_without_repo_access() {
             "description": "Test task description",
             "stats": { "risk": "LOW", "tags": ["test"] },
             "diff_refs": []
+        }));
+    let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
+    let options = vec![agent_client_protocol::PermissionOption::new(
+        "allow",
+        "Allow",
+        agent_client_protocol::PermissionOptionKind::AllowOnce,
+    )];
+    let req = agent_client_protocol::RequestPermissionRequest::new(
+        agent_client_protocol::SessionId::new("s1"),
+        tool_call,
+        options,
+    );
+    let resp =
+        <super::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
+            &client, req,
+        )
+        .await
+        .unwrap();
+    assert!(matches!(
+        resp.outcome,
+        agent_client_protocol::RequestPermissionOutcome::Selected(_)
+    ));
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn permission_allows_wrapped_return_task_payload() {
+    let client = super::client::LaReviewClient::new(None, "run-1", None);
+    let fields = agent_client_protocol::ToolCallUpdateFields::new()
+        .kind(agent_client_protocol::ToolKind::Other)
+        .title("mcp")
+        .raw_input(serde_json::json!({
+            "tool": "return_task",
+            "server": "lareview-tasks",
+            "arguments": {
+                "id": "wrapped-task",
+                "title": "Wrapped Task",
+                "description": "Test task description",
+                "stats": { "risk": "LOW", "tags": ["test"] },
+                "diff_refs": []
+            }
         }));
     let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
     let options = vec![agent_client_protocol::PermissionOption::new(
@@ -246,6 +286,37 @@ async fn permission_allows_safe_read_under_repo_root() {
 }
 
 #[tokio::test(flavor = "current_thread")]
+async fn permission_allows_missing_file_under_repo_root() {
+    let root = tempfile::tempdir().expect("root");
+    let client = super::client::LaReviewClient::new(None, "run-1", Some(root.path().to_path_buf()));
+    let fields = agent_client_protocol::ToolCallUpdateFields::new()
+        .kind(agent_client_protocol::ToolKind::Read)
+        .title("fs/read_text_file")
+        .raw_input(serde_json::json!({ "path": "src/missing.rs" }));
+    let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
+    let options = vec![agent_client_protocol::PermissionOption::new(
+        "allow",
+        "Allow",
+        agent_client_protocol::PermissionOptionKind::AllowOnce,
+    )];
+    let req = agent_client_protocol::RequestPermissionRequest::new(
+        agent_client_protocol::SessionId::new("s1"),
+        tool_call,
+        options,
+    );
+    let resp =
+        <super::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
+            &client, req,
+        )
+        .await
+        .unwrap();
+    assert!(matches!(
+        resp.outcome,
+        agent_client_protocol::RequestPermissionOutcome::Selected(_)
+    ));
+}
+
+#[tokio::test(flavor = "current_thread")]
 async fn permission_denies_read_outside_repo_root() {
     let root = tempfile::tempdir().expect("root");
     std::fs::write(root.path().join("inside.rs"), "hi").expect("write");
@@ -323,4 +394,39 @@ fn validate_tasks_requires_full_file_coverage() {
 
     let missing = vec![sample_task("T1", &[]), sample_task("T2", &[])];
     assert!(super::validation::validate_tasks_payload(&missing, Some(&raw), diff).is_err());
+}
+
+#[test]
+fn validate_tasks_rejects_invalid_hunks() {
+    let diff = "diff --git a/src/a.rs b/src/a.rs\n--- a/src/a.rs\n+++ b/src/a.rs\n@@ -1,1 +1,1 @@\n-old\n+new\n";
+    let mut task = sample_task("T1", &["src/a.rs"]);
+    task.diff_refs = vec![DiffRef {
+        file: "src/a.rs".to_string(),
+        hunks: vec![HunkRef {
+            old_start: 2,
+            old_lines: 1,
+            new_start: 2,
+            new_lines: 1,
+        }],
+    }];
+    assert!(super::validation::validate_tasks_payload(&[task], None, diff).is_err());
+}
+
+#[test]
+fn validate_tasks_rejects_unknown_file_with_empty_hunks() {
+    let diff = "diff --git a/src/a.rs b/src/a.rs\n--- a/src/a.rs\n+++ b/src/a.rs\n@@ -1,1 +1,1 @@\n-old\n+new\n";
+    let mut task = sample_task("T1", &["src/a.rs"]);
+    task.diff_refs = vec![DiffRef {
+        file: "src/missing.rs".to_string(),
+        hunks: vec![],
+    }];
+    assert!(super::validation::validate_tasks_payload(&[task], None, diff).is_err());
+}
+
+#[test]
+fn validate_tasks_rejects_missing_diagram() {
+    let diff = "diff --git a/src/a.rs b/src/a.rs\n--- a/src/a.rs\n+++ b/src/a.rs\n";
+    let mut task = sample_task("T1", &["src/a.rs"]);
+    task.diagram = None;
+    assert!(super::validation::validate_tasks_payload(&[task], None, diff).is_err());
 }

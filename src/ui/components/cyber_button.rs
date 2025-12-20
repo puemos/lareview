@@ -1,0 +1,141 @@
+use crate::ui::theme::current_theme;
+use egui::{Color32, FontId, Rect, Response, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
+
+pub fn cyber_button(ui: &mut Ui, text: &str, enabled: bool, is_generating: bool) -> Response {
+    let theme = current_theme();
+    let time = ui.input(|i| i.time);
+
+    // 1. Layout Specs
+    let height = 32.0;
+    let width = ui.available_width();
+    let (rect, response) = ui.allocate_exact_size(
+        vec2(width, height),
+        if enabled {
+            Sense::click()
+        } else {
+            Sense::hover()
+        },
+    );
+
+    // Repaint triggers for animations
+    if is_generating || (response.hovered() && enabled) {
+        ui.ctx().request_repaint();
+    }
+
+    let hover_ratio = ui
+        .ctx()
+        .animate_bool(response.id, response.hovered() && enabled);
+
+    if !ui.is_rect_visible(rect) {
+        return response;
+    }
+
+    let painter = ui.painter();
+
+    // --- 2. BACKGROUND & ACCENT ---
+    let bg_color = if is_generating {
+        theme.bg_secondary.gamma_multiply(0.4)
+    } else if enabled {
+        theme.bg_card.lerp_to_gamma(theme.brand, hover_ratio * 0.08)
+    } else {
+        theme.bg_muted.gamma_multiply(0.3)
+    };
+
+    painter.rect_filled(rect, 0.0, bg_color);
+
+    // Status Notch (Left Edge)
+    let notch_rect = Rect::from_min_size(rect.min, vec2(2.0, rect.height()));
+    let notch_color = if is_generating {
+        theme.brand.linear_multiply((time * 8.0).sin().abs() as f32)
+    } else if enabled {
+        theme.brand.gamma_multiply(0.4 + (hover_ratio * 0.6))
+    } else {
+        theme.border.gamma_multiply(0.5)
+    };
+    painter.rect_filled(notch_rect, 0.0, notch_color);
+
+    // Border
+    let border_color = if enabled {
+        theme.border.lerp_to_gamma(theme.brand, hover_ratio)
+    } else {
+        theme.border.gamma_multiply(0.2)
+    };
+    painter.rect_stroke(
+        rect,
+        0.0,
+        Stroke::new(1.0, border_color),
+        StrokeKind::Inside,
+    );
+
+    // --- 3. CONTENT (ICON & TEXT) ---
+    let content_color = if is_generating {
+        theme.text_accent
+    } else if enabled {
+        theme
+            .text_primary
+            .lerp_to_gamma(theme.text_accent, hover_ratio)
+    } else {
+        theme.text_disabled
+    };
+
+    let display_text = if is_generating { "RUNNING..." } else { text }.to_uppercase();
+    let galley = painter.layout_no_wrap(display_text, FontId::monospace(11.0), content_color);
+
+    let gap = 10.0;
+    let icon_size = 8.0;
+    let total_w = icon_size + gap + galley.size().x;
+
+    let start_x = rect.center().x - (total_w / 2.0);
+    let icon_center = pos2(start_x + (icon_size / 2.0), rect.center().y);
+
+    // DRAW GEOMETRIC ICON
+    if is_generating {
+        // Rotating Reticle (Running)
+        let angle = (time * 6.0) as f32;
+        for i in 0..4 {
+            let arm_angle = angle + (i as f32 * std::f32::consts::PI / 2.0);
+            let direction = vec2(arm_angle.cos(), arm_angle.sin());
+            painter.line_segment(
+                [icon_center + direction * 2.0, icon_center + direction * 5.0],
+                Stroke::new(1.2, theme.brand),
+            );
+        }
+    } else {
+        // Static Diamond (Idle)
+        // When hovered, it slowly rotates 45 degrees
+        let angle = if enabled {
+            hover_ratio * std::f32::consts::PI / 4.0
+        } else {
+            0.0
+        };
+        let cos_a = angle.cos();
+        let sin_a = angle.sin();
+        let r = 4.0;
+
+        let corners = [vec2(0.0, -r), vec2(r, 0.0), vec2(0.0, r), vec2(-r, 0.0)].map(|v| {
+            let rx = v.x * cos_a - v.y * sin_a;
+            let ry = v.x * sin_a + v.y * cos_a;
+            icon_center + vec2(rx, ry)
+        });
+
+        painter.add(egui::Shape::convex_polygon(
+            corners.to_vec(),
+            Color32::TRANSPARENT,
+            Stroke::new(1.2, content_color.gamma_multiply(0.8)),
+        ));
+
+        // Add a tiny dot in center if hovered
+        if hover_ratio > 0.1 {
+            painter.circle_filled(icon_center, 1.0 * hover_ratio, theme.brand);
+        }
+    }
+
+    // DRAW TEXT
+    let text_pos = pos2(
+        start_x + icon_size + gap,
+        rect.center().y - galley.size().y / 2.0,
+    );
+    painter.galley(text_pos, galley, Color32::TRANSPARENT);
+
+    response
+}

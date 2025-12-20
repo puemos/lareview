@@ -33,7 +33,18 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
             body,
             file_path,
             line_number,
-        } => save_note(app, task_id, body, file_path, line_number),
+            parent_id,
+            root_id,
+        } => save_note(
+            app,
+            task_id,
+            body,
+            file_path,
+            line_number,
+            parent_id,
+            root_id,
+        ),
+        Command::ResolveThread { task_id, root_id } => resolve_thread(app, task_id, root_id),
         Command::RunD2 { command } => run_d2_command(app, command),
         Command::GenerateExportPreview { review_id, run_id } => {
             generate_export_preview(app, review_id, run_id)
@@ -43,6 +54,14 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
             run_id,
             path,
         } => export_review(app, review_id, run_id, path),
+        Command::UpdateNote {
+            note_id,
+            title,
+            severity,
+        } => update_note(app, note_id, title, severity),
+        Command::SaveRepo { repo } => save_repo(app, repo),
+        Command::DeleteRepo { repo_id } => delete_repo(app, repo_id),
+        Command::PickFolderForLink => pick_folder_for_link(app),
     }
 }
 
@@ -204,15 +223,22 @@ fn start_generation(
         candidate.args.join(" ")
     );
 
+    let repo_root = app
+        .state
+        .selected_repo_id
+        .as_ref()
+        .and_then(|id| app.state.linked_repos.iter().find(|r| &r.id == id))
+        .map(|r| r.path.clone());
+
     let input = GenerateTasksInput {
         run_context,
-        repo_root: None,
+        repo_root,
         agent_command,
         agent_args: candidate.args,
         progress_tx: Some(progress_tx),
         mcp_server_binary: None,
         timeout_secs: Some(5000),
-        debug: false,
+        debug: std::env::var("ACP_DEBUG").is_ok(),
     };
 
     let gen_tx = app.gen_tx.clone();
@@ -378,13 +404,25 @@ fn save_note(
     body: String,
     file_path: Option<String>,
     line_number: Option<u32>,
+    parent_id: Option<String>,
+    root_id: Option<String>,
 ) {
+    let id = uuid::Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().to_rfc3339();
     let note = crate::domain::Note {
+        id: id.clone(),
         task_id: task_id.clone(),
+        author: "User".to_string(),
         body,
-        updated_at: chrono::Utc::now().to_rfc3339(),
+        created_at: now.clone(),
+        updated_at: now,
         file_path,
         line_number,
+        parent_id,
+        root_id: root_id.or(Some(id)), // Use provided root_id or self if root
+        status: crate::domain::NoteStatus::Open,
+        title: None,
+        severity: None,
     };
 
     let result = app
@@ -396,6 +434,16 @@ fn save_note(
     app.dispatch(Action::Review(ReviewAction::SelectTask {
         task_id: task_id.clone(),
     })); // Reload to get updated list
+}
+
+fn resolve_thread(app: &mut LaReviewApp, task_id: crate::domain::TaskId, root_id: String) {
+    let result = app
+        .note_repo
+        .resolve_thread(&task_id, &root_id)
+        .map_err(|e| format!("Failed to resolve thread: {e}"));
+
+    app.dispatch(Action::Async(AsyncAction::NoteSaved(result)));
+    app.dispatch(Action::Review(ReviewAction::SelectTask { task_id }));
 }
 
 fn run_d2_command(app: &mut LaReviewApp, command: D2Command) {
@@ -563,5 +611,79 @@ fn export_review(
                 result.map_err(|e: anyhow::Error| e.to_string()),
             )))
             .await;
+    });
+}
+
+fn update_note(
+    app: &mut LaReviewApp,
+    note_id: String,
+    title: Option<String>,
+    severity: Option<crate::domain::NoteSeverity>,
+) {
+    let result = app
+        .note_repo
+        .update_metadata(&note_id, title, severity)
+        .map_err(|e| format!("Failed to update note: {e}"));
+
+    app.dispatch(Action::Async(AsyncAction::NoteSaved(result)));
+    app.dispatch(Action::Review(super::action::ReviewAction::RefreshFromDb {
+        reason: super::command::ReviewDataRefreshReason::Manual,
+    }));
+}
+
+fn save_repo(app: &mut LaReviewApp, repo: crate::domain::LinkedRepo) {
+    let repo_repo = app.repo_repo.clone();
+    let action_tx = app.action_tx.clone();
+
+    tokio::spawn(async move {
+        let result = repo_repo
+            .save(&repo)
+            .map(|_| repo.clone())
+            .map_err(|e| e.to_string());
+        let _ = action_tx
+            .send(Action::Async(AsyncAction::RepoSaved(result)))
+            .await;
+    });
+}
+
+fn delete_repo(app: &mut LaReviewApp, repo_id: String) {
+    let repo_repo = app.repo_repo.clone();
+    let action_tx = app.action_tx.clone();
+
+    tokio::spawn(async move {
+        let result = repo_repo
+            .delete(&repo_id)
+            .map(|_| repo_id.clone())
+            .map_err(|e| e.to_string());
+        let _ = action_tx
+            .send(Action::Async(AsyncAction::RepoDeleted(result)))
+            .await;
+    });
+}
+
+fn pick_folder_for_link(app: &mut LaReviewApp) {
+    let action_tx = app.action_tx.clone();
+
+    tokio::spawn(async move {
+        if let Some(path) = rfd::FileDialog::new().pick_folder() {
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| "Unknown".to_string());
+
+            let remotes = crate::infra::git::extract_git_remotes(&path);
+
+            let repo = crate::domain::LinkedRepo {
+                id: uuid::Uuid::new_v4().to_string(),
+                name,
+                path,
+                remotes,
+                created_at: chrono::Utc::now().to_rfc3339(),
+            };
+
+            let _ = action_tx
+                .send(Action::Async(AsyncAction::NewRepoPicked(repo)))
+                .await;
+        }
     });
 }

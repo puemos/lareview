@@ -5,16 +5,15 @@ use crate::application::review::ordering::{
 };
 use crate::ui::app::{Action, LaReviewApp, ReviewAction};
 use crate::ui::components::action_button::action_button;
+use crate::ui::components::pills::pill_action_button;
 use crate::ui::components::status::error_banner;
-use crate::ui::components::{badge::badge, pills::pill_action_button};
 use crate::ui::spacing;
 use crate::ui::theme::current_theme;
 use eframe::egui;
 use egui_phosphor::regular as icons;
 
-// Fixed top header sizing for consistent alignment across widgets.
-const TOP_HEADER_HEIGHT: f32 = 44.0;
-const TOP_HEADER_CONTROL_HEIGHT: f32 = 28.0;
+// Optimized header height for a "Toolbar" feel
+const TOP_HEADER_HEIGHT: f32 = 52.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RightPaneState {
@@ -26,20 +25,18 @@ enum RightPaneState {
 
 impl LaReviewApp {
     pub fn ui_review(&mut self, ui: &mut egui::Ui) {
-        // Prepare data upfront so the header can show progress/actions.
+        // --- 1. Data Preparation ---
         let tasks_by_sub_flow = self.state.tasks_by_sub_flow();
         let display_order_tasks = tasks_in_display_order(&tasks_by_sub_flow);
         let all_tasks = self.state.tasks();
         let total_tasks = display_order_tasks.len();
+
         let done_tasks = display_order_tasks
             .iter()
-            .filter(|t| {
-                matches!(
-                    t.status,
-                    crate::domain::TaskStatus::Done | crate::domain::TaskStatus::Ignored
-                )
-            })
+            .filter(|t| t.status.is_closed())
             .count();
+
+        // Count open (Pending + InProgress)
         let open_tasks = display_order_tasks
             .iter()
             .filter(|t| {
@@ -50,12 +47,7 @@ impl LaReviewApp {
             })
             .count();
 
-        let progress = if total_tasks > 0 {
-            (done_tasks as f32) / (total_tasks as f32)
-        } else {
-            0.0
-        };
-
+        // Find next actionable task
         let next_open_id = display_order_tasks
             .iter()
             .find(|t| t.status == crate::domain::TaskStatus::Pending)
@@ -68,173 +60,109 @@ impl LaReviewApp {
 
         let mut trigger_delete_review = false;
 
-        // --- Top Header Frame for consistent padding and sizing ---
+        // --- 2. Main Container Setup ---
+        // We calculate the content area manually to handle the split view cleanly
+        let side_margin = spacing::SPACING_SM;
+        let content_rect = ui
+            .available_rect_before_wrap()
+            .shrink2(egui::vec2(side_margin, 0.0));
+
+        let mut content_ui = ui.new_child(egui::UiBuilder::new().max_rect(content_rect));
+        content_ui.set_clip_rect(content_rect); // Clip to prevent spillover
+        let ui = &mut content_ui;
+
+        // --- 3. Top Header (Toolbar) ---
         egui::Frame::NONE
-            .fill(current_theme().bg_secondary) // Match app header
-            .inner_margin(egui::Margin::symmetric(
-                spacing::SPACING_MD as i8,
-                spacing::SPACING_SM as i8,
-            ))
+            .inner_margin(egui::Margin::symmetric(spacing::SPACING_MD as i8, 0))
             .show(ui, |ui| {
-                let header_inner_height =
-                    (TOP_HEADER_HEIGHT - 2.0 * spacing::SPACING_SM).max(TOP_HEADER_CONTROL_HEIGHT);
-                ui.set_min_height(header_inner_height);
+                ui.set_min_height(TOP_HEADER_HEIGHT);
+                ui.allocate_ui_with_layout(
+                    egui::vec2(ui.available_width(), TOP_HEADER_HEIGHT),
+                    egui::Layout::left_to_right(egui::Align::Center),
+                    |ui| {
+                        // A. Left Side: Context Selectors
+                        ui.horizontal(|ui| {
+                            self.render_header_selectors(ui);
+                        });
 
-                ui.scope(|ui| {
-                    let old_interact_size = ui.spacing().interact_size;
-                    let old_button_padding = ui.spacing().button_padding;
-                    ui.spacing_mut().interact_size.y = TOP_HEADER_CONTROL_HEIGHT;
-                    ui.spacing_mut().button_padding =
-                        egui::vec2(spacing::BUTTON_PADDING.0, spacing::BUTTON_PADDING.1);
+                        // B. Spacer
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            // C. Right Side: Actions
+                            ui.add_space(spacing::SPACING_XS);
 
-                    ui.allocate_ui_with_layout(
-                        egui::vec2(ui.available_width(), header_inner_height),
-                        egui::Layout::left_to_right(egui::Align::Center),
-                        |ui| {
-                            // LEFT: Review and Run Selection Dropdowns
-                            if !self.state.reviews.is_empty() {
-                                let current_id = self.state.selected_review_id.clone();
-                                let current_label = current_id
-                                    .as_ref()
-                                    .and_then(|id| {
-                                        self.state.reviews.iter().find(|r| &r.id == id)
-                                    })
-                                    .map(|r| r.title.clone())
-                                    .unwrap_or_else(|| "Select review…".to_string());
+                            // Delete Button
+                            let review_selected = self.state.selected_review_id.is_some();
+                            if review_selected {
+                                if pill_action_button(
+                                    ui,
+                                    icons::TRASH_SIMPLE,
+                                    "Delete",
+                                    review_selected,
+                                    current_theme().border,
+                                )
+                                .on_hover_text("Delete the selected review")
+                                .clicked()
+                                {
+                                    trigger_delete_review = true;
+                                }
+                                ui.add_space(spacing::SPACING_XS);
 
-                                egui::ComboBox::from_id_salt("review_select")
-                                    .selected_text(current_label)
-                                    .width(180.0)
-                                    .show_ui(ui, |ui| {
-                                        let mut next_review_id: Option<String> = None;
-                                        for review in &self.state.reviews {
-                                            let selected =
-                                                current_id.as_deref() == Some(&review.id);
-                                            if ui
-                                                .selectable_label(selected, &review.title)
-                                                .clicked()
-                                            {
-                                                next_review_id = Some(review.id.clone());
-                                            }
-                                        }
+                                // Export Button
+                                if pill_action_button(
+                                    ui,
+                                    icons::EXPORT,
+                                    "Export",
+                                    review_selected,
+                                    current_theme().border,
+                                )
+                                .on_hover_text("Export as markdown")
+                                .clicked()
+                                {
+                                    self.dispatch(Action::Review(
+                                        ReviewAction::RequestExportPreview,
+                                    ));
+                                }
 
-                                        if let Some(review_id) = next_review_id {
-                                            self.dispatch(Action::Review(
-                                                ReviewAction::SelectReview { review_id },
-                                            ));
-                                        }
-                                    });
-                            }
-
-                            ui.add_space(spacing::SPACING_SM);
-
-                            if let Some(selected_review_id) = self.state.selected_review_id.clone()
-                            {
-                                let runs_for_review: Vec<(String, String)> = self
-                                    .state
-                                    .runs
-                                    .iter()
-                                    .filter(|run| run.review_id == selected_review_id)
-                                    .map(|run| {
-                                        let short = run.id.chars().take(8).collect::<String>();
-                                        (run.id.clone(), format!("{short}… ({})", run.agent_id))
-                                    })
-                                    .collect();
-
-                                if !runs_for_review.is_empty() {
-                                    let current_run_id = self.state.selected_run_id.clone();
-                                    let current_run_label = current_run_id
-                                        .as_ref()
-                                        .and_then(|id| {
-                                            runs_for_review
-                                                .iter()
-                                                .find(|(run_id, _)| run_id == id)
-                                        })
-                                        .map(|(run_id, _)| {
-                                            format!(
-                                                "Run {}…",
-                                                run_id.chars().take(8).collect::<String>()
-                                            )
-                                        })
-                                        .unwrap_or_else(|| "Select run…".to_string());
-
-                                    let mut next_run_id: Option<String> = None;
-                                    egui::ComboBox::from_id_salt("run_select")
-                                        .selected_text(current_run_label)
-                                        .width(120.0)
-                                        .show_ui(ui, |ui| {
-                                            for (run_id, label) in &runs_for_review {
-                                                let selected = current_run_id.as_deref()
-                                                    == Some(run_id.as_str());
-                                                if ui.selectable_label(selected, label).clicked()
-                                                {
-                                                    next_run_id = Some(run_id.clone());
-                                                }
-                                            }
-                                        });
-
-                                    if let Some(run_id) = next_run_id {
-                                        self.dispatch(Action::Review(ReviewAction::SelectRun {
-                                            run_id,
-                                        }));
-                                    }
+                                if self.state.is_exporting {
+                                    ui.add_space(spacing::SPACING_XS);
+                                    ui.spinner();
                                 }
                             }
 
-                            // RIGHT: Actions
-                            ui.allocate_ui_with_layout(
-                                egui::vec2(ui.available_width(), ui.available_height()),
-                                egui::Layout::right_to_left(egui::Align::Center),
-                                |ui| {
-                                    let review_selected = self.state.selected_review_id.is_some();
-                                    if review_selected {
-                                        let resp = pill_action_button(
-                                            ui,
-                                            icons::TRASH_SIMPLE,
-                                            "Delete",
-                                            review_selected,
-                                            current_theme().border,
-                                        )
-                                        .on_hover_text(
-                                            "Delete the selected review, including all its runs, tasks, and notes.",
-                                        );
-                                        if resp.clicked() {
-                                            trigger_delete_review = true;
-                                        }
+                            // Progress Text (Right aligned next to actions)
+                            if total_tasks > 0 {
+                                ui.add_space(spacing::SPACING_MD);
+                                ui.label(
+                                    egui::RichText::new(format!(
+                                        "{}/{} Tasks",
+                                        done_tasks, total_tasks
+                                    ))
+                                    .size(12.0)
+                                    .color(
+                                        if done_tasks == total_tasks {
+                                            current_theme().success
+                                        } else {
+                                            current_theme().text_muted
+                                        },
+                                    ),
+                                );
+                            }
+                        });
+                    },
+                );
 
-                                        ui.add_space(spacing::SPACING_SM);
+                let bar_rect = egui::Rect::from_min_size(
+                    egui::pos2(ui.min_rect().left(), ui.min_rect().bottom() + 2.0),
+                    egui::vec2(ui.min_rect().width(), 2.0),
+                );
 
-                                        let resp = pill_action_button(
-                                            ui,
-                                            icons::EXPORT,
-                                            "Export",
-                                            review_selected,
-                                            current_theme().border,
-                                        )
-                                        .on_hover_text("Export the review as a markdown file.");
-                                        if resp.clicked() {
-                                            self.dispatch(Action::Review(
-                                                ReviewAction::RequestExportPreview,
-                                            ));
-                                        }
+                let fill_rect =
+                    egui::Rect::from_min_size(bar_rect.min, egui::vec2(bar_rect.width(), 1.0));
+                ui.painter()
+                    .rect_filled(fill_rect, 0.0, current_theme().border);
+            });
 
-                                        if self.state.is_exporting {
-                                            ui.add_space(spacing::SPACING_SM);
-                                            ui.add(egui::Spinner::new().size(16.0));
-                                        }
-                                    }
-                                },
-                            );
-                        },
-                    );
-
-                    ui.spacing_mut().interact_size = old_interact_size;
-                    ui.spacing_mut().button_padding = old_button_padding;
-                });
-            }); // Close the header frame
-
-        // Removed: ui.add_space(spacing::SPACING_XS + 2.0);
-
+        // Handle delayed actions
         if trigger_delete_review {
             self.dispatch(Action::Review(ReviewAction::DeleteReview));
             return;
@@ -246,456 +174,435 @@ impl LaReviewApp {
             error_banner(ui, err);
         }
 
-        ui.add_space(spacing::SPACING_SM);
+        // --- 4. Content Area (Split View) ---
 
-        // 3. Default selection rule (meaningful auto-select only)
-        let selected_task_is_valid = self
-            .state
-            .selected_task_id
-            .as_ref()
-            .is_some_and(|id| display_order_tasks.iter().any(|t| &t.id == id));
-
+        // Handle "No Review" state early
         if display_order_tasks.is_empty() {
-            if self.state.selected_task_id.is_some()
-                || self.state.current_note.is_some()
-                || self.state.current_line_note.is_some()
-            {
-                self.dispatch(Action::Review(ReviewAction::ClearSelection));
-            }
-        } else if !selected_task_is_valid {
-            if let Some(next_open) = display_order_tasks
-                .iter()
-                .find(|t| t.status == crate::domain::TaskStatus::Pending)
-                .or_else(|| {
-                    display_order_tasks
-                        .iter()
-                        .find(|t| t.status == crate::domain::TaskStatus::InProgress)
-                })
-            {
-                self.select_task(next_open);
-            } else {
-                // No pending tasks: show "All done" by default (do not auto-select done).
-                if self.state.selected_task_id.is_some()
-                    || self.state.current_note.is_some()
-                    || self.state.current_line_note.is_some()
-                {
-                    self.dispatch(Action::Review(ReviewAction::ClearSelection));
-                }
-            }
-        }
-
-        if display_order_tasks.is_empty() {
-            let available = ui.available_size();
-            ui.allocate_ui_with_layout(
-                available,
-                egui::Layout::centered_and_justified(egui::Direction::TopDown),
-                |ui| {
-                    ui.vertical_centered(|ui| {
-                        ui.heading("No review tasks yet");
-                        ui.add_space(6.0);
-                        ui.label(
-                            egui::RichText::new(
-                                "Generate tasks from your diff to start reviewing.",
-                            )
-                            .color(current_theme().text_muted),
-                        );
-                        ui.add_space(16.0);
-                        let cta = egui::Button::new(
-                            egui::RichText::new("Generate tasks")
-                                .size(15.0)
-                                .color(current_theme().brand),
-                        )
-                        .fill(egui::Color32::TRANSPARENT)
-                        .stroke(egui::Stroke::NONE);
-                        if ui.add(cta).clicked() {
-                            self.switch_to_generate();
-                        }
-                    });
-                },
-            );
+            self.render_empty_state(ui);
             return;
         }
 
-        // 3. Layout: Split View (Navigation Left | Content Right)
-        let available_height = ui.available_height();
+        // Auto-selection logic
+        self.handle_auto_selection(&display_order_tasks, next_open_id.clone());
 
-        // Memory for resizable width
+        // Layout Calculations
+        let available_rect = ui.available_rect_before_wrap();
+        let available_height = available_rect.height();
+        let available_width = available_rect.width();
+
         let tree_width_id = ui.id().with("tree_panel_width");
-        let available_width = ui.available_width();
         let saved_tree_width = ui
             .memory(|mem| mem.data.get_temp::<f32>(tree_width_id))
-            .unwrap_or(300.0); // Slightly wider default for the Intent panel
-        let tree_width =
-            crate::ui::layout::clamp_width(saved_tree_width, 200.0, available_width * 0.4);
+            .unwrap_or(280.0);
+        let max_tree_width = available_width * 0.45;
+        let tree_width = crate::ui::layout::clamp_width(saved_tree_width, 220.0, max_tree_width);
 
-        let (left_rect, right_rect) = {
-            let available = ui.available_rect_before_wrap();
-            let left =
-                egui::Rect::from_min_size(available.min, egui::vec2(tree_width, available_height));
-            // Add a small gap for the resize handle
-            let right = egui::Rect::from_min_size(
-                egui::pos2(available.min.x + tree_width + 4.0, available.min.y),
-                egui::vec2(available.width() - tree_width - 4.0, available_height),
-            );
-            (left, right)
-        };
+        let resize_handle_width = 8.0; // wider logical hit-box, visual line will be thin
 
-        // --- LEFT PANEL: Navigation & Intent (Contains the Tree Layout) ---
-        let mut left_ui = ui.new_child(egui::UiBuilder::new().max_rect(left_rect));
-        egui::Frame::NONE
-            .fill(current_theme().bg_secondary) // Base background for sidebar
-            .inner_margin(egui::Margin::same(spacing::SPACING_MD as i8))
-            .show(&mut left_ui, |ui| {
-                if total_tasks == 0 {
-                    ui.vertical_centered(|ui| {
-                        ui.add_space(60.0);
-                        ui.label(
-                            egui::RichText::new(egui_phosphor::regular::BOUNDING_BOX)
-                                .size(48.0)
-                                .color(current_theme().border_secondary),
-                        );
-                        ui.add_space(spacing::SPACING_MD);
-                        ui.heading("No review tasks yet");
-                        ui.add_space(6.0);
-                        ui.label(
-                            egui::RichText::new(
-                                "Once tasks are generated, they will show up in the left panel.",
-                            )
-                            .color(current_theme().text_muted),
-                        );
-                        ui.add_space(14.0);
-                        if action_button(ui, "Generate tasks", true, current_theme().brand)
-                            .clicked()
-                        {
-                            self.switch_to_generate();
-                        }
-                    });
-                    return;
-                }
-
-                let selected_review = self
-                    .state
-                    .selected_review_id
-                    .as_ref()
-                    .and_then(|id| self.state.reviews.iter().find(|r| &r.id == id));
-
-                let review_title = selected_review
-                    .map(|r| r.title.as_str())
-                    .unwrap_or("Review");
-
-                // Review Title: Make it bold and slightly larger than regular text
-                ui.add(
-                    egui::Label::new(
-                        egui::RichText::new(review_title)
-                            .size(15.0)
-                            .strong()
-                            .color(current_theme().text_primary),
-                    )
-                    .wrap(),
-                );
-
-                ui.add_space(12.0);
-
-                // New Progress Bar & Metadata Row
-                ui.horizontal(|ui| {
-                    // Left: Progress Label
-                    ui.label(
-                        egui::RichText::new(format!("{} / {} Tasks", done_tasks, total_tasks))
-                            .color(current_theme().text_on_muted)
-                            .size(12.0),
-                    );
-
-                    // Right: Overall Risk Badge
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let max_risk = all_tasks
-                            .iter()
-                            .map(|t| t.stats.risk)
-                            .max()
-                            .unwrap_or(crate::domain::RiskLevel::Low);
-
-                        let (risk_icon, risk_text, risk_bg, risk_fg) = match max_risk {
-                            crate::domain::RiskLevel::Low => (
-                                icons::CARET_CIRCLE_DOWN,
-                                "Low risk",
-                                current_theme().accent.gamma_multiply(0.2),
-                                current_theme().accent,
-                            ),
-                            crate::domain::RiskLevel::Medium => (
-                                icons::CARET_CIRCLE_UP,
-                                "Med risk",
-                                current_theme().warning.gamma_multiply(0.2),
-                                current_theme().warning,
-                            ),
-                            crate::domain::RiskLevel::High => (
-                                icons::CARET_CIRCLE_DOUBLE_UP,
-                                "High risk",
-                                current_theme().destructive.gamma_multiply(0.2),
-                                current_theme().destructive,
-                            ),
-                        };
-                        // NOTE: The 'badge' helper is assumed to be defined at the end of the file.
-                        badge(ui, &format!("{risk_icon} {risk_text}"), risk_bg, risk_fg);
-                    });
-                });
-
-                ui.add_space(spacing::SPACING_XS);
-
-                // Progress Bar
-                let progress_bar = egui::ProgressBar::new(progress).fill(if progress == 1.0 {
-                    current_theme().success
-                } else {
-                    current_theme().accent
-                });
-
-                ui.add(progress_bar);
-
-                ui.add_space(spacing::SPACING_SM);
-
-                // Review Source Metadata
-                if let Some(review) = selected_review {
-                    let source_text = match &review.source {
-                        crate::domain::ReviewSource::DiffPaste { .. } => {
-                            "Source: pasted diff".to_string()
-                        }
-                        crate::domain::ReviewSource::GitHubPr {
-                            owner,
-                            repo,
-                            number,
-                            ..
-                        } => {
-                            format!("Source: GitHub {owner}/{repo}#{number}")
-                        }
-                    };
-                    ui.label(
-                        egui::RichText::new(source_text)
-                            .size(11.0)
-                            .color(current_theme().text_disabled),
-                    );
-                }
-
-                ui.add_space(spacing::SPACING_MD);
-                ui.separator();
-                ui.add_space(spacing::SPACING_MD);
-
-                // B. Navigation Tree (Sub-flows)
-                egui::ScrollArea::vertical()
-                    .id_salt("nav_tree_scroll")
-                    .show(ui, |ui| {
-                        for (sub_flow_name, tasks) in sub_flows_in_display_order(&tasks_by_sub_flow)
-                        {
-                            let title = sub_flow_name.as_deref().unwrap_or("Uncategorized");
-                            let finished_count =
-                                tasks.iter().filter(|t| t.status.is_closed()).count();
-                            let total_tasks = tasks.len(); // <--- Get total count
-                            let is_done = finished_count == total_tasks && !tasks.is_empty();
-
-                            // --- Format the header text to include the counts ---
-                            let header_title =
-                                format!("{} ({}/{})", title, finished_count, total_tasks);
-                            // ---
-
-                            let mut header_text =
-                                egui::RichText::new(header_title).color(if is_done {
-                                    // <--- Use the new formatted string
-                                    current_theme().text_muted
-                                } else {
-                                    current_theme().text_primary
-                                });
-                            if is_done {
-                                header_text = header_text.strikethrough();
-                            }
-
-                            egui::CollapsingHeader::new(header_text)
-                                .id_salt(ui.id().with(("sub_flow", title)))
-                                .default_open(true)
-                                .show(ui, |ui| {
-                                    ui.spacing_mut().item_spacing = egui::vec2(
-                                        spacing::TIGHT_ITEM_SPACING.0,
-                                        spacing::TIGHT_ITEM_SPACING.1,
-                                    ); // 4.0, 4.0
-                                    for task in tasks_in_sub_flow_display_order(tasks) {
-                                        self.render_nav_item(ui, task);
-                                    }
-                                });
-                            ui.add_space(spacing::SPACING_SM);
-                        }
-                    });
-            });
-
-        // 4. Resize Handle
+        // Rect Definitions
+        let left_rect =
+            egui::Rect::from_min_size(available_rect.min, egui::vec2(tree_width, available_height));
         let resize_rect = egui::Rect::from_min_size(
             egui::pos2(left_rect.max.x, left_rect.min.y),
-            egui::vec2(4.0, left_rect.height()),
+            egui::vec2(resize_handle_width, available_height),
         );
-        let resize_response = ui.interact(resize_rect, ui.id().with("resize"), egui::Sense::drag());
+        let center_rect = egui::Rect::from_min_max(
+            egui::pos2(resize_rect.max.x, available_rect.min.y),
+            available_rect.max,
+        );
 
+        // --- A. Left Panel (Navigation Tree) ---
+        {
+            let mut left_ui = ui.new_child(egui::UiBuilder::new().max_rect(left_rect));
+            // Slight contrast for navigation panel
+            egui::Frame::NONE
+                .inner_margin(spacing::SPACING_MD)
+                .show(&mut left_ui, |ui| {
+                    egui::ScrollArea::vertical()
+                        .id_salt("nav_tree_scroll")
+                        .show(ui, |ui| {
+                            self.render_navigation_tree(ui, &tasks_by_sub_flow);
+                        });
+                });
+        }
+
+        // --- B. Resize Handle ---
+        let resize_response = ui.interact(
+            resize_rect,
+            ui.id().with("resize_tree"),
+            egui::Sense::drag(),
+        );
         if resize_response.dragged()
             && let Some(pointer_pos) = ui.ctx().pointer_interact_pos()
         {
-            let new_width = crate::ui::layout::clamp_width(
-                pointer_pos.x - left_rect.min.x,
-                200.0,
-                available_width * 0.6,
-            );
+            let new_width = pointer_pos.x - available_rect.min.x;
             ui.memory_mut(|mem| mem.data.insert_temp(tree_width_id, new_width));
         }
 
-        // Draw resize line
-        let line_color = if resize_response.hovered() || resize_response.dragged() {
-            current_theme().accent
-        } else {
-            current_theme().border // Standardize on overlay0
-        };
-        ui.painter()
-            .rect_filled(resize_rect, egui::CornerRadius::ZERO, line_color);
-        if resize_response.hovered() {
+        // Draw Resize Visuals
+        let hover_active = resize_response.hovered() || resize_response.dragged();
+        if hover_active {
             ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
         }
+        // Draw a subtle line in the center of the handle
+        let line_x = resize_rect.center().x;
+        let line_color = if hover_active {
+            current_theme().accent
+        } else {
+            current_theme().border
+        };
+        ui.painter().line_segment(
+            [
+                egui::pos2(line_x, resize_rect.min.y),
+                egui::pos2(line_x, resize_rect.max.y),
+            ],
+            egui::Stroke::new(1.0, line_color),
+        );
 
-        // --- RIGHT PANEL: Task Details ---
-        let mut right_ui = ui.new_child(egui::UiBuilder::new().max_rect(right_rect));
-        egui::Frame::NONE
-            .fill(current_theme().bg_primary) // Crust background for content
-            .inner_margin(egui::Margin::symmetric(spacing::SPACING_XL as i8, 0))
-            .show(&mut right_ui, |ui| {
-                let right_state = if display_order_tasks.is_empty() {
-                    RightPaneState::NoTasks
-                } else if self.state.selected_task_id.is_some() {
-                    RightPaneState::TaskSelected
-                } else if open_tasks == 0 {
-                    RightPaneState::AllDone
-                } else {
-                    RightPaneState::ReadyNoSelection
-                };
+        // --- C. Center Panel (Task Detail or Status) ---
+        {
+            let mut center_ui = ui.new_child(egui::UiBuilder::new().max_rect(center_rect));
+            egui::Frame::NONE
+                .fill(current_theme().bg_primary)
+                .inner_margin(spacing::SPACING_XL)
+                .show(&mut center_ui, |ui| {
+                    self.render_center_pane(
+                        ui,
+                        &all_tasks,
+                        display_order_tasks.len(),
+                        open_tasks,
+                        next_open_id,
+                    );
+                });
+        }
+    }
 
-                // Empty states + detail
-                match right_state {
-                    RightPaneState::TaskSelected => {
-                        if let Some(task_id) = &self.state.selected_task_id
-                            && let Some(task) = all_tasks.iter().find(|t| &t.id == task_id) {
-                            self.render_task_detail(ui, task);
-                            return;
-                        }
-                        // Selection is missing from current list: fall back to Ready state.
-                        self.dispatch(Action::Review(ReviewAction::ClearSelection));
-                    }
-                    RightPaneState::NoTasks => {}
-                    RightPaneState::AllDone => {}
-                    RightPaneState::ReadyNoSelection => {}
-                }
+    /// Renders the dropdowns for Review and Run selection in the header
+    fn render_header_selectors(&mut self, ui: &mut egui::Ui) {
+        if self.state.reviews.is_empty() {
+            return;
+        }
 
-                // Track state transitions for focus behavior.
-                let pane_state_id = ui.id().with("right_pane_state");
-                let prev_state = ui
-                    .memory(|mem| mem.data.get_temp::<RightPaneState>(pane_state_id))
-                    .unwrap_or(RightPaneState::TaskSelected);
-                ui.memory_mut(|mem| mem.data.insert_temp(pane_state_id, right_state));
+        let current_id = self.state.selected_review_id.clone();
+        let reviews = self.state.reviews.clone();
 
-                match right_state {
-                    RightPaneState::ReadyNoSelection => {
-                        let should_focus_primary =
-                            prev_state != RightPaneState::ReadyNoSelection
-                                && ui.ctx().memory(|mem| mem.focused().is_none());
+        // Find label
+        let current_label = current_id
+            .as_ref()
+            .and_then(|id| reviews.iter().find(|r| &r.id == id))
+            .map(|r| r.title.clone())
+            .unwrap_or_else(|| "Select review…".to_string());
 
-                        // Keyboard shortcuts (only in this state).
-                        let mut trigger_primary = false;
-                        let mut trigger_secondary = false;
-                        ui.ctx().input(|i| {
-                            if i.key_pressed(egui::Key::Enter) {
-                                if i.modifiers.shift {
-                                    trigger_secondary = true;
-                                } else {
-                                    trigger_primary = true;
-                                }
-                            }
-                        });
-
-                        ui.vertical_centered(|ui| {
-                            ui.add_space(80.0);
-                            ui.label(
-                                egui::RichText::new(egui_phosphor::regular::LIST_CHECKS)
-                                    .size(64.0)
-                                    .color(current_theme().border_secondary),
-                            );
-                            ui.add_space(16.0);
-                            ui.heading("Ready to review");
-                            ui.add_space(6.0);
-                            ui.label(
-                                egui::RichText::new("Pick a task on the left, or jump in now.")
-                                    .color(current_theme().text_disabled),
-                            );
-                            ui.add_space(16.0);
-
-                            let primary_enabled = next_open_id.is_some();
-                            let primary_resp =
-                                pill_action_button(ui, icons::ARROW_RIGHT, "Next open", primary_enabled, current_theme().brand);
-                            if should_focus_primary {
-                                ui.memory_mut(|mem| mem.request_focus(primary_resp.id));
-                            }
-                            if (primary_resp.clicked() || trigger_primary)
-                                && let Some(id) = next_open_id.as_deref()
-                            {
-                                self.select_task_by_id(&all_tasks, id);
-                            }
-
-                            ui.add_space(12.0);
-                            ui.label(
-                                egui::RichText::new(
-                                    "Tip: Start with HIGH RISK to catch big issues early.",
-                                )
-                                .color(current_theme().text_muted)
-                                .size(12.0),
-                            );
-                        });
-                    }
-                    RightPaneState::NoTasks => {
-                        ui.vertical_centered(|ui| {
-                            ui.add_space(80.0);
-                            ui.label(
-                                egui::RichText::new(egui_phosphor::regular::BOUNDING_BOX)
-                                    .size(64.0)
-                                    .color(current_theme().border_secondary),
-                            );
-                            ui.add_space(16.0);
-                            ui.heading("No review tasks yet");
-                            ui.add_space(6.0);
-                            ui.label(
-                                egui::RichText::new(
-                                    "Once tasks are generated, they will show up in the left panel.",
-                                )
-                                .color(current_theme().text_muted),
-                            );
-                            ui.add_space(16.0);
-                            if action_button(ui, "Generate tasks", true, current_theme().brand).clicked() {
-                                self.switch_to_generate();
-                            }
-                        });
-                    }
-                    RightPaneState::AllDone => {
-                        ui.vertical_centered(|ui| {
-                            ui.add_space(80.0);
-                            ui.label(
-                                egui::RichText::new(egui_phosphor::regular::CHECK_CIRCLE)
-                                    .size(64.0)
-                                    .color(current_theme().success.gamma_multiply(0.8)),
-                            );
-                            ui.add_space(16.0);
-                            ui.heading("All done");
-                            ui.add_space(6.0);
-                            ui.label(
-                                egui::RichText::new(format!("You closed {} tasks.", done_tasks))
-                                    .color(current_theme().text_muted),
-                            );
-                            ui.add_space(16.0);
-                            if action_button(ui, "Back to generate", true, current_theme().brand).clicked() {
-                                self.switch_to_generate();
-                            }
-                        });
-                    }
-                    RightPaneState::TaskSelected => {
-                        // handled above
+        // Review Selector
+        ui.add(egui::Label::new(
+            egui::RichText::new("Review:")
+                .size(12.0)
+                .color(current_theme().text_muted),
+        ));
+        egui::ComboBox::from_id_salt("review_select")
+            .selected_text(egui::RichText::new(current_label).strong())
+            .width(200.0)
+            .show_ui(ui, |ui| {
+                for review in &reviews {
+                    let is_selected = current_id.as_deref() == Some(&review.id);
+                    if ui.selectable_label(is_selected, &review.title).clicked() {
+                        self.dispatch(Action::Review(ReviewAction::SelectReview {
+                            review_id: review.id.clone(),
+                        }));
                     }
                 }
             });
+
+        ui.add_space(spacing::SPACING_MD);
+
+        // Run Selector (if Review selected)
+        if let Some(selected_review_id) = self.state.selected_review_id.clone() {
+            let runs: Vec<_> = self
+                .state
+                .runs
+                .iter()
+                .filter(|r| r.review_id == selected_review_id)
+                .cloned()
+                .collect();
+
+            if !runs.is_empty() {
+                let current_run_id = self.state.selected_run_id.clone();
+                let run_label = current_run_id
+                    .as_ref()
+                    .and_then(|id| runs.iter().find(|r| &r.id == id))
+                    .map(|r| format!("Run {}…", r.id.chars().take(6).collect::<String>()))
+                    .unwrap_or_else(|| "Select run…".to_string());
+
+                ui.add(egui::Label::new(
+                    egui::RichText::new("Run:")
+                        .size(12.0)
+                        .color(current_theme().text_muted),
+                ));
+                egui::ComboBox::from_id_salt("run_select")
+                    .selected_text(run_label)
+                    .width(140.0)
+                    .show_ui(ui, |ui| {
+                        for run in runs {
+                            let is_selected = current_run_id.as_deref() == Some(&run.id);
+                            let label = format!(
+                                "{}… ({})",
+                                run.id.chars().take(8).collect::<String>(),
+                                run.agent_id
+                            );
+                            if ui.selectable_label(is_selected, label).clicked() {
+                                self.dispatch(Action::Review(ReviewAction::SelectRun {
+                                    run_id: run.id.clone(),
+                                }));
+                            }
+                        }
+                    });
+            }
+        }
+    }
+
+    /// Renders the "No Tasks" empty state
+    fn render_empty_state(&mut self, ui: &mut egui::Ui) {
+        ui.allocate_ui_with_layout(
+            ui.available_size(),
+            egui::Layout::centered_and_justified(egui::Direction::TopDown),
+            |ui| {
+                ui.vertical_centered(|ui| {
+                    // Hero Icon
+                    ui.label(
+                        egui::RichText::new(icons::BOUNDING_BOX)
+                            .size(64.0)
+                            .color(current_theme().border_secondary),
+                    );
+                    ui.add_space(spacing::SPACING_MD);
+                    ui.heading("No review tasks yet");
+                    ui.add_space(8.0);
+                    ui.label(
+                        egui::RichText::new("Generate tasks from your diff to start reviewing.")
+                            .color(current_theme().text_muted),
+                    );
+                    ui.add_space(24.0);
+
+                    if action_button(ui, "Generate tasks", true, current_theme().brand).clicked() {
+                        self.switch_to_generate();
+                    }
+                });
+            },
+        );
+    }
+
+    /// Renders the logic for the Left Panel (Navigation)
+    fn render_navigation_tree(
+        &mut self,
+        ui: &mut egui::Ui,
+        tasks_by_sub_flow: &std::collections::HashMap<
+            Option<String>,
+            Vec<crate::domain::ReviewTask>,
+        >,
+    ) {
+        let sub_flows = sub_flows_in_display_order(tasks_by_sub_flow);
+
+        if sub_flows.is_empty() {
+            ui.vertical_centered(|ui| {
+                ui.add_space(20.0);
+                ui.label(
+                    egui::RichText::new("No tasks loaded")
+                        .italics()
+                        .color(current_theme().text_muted),
+                );
+            });
+            return;
+        }
+
+        ui.spacing_mut().item_spacing = egui::vec2(0.0, spacing::SPACING_SM);
+        ui.visuals_mut().indent_has_left_vline = false;
+
+        for (sub_flow_name, tasks) in sub_flows {
+            let title = sub_flow_name.as_deref().unwrap_or("UNCATEGORIZED");
+            let title_upper = title.to_uppercase();
+            let total = tasks.len();
+            let finished = tasks.iter().filter(|t| t.status.is_closed()).count();
+            let is_done = finished == total && total > 0;
+
+            let header_id = ui.id().with(("sub_flow_collapse", title));
+
+            ui.set_width(ui.available_width());
+
+            egui::collapsing_header::CollapsingState::load_with_default_open(
+                ui.ctx(),
+                header_id,
+                true,
+            )
+            .show_header(ui, |ui| {
+                ui.horizontal(|ui| {
+                    let mut heading = egui::RichText::new(&title_upper)
+                        .family(egui::FontFamily::Proportional)
+                        .strong()
+                        .size(11.0)
+                        .extra_letter_spacing(0.5);
+
+                    if is_done {
+                        heading = heading.color(current_theme().text_muted);
+                    } else {
+                        heading = heading.color(current_theme().text_primary);
+                    }
+
+                    ui.label(heading);
+
+                    ui.add_space(spacing::SPACING_XS);
+
+                    let color = if is_done {
+                        current_theme().success
+                    } else {
+                        current_theme().text_muted
+                    };
+
+                    let count_text = egui::RichText::new(format!("{}/{}", finished, total))
+                        .size(11.0)
+                        .color(color);
+
+                    ui.label(count_text);
+                });
+            })
+            .body(|ui| {
+                ui.spacing_mut().item_spacing = egui::vec2(0.0, spacing::SPACING_XS);
+                for task in tasks_in_sub_flow_display_order(tasks) {
+                    self.render_nav_item(ui, task);
+                }
+                ui.add_space(spacing::SPACING_SM);
+            });
+        }
+    }
+
+    /// Renders the logic for the Center Panel
+    fn render_center_pane(
+        &mut self,
+        ui: &mut egui::Ui,
+        all_tasks: &[crate::domain::ReviewTask],
+        total_count: usize,
+        open_count: usize,
+        next_open_id: Option<String>,
+    ) {
+        let state = if self.state.selected_task_id.is_some() {
+            // Validate selection still exists
+            if all_tasks
+                .iter()
+                .any(|t| Some(&t.id) == self.state.selected_task_id.as_ref())
+            {
+                RightPaneState::TaskSelected
+            } else {
+                RightPaneState::ReadyNoSelection // Fallback
+            }
+        } else if total_count == 0 {
+            RightPaneState::NoTasks
+        } else if open_count == 0 {
+            RightPaneState::AllDone
+        } else {
+            RightPaneState::ReadyNoSelection
+        };
+
+        match state {
+            RightPaneState::TaskSelected => {
+                if let Some(task_id) = &self.state.selected_task_id
+                    && let Some(task) = all_tasks.iter().find(|t| &t.id == task_id)
+                {
+                    self.render_task_detail(ui, task);
+                }
+            }
+            RightPaneState::ReadyNoSelection => {
+                self.render_ready_state(ui, next_open_id);
+            }
+            RightPaneState::AllDone => {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(ui.available_height() * 0.3);
+                    ui.label(
+                        egui::RichText::new(icons::CHECK_CIRCLE)
+                            .size(64.0)
+                            .color(current_theme().success),
+                    );
+                    ui.add_space(16.0);
+                    ui.heading("All tasks completed!");
+                    ui.label(egui::RichText::new("Great job.").color(current_theme().text_muted));
+                });
+            }
+            _ => {}
+        }
+    }
+
+    /// Screen shown when tasks exist but none are selected
+    fn render_ready_state(&mut self, ui: &mut egui::Ui, next_open_id: Option<String>) {
+        // Keyboard shortcuts logic
+        let mut trigger_primary = false;
+        if ui.input(|i| i.key_pressed(egui::Key::Enter) && !i.modifiers.shift) {
+            trigger_primary = true;
+        }
+
+        ui.vertical_centered(|ui| {
+            ui.add_space(ui.available_height() * 0.25);
+
+            // Hero Icon
+            ui.label(
+                egui::RichText::new(icons::LIST_CHECKS)
+                    .size(64.0)
+                    .color(current_theme().brand.gamma_multiply(0.8)),
+            );
+            ui.add_space(24.0);
+
+            ui.heading("Ready to Review");
+            ui.add_space(8.0);
+            ui.label(
+                egui::RichText::new("Select a task from the sidebar or start the queue.")
+                    .color(current_theme().text_secondary),
+            );
+
+            ui.add_space(32.0);
+
+            // Primary Action
+            let btn_enabled = next_open_id.is_some();
+            let resp = pill_action_button(
+                ui,
+                icons::ARROW_RIGHT,
+                "Start Reviewing",
+                btn_enabled,
+                current_theme().brand,
+            );
+
+            // Hint for keyboard shortcut
+            ui.add_space(8.0);
+            ui.label(
+                egui::RichText::new("Press [Enter] to start")
+                    .size(10.0)
+                    .color(current_theme().text_disabled),
+            );
+
+            if (resp.clicked() || trigger_primary)
+                && btn_enabled
+                && let Some(id) = next_open_id
+                && let Some(task) = self.state.tasks().iter().find(|t| t.id == id)
+            {
+                // Helper to find task and select it
+                self.select_task(task);
+            }
+        });
+    }
+
+    fn handle_auto_selection(
+        &mut self,
+        display_tasks: &[&crate::domain::ReviewTask],
+        _next_open_id: Option<String>,
+    ) {
+        // Only enforce logic if selection is invalid or missing when it shouldn't be
+        let selection_valid = self
+            .state
+            .selected_task_id
+            .as_ref()
+            .is_some_and(|id| display_tasks.iter().any(|t| &t.id == id));
+
+        if !selection_valid && !self.state.is_exporting {
+            // Logic: If user was doing something, clear it. If just starting, maybe wait?
+            // Current logic: clear if invalid.
+            if self.state.selected_task_id.is_some() {
+                self.dispatch(Action::Review(ReviewAction::ClearSelection));
+            }
+        }
     }
 }

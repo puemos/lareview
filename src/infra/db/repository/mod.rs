@@ -3,11 +3,13 @@
 //! Provides database operations for reviews, runs, tasks, and notes.
 
 mod note;
+mod repo;
 mod review;
 mod review_run;
 mod task;
 
 pub use note::NoteRepository;
+pub use repo::RepoRepository;
 pub use review::ReviewRepository;
 pub use review_run::ReviewRunRepository;
 pub use task::TaskRepository;

@@ -42,6 +42,8 @@ async fn test_return_task_tool_writes_file() {
         tasks_out: Some(out_path.clone()),
         log_file: None,
         run_context: Some(run_context_path.path().to_path_buf()),
+        repo_root: None,
+        db_path: Some(db_path.clone()),
     });
 
     let tool = tool::create_return_task_tool(config);
@@ -50,6 +52,7 @@ async fn test_return_task_tool_writes_file() {
         "title": "test",
         "description": "test task",
         "stats": { "risk": "LOW", "tags": ["test"] },
+        "diagram": "Flow: { shape: sequence_diagram Reviewer -> Code: \"review\" }",
         "diff_refs": [
             {
                 "file": "src/a.rs",
@@ -126,6 +129,8 @@ async fn test_return_task_tool_persists_to_db() {
         tasks_out: None,
         log_file: None,
         run_context: Some(run_context_path),
+        repo_root: None,
+        db_path: Some(db_path.clone()),
     });
 
     let tool = tool::create_return_task_tool(config);
@@ -134,6 +139,7 @@ async fn test_return_task_tool_persists_to_db() {
         "title": "DB Task",
         "description": "persist me",
         "stats": { "risk": "HIGH", "tags": ["database"] },
+        "diagram": "Flow: { shape: sequence_diagram Reviewer -> DB: \"check\" }",
         "diff_refs": [
             {
                 "file": "src/a.rs",
@@ -203,6 +209,8 @@ async fn test_finalize_review_tool_updates_metadata() {
         tasks_out: Some(out_path.clone()),
         log_file: None,
         run_context: None,
+        repo_root: None,
+        db_path: Some(db_path.clone()),
     });
 
     let tool = tool::create_finalize_review_tool(config);
@@ -267,6 +275,8 @@ async fn test_multiple_tasks_and_finalize_persists_correctly() {
         tasks_out: None,
         log_file: None,
         run_context: Some(run_context_path.clone()),
+        repo_root: None,
+        db_path: Some(db_path.clone()),
     });
 
     let return_task_tool = tool::create_return_task_tool(config.clone());
@@ -277,7 +287,20 @@ async fn test_multiple_tasks_and_finalize_persists_correctly() {
         "title": "First Task",
         "description": "First task description",
         "stats": { "risk": "LOW", "tags": ["one"] },
-        "diff_refs": []
+        "diagram": "Flow: { shape: sequence_diagram Reviewer -> Code: \"review\" }",
+        "diff_refs": [
+            {
+                "file": "src/a.rs",
+                "hunks": [
+                    {
+                        "old_start": 1,
+                        "old_lines": 1,
+                        "new_start": 1,
+                        "new_lines": 1
+                    }
+                ]
+            }
+        ]
     });
 
     let _ = return_task_tool
@@ -296,7 +319,20 @@ async fn test_multiple_tasks_and_finalize_persists_correctly() {
         "title": "Second Task",
         "description": "Second task description",
         "stats": { "risk": "MEDIUM", "tags": ["two"] },
-        "diff_refs": []
+        "diagram": "Flow: { shape: sequence_diagram Reviewer -> Code: \"verify\" }",
+        "diff_refs": [
+            {
+                "file": "src/a.rs",
+                "hunks": [
+                    {
+                        "old_start": 1,
+                        "old_lines": 1,
+                        "new_start": 1,
+                        "new_lines": 1
+                    }
+                ]
+            }
+        ]
     });
 
     let _ = return_task_tool

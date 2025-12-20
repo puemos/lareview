@@ -125,37 +125,9 @@ fn parse_hunk(lines: &[&str], start_idx: usize, start_line_idx: u32) -> Option<(
     let header_line = start_line_idx;
 
     // Parse old and new line info from header: @@ -old_start,old_len +new_start,new_len @@
-    let mut old_start = 1;
-    let mut old_len = 0;
-    let mut new_start = 1;
-    let mut new_len = 0;
-
-    // Extract the hunk info part from the header
-    let header_parts: Vec<&str> = hunk_header.split("@@").collect();
-    if header_parts.len() > 1 {
-        let hunk_info = header_parts[0].trim_start_matches('@');
-        let info_parts: Vec<&str> = hunk_info.split_whitespace().collect();
-
-        for part in info_parts {
-            if let Some(stripped) = part.strip_prefix('-') {
-                let nums: Vec<&str> = stripped.split(',').collect();
-                if let Some(start_str) = nums.first() {
-                    old_start = start_str.parse().unwrap_or(1);
-                }
-                if let Some(len_str) = nums.get(1) {
-                    old_len = len_str.parse().unwrap_or(0);
-                }
-            } else if let Some(stripped) = part.strip_prefix('+') {
-                let nums: Vec<&str> = stripped.split(',').collect();
-                if let Some(start_str) = nums.first() {
-                    new_start = start_str.parse().unwrap_or(1);
-                }
-                if let Some(len_str) = nums.get(1) {
-                    new_len = len_str.parse().unwrap_or(0);
-                }
-            }
-        }
-    }
+    let (old_start, old_len, new_start, new_len) = parse_hunk_header(hunk_header)
+        // Fall back to defaults if parsing fails so rendering still works
+        .unwrap_or((1, 0, 1, 0));
 
     // Count the actual lines in the hunk body
     let body_start_line_idx = start_line_idx + 1;
@@ -184,40 +156,34 @@ fn parse_hunk(lines: &[&str], start_idx: usize, start_line_idx: u32) -> Option<(
     let mut checkpoints = Vec::new();
     let mut current_old = old_start;
     let mut current_new = new_start;
+    let mut last_line_numbers: Option<(u32, u32, u32)> = None;
 
     for (idx, line_idx) in body_range.clone().enumerate() {
         // Update line numbers based on line type
         if (idx + start_idx + 1) < lines.len() {
             let line = lines[idx + start_idx + 1];
-            match get_change_type_from_line(line) {
+            let change_type = get_change_type_from_line(line);
+            let is_checkpoint = idx % CHECKPOINT_INTERVAL as usize == 0;
+
+            if is_checkpoint {
+                checkpoints.push(Checkpoint {
+                    at_line: line_idx,
+                    old_no: current_old,
+                    new_no: current_new,
+                });
+            }
+
+            // Record the numbers for this line before advancing
+            last_line_numbers = Some((line_idx, current_old, current_new));
+
+            match change_type {
                 ChangeType::Insert => {
-                    if idx % CHECKPOINT_INTERVAL as usize == 0 {
-                        checkpoints.push(Checkpoint {
-                            at_line: line_idx,
-                            old_no: current_old,
-                            new_no: current_new,
-                        });
-                    }
                     current_new += 1;
                 }
                 ChangeType::Delete => {
-                    if idx % CHECKPOINT_INTERVAL as usize == 0 {
-                        checkpoints.push(Checkpoint {
-                            at_line: line_idx,
-                            old_no: current_old,
-                            new_no: current_new,
-                        });
-                    }
                     current_old += 1;
                 }
                 ChangeType::Equal => {
-                    if idx % CHECKPOINT_INTERVAL as usize == 0 {
-                        checkpoints.push(Checkpoint {
-                            at_line: line_idx,
-                            old_no: current_old,
-                            new_no: current_new,
-                        });
-                    }
                     current_old += 1;
                     current_new += 1;
                 }
@@ -226,11 +192,16 @@ fn parse_hunk(lines: &[&str], start_idx: usize, start_line_idx: u32) -> Option<(
     }
 
     // Add final checkpoint if there isn't one at the end
-    if checkpoints.is_empty() || checkpoints.last().unwrap().at_line < body_range.end - 1 {
+    if let Some((last_idx, last_old, last_new)) = last_line_numbers
+        && checkpoints
+            .last()
+            .map(|cp| cp.at_line != last_idx)
+            .unwrap_or(true)
+    {
         checkpoints.push(Checkpoint {
-            at_line: body_range.end - 1,
-            old_no: current_old,
-            new_no: current_new,
+            at_line: last_idx,
+            old_no: last_old,
+            new_no: last_new,
         });
     }
 
@@ -246,6 +217,42 @@ fn parse_hunk(lines: &[&str], start_idx: usize, start_line_idx: u32) -> Option<(
     };
 
     Some((hunk, body_line_count + 1)) // +1 for the header line
+}
+
+fn parse_hunk_header(header: &str) -> Option<(u32, u32, u32, u32)> {
+    if !header.starts_with("@@") {
+        return None;
+    }
+
+    // Trim the leading "@@" and capture the segment before the next "@@"
+    let rest = header.trim_start_matches('@');
+    let (meta, _) = rest.split_once("@@")?;
+    let mut old_start = 1;
+    let mut old_len = 0;
+    let mut new_start = 1;
+    let mut new_len = 0;
+
+    for part in meta.split_whitespace() {
+        if let Some(stripped) = part.strip_prefix('-') {
+            let nums: Vec<&str> = stripped.split(',').collect();
+            if let Some(start_str) = nums.first() {
+                old_start = start_str.parse().unwrap_or(1);
+            }
+            if let Some(len_str) = nums.get(1) {
+                old_len = len_str.parse().unwrap_or(0);
+            }
+        } else if let Some(stripped) = part.strip_prefix('+') {
+            let nums: Vec<&str> = stripped.split(',').collect();
+            if let Some(start_str) = nums.first() {
+                new_start = start_str.parse().unwrap_or(1);
+            }
+            if let Some(len_str) = nums.get(1) {
+                new_len = len_str.parse().unwrap_or(0);
+            }
+        }
+    }
+
+    Some((old_start, old_len, new_start, new_len))
 }
 
 // Determine change type for a line
@@ -336,4 +343,63 @@ pub fn calculate_line_numbers(
 
     // If we couldn't find the line in any hunk (e.g., it's a file header line)
     (None, None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{calculate_line_numbers, index_diff};
+
+    #[test]
+    fn calculates_line_numbers_for_mid_file_hunk() {
+        let diff = r#"diff --git a/file.txt b/file.txt
+--- a/file.txt
++++ b/file.txt
+@@ -10,2 +10,3 @@
+ line10
++line10.5
+ line11
+"#;
+
+        let doc = index_diff(diff);
+        assert_eq!(doc.files.len(), 1);
+        let file = &doc.files[0];
+        assert_eq!(file.hunks.len(), 1);
+        let hunk = &file.hunks[0];
+
+        let first_line_idx = hunk.body_range.start;
+        let insert_line_idx = hunk.body_range.start + 1;
+        let last_line_idx = hunk.body_range.end - 1;
+
+        let (old_first, new_first) = calculate_line_numbers(&doc, 0, first_line_idx);
+        assert_eq!((old_first, new_first), (Some(10), Some(10)));
+
+        let (old_insert, new_insert) = calculate_line_numbers(&doc, 0, insert_line_idx);
+        assert_eq!((old_insert, new_insert), (None, Some(11)));
+
+        let (old_last, new_last) = calculate_line_numbers(&doc, 0, last_line_idx);
+        assert_eq!((old_last, new_last), (Some(11), Some(12)));
+    }
+
+    #[test]
+    fn does_not_shift_last_line_numbers() {
+        let diff = r#"diff --git a/file.txt b/file.txt
+--- a/file.txt
++++ b/file.txt
+@@ -20,3 +20,3 @@
+ line20
+-line21
++line21-updated
+ line22
+"#;
+
+        let doc = index_diff(diff);
+        assert_eq!(doc.files.len(), 1);
+        let file = &doc.files[0];
+        assert_eq!(file.hunks.len(), 1);
+        let hunk = &file.hunks[0];
+
+        let last_line_idx = hunk.body_range.end - 1;
+        let (old_last, new_last) = calculate_line_numbers(&doc, 0, last_line_idx);
+        assert_eq!((old_last, new_last), (Some(22), Some(22)));
+    }
 }

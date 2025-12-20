@@ -52,18 +52,18 @@ lazy_static::lazy_static! {
 
     static ref FONT_DB: Arc<fontdb::Database> = {
         let mut db = fontdb::Database::new();
-        if let Some(font_data) = crate::assets::get_content("assets/fonts/SpaceMono-Regular.ttf") {
+        if let Some(font_data) = crate::assets::get_content("assets/fonts/Geist.ttf") {
             db.load_font_data(font_data.to_vec());
         }
-        if let Some(font_data) = crate::assets::get_content("assets/fonts/Inter-Regular.ttf") {
+        if let Some(font_data) = crate::assets::get_content("assets/fonts/GeistMono.ttf") {
             db.load_font_data(font_data.to_vec());
         }
-        // Set Inter as the fallback for all generic families, with Space Mono as secondary for monospace
-        db.set_serif_family("Inter");
-        db.set_sans_serif_family("Inter");
-        db.set_monospace_family("Space Mono");
-        db.set_cursive_family("Inter");
-        db.set_fantasy_family("Inter");
+        // Set Geist as the fallback for all generic families, with Geist Mono for monospace
+        db.set_serif_family("Geist");
+        db.set_sans_serif_family("Geist");
+        db.set_monospace_family("Geist Mono");
+        db.set_cursive_family("Geist");
+        db.set_fantasy_family("Geist");
         Arc::new(db)
     };
 }
@@ -125,18 +125,18 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<String>, is_dark_mode: bool) -
 
                 let state = match result {
                     Ok(svg_str) => {
-                        // Replace D2's generated font family with "Inter"
+                        // Replace D2's generated font family with "Geist"
                         // D2 generates CSS like: font-family: "d2-73211304-font-regular";
-                        // We want: font-family: "Inter";
+                        // We want: font-family: "Geist";
                         lazy_static::lazy_static! {
                             static ref FONT_RE: regex::Regex = regex::Regex::new(r#"font-family:\s*"[^"]+";"#).unwrap();
                         }
-                        let svg_str = FONT_RE.replace_all(&svg_str, r#"font-family: "Inter";"#);
+                        let svg_str = FONT_RE.replace_all(&svg_str, r#"font-family: "Geist";"#);
 
                         // Background Rasterization using resvg
                         let opt = usvg::Options {
                             fontdb: FONT_DB.clone(),
-                            font_family: "Inter".to_string(),
+                            font_family: "Geist".to_string(),
                             ..Default::default()
                         };
                         let rtree = usvg::Tree::from_str(&svg_str, &opt);

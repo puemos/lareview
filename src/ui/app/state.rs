@@ -43,6 +43,12 @@ impl std::fmt::Display for SelectedAgent {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThreadContext {
+    pub file_path: String,
+    pub line_number: u32,
+}
+
 /// All app state in one struct.
 #[derive(Default)]
 pub struct AppState {
@@ -92,10 +98,21 @@ pub struct AppState {
 
     pub cached_unified_diff: Option<(Vec<crate::domain::DiffRef>, String)>,
 
+    pub active_thread: Option<ThreadContext>, // Default is None which matches Option default
+
     pub is_exporting: bool,
     pub d2_install_output: String,
     pub is_d2_installing: bool,
     pub allow_d2_install: bool,
+
+    /// All linked repositories loaded from DB
+    pub linked_repos: Vec<crate::domain::LinkedRepo>,
+    /// Currently selected repo for the Generate view
+    pub selected_repo_id: Option<String>,
+
+    // UI state for Generate view
+    pub agent_panel_collapsed: bool,
+    pub plan_panel_collapsed: bool,
 }
 
 #[derive(Debug, Clone)]

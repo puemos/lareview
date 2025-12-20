@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use eframe::egui;
-use eframe::egui::{FontData, FontDefinitions, FontFamily};
+use eframe::egui::FontDefinitions;
+use egui::{FontData, FontFamily};
 use tokio::sync::mpsc;
 
 use crate::infra::db::{
@@ -14,24 +15,36 @@ use super::state::{AppState, AppView, SelectedAgent};
 impl LaReviewApp {
     pub fn new_egui(cc: &eframe::CreationContext<'_>) -> Self {
         let mut fonts = FontDefinitions::default();
+
+        // Load Geist for proportional text
         fonts.font_data.insert(
-            "SpaceMono".to_owned(),
+            "Geist".to_owned(),
             FontData::from_static(
-                crate::assets::get_content("assets/fonts/SpaceMono-Regular.ttf")
-                    .expect("SpaceMono font missing"),
+                crate::assets::get_content("assets/fonts/Geist.ttf").expect("Geist font missing"),
             )
             .into(),
         );
+
+        // Load Geist Mono for monospace text
+        fonts.font_data.insert(
+            "GeistMono".to_owned(),
+            FontData::from_static(
+                crate::assets::get_content("assets/fonts/GeistMono.ttf")
+                    .expect("GeistMono font missing"),
+            )
+            .into(),
+        );
+
         fonts
             .families
             .entry(FontFamily::Proportional)
             .or_default()
-            .insert(0, "SpaceMono".to_owned());
+            .insert(0, "Geist".to_owned());
         fonts
             .families
             .entry(FontFamily::Monospace)
             .or_default()
-            .insert(0, "SpaceMono".to_owned());
+            .insert(0, "GeistMono".to_owned());
 
         egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
 
@@ -45,6 +58,9 @@ impl LaReviewApp {
         let note_repo = Arc::new(NoteRepository::new(conn.clone()));
         let review_repo = Arc::new(ReviewRepository::new(conn.clone()));
         let run_repo = Arc::new(ReviewRunRepository::new(conn.clone()));
+        let repo_repo = Arc::new(crate::infra::db::repository::RepoRepository::new(
+            conn.clone(),
+        ));
 
         let mut state = AppState {
             current_view: AppView::Generate,
@@ -52,6 +68,10 @@ impl LaReviewApp {
             diff_text: String::new(),
             ..Default::default()
         };
+
+        if let Ok(repos) = repo_repo.find_all() {
+            state.linked_repos = repos;
+        }
 
         if let Ok(reviews) = review_repo.list_all() {
             state.reviews = reviews;
@@ -74,6 +94,7 @@ impl LaReviewApp {
             note_repo,
             review_repo,
             run_repo,
+            repo_repo,
             _db: db,
             gen_tx,
             gen_rx,

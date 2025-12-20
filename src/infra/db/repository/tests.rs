@@ -74,11 +74,19 @@ fn test_note_repository_round_trip() -> anyhow::Result<()> {
 
     let task_id = "task-note-1".to_string();
     let note = crate::domain::Note {
+        id: "note-1".to_string(),
         task_id: task_id.clone(),
+        author: "user".to_string(),
         body: "Body".into(),
+        created_at: "now".into(),
         updated_at: "now".into(),
         file_path: None,
         line_number: None,
+        parent_id: None,
+        root_id: None,
+        status: crate::domain::NoteStatus::Open,
+        title: None,
+        severity: None,
     };
 
     note_repo.save(&note)?;

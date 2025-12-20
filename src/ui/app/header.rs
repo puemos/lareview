@@ -1,169 +1,151 @@
 use eframe::egui;
-use egui_phosphor::regular::COFFEE;
-use egui_phosphor::regular::ONIGIRI;
+use egui_phosphor::regular as icons;
 
 use super::LaReviewApp;
 use super::state::AppView;
-use crate::ui::spacing;
+use crate::ui::spacing::SPACING_MD;
 use crate::ui::theme;
 
 impl LaReviewApp {
     pub(super) fn render_header(&mut self, ctx: &egui::Context) {
         let theme = theme::current_theme();
 
+        // 1. Define styling constants for a "Pro" feel
+        let header_height = 52.0;
+        let nav_rounding = 6.0;
+
         egui::TopBottomPanel::top("header")
-            .frame(egui::Frame::NONE.fill(theme.bg_secondary))
+            .exact_height(header_height)
             .show(ctx, |ui| {
+                // Setup layout for 3 columns: Left (Logo), Center (Nav), Right (actions)
                 let rect = ui.available_rect_before_wrap();
 
-                // TUI-style bottom border for the header
-                ui.painter().line_segment(
-                    [
-                        egui::pos2(rect.min.x, rect.max.y - 1.0),
-                        egui::pos2(rect.max.x, rect.max.y - 1.0),
-                    ],
-                    egui::Stroke::new(1.0, theme.border),
-                );
+                // --- 1. LEFT: App Identity ---
+                // We use allocate_ui_at_rect to pin this to the left
+                let left_rect =
+                    egui::Rect::from_min_size(rect.min, egui::vec2(200.0, rect.height()));
+                ui.scope_builder(egui::UiBuilder::new().max_rect(left_rect), |ui| {
+                    ui.horizontal_centered(|ui| {
+                        ui.add_space(SPACING_MD); // SPACE FOR MACOS TRAFFIC LIGHTS
 
-                ui.add_space(spacing::SPACING_SM);
+                        // Just the icon, slightly larger
+                        ui.label(
+                            egui::RichText::new(icons::CIRCLE_HALF)
+                                .size(22.0)
+                                .color(theme.brand),
+                        );
 
-                // Create a response for the whole header for dragging
-                let header_response = ui.interact(
-                    rect,
-                    ui.id().with("header_drag"),
-                    egui::Sense::click_and_drag(),
-                );
+                        ui.add_space(4.0);
 
-                // If the header is dragged, start window drag
-                if header_response.dragged() {
-                    ctx.send_viewport_cmd(egui::ViewportCommand::StartDrag);
-                }
-
-                // Get the full header rect for absolute positioning
-                let header_rect = ui.available_rect_before_wrap();
-                let header_width = header_rect.width();
-
-                ui.horizontal(|ui| {
-                    // Left section: Window Controls and Logo
-                    ui.add_space(spacing::SPACING_MD);
-
-                    match ui.ctx().try_load_texture(
-                        "app_logo",
-                        egui::TextureOptions::LINEAR,
-                        Default::default(),
-                    ) {
-                        Ok(egui::load::TexturePoll::Ready { texture }) => {
-                            ui.image(texture);
-                        }
-                        Ok(egui::load::TexturePoll::Pending { .. }) | Err(_) => {
-                            ui.add(egui::Label::new(
-                                egui::RichText::new(egui_phosphor::regular::CIRCLE_HALF)
-                                    .size(22.0)
-                                    .color(theme.brand),
-                            ));
-                        }
-                    }
-                    ui.heading(
-                        egui::RichText::new("LaReview")
-                            .strong()
-                            .color(theme.text_primary)
-                            .size(16.0),
-                    );
-                    // Calculate center position for navigation
-                    let nav_width = 380.0; // wider to fit Settings too
-                    let center_x = header_rect.min.x + (header_width / 2.0) - (nav_width / 2.0);
-                    let current_x = ui.cursor().min.x;
-                    let space_to_center = (center_x - current_x).max(0.0);
-
-                    ui.add_space(space_to_center);
-
-                    // Center section: Navigation buttons (TUI-style)
-                    let is_generate = self.state.current_view == AppView::Generate;
-                    let generate_text = if is_generate {
-                        format!("[{} GENERATE]", ONIGIRI)
-                    } else {
-                        format!(" {} GENERATE ", ONIGIRI)
-                    };
-
-                    let generate_response = ui.add(
-                        egui::Button::new(egui::RichText::new(generate_text).color(
-                            if is_generate {
-                                theme.brand
-                            } else {
-                                theme.text_disabled
-                            },
-                        ))
-                        .frame(false)
-                        .corner_radius(egui::CornerRadius::ZERO),
-                    );
-                    if generate_response.clicked() {
-                        self.switch_to_generate();
-                    }
-
-                    ui.add_space(spacing::SPACING_MD);
-
-                    let is_review = self.state.current_view == AppView::Review;
-                    let task_count = self.state.all_tasks.len();
-                    let review_label = if task_count > 0 {
-                        format!("REVIEW ({})", task_count)
-                    } else {
-                        "REVIEW".to_string()
-                    };
-
-                    let review_text = if is_review {
-                        format!("[{} {}]", COFFEE, review_label)
-                    } else {
-                        format!(" {} {} ", COFFEE, review_label)
-                    };
-
-                    let review_response = ui.add(
-                        egui::Button::new(egui::RichText::new(review_text).color(if is_review {
-                            theme.brand
-                        } else {
-                            theme.text_disabled
-                        }))
-                        .frame(false)
-                        .corner_radius(egui::CornerRadius::ZERO),
-                    );
-                    let review_response =
-                        review_response.on_hover_cursor(egui::CursorIcon::PointingHand);
-                    if review_response.clicked() {
-                        self.switch_to_review();
-                    }
-
-                    ui.add_space(spacing::SPACING_MD);
-
-                    // Settings button (Now in center)
-                    let is_settings = self.state.current_view == AppView::Settings;
-                    let settings_text = if is_settings {
-                        "[SETTINGS]"
-                    } else {
-                        " SETTINGS "
-                    };
-
-                    let settings_response = ui.add(
-                        egui::Button::new(egui::RichText::new(settings_text).color(
-                            if is_settings {
-                                theme.brand
-                            } else {
-                                theme.text_disabled
-                            },
-                        ))
-                        .frame(false)
-                        .corner_radius(egui::CornerRadius::ZERO),
-                    );
-                    let settings_response =
-                        settings_response.on_hover_cursor(egui::CursorIcon::PointingHand);
-                    if settings_response.clicked() {
-                        self.switch_to_settings();
-                    }
-
-                    // Right section: Just spacing now
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.add_space(spacing::SPACING_SM);
+                        // App Name - slightly muted to let content shine
+                        ui.label(
+                            egui::RichText::new("LaReview")
+                                .strong()
+                                .size(14.0)
+                                .color(theme.text_primary),
+                        );
                     });
                 });
-                ui.add_space(spacing::SPACING_SM);
+
+                // --- 2. CENTER: Navigation Tabs ---
+                // Absolute center positioning looks best for tools
+                let center_width = 320.0;
+                let center_rect =
+                    egui::Rect::from_center_size(rect.center(), egui::vec2(center_width, 32.0));
+                // Slightly inset the tabs from the pill background to give breathing room
+                let tab_rect = center_rect.shrink2(egui::vec2(6.0, 3.0));
+
+                ui.scope_builder(egui::UiBuilder::new().max_rect(tab_rect), |ui| {
+                    // Draw a background container for the tabs (Segmented Control style)
+                    ui.painter().rect_filled(
+                        center_rect,
+                        egui::CornerRadius::same(nav_rounding as u8),
+                        theme.bg_secondary, // Darker background for the pill container
+                    );
+
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0); // Tight packing
+
+                        // We split the width equally among tabs
+                        let tab_width = tab_rect.width() / 3.0;
+
+                        self.render_tab(
+                            ui,
+                            AppView::Generate,
+                            "Generate",
+                            icons::GIT_DIFF,
+                            tab_width,
+                            nav_rounding,
+                        );
+                        self.render_tab(
+                            ui,
+                            AppView::Review,
+                            "Review",
+                            icons::COFFEE,
+                            tab_width,
+                            nav_rounding,
+                        );
+                        self.render_tab(
+                            ui,
+                            AppView::Settings,
+                            "Settings",
+                            icons::GEAR,
+                            tab_width,
+                            nav_rounding,
+                        );
+                    });
+                });
             });
+    }
+
+    // Helper for the "Segmented Control" style tabs
+    fn render_tab(
+        &mut self,
+        ui: &mut egui::Ui,
+        view: AppView,
+        label: &str,
+        icon: &str,
+        width: f32,
+        rounding: f32,
+    ) {
+        let is_active = self.state.current_view == view;
+        let theme = theme::current_theme();
+
+        let (bg, stroke) = if is_active {
+            (theme.bg_primary, egui::Stroke::new(1.0, theme.border))
+        } else {
+            (
+                egui::Color32::TRANSPARENT,
+                egui::Stroke::new(1.0, egui::Color32::TRANSPARENT),
+            )
+        };
+
+        let mut text = egui::RichText::new(format!("{} {}", icon, label))
+            .size(13.0)
+            .strong();
+
+        if is_active {
+            text = text.color(theme.brand);
+        }
+
+        ui.scope(|ui| {
+            let visuals = &mut ui.style_mut().visuals.widgets;
+            visuals.inactive.fg_stroke.color = theme.text_secondary;
+            visuals.hovered.fg_stroke.color = theme.text_primary;
+
+            let btn = egui::Button::new(text)
+                .fill(bg)
+                .stroke(stroke)
+                .corner_radius(rounding - 2.0) // Slightly less rounding than container
+                .min_size(egui::vec2(width, 26.0)); // Fill the segment while leaving pill padding
+
+            if ui.add(btn).clicked() {
+                match view {
+                    AppView::Generate => self.switch_to_generate(),
+                    AppView::Review => self.switch_to_review(),
+                    AppView::Settings => self.switch_to_settings(),
+                }
+            }
+        });
     }
 }
