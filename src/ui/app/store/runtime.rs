@@ -143,22 +143,8 @@ fn check_github_status(app: &mut LaReviewApp) {
 
     tokio::spawn(async move {
         let result: Result<GhStatusPayload, String> = async {
-            let gh_path = match which::which("gh") {
-                Ok(path) => path,
-                Err(_) => {
-                    let brew_path =
-                        crate::infra::brew::find_brew().ok_or("gh is not installed".to_string())?;
-                    let gh_path = brew_path
-                        .parent()
-                        .map(|parent| parent.join("gh"))
-                        .ok_or("gh is not installed".to_string())?;
-                    if gh_path.is_file() {
-                        gh_path
-                    } else {
-                        return Err("gh is not installed".to_string());
-                    }
-                }
-            };
+            let gh_path = crate::infra::brew::find_bin("gh")
+                .ok_or_else(|| "gh is not installed".to_string())?;
 
             let auth = tokio::process::Command::new(&gh_path)
                 .args(["auth", "status", "--hostname", "github.com"])

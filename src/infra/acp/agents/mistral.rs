@@ -4,7 +4,7 @@ use super::super::agent_discovery::AgentCandidate;
 
 // Check if a command is available in PATH
 fn is_command_available(command: &str) -> bool {
-    which::which(command).is_ok()
+    crate::infra::brew::find_bin(command).is_some()
 }
 
 /// Mistral ACP-Vibe candidate

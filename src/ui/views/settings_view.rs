@@ -109,7 +109,7 @@ impl LaReviewApp {
             .inner_margin(spacing::SPACING_LG)
             .show(ui, |ui| {
                 // ⚠️ CRITICAL: Still calculating this every frame due to state restriction.
-                let d2_installed = which::which("d2").is_ok();
+                let d2_installed = crate::infra::brew::find_bin("d2").is_some();
 
                 // 2. Consistent Header Layout (Title + Status far right)
                 ui.horizontal(|ui| {
