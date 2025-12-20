@@ -9,13 +9,17 @@ fn is_command_available(command: &str) -> bool {
 
 /// Mistral ACP-Vibe candidate
 pub fn mistral_candidate() -> AgentCandidate {
+    let command = crate::infra::brew::find_bin("vibe-acp")
+        .map(|path| path.to_string_lossy().to_string());
+    let available = command.is_some();
+
     AgentCandidate {
         id: "mistral".to_string(),
         label: "Mistral".to_string(),
         logo: Some("assets/icons/mistral.svg".to_string()),
-        command: Some("vibe-acp".to_string()),
+        command,
         args: vec![],
-        available: is_command_available("vibe-acp"),
+        available,
     }
 }
 

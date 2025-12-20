@@ -9,18 +9,30 @@ fn is_command_available(command: &str) -> bool {
 
 /// Build the Codex candidate, allowing overrides for binary/package.
 pub fn codex_candidate() -> AgentCandidate {
-    AgentCandidate {
-        id: "codex".to_string(),
-        label: "Codex".to_string(),
-        logo: Some("assets/icons/codex.svg".to_string()),
-        command: Some("npx".to_string()),
-        args: vec![
+    let bin_override = std::env::var("CODEX_ACP_BIN").ok();
+    let command = match bin_override.as_deref() {
+        Some(bin) => crate::infra::brew::find_bin(bin),
+        None => crate::infra::brew::find_bin("npx"),
+    };
+    let available = command.is_some();
+    let args = if bin_override.is_some() {
+        Vec::new()
+    } else {
+        vec![
             "-y".to_string(),
             "@zed-industries/codex-acp@latest".to_string(),
             "-c".to_string(),
             "model=\"gpt-5.2\"".to_string(),
-        ],
-        available: is_command_available("npx"),
+        ]
+    };
+
+    AgentCandidate {
+        id: "codex".to_string(),
+        label: "Codex".to_string(),
+        logo: Some("assets/icons/codex.svg".to_string()),
+        command: command.map(|path| path.to_string_lossy().to_string()),
+        args,
+        available,
     }
 }
 

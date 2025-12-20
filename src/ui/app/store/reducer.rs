@@ -369,6 +369,22 @@ fn reduce_settings(state: &mut AppState, action: SettingsAction) -> Vec<Command>
         SettingsAction::UnlinkRepository(repo_id) => {
             vec![Command::DeleteRepo { repo_id }]
         }
+        SettingsAction::UpdateExtraPath(extra_path) => {
+            state.extra_path = extra_path;
+            Vec::new()
+        }
+        SettingsAction::SaveExtraPath => vec![Command::SaveAppConfig {
+            extra_path: state.extra_path.clone(),
+            has_seen_requirements: state.has_seen_requirements,
+        }],
+        SettingsAction::DismissRequirements => {
+            state.show_requirements_modal = false;
+            state.has_seen_requirements = true;
+            vec![Command::SaveAppConfig {
+                extra_path: state.extra_path.clone(),
+                has_seen_requirements: state.has_seen_requirements,
+            }]
+        }
     }
 }
 

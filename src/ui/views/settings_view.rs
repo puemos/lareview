@@ -103,6 +103,52 @@ impl LaReviewApp {
 
         ui.add_space(spacing::SPACING_LG);
 
+        // --- Executable PATH Overrides ---
+        egui::Frame::group(ui.style())
+            .fill(theme.bg_secondary)
+            .inner_margin(spacing::SPACING_LG)
+            .show(ui, |ui| {
+                let path_sep = if cfg!(windows) { ";" } else { ":" };
+
+                ui.horizontal(|ui| {
+                    ui.strong("Executable Search Paths");
+                });
+
+                ui.add_space(spacing::SPACING_SM);
+                ui.label(format!(
+                    "Add extra PATH entries for locating tools (separate with {}).",
+                    path_sep
+                ));
+                ui.add_space(spacing::SPACING_SM);
+                self.ui_copyable_command(
+                    ui,
+                    "Show PATH in terminal",
+                    "echo $PATH | tr ':' '\\n'",
+                );
+                ui.add_space(spacing::SPACING_SM);
+
+                let mut extra_path = self.state.extra_path.clone();
+                if ui
+                    .add(
+                        egui::TextEdit::singleline(&mut extra_path)
+                            .hint_text("e.g. /usr/local/bin:/opt/custom/bin")
+                            .desired_width(f32::INFINITY),
+                    )
+                    .changed()
+                {
+                    self.dispatch(Action::Settings(SettingsAction::UpdateExtraPath(extra_path)));
+                }
+
+                ui.add_space(spacing::SPACING_SM);
+                ui.horizontal(|ui| {
+                    if ui.button("Apply Paths").clicked() {
+                        self.dispatch(Action::Settings(SettingsAction::SaveExtraPath));
+                    }
+                });
+            });
+
+        ui.add_space(spacing::SPACING_LG);
+
         // --- D2 Section ---
         egui::Frame::group(ui.style())
             .fill(theme.bg_secondary)

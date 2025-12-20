@@ -9,13 +9,17 @@ fn is_command_available(command: &str) -> bool {
 
 /// OpenCode candidate (static for now).
 pub fn opencode_candidate() -> AgentCandidate {
+    let command = crate::infra::brew::find_bin("opencode")
+        .map(|path| path.to_string_lossy().to_string());
+    let available = command.is_some();
+
     AgentCandidate {
         id: "opencode".to_string(),
         label: "OpenCode".to_string(),
         logo: Some("assets/icons/opencode.svg".to_string()),
-        command: Some("opencode".to_string()),
+        command,
         args: vec!["acp".to_string()],
-        available: is_command_available("opencode"),
+        available,
     }
 }
 

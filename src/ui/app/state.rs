@@ -112,6 +112,11 @@ pub struct AppState {
     /// Currently selected repo for the Generate view
     pub selected_repo_id: Option<String>,
 
+    /// Extra PATH entries for locating tools in GUI sessions.
+    pub extra_path: String,
+    pub show_requirements_modal: bool,
+    pub has_seen_requirements: bool,
+
     // UI state for Generate view
     pub agent_panel_collapsed: bool,
     pub plan_panel_collapsed: bool,

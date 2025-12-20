@@ -9,13 +9,17 @@ fn is_command_available(command: &str) -> bool {
 
 /// Kimi candidate (static for now).
 pub fn kimi_candidate() -> AgentCandidate {
+    let command = crate::infra::brew::find_bin("kimi")
+        .map(|path| path.to_string_lossy().to_string());
+    let available = command.is_some();
+
     AgentCandidate {
         id: "kimi".to_string(),
         label: "Kimi CLI".to_string(),
         logo: Some("assets/icons/kimi.svg".to_string()),
-        command: Some("kimi".to_string()),
+        command,
         args: vec!["--acp".to_string()],
-        available: is_command_available("kimi"),
+        available,
     }
 }
 

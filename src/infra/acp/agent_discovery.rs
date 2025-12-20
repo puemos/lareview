@@ -24,6 +24,7 @@ pub struct AgentCandidate {
 struct AgentCache {
     candidates: Vec<AgentCandidate>,
     last_updated: std::time::Instant,
+    extra_path_snapshot: Option<String>,
 }
 
 impl AgentCache {}
@@ -36,10 +37,14 @@ const CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(30); // 30
 /// Uses a cached AgentRegistry to avoid recreating it on each call, with TTL
 pub fn list_agent_candidates() -> Vec<AgentCandidate> {
     let mut cache_guard = AGENT_CACHE.lock().unwrap();
+    let extra_path_snapshot = std::env::var("LAREVIEW_EXTRA_PATH").ok();
 
     // Check if cache is valid (not expired)
     match cache_guard.as_ref() {
-        Some(cache) if cache.last_updated.elapsed() < CACHE_TTL => {
+        Some(cache)
+            if cache.last_updated.elapsed() < CACHE_TTL
+                && cache.extra_path_snapshot == extra_path_snapshot =>
+        {
             // Return cached data
             cache.candidates.clone()
         }
@@ -55,6 +60,7 @@ pub fn list_agent_candidates() -> Vec<AgentCandidate> {
             *cache_guard = Some(AgentCache {
                 candidates: candidates.clone(),
                 last_updated: std::time::Instant::now(),
+                extra_path_snapshot,
             });
 
             candidates

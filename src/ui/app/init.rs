@@ -64,12 +64,25 @@ impl LaReviewApp {
             conn.clone(),
         ));
 
+        let config = crate::infra::app_config::load_config();
+
         let mut state = AppState {
             current_view: AppView::Generate,
             selected_agent: SelectedAgent::new("codex"),
             diff_text: String::new(),
             ..Default::default()
         };
+
+        state.extra_path = config.extra_path.clone().unwrap_or_default();
+        state.has_seen_requirements = config.has_seen_requirements;
+        state.show_requirements_modal = !config.has_seen_requirements;
+
+        if !state.extra_path.trim().is_empty() {
+            // set_var is currently unsafe on nightly; this is limited to process-local config.
+            unsafe {
+                std::env::set_var("LAREVIEW_EXTRA_PATH", state.extra_path.clone());
+            }
+        }
 
         if let Ok(repos) = repo_repo.find_all() {
             state.linked_repos = repos;

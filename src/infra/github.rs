@@ -3,6 +3,7 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use serde::Deserialize;
 use tokio::process::Command;
+use crate::infra::brew;
 
 #[derive(Debug, Clone)]
 pub struct GitHubPrRef {
@@ -70,7 +71,8 @@ struct GhPrViewJson {
 }
 
 pub async fn fetch_pr_metadata(pr: &GitHubPrRef) -> Result<GitHubPrMetadata> {
-    let output = Command::new("gh")
+    let gh_path = brew::find_bin("gh").context("resolve `gh` path")?;
+    let output = Command::new(&gh_path)
         .args([
             "pr",
             "view",
@@ -99,7 +101,8 @@ pub async fn fetch_pr_metadata(pr: &GitHubPrRef) -> Result<GitHubPrMetadata> {
 }
 
 pub async fn fetch_pr_diff(pr: &GitHubPrRef) -> Result<String> {
-    let output = Command::new("gh")
+    let gh_path = brew::find_bin("gh").context("resolve `gh` path")?;
+    let output = Command::new(&gh_path)
         .args(["pr", "diff", pr.url.as_str()])
         .output()
         .await

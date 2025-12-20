@@ -68,6 +68,10 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
         Command::SaveRepo { repo } => save_repo(app, repo),
         Command::DeleteRepo { repo_id } => delete_repo(app, repo_id),
         Command::PickFolderForLink => pick_folder_for_link(app),
+        Command::SaveAppConfig {
+            extra_path,
+            has_seen_requirements,
+        } => save_app_config(extra_path, has_seen_requirements),
     }
 }
 
@@ -280,6 +284,33 @@ fn start_generation(
             }
         }
     });
+}
+
+fn save_app_config(extra_path: String, has_seen_requirements: bool) {
+    let extra_path = extra_path.trim().to_string();
+    let config = crate::infra::app_config::AppConfig {
+        extra_path: if extra_path.is_empty() {
+            None
+        } else {
+            Some(extra_path.clone())
+        },
+        has_seen_requirements,
+    };
+
+    if !extra_path.is_empty() {
+        // set_var is currently unsafe on nightly; this is limited to process-local config.
+        unsafe {
+            std::env::set_var("LAREVIEW_EXTRA_PATH", extra_path);
+        }
+    } else {
+        unsafe {
+            std::env::remove_var("LAREVIEW_EXTRA_PATH");
+        }
+    }
+
+    if let Err(err) = crate::infra::app_config::save_config(&config) {
+        eprintln!("[config] Failed to save config: {err}");
+    }
 }
 
 fn refresh_review_data(app: &mut LaReviewApp, reason: super::command::ReviewDataRefreshReason) {

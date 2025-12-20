@@ -88,4 +88,8 @@ pub enum Command {
         repo_id: String,
     },
     PickFolderForLink,
+    SaveAppConfig {
+        extra_path: String,
+        has_seen_requirements: bool,
+    },
 }

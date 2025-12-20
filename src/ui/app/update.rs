@@ -79,5 +79,6 @@ impl eframe::App for LaReviewApp {
 
         self.render_full_diff_overlay(ctx);
         self.render_export_preview_overlay(ctx);
+        self.render_requirements_overlay(ctx);
     }
 }

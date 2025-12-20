@@ -1,6 +1,6 @@
 use eframe::egui;
 
-use super::{Action, LaReviewApp, ReviewAction};
+use super::{Action, LaReviewApp, ReviewAction, SettingsAction};
 use crate::ui::components::pills::pill_action_button;
 use crate::ui::spacing;
 
@@ -186,4 +186,86 @@ impl LaReviewApp {
             self.dispatch(Action::Review(ReviewAction::CloseExportPreview));
         }
     }
+
+    pub(super) fn render_requirements_overlay(&mut self, ctx: &egui::Context) {
+        if !self.state.show_requirements_modal {
+            return;
+        }
+
+        let theme = crate::ui::theme::current_theme();
+        let mut open = true;
+
+        let gh_path = crate::infra::brew::find_bin("gh");
+        let d2_path = crate::infra::brew::find_bin("d2");
+        let agents = crate::infra::acp::list_agent_candidates();
+
+        egui::Window::new("Setup Checklist")
+            .open(&mut open)
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+            .frame(
+                egui::Frame::window(&ctx.style())
+                    .inner_margin(egui::Margin::same(spacing::SPACING_MD as i8)),
+            )
+            .show(ctx, |ui| {
+                ui.label("Ensure these tools are installed and discoverable:");
+                ui.add_space(spacing::SPACING_SM);
+
+                egui::Grid::new("requirements_grid")
+                    .num_columns(3)
+                    .spacing([spacing::SPACING_LG, spacing::SPACING_SM])
+                    .show(ui, |ui| {
+                        ui.strong("Tool");
+                        ui.strong("Status");
+                        ui.strong("Path");
+                        ui.end_row();
+
+                        render_requirement_row(ui, "GitHub CLI (gh)", &gh_path, theme);
+                        render_requirement_row(ui, "D2", &d2_path, theme);
+
+                        for agent in &agents {
+                            let label = format!("Agent: {}", agent.label);
+                            let path = agent.command.as_ref().map(|p| std::path::PathBuf::from(p));
+                            render_requirement_row(ui, &label, &path, theme);
+                        }
+                    });
+
+                ui.add_space(spacing::SPACING_MD);
+                ui.horizontal(|ui| {
+                    if ui.button("Open Settings").clicked() {
+                        self.switch_to_settings();
+                        self.dispatch(Action::Settings(SettingsAction::DismissRequirements));
+                    }
+                    if ui.button("Dismiss").clicked() {
+                        self.dispatch(Action::Settings(SettingsAction::DismissRequirements));
+                    }
+                });
+            });
+
+        if !open {
+            self.dispatch(Action::Settings(SettingsAction::DismissRequirements));
+        }
+    }
+}
+
+fn render_requirement_row(
+    ui: &mut egui::Ui,
+    label: &str,
+    path: &Option<std::path::PathBuf>,
+    theme: crate::ui::theme::Theme,
+) {
+    let is_ready = path.is_some();
+    ui.label(label);
+    if is_ready {
+        ui.colored_label(theme.success, "✔ Ready");
+    } else {
+        ui.colored_label(theme.destructive, "✖ Missing");
+    }
+    ui.monospace(
+        path.as_ref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "Not found".to_string()),
+    );
+    ui.end_row();
 }

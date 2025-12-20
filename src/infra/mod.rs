@@ -3,6 +3,7 @@
 //! This module contains IO-heavy integrations (SQLite, ACP, filesystem).
 
 pub mod acp;
+pub mod app_config;
 pub mod brew;
 pub mod d2;
 pub mod db;

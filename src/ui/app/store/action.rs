@@ -109,6 +109,9 @@ pub enum SettingsAction {
     CheckGitHubStatus,
     LinkRepository,
     UnlinkRepository(String),
+    UpdateExtraPath(String),
+    SaveExtraPath,
+    DismissRequirements,
 }
 
 #[derive(Debug)]
