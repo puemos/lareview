@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.6] - 2025-12-20
+
+### Added
+
+- Threaded feedback with status/impact chips, comment timelines, and creation from diff or task views.
+- Repository context selector to switch linked repos for plan and review workflows.
+- Refreshed UI look with Geist/GeistMono typography and new cyber button styling.
+
+### Changed
+
+- Rethemed generate/review screens with tighter spacing, store/runtime updates, and clearer hierarchy.
+- ACP task generation and MCP server validation tuned for repo-aware prompts and safer ingestion.
+
+### Fixed
+
+- Database tests now seed parent rows before note inserts to avoid constraint errors.
+- Diff indexing and D2 rendering stability improvements.
+
 ## [0.0.5] - 2025-12-18
 
 ### Added
