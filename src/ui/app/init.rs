@@ -26,6 +26,24 @@ impl LaReviewApp {
             .into(),
         );
 
+        fonts.font_data.insert(
+            "GeistBold".to_owned(),
+            FontData::from_static(
+                crate::assets::get_content("assets/fonts/Geist-Bold.ttf")
+                    .expect("Geist-Bold font missing"),
+            )
+            .into(),
+        );
+
+        fonts.font_data.insert(
+            "GeistItalic".to_owned(),
+            FontData::from_static(
+                crate::assets::get_content("assets/fonts/Geist-Italic.ttf")
+                    .expect("Geist-Italic font missing"),
+            )
+            .into(),
+        );
+
         // Load Geist Mono for monospace text
         fonts.font_data.insert(
             "GeistMono".to_owned(),
@@ -40,7 +58,23 @@ impl LaReviewApp {
             .families
             .entry(FontFamily::Proportional)
             .or_default()
-            .insert(0, "Geist".to_owned());
+            .extend([
+                "Geist".to_owned(),
+                "GeistBold".to_owned(),
+                "GeistItalic".to_owned(),
+            ]);
+
+        fonts
+            .families
+            .insert(FontFamily::Name("Geist".into()), vec!["Geist".to_owned()]);
+        fonts.families.insert(
+            FontFamily::Name("GeistBold".into()),
+            vec!["GeistBold".to_owned()],
+        );
+        fonts.families.insert(
+            FontFamily::Name("GeistItalic".into()),
+            vec!["GeistItalic".to_owned()],
+        );
         fonts
             .families
             .entry(FontFamily::Monospace)

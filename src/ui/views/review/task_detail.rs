@@ -36,6 +36,7 @@ impl LaReviewApp {
                     egui::Label::new(
                         egui::RichText::new(&task.title)
                             .size(22.0)
+                            .line_height(Some(32.0))
                             .color(current_theme().text_primary),
                     )
                     .wrap(),

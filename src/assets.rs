@@ -18,6 +18,8 @@ pub fn get_content(path: &str) -> Option<&'static [u8]> {
 
         // Fonts
         "assets/fonts/Geist.ttf" => Some(include_bytes!("../assets/fonts/Geist.ttf")),
+        "assets/fonts/Geist-Bold.ttf" => Some(include_bytes!("../assets/fonts/Geist-Bold.ttf")),
+        "assets/fonts/Geist-Italic.ttf" => Some(include_bytes!("../assets/fonts/Geist-Italic.ttf")),
         "assets/fonts/GeistMono.ttf" => Some(include_bytes!("../assets/fonts/GeistMono.ttf")),
 
         _ => None,

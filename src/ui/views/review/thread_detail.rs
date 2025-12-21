@@ -336,7 +336,7 @@ impl LaReviewApp {
             ui.label(
                 egui::RichText::new(&comment.body)
                     .color(theme.text_secondary)
-                    .line_height(Some(22.0)),
+                    .line_height(Some(26.0)),
             );
         });
     }

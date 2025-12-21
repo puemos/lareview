@@ -325,11 +325,6 @@ impl LaReviewApp {
             .unwrap_or_else(|| "Select review…".to_string());
 
         // Review Selector
-        ui.add(egui::Label::new(
-            egui::RichText::new("Review:")
-                .size(12.0)
-                .color(current_theme().text_muted),
-        ));
         egui::ComboBox::from_id_salt("review_select")
             .selected_text(egui::RichText::new(current_label).strong())
             .width(200.0)
@@ -343,52 +338,6 @@ impl LaReviewApp {
                     }
                 }
             });
-
-        ui.add_space(spacing::SPACING_MD);
-
-        // Run Selector (if Review selected)
-        if let Some(selected_review_id) = self.state.selected_review_id.clone() {
-            let runs: Vec<_> = self
-                .state
-                .runs
-                .iter()
-                .filter(|r| r.review_id == selected_review_id)
-                .cloned()
-                .collect();
-
-            if !runs.is_empty() {
-                let current_run_id = self.state.selected_run_id.clone();
-                let run_label = current_run_id
-                    .as_ref()
-                    .and_then(|id| runs.iter().find(|r| &r.id == id))
-                    .map(|r| format!("Run {}…", r.id.chars().take(6).collect::<String>()))
-                    .unwrap_or_else(|| "Select run…".to_string());
-
-                ui.add(egui::Label::new(
-                    egui::RichText::new("Run:")
-                        .size(12.0)
-                        .color(current_theme().text_muted),
-                ));
-                egui::ComboBox::from_id_salt("run_select")
-                    .selected_text(run_label)
-                    .width(140.0)
-                    .show_ui(ui, |ui| {
-                        for run in runs {
-                            let is_selected = current_run_id.as_deref() == Some(&run.id);
-                            let label = format!(
-                                "{}… ({})",
-                                run.id.chars().take(8).collect::<String>(),
-                                run.agent_id
-                            );
-                            if ui.selectable_label(is_selected, label).clicked() {
-                                self.dispatch(Action::Review(ReviewAction::SelectRun {
-                                    run_id: run.id.clone(),
-                                }));
-                            }
-                        }
-                    });
-            }
-        }
     }
 
     /// Renders the "No Tasks" empty state

@@ -50,6 +50,7 @@ glam = "0.30.9"
 uuid = { version = "1", features = ["v4"] }
 rfd = "0.15"
 egui_commonmark = { version = "0.22", features = ["svg", "embedded_image", "pulldown_cmark", "better_syntax_highlighting"] }
+syntect = "5"
 pulldown-cmark = "0.12"
 base64 = "0.22.1"
 resvg = "0.45"
