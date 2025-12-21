@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.8] - 2025-12-22
+
+### Added
+
+- Custom markdown renderer with syntax highlighting and font variants.
+- Cyber reticle/spinner animation components.
+- Inline comment tool for agents.
+- Repos screen moved to its own dedicated view.
+
+### Changed
+
+- Split store reducer into feature-specific modules.
+- Improved generate/review views layout consistency.
+- Added side margins to repos/settings views.
+- Enhanced cyber button behavior and guarded layouts against small widths.
+- Release pipeline now includes macOS artifacts and SHA256 checksum files.
+
+### Fixed
+
+- Removed brand docs assets.
+
 ## [0.0.7] - 2025-12-20
 
 ### Added
