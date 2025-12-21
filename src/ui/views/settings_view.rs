@@ -6,7 +6,14 @@ use crate::ui::theme;
 
 impl LaReviewApp {
     pub fn ui_settings(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Settings");
+        let side_margin = spacing::SPACING_SM;
+        let content_rect = ui
+            .available_rect_before_wrap()
+            .shrink2(egui::vec2(side_margin, 0.0));
+        let mut content_ui = ui.new_child(egui::UiBuilder::new().max_rect(content_rect));
+        content_ui.set_clip_rect(content_rect);
+        let ui = &mut content_ui;
+
         ui.add_space(spacing::SPACING_LG);
 
         // --- GitHub Section ---

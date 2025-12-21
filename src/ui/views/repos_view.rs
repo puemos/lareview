@@ -5,7 +5,14 @@ use eframe::egui;
 
 impl LaReviewApp {
     pub fn ui_repos(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Repositories");
+        let side_margin = spacing::SPACING_SM;
+        let content_rect = ui
+            .available_rect_before_wrap()
+            .shrink2(egui::vec2(side_margin, 0.0));
+        let mut content_ui = ui.new_child(egui::UiBuilder::new().max_rect(content_rect));
+        content_ui.set_clip_rect(content_rect);
+        let ui = &mut content_ui;
+
         ui.add_space(spacing::SPACING_LG);
 
         let theme = theme::current_theme();
