@@ -49,7 +49,7 @@ impl LaReviewApp {
 
                 // --- 2. CENTER: Navigation Tabs ---
                 // Absolute center positioning looks best for tools
-                let center_width = 320.0;
+                let center_width = 380.0;
                 let center_rect =
                     egui::Rect::from_center_size(rect.center(), egui::vec2(center_width, 32.0));
                 // Slightly inset the tabs from the pill background to give breathing room
@@ -64,10 +64,11 @@ impl LaReviewApp {
                     );
 
                     ui.horizontal(|ui| {
-                        ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0); // Tight packing
+                        let spacing = 4.0;
+                        ui.spacing_mut().item_spacing = egui::vec2(spacing, 0.0);
 
-                        // We split the width equally among tabs
-                        let tab_width = tab_rect.width() / 3.0;
+                        // We split the width equally among tabs, accounting for spacing
+                        let tab_width = (tab_rect.width() - (3.0 * spacing)) / 4.0;
 
                         self.render_tab(
                             ui,
@@ -82,6 +83,14 @@ impl LaReviewApp {
                             AppView::Review,
                             "Review",
                             icons::COFFEE,
+                            tab_width,
+                            nav_rounding,
+                        );
+                        self.render_tab(
+                            ui,
+                            AppView::Repos,
+                            "Repos",
+                            icons::GIT_BRANCH,
                             tab_width,
                             nav_rounding,
                         );
@@ -143,6 +152,7 @@ impl LaReviewApp {
                 match view {
                     AppView::Generate => self.switch_to_generate(),
                     AppView::Review => self.switch_to_review(),
+                    AppView::Repos => self.switch_to_repos(),
                     AppView::Settings => self.switch_to_settings(),
                 }
             }

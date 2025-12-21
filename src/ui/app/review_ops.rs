@@ -17,6 +17,12 @@ impl LaReviewApp {
         )));
     }
 
+    pub fn switch_to_repos(&mut self) {
+        self.dispatch(Action::Navigation(NavigationAction::SwitchTo(
+            AppView::Repos,
+        )));
+    }
+
     pub fn switch_to_settings(&mut self) {
         self.dispatch(Action::Navigation(NavigationAction::SwitchTo(
             AppView::Settings,

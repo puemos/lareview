@@ -14,6 +14,7 @@ pub enum AppView {
     #[default]
     Generate,
     Review,
+    Repos,
     Settings,
 }
 

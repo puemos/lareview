@@ -73,6 +73,7 @@ impl eframe::App for LaReviewApp {
                 .show(ui, |ui| match self.state.current_view {
                     AppView::Generate => self.ui_generate(ui),
                     AppView::Review => self.ui_review(ui),
+                    AppView::Repos => self.ui_repos(ui),
                     AppView::Settings => self.ui_settings(ui),
                 });
         });
