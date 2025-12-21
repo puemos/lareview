@@ -62,7 +62,7 @@ impl LaReviewApp {
 
         // --- 2. Main Container Setup ---
         // We calculate the content area manually to handle the split view cleanly
-        let side_margin = spacing::SPACING_SM;
+        let side_margin = 0.0;
         let content_rect = ui
             .available_rect_before_wrap()
             .shrink2(egui::vec2(side_margin, 0.0));
@@ -72,7 +72,7 @@ impl LaReviewApp {
         let ui = &mut content_ui;
 
         // --- 3. Top Header (Toolbar) ---
-        egui::Frame::NONE
+        let header_response = egui::Frame::NONE
             .inner_margin(egui::Margin::symmetric(spacing::SPACING_MD as i8, 0))
             .show(ui, |ui| {
                 ui.set_min_height(TOP_HEADER_HEIGHT);
@@ -150,17 +150,18 @@ impl LaReviewApp {
                         });
                     },
                 );
-
-                let bar_rect = egui::Rect::from_min_size(
-                    egui::pos2(ui.min_rect().left(), ui.min_rect().bottom() + 2.0),
-                    egui::vec2(ui.min_rect().width(), 2.0),
-                );
-
-                let fill_rect =
-                    egui::Rect::from_min_size(bar_rect.min, egui::vec2(bar_rect.width(), 1.0));
-                ui.painter()
-                    .rect_filled(fill_rect, 0.0, current_theme().border);
             });
+
+        // Draw Full-Width Separator
+        let bar_rect = egui::Rect::from_min_size(
+            egui::pos2(
+                content_rect.left(),
+                header_response.response.rect.bottom() + 2.0,
+            ),
+            egui::vec2(content_rect.width(), 1.0),
+        );
+        ui.painter()
+            .rect_filled(bar_rect, 0.0, current_theme().border);
 
         // Handle delayed actions
         if trigger_delete_review {
@@ -200,15 +201,25 @@ impl LaReviewApp {
         let resize_handle_width = 8.0; // wider logical hit-box, visual line will be thin
 
         // Rect Definitions
-        let left_rect =
-            egui::Rect::from_min_size(available_rect.min, egui::vec2(tree_width, available_height));
+        // Safety: Ensure left pane + resize handle doesn't exceed available width
+        let safe_tree_width = tree_width.min((available_width - resize_handle_width).max(0.0));
+
+        let left_rect = egui::Rect::from_min_size(
+            available_rect.min,
+            egui::vec2(safe_tree_width, available_height),
+        );
         let resize_rect = egui::Rect::from_min_size(
             egui::pos2(left_rect.max.x, left_rect.min.y),
             egui::vec2(resize_handle_width, available_height),
         );
+
+        // Safety: Ensure center rect has non-negative width
+        let center_min_x = resize_rect.max.x;
+        let center_max_x = available_rect.max.x.max(center_min_x);
+
         let center_rect = egui::Rect::from_min_max(
-            egui::pos2(resize_rect.max.x, available_rect.min.y),
-            available_rect.max,
+            egui::pos2(center_min_x, available_rect.min.y),
+            egui::pos2(center_max_x, available_rect.max.y),
         );
 
         // --- A. Left Panel (Navigation Tree) ---
@@ -245,7 +256,7 @@ impl LaReviewApp {
             ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
         }
         // Draw a subtle line in the center of the handle
-        let line_x = resize_rect.center().x;
+        let line_x = resize_rect.center().x + 3.5;
         let line_color = if hover_active {
             current_theme().accent
         } else {
@@ -264,7 +275,7 @@ impl LaReviewApp {
             let mut center_ui = ui.new_child(egui::UiBuilder::new().max_rect(center_rect));
             egui::Frame::NONE
                 .fill(current_theme().bg_primary)
-                .inner_margin(spacing::SPACING_XL)
+                // REMOVED: .inner_margin(spacing::SPACING_XL) - We handle padding manually per view
                 .show(&mut center_ui, |ui| {
                     self.render_center_pane(
                         ui,
@@ -511,17 +522,23 @@ impl LaReviewApp {
                 self.render_ready_state(ui, next_open_id);
             }
             RightPaneState::AllDone => {
-                ui.vertical_centered(|ui| {
-                    ui.add_space(ui.available_height() * 0.3);
-                    ui.label(
-                        egui::RichText::new(icons::CHECK_CIRCLE)
-                            .size(64.0)
-                            .color(current_theme().success),
-                    );
-                    ui.add_space(16.0);
-                    ui.heading("All tasks completed!");
-                    ui.label(egui::RichText::new("Great job.").color(current_theme().text_muted));
-                });
+                egui::Frame::NONE
+                    .inner_margin(spacing::SPACING_XL)
+                    .show(ui, |ui| {
+                        ui.vertical_centered(|ui| {
+                            ui.add_space(ui.available_height() * 0.3);
+                            ui.label(
+                                egui::RichText::new(icons::CHECK_CIRCLE)
+                                    .size(64.0)
+                                    .color(current_theme().success),
+                            );
+                            ui.add_space(16.0);
+                            ui.heading("All tasks completed!");
+                            ui.label(
+                                egui::RichText::new("Great job.").color(current_theme().text_muted),
+                            );
+                        });
+                    });
             }
             _ => {}
         }
@@ -535,53 +552,57 @@ impl LaReviewApp {
             trigger_primary = true;
         }
 
-        ui.vertical_centered(|ui| {
-            ui.add_space(ui.available_height() * 0.25);
+        egui::Frame::NONE
+            .inner_margin(spacing::SPACING_XL)
+            .show(ui, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(ui.available_height() * 0.25);
 
-            // Hero Icon
-            ui.label(
-                egui::RichText::new(icons::LIST_CHECKS)
-                    .size(64.0)
-                    .color(current_theme().brand.gamma_multiply(0.8)),
-            );
-            ui.add_space(24.0);
+                    // Hero Icon
+                    ui.label(
+                        egui::RichText::new(icons::LIST_CHECKS)
+                            .size(64.0)
+                            .color(current_theme().brand.gamma_multiply(0.8)),
+                    );
+                    ui.add_space(24.0);
 
-            ui.heading("Ready to Review");
-            ui.add_space(8.0);
-            ui.label(
-                egui::RichText::new("Select a task from the sidebar or start the queue.")
-                    .color(current_theme().text_secondary),
-            );
+                    ui.heading("Ready to Review");
+                    ui.add_space(8.0);
+                    ui.label(
+                        egui::RichText::new("Select a task from the sidebar or start the queue.")
+                            .color(current_theme().text_secondary),
+                    );
 
-            ui.add_space(32.0);
+                    ui.add_space(32.0);
 
-            // Primary Action
-            let btn_enabled = next_open_id.is_some();
-            let resp = pill_action_button(
-                ui,
-                icons::ARROW_RIGHT,
-                "Start Reviewing",
-                btn_enabled,
-                current_theme().brand,
-            );
+                    // Primary Action
+                    let btn_enabled = next_open_id.is_some();
+                    let resp = pill_action_button(
+                        ui,
+                        icons::ARROW_RIGHT,
+                        "Start Reviewing",
+                        btn_enabled,
+                        current_theme().brand,
+                    );
 
-            // Hint for keyboard shortcut
-            ui.add_space(8.0);
-            ui.label(
-                egui::RichText::new("Press [Enter] to start")
-                    .size(10.0)
-                    .color(current_theme().text_disabled),
-            );
+                    // Hint for keyboard shortcut
+                    ui.add_space(8.0);
+                    ui.label(
+                        egui::RichText::new("Press [Enter] to start")
+                            .size(10.0)
+                            .color(current_theme().text_disabled),
+                    );
 
-            if (resp.clicked() || trigger_primary)
-                && btn_enabled
-                && let Some(id) = next_open_id
-                && let Some(task) = self.state.tasks().iter().find(|t| t.id == id)
-            {
-                // Helper to find task and select it
-                self.select_task(task);
-            }
-        });
+                    if (resp.clicked() || trigger_primary)
+                        && btn_enabled
+                        && let Some(id) = next_open_id
+                        && let Some(task) = self.state.tasks().iter().find(|t| t.id == id)
+                    {
+                        // Helper to find task and select it
+                        self.select_task(task);
+                    }
+                });
+            });
     }
 
     fn handle_auto_selection(

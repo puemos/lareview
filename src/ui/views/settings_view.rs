@@ -6,26 +6,18 @@ use crate::ui::theme;
 
 impl LaReviewApp {
     pub fn ui_settings(&mut self, ui: &mut egui::Ui) {
-        let side_margin = spacing::SPACING_SM;
-        let content_rect = ui
-            .available_rect_before_wrap()
-            .shrink2(egui::vec2(side_margin, 0.0));
-        let mut content_ui = ui.new_child(egui::UiBuilder::new().max_rect(content_rect));
-        content_ui.set_clip_rect(content_rect);
-        let ui = &mut content_ui;
-
-        ui.add_space(spacing::SPACING_LG);
+        let theme = theme::current_theme();
 
         // --- GitHub Section ---
-        let theme = theme::current_theme();
-        egui::Frame::group(ui.style())
-            .fill(theme.bg_secondary)
-            .inner_margin(spacing::SPACING_LG)
+        egui::Frame::NONE
+            .inner_margin(egui::Margin::symmetric(
+                spacing::SPACING_LG as i8,
+                spacing::SPACING_MD as i8,
+            ))
             .show(ui, |ui| {
-                // 1. Consistent Header Layout (Title + Status far right)
+                // Title Block
                 ui.horizontal(|ui| {
                     ui.strong("GitHub CLI Integration");
-                    // Use right_to_left layout for the status indicator
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if self.state.is_gh_status_checking {
                             ui.label(egui::RichText::new("Checking...").color(theme.warning));
@@ -41,14 +33,12 @@ impl LaReviewApp {
 
                 ui.add_space(spacing::SPACING_SM);
 
+                // Content Block
                 egui::Grid::new("gh_settings_grid")
                     .num_columns(2)
                     .spacing([spacing::SPACING_LG, spacing::SPACING_MD])
                     .show(ui, |ui| {
-                        // Label Column
                         ui.label("Connection:");
-
-                        // Value Column
                         ui.horizontal(|ui| {
                             if let Some(err) = &self.state.gh_status_error {
                                 ui.colored_label(theme.destructive, "Disconnected");
@@ -68,7 +58,6 @@ impl LaReviewApp {
                         });
                         ui.end_row();
 
-                        // CLI Path Row
                         if let Some(status) = &self.state.gh_status {
                             ui.label("Executable Path:");
                             ui.monospace(&status.gh_path);
@@ -78,7 +67,6 @@ impl LaReviewApp {
 
                 ui.add_space(spacing::SPACING_MD);
 
-                // Action Bar
                 ui.horizontal(|ui| {
                     let btn_label = if self.state.is_gh_status_checking {
                         "Checking..."
@@ -96,76 +84,53 @@ impl LaReviewApp {
                     }
                 });
 
-                // Troubleshooting (Only visible if needed)
+                // Troubleshooting
                 if self.state.gh_status.is_none() || self.state.gh_status_error.is_some() {
-                    ui.add_space(spacing::SPACING_MD);
-                    ui.separator();
-                    ui.add_space(spacing::SPACING_SM);
-                    ui.label(egui::RichText::new("Setup Instructions").strong());
-
-                    self.ui_copyable_command(ui, "Install via Homebrew", "brew install gh");
-                    self.ui_copyable_command(ui, "Authenticate", "gh auth login");
-                }
-            });
-
-        ui.add_space(spacing::SPACING_LG);
-
-        // --- Executable PATH Overrides ---
-        egui::Frame::group(ui.style())
-            .fill(theme.bg_secondary)
-            .inner_margin(spacing::SPACING_LG)
-            .show(ui, |ui| {
-                let path_sep = if cfg!(windows) { ";" } else { ":" };
-
-                ui.horizontal(|ui| {
-                    ui.strong("Executable Search Paths");
-                });
-
-                ui.add_space(spacing::SPACING_SM);
-                ui.label(format!(
-                    "Add extra PATH entries for locating tools (separate with {}).",
-                    path_sep
-                ));
-                ui.add_space(spacing::SPACING_SM);
-                self.ui_copyable_command(ui, "Show PATH in terminal", "echo $PATH | tr ':' '\\n'");
-                ui.add_space(spacing::SPACING_SM);
-
-                let mut extra_path = self.state.extra_path.clone();
-                if ui
-                    .add(
-                        egui::TextEdit::singleline(&mut extra_path)
-                            .hint_text("e.g. /usr/local/bin:/opt/custom/bin")
-                            .desired_width(f32::INFINITY),
+                    ui.add_space(spacing::SPACING_LG);
+                    egui::CollapsingHeader::new(
+                        egui::RichText::new("Setup Instructions")
+                            .strong()
+                            .color(theme.text_secondary),
                     )
-                    .changed()
-                {
-                    self.dispatch(Action::Settings(SettingsAction::UpdateExtraPath(
-                        extra_path,
-                    )));
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        ui.add_space(spacing::SPACING_SM);
+                        egui::Frame::NONE
+                            .fill(theme.bg_secondary)
+                            .inner_margin(spacing::SPACING_MD)
+                            .corner_radius(crate::ui::spacing::RADIUS_MD)
+                            .show(ui, |ui| {
+                                ui.vertical(|ui| {
+                                    self.ui_copyable_command(
+                                        ui,
+                                        "1. Install via Homebrew",
+                                        "brew install gh",
+                                    );
+                                    ui.add_space(spacing::SPACING_MD);
+                                    self.ui_copyable_command(
+                                        ui,
+                                        "2. Authenticate",
+                                        "gh auth login",
+                                    );
+                                });
+                            });
+                    });
                 }
-
-                ui.add_space(spacing::SPACING_SM);
-                ui.horizontal(|ui| {
-                    if ui.button("Apply Paths").clicked() {
-                        self.dispatch(Action::Settings(SettingsAction::SaveExtraPath));
-                    }
-                });
             });
 
-        ui.add_space(spacing::SPACING_LG);
+        ui.separator();
 
         // --- D2 Section ---
-        egui::Frame::group(ui.style())
-            .fill(theme.bg_secondary)
-            .inner_margin(spacing::SPACING_LG)
+        egui::Frame::NONE
+            .inner_margin(egui::Margin::symmetric(
+                spacing::SPACING_LG as i8,
+                spacing::SPACING_MD as i8,
+            ))
             .show(ui, |ui| {
-                // ⚠️ CRITICAL: Still calculating this every frame due to state restriction.
                 let d2_installed = crate::infra::brew::find_bin("d2").is_some();
 
-                // 2. Consistent Header Layout (Title + Status far right)
                 ui.horizontal(|ui| {
                     ui.strong("D2 Diagram Engine");
-                    // Use right_to_left layout for the installation status
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if self.state.is_d2_installing {
                             ui.label(egui::RichText::new("Installing...").color(theme.warning));
@@ -177,10 +142,11 @@ impl LaReviewApp {
                     });
                 });
 
-                ui.add_space(spacing::SPACING_MD);
+                ui.add_space(spacing::SPACING_SM);
 
                 let install_cmd = "curl -fsSL https://d2lang.com/install.sh | sh -s --";
-                let uninstall_cmd = "curl -fsSL https://d2lang.com/install.sh | sh -s -- --uninstall";
+                let uninstall_cmd =
+                    "curl -fsSL https://d2lang.com/install.sh | sh -s -- --uninstall";
 
                 if d2_installed {
                     ui.label("D2 is ready to render diagrams.");
@@ -197,7 +163,6 @@ impl LaReviewApp {
                         }
                     });
                 } else {
-                    // Warning box for remote script
                     egui::Frame::NONE
                         .fill(theme.bg_surface)
                         .inner_margin(spacing::SPACING_SM)
@@ -214,17 +179,23 @@ impl LaReviewApp {
 
                     ui.add_space(spacing::SPACING_MD);
 
-                    // Confirmation Checkbox
                     let mut allow = self.state.allow_d2_install;
-                    if ui.checkbox(&mut allow, "I understand and want to proceed").changed() {
+                    if ui
+                        .checkbox(&mut allow, "I understand and want to proceed")
+                        .changed()
+                    {
                         self.dispatch(Action::Settings(SettingsAction::SetAllowD2Install(allow)));
                     }
 
                     ui.add_space(12.0);
 
                     ui.horizontal(|ui| {
-                        let can_install = self.state.allow_d2_install && !self.state.is_d2_installing;
-                        if ui.add_enabled(can_install, egui::Button::new("Install Automatically")).clicked() {
+                        let can_install =
+                            self.state.allow_d2_install && !self.state.is_d2_installing;
+                        if ui
+                            .add_enabled(can_install, egui::Button::new("Install Automatically"))
+                            .clicked()
+                        {
                             self.dispatch(Action::Settings(SettingsAction::RequestD2Install));
                         }
                     });
@@ -236,7 +207,6 @@ impl LaReviewApp {
                     self.ui_copyable_command(ui, "Manual Install Command", install_cmd);
                 }
 
-                // Installation Progress & Logs
                 if self.state.is_d2_installing {
                     ui.add_space(12.0);
                     ui.horizontal(|ui| {
@@ -254,10 +224,12 @@ impl LaReviewApp {
                                 .max_height(150.0)
                                 .show(ui, |ui| {
                                     ui.add(
-                                        egui::TextEdit::multiline(&mut self.state.d2_install_output.as_str())
-                                            .font(egui::TextStyle::Monospace)
-                                            .desired_width(f32::INFINITY)
-                                            .lock_focus(true) // Read-only feel
+                                        egui::TextEdit::multiline(
+                                            &mut self.state.d2_install_output.as_str(),
+                                        )
+                                        .font(egui::TextStyle::Monospace)
+                                        .desired_width(f32::INFINITY)
+                                        .lock_focus(true),
                                     );
                                 });
                         });

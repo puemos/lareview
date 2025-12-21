@@ -5,22 +5,14 @@ use eframe::egui;
 
 impl LaReviewApp {
     pub fn ui_repos(&mut self, ui: &mut egui::Ui) {
-        let side_margin = spacing::SPACING_SM;
-        let content_rect = ui
-            .available_rect_before_wrap()
-            .shrink2(egui::vec2(side_margin, 0.0));
-        let mut content_ui = ui.new_child(egui::UiBuilder::new().max_rect(content_rect));
-        content_ui.set_clip_rect(content_rect);
-        let ui = &mut content_ui;
-
-        ui.add_space(spacing::SPACING_LG);
-
         let theme = theme::current_theme();
 
-        // --- Linked Repositories Section ---
-        egui::Frame::group(ui.style())
-            .fill(theme.bg_secondary)
-            .inner_margin(spacing::SPACING_LG)
+        // --- Header Section ---
+        egui::Frame::NONE
+            .inner_margin(egui::Margin::symmetric(
+                spacing::SPACING_LG as i8,
+                spacing::SPACING_MD as i8,
+            ))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
                     ui.strong("Linked Repositories");
@@ -30,40 +22,66 @@ impl LaReviewApp {
                         }
                     });
                 });
+            });
 
-                ui.add_space(spacing::SPACING_MD);
+        ui.separator();
 
-                if self.state.linked_repos.is_empty() {
+        // --- Content Section ---
+        if self.state.linked_repos.is_empty() {
+            egui::Frame::NONE
+                .inner_margin(egui::Margin::symmetric(
+                    spacing::SPACING_LG as i8,
+                    spacing::SPACING_MD as i8,
+                ))
+                .show(ui, |ui| {
                     ui.weak("No repositories linked. Link a local Git repo to allow the agent to read file contents.");
-                } else {
-                    for repo in self.state.linked_repos.clone() {
-                        ui.group(|ui| {
-                            ui.horizontal(|ui| {
-                                ui.vertical(|ui| {
-                                    ui.label(egui::RichText::new(&repo.name).strong());
-                                    ui.monospace(repo.path.to_string_lossy());
-                                });
-
-                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                    if ui.button("✖ Unlink").clicked() {
-                                        self.dispatch(Action::Settings(SettingsAction::UnlinkRepository(repo.id.clone())));
-                                    }
-                                });
+                });
+        } else {
+            let total_repos = self.state.linked_repos.len();
+            for (index, repo) in self.state.linked_repos.clone().into_iter().enumerate() {
+                egui::Frame::NONE
+                    .inner_margin(egui::Margin::symmetric(
+                        spacing::SPACING_LG as i8,
+                        spacing::SPACING_MD as i8,
+                    ))
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.vertical(|ui| {
+                                ui.label(egui::RichText::new(&repo.name).strong());
+                                ui.monospace(repo.path.to_string_lossy());
                             });
 
-                            if !repo.remotes.is_empty() {
-                                ui.add_space(spacing::SPACING_XS);
-                                ui.horizontal(|ui| {
-                                    ui.weak("Remotes: ");
-                                    for remote in &repo.remotes {
-                                        ui.label(egui::RichText::new(remote).small().color(theme.text_disabled));
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    if ui.button("✖ Unlink").clicked() {
+                                        self.dispatch(Action::Settings(
+                                            SettingsAction::UnlinkRepository(repo.id.clone()),
+                                        ));
                                     }
-                                });
-                            }
+                                },
+                            );
                         });
-                        ui.add_space(spacing::SPACING_SM);
-                    }
+
+                        if !repo.remotes.is_empty() {
+                            ui.add_space(spacing::SPACING_XS);
+                            ui.horizontal(|ui| {
+                                ui.weak("Remotes: ");
+                                for remote in &repo.remotes {
+                                    ui.label(
+                                        egui::RichText::new(remote)
+                                            .small()
+                                            .color(theme.text_disabled),
+                                    );
+                                }
+                            });
+                        }
+                    });
+
+                if index + 1 < total_repos {
+                    ui.separator();
                 }
-            });
+            }
+        }
     }
 }

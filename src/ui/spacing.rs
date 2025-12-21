@@ -9,8 +9,8 @@
 /// Extra small spacing value (4px)
 pub const SPACING_XS: f32 = 4.0;
 
-/// Thin resize handle width (2px)
-pub const RESIZE_HANDLE_WIDTH: f32 = 2.0;
+/// Thin resize handle width (1px)
+pub const RESIZE_HANDLE_WIDTH: f32 = 1.0;
 
 /// Small spacing value (8px)
 pub const SPACING_SM: f32 = 8.0;

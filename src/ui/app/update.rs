@@ -67,16 +67,18 @@ impl eframe::App for LaReviewApp {
 
         self.render_header(ctx);
 
-        egui::CentralPanel::default().show(ctx, |ui| {
-            egui::ScrollArea::vertical()
-                .auto_shrink([false; 2])
-                .show(ui, |ui| match self.state.current_view {
-                    AppView::Generate => self.ui_generate(ui),
-                    AppView::Review => self.ui_review(ui),
-                    AppView::Repos => self.ui_repos(ui),
-                    AppView::Settings => self.ui_settings(ui),
-                });
-        });
+        egui::CentralPanel::default()
+            .frame(egui::Frame::NONE.fill(theme.bg_primary))
+            .show(ctx, |ui| {
+                egui::ScrollArea::vertical()
+                    .auto_shrink([false; 2])
+                    .show(ui, |ui| match self.state.current_view {
+                        AppView::Generate => self.ui_generate(ui),
+                        AppView::Review => self.ui_review(ui),
+                        AppView::Repos => self.ui_repos(ui),
+                        AppView::Settings => self.ui_settings(ui),
+                    });
+            });
 
         self.render_full_diff_overlay(ctx);
         self.render_export_preview_overlay(ctx);
