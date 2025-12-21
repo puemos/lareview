@@ -1,3 +1,4 @@
+use super::comment_ingest::save_agent_comment;
 use super::config::ServerConfig;
 use super::logging::log_to_file;
 use super::task_ingest::{save_task, update_review_metadata};
@@ -193,6 +194,54 @@ pub(super) fn create_finalize_review_tool(config: Arc<ServerConfig>) -> impl Too
          Call this once at the end of your analysis after all tasks have been submitted via return_task.",
     )
     .with_schema(review_metadata_schema())
+}
+
+/// Create the add_comment tool for submitting inline comments.
+pub(super) fn create_add_comment_tool(config: Arc<ServerConfig>) -> impl ToolHandler {
+    SimpleTool::new("add_comment", move |args: Value, _extra| {
+        let config = config.clone();
+        Box::pin(async move {
+            log_to_file(&config, "add_comment called");
+            let persist_args = args.clone();
+
+            let persist_config = config.clone();
+            let persist_result = tokio::task::spawn_blocking(move || {
+                save_agent_comment(&persist_config, persist_args)
+            })
+            .await;
+
+            match persist_result {
+                Ok(Ok(thread_id)) => {
+                    log_to_file(
+                        &config,
+                        &format!("AddCommentTool persisted thread: {}", thread_id),
+                    );
+                    Ok(json!({ "status": "ok", "message": "Comment added successfully", "thread_id": thread_id }))
+                },
+                Ok(Err(err)) => {
+                    log_to_file(
+                        &config,
+                        &format!("AddCommentTool failed to save comment: {err:?}"),
+                    );
+                    Err(pmcp::Error::Validation(format!("invalid add_comment payload: {err}")))
+                }
+                Err(join_err) => {
+                    log_to_file(
+                        &config,
+                        &format!("AddCommentTool task join error: {join_err}"),
+                    );
+                    Err(pmcp::Error::Internal(format!(
+                        "add_comment persistence join error: {join_err}"
+                    )))
+                }
+            }
+        })
+    })
+    .with_description(
+        "Add a specific, inline comment on a file line. Use this for targeted feedback (nitpicks, questions, suggestions) \
+         that doesn't warrant a full task. Requires file, line, body. Optional title, impact, task_id.",
+    )
+    .with_schema(add_comment_schema())
 }
 
 #[derive(Debug, Deserialize)]
@@ -729,5 +778,44 @@ fn review_metadata_schema() -> Value {
             }
         },
         "required": ["title"]
+    })
+}
+
+fn add_comment_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "file": {
+                "type": "string",
+                "description": "Path to the file relative to repo root."
+            },
+            "line": {
+                "type": "integer",
+                "description": "Line number where the comment applies."
+            },
+            "side": {
+                "type": "string",
+                "enum": ["old", "new"],
+                "description": "Which side of the diff (default: new)."
+            },
+            "body": {
+                "type": "string",
+                "description": "The comment content (Markdown supported)."
+            },
+            "title": {
+                "type": "string",
+                "description": "Short summary of the comment."
+            },
+            "impact": {
+                "type": "string",
+                "enum": ["nitpick", "blocking", "nice_to_have"],
+                "description": "Severity of the comment (default: nitpick)."
+            },
+            "task_id": {
+                "type": "string",
+                "description": "Optional: Link this comment to a specific task ID."
+            }
+        },
+        "required": ["file", "line", "body"]
     })
 }

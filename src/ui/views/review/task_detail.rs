@@ -295,14 +295,14 @@ impl LaReviewApp {
 
     fn render_description_tab(&mut self, ui: &mut egui::Ui, task: &crate::domain::ReviewTask) {
         let max_width = 720.0;
-
+        let diff_width = ui.available_width() - max_width;
         ui.vertical(|ui| {
             // Maximized paragraph spacing for "airy" feel
             ui.spacing_mut().item_spacing.y = 28.0;
 
             ui.horizontal(|ui| {
-                ui.set_max_width(max_width);
                 ui.vertical(|ui| {
+                    ui.set_max_width(max_width);
                     // Description
                     let description = crate::infra::normalize_newlines(&task.description);
 
@@ -310,14 +310,12 @@ impl LaReviewApp {
                     ui.scope(|ui| {
                         ui.style_mut().override_text_style = Some(egui::TextStyle::Body);
 
-                        // 16px proportional for main body
-                        let body_font_id = egui::FontId::proportional(16.0);
+                        let body_font_id = egui::FontId::proportional(13.0);
                         ui.style_mut()
                             .text_styles
                             .insert(egui::TextStyle::Body, body_font_id);
 
-                        // 14.5px monospace for code - balanced with body to avoid overlap
-                        let mono_font_id = egui::FontId::monospace(14.5);
+                        let mono_font_id = egui::FontId::monospace(13.0);
                         ui.style_mut()
                             .text_styles
                             .insert(egui::TextStyle::Monospace, mono_font_id);
@@ -327,9 +325,9 @@ impl LaReviewApp {
                         ui.spacing_mut().indent = 16.0;
 
                         // Theme-integrated colors for markdown elements
-                        ui.visuals_mut().override_text_color = Some(current_theme().text_primary);
+                        ui.visuals_mut().override_text_color = Some(current_theme().text_secondary);
                         ui.visuals_mut().widgets.noninteractive.fg_stroke.color =
-                            current_theme().text_primary;
+                            current_theme().text_secondary;
                         ui.visuals_mut().extreme_bg_color = current_theme().bg_tertiary; // Code blocks
                         ui.visuals_mut().widgets.noninteractive.bg_fill =
                             current_theme().bg_tertiary; // Other elements
@@ -368,16 +366,9 @@ impl LaReviewApp {
 
                                         ui.horizontal(|ui| {
                                             ui.label(
-                                                egui::RichText::new(
-                                                    egui_phosphor::regular::SPARKLE,
-                                                )
-                                                .size(16.0)
-                                                .color(current_theme().warning),
-                                            );
-                                            ui.label(
-                                                egui::RichText::new("AI Insight")
+                                                egui::RichText::new("Insight")
                                                     .strong()
-                                                    .size(16.0)
+                                                    .size(13.0)
                                                     .color(current_theme().warning),
                                             );
                                         });
@@ -398,12 +389,12 @@ impl LaReviewApp {
                                             ui.visuals_mut().extreme_bg_color =
                                                 current_theme().bg_surface; // Slightly different for contrast
 
-                                            let body_font_id = egui::FontId::proportional(15.0);
+                                            let body_font_id = egui::FontId::proportional(13.0);
                                             ui.style_mut()
                                                 .text_styles
                                                 .insert(egui::TextStyle::Body, body_font_id);
 
-                                            let mono_font_id = egui::FontId::monospace(13.5);
+                                            let mono_font_id = egui::FontId::monospace(13.0);
                                             ui.style_mut()
                                                 .text_styles
                                                 .insert(egui::TextStyle::Monospace, mono_font_id);
@@ -420,6 +411,7 @@ impl LaReviewApp {
                         }
                     });
                 });
+                ui.allocate_space(egui::vec2(diff_width, 0.0));
             });
         });
     }

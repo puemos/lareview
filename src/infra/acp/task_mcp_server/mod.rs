@@ -4,6 +4,7 @@
 //! It also supports legacy bulk tools for backward compatibility.
 //! The server runs over stdio so the ACP agent can launch it as an MCP server.
 
+mod comment_ingest;
 mod config;
 mod logging;
 mod parsing;
@@ -41,6 +42,7 @@ pub async fn run_task_mcp_server() -> pmcp::Result<()> {
             "finalize_review",
             tool::create_finalize_review_tool(config.clone()),
         )
+        .tool("add_comment", tool::create_add_comment_tool(config.clone()))
         .build()?;
 
     logging::log_to_file(&config, "running task MCP server on stdio (line-delimited)");

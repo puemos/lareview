@@ -90,7 +90,7 @@ impl LaReviewApp {
                             ui,
                             AppView::Repos,
                             "Repos",
-                            icons::GIT_BRANCH,
+                            icons::FOLDER,
                             tab_width,
                             nav_rounding,
                         );

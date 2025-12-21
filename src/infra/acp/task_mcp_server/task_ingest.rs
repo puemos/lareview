@@ -100,7 +100,7 @@ fn validate_task_diagram(task: &ReviewTask) -> Result<()> {
     Ok(())
 }
 
-fn open_database(config: &ServerConfig) -> Result<Database> {
+pub(super) fn open_database(config: &ServerConfig) -> Result<Database> {
     if let Some(path) = &config.db_path {
         Database::open_at(path.clone()).context("open database")
     } else {

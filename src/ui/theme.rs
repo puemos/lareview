@@ -3,12 +3,12 @@
 //! Theme definitions for LaReview
 //!
 //! This module provides semantic color names built on top of the Catppuccin Mocha palette
-//! following shadcn/ui best practices for consistent and accessible theming throughout the application.
+//! for consistent and accessible theming throughout the application.
 
 use catppuccin_egui::MOCHA;
 use eframe::egui;
 
-/// Semantic color theme that builds upon the Catppuccin Mocha palette following shadcn/ui best practices
+/// Semantic color theme that builds upon the Catppuccin Mocha palette
 #[derive(Debug, Clone, Copy)]
 pub struct Theme {
     // Background colors with matching text colors for accessibility
@@ -95,7 +95,7 @@ pub struct Theme {
 }
 
 impl Theme {
-    /// Creates a new theme based on the Catppuccin Mocha palette following shadcn/ui best practices
+    /// Creates a new theme based on the Catppuccin Mocha palette
     pub fn mocha() -> Self {
         Self {
             // Background-text pairs for accessibility
