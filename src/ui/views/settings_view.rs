@@ -6,6 +6,10 @@ use crate::ui::theme;
 
 impl LaReviewApp {
     pub fn ui_settings(&mut self, ui: &mut egui::Ui) {
+        if ui.available_width() < 100.0 {
+            return;
+        }
+
         let theme = theme::current_theme();
 
         // --- GitHub Section ---

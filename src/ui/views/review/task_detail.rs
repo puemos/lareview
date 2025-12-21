@@ -19,6 +19,12 @@ impl LaReviewApp {
         ui: &mut egui::Ui,
         task: &crate::domain::ReviewTask,
     ) {
+        // Safety: ensure enough width for margins
+        let min_width = spacing::SPACING_XL * 2.0 + 10.0;
+        if ui.available_width() < min_width {
+            return;
+        }
+
         egui::Frame::NONE
             .inner_margin(egui::Margin::symmetric(
                 spacing::SPACING_XL as i8,

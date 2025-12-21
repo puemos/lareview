@@ -41,15 +41,29 @@ impl LaReviewApp {
             title_text = title_text.color(current_theme().text_muted).strikethrough();
         }
 
+        // Safety: If available width is less than the margin, we might panic on child allocation.
+        let min_needed_width = spacing::SPACING_SM + 4.0;
+        if ui.available_width() < min_needed_width {
+            return;
+        }
+
+        let avail = ui.available_width();
         let response = egui::Frame::NONE
             .fill(bg_color)
-            .corner_radius(crate::ui::spacing::RADIUS_MD)
-            .inner_margin(egui::Margin::symmetric(
-                spacing::SPACING_SM as i8,
-                (spacing::SPACING_XS + 1.0) as i8,
-            ))
+            .corner_radius(egui::CornerRadius {
+                nw: crate::ui::spacing::RADIUS_MD,
+                ne: 0,
+                sw: crate::ui::spacing::RADIUS_MD,
+                se: 0,
+            })
+            .inner_margin(egui::Margin {
+                left: spacing::SPACING_SM as i8,
+                right: 0,
+                top: (spacing::SPACING_XS + 1.0) as i8,
+                bottom: (spacing::SPACING_XS + 1.0) as i8,
+            })
             .show(ui, |ui| {
-                ui.set_width(ui.available_width());
+                ui.set_min_width(avail);
                 ui.horizontal(|ui| {
                     // Navigation: risk + crossed title (when closed)
                     ui.label(egui::RichText::new(risk_icon).size(15.0).color(risk_color))

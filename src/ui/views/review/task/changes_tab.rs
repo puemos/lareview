@@ -9,6 +9,10 @@ impl LaReviewApp {
         ui: &mut egui::Ui,
         task: &crate::domain::ReviewTask,
     ) {
+        if ui.available_width() < 50.0 {
+            return;
+        }
+
         let unified_diff = match &self.state.cached_unified_diff {
             Some((cached_diff_refs, diff_string)) if cached_diff_refs == &task.diff_refs => {
                 diff_string.clone()

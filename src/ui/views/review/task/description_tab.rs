@@ -13,7 +13,7 @@ impl LaReviewApp {
             .inner_margin(spacing::SPACING_XL)
             .show(ui, |ui| {
                 let max_width = 720.0;
-                let diff_width = ui.available_width() - max_width;
+                let diff_width = (ui.available_width() - max_width).max(0.0);
                 ui.vertical(|ui| {
                     ui.spacing_mut().item_spacing.y = 28.0;
 

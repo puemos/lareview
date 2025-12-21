@@ -8,6 +8,10 @@ impl LaReviewApp {
         ui: &mut egui::Ui,
         task: &crate::domain::ReviewTask,
     ) {
+        if ui.available_width() < 50.0 {
+            return;
+        }
+
         egui::Frame::NONE
             .inner_margin(spacing::SPACING_XL)
             .show(ui, |ui| {

@@ -11,6 +11,9 @@ pub fn status_label(ui: &mut egui::Ui, text: &str, color: egui::Color32) {
 
 /// Common error banner component
 pub fn error_banner(ui: &mut egui::Ui, error_message: &str) {
+    if ui.available_width() < 50.0 {
+        return;
+    }
     let theme = theme::current_theme();
     egui::Frame::new()
         .fill(theme.destructive.gamma_multiply(0.2))

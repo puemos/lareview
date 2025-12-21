@@ -25,6 +25,10 @@ enum RightPaneState {
 
 impl LaReviewApp {
     pub fn ui_review(&mut self, ui: &mut egui::Ui) {
+        if ui.available_width() < 100.0 {
+            return;
+        }
+
         // --- 1. Data Preparation ---
         let tasks_by_sub_flow = self.state.tasks_by_sub_flow();
         let display_order_tasks = tasks_in_display_order(&tasks_by_sub_flow);
@@ -198,14 +202,19 @@ impl LaReviewApp {
         let saved_tree_width = ui
             .memory(|mem| mem.data.get_temp::<f32>(tree_width_id))
             .unwrap_or(280.0);
-        let max_tree_width = available_width * 0.45;
+        let max_tree_width = (available_width - 100.0).max(0.0); // Leave at least 100px for center
         let tree_width = crate::ui::layout::clamp_width(saved_tree_width, 220.0, max_tree_width);
 
-        let resize_handle_width = 8.0; // wider logical hit-box, visual line will be thin
+        let resize_handle_width = 8.0;
 
         // Rect Definitions
-        // Safety: Ensure left pane + resize handle doesn't exceed available width
-        let safe_tree_width = tree_width.min((available_width - resize_handle_width).max(0.0));
+        // Minimum width to avoid negative size panics (2 * SPACING_MD + some buffer)
+        let min_viable_width = spacing::SPACING_MD * 2.0 + 10.0;
+        let safe_tree_width = if available_width > min_viable_width + 50.0 {
+            tree_width.min(available_width - 50.0).max(0.0)
+        } else {
+            0.0
+        };
 
         let left_rect = egui::Rect::from_min_size(
             available_rect.min,
@@ -226,15 +235,23 @@ impl LaReviewApp {
         );
 
         // --- A. Left Panel (Navigation Tree) ---
-        {
+        if safe_tree_width > min_viable_width {
             let mut left_ui = ui.new_child(egui::UiBuilder::new().max_rect(left_rect));
             // Slight contrast for navigation panel
             egui::Frame::NONE
-                .inner_margin(spacing::SPACING_MD)
+                .inner_margin(egui::Margin {
+                    left: (spacing::SPACING_SM + 2.0) as i8,
+                    right: 0,
+                    top: spacing::SPACING_MD as i8,
+                    bottom: spacing::SPACING_MD as i8,
+                })
                 .show(&mut left_ui, |ui| {
+                    ui.spacing_mut().item_spacing.x = 0.0;
                     egui::ScrollArea::vertical()
                         .id_salt("nav_tree_scroll")
+                        .auto_shrink([false, false])
                         .show(ui, |ui| {
+                            ui.spacing_mut().item_spacing.x = 0.0;
                             self.render_navigation_tree(ui, &tasks_by_sub_flow);
                         });
                 });
@@ -428,7 +445,10 @@ impl LaReviewApp {
         }
 
         ui.spacing_mut().item_spacing = egui::vec2(0.0, spacing::SPACING_SM);
-        ui.visuals_mut().indent_has_left_vline = false;
+        ui.spacing_mut().indent = 12.0;
+        ui.visuals_mut().indent_has_left_vline = true;
+        ui.visuals_mut().widgets.noninteractive.bg_stroke =
+            egui::Stroke::new(1.0, current_theme().border);
 
         for (sub_flow_name, tasks) in sub_flows {
             let title = sub_flow_name.as_deref().unwrap_or("UNCATEGORIZED");
@@ -478,6 +498,7 @@ impl LaReviewApp {
                 });
             })
             .body(|ui| {
+                ui.set_width(ui.available_width());
                 ui.spacing_mut().item_spacing = egui::vec2(0.0, spacing::SPACING_XS);
                 for task in tasks_in_sub_flow_display_order(tasks) {
                     self.render_nav_item(ui, task);
@@ -525,6 +546,10 @@ impl LaReviewApp {
                 self.render_ready_state(ui, next_open_id);
             }
             RightPaneState::AllDone => {
+                let min_width = spacing::SPACING_XL * 2.0 + 10.0;
+                if ui.available_width() < min_width {
+                    return;
+                }
                 egui::Frame::NONE
                     .inner_margin(spacing::SPACING_XL)
                     .show(ui, |ui| {
@@ -549,6 +574,12 @@ impl LaReviewApp {
 
     /// Screen shown when tasks exist but none are selected
     fn render_ready_state(&mut self, ui: &mut egui::Ui, next_open_id: Option<String>) {
+        // Safety: ensure enough width for margins
+        let min_width = spacing::SPACING_XL * 2.0 + 10.0;
+        if ui.available_width() < min_width {
+            return;
+        }
+
         // Keyboard shortcuts logic
         let mut trigger_primary = false;
         if ui.input(|i| i.key_pressed(egui::Key::Enter) && !i.modifiers.shift) {

@@ -5,6 +5,10 @@ use eframe::egui;
 
 impl LaReviewApp {
     pub fn ui_repos(&mut self, ui: &mut egui::Ui) {
+        if ui.available_width() < 100.0 {
+            return;
+        }
+
         let theme = theme::current_theme();
 
         // --- Header Section ---

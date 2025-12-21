@@ -15,6 +15,10 @@ impl LaReviewApp {
             egui::Rect::from_min_size(egui::Pos2::new(0.0, 0.0), rect.size())
         });
 
+        if viewport_rect.width() < 100.0 || viewport_rect.height() < 100.0 {
+            return;
+        }
+
         let mut open = true;
         let outer_padding = egui::vec2(spacing::SPACING_MD, spacing::SPACING_SM);
 
@@ -60,6 +64,11 @@ impl LaReviewApp {
             let rect = ctx.available_rect();
             egui::Rect::from_min_size(egui::Pos2::new(0.0, 0.0), rect.size())
         });
+
+        if viewport_rect.width() < 100.0 || viewport_rect.height() < 100.0 {
+            return;
+        }
+
         let outer_padding = egui::vec2(spacing::SPACING_SM, spacing::SPACING_SM);
 
         egui::Window::new("Export Review Preview")

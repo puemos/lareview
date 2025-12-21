@@ -9,6 +9,10 @@ use eframe::egui;
 
 impl LaReviewApp {
     pub fn ui_generate(&mut self, ui: &mut egui::Ui) {
+        if ui.available_width() < 100.0 {
+            return;
+        }
+
         let mut trigger_generate = false;
         let mut trigger_reset = false;
         // New: Trigger for auto-fetching PRs
@@ -97,41 +101,13 @@ impl LaReviewApp {
                                         || input_trimmed.starts_with("diff --git ")
                                         || input_trimmed.starts_with("--- a/"));
 
-                                // -- TOOLBAR --
-                                ui.horizontal(|ui| {
-                                    ui.heading(
-                                        egui::RichText::new("INPUT")
-                                            .size(16.0)
-                                            .color(current_theme().text_primary),
-                                    );
 
-                                    ui.with_layout(
-                                        egui::Layout::right_to_left(egui::Align::Center),
-                                        |ui| {
-                                            if ui
-                                                .button(
-                                                    egui::RichText::new(format!(
-                                                        "{} New",
-                                                        egui_phosphor::regular::PLUS
-                                                    ))
-                                                    .color(current_theme().success),
-                                                )
-                                                .clicked()
-                                            {
-                                                trigger_reset = true;
-                                            }
-                                        },
-                                    );
-                                });
 
-                                ui.add_space(spacing::SPACING_XS);
 
                                 // -- UNIFIED CONTENT AREA --
                                 egui::Frame::new()
                                     .fill(current_theme().bg_primary)
                                     .inner_margin(egui::Margin::same(spacing::SPACING_XS as i8))
-                                    .stroke(egui::Stroke::new(1.0, current_theme().border))
-                                    .corner_radius(crate::ui::spacing::RADIUS_MD)
                                     .show(ui, |ui| {
                                         // Loading Spinner Override
                                         if self.state.is_preview_fetching && !is_from_github {
@@ -264,7 +240,7 @@ impl LaReviewApp {
             {
                 let new_right_width = content_width - (pointer_pos.x - left_rect.min.x);
                 let clamped_width =
-                    crate::ui::layout::clamp_width(new_right_width, 250.0, content_width * 0.5);
+                    crate::ui::layout::clamp_width(new_right_width, 450.0, content_width * 0.5);
                 ui.memory_mut(|mem| {
                     mem.data.insert_temp(pane_width_id, clamped_width);
                 });
@@ -297,14 +273,6 @@ impl LaReviewApp {
                             ui.spacing_mut().item_spacing =
                                 egui::vec2(spacing::BUTTON_PADDING.0, spacing::BUTTON_PADDING.1);
 
-                            ui.horizontal(|ui| {
-                                ui.heading(
-                                    egui::RichText::new("AGENT")
-                                        .size(16.0)
-                                        .color(current_theme().text_primary),
-                                );
-                            });
-
                             if let Some(err) = &self.state.generation_error {
                                 ui.add_space(spacing::SPACING_XS);
 
@@ -316,9 +284,9 @@ impl LaReviewApp {
                             // --- Integrated Control Panel ---
 
                             egui::Frame::new()
-                                .stroke(egui::Stroke::new(1.0, current_theme().border))
-                                .corner_radius(crate::ui::spacing::RADIUS_MD)
-                                .inner_margin(spacing::SPACING_SM as i8)
+                                // .stroke(egui::Stroke::new(1.0, current_theme().border))
+                                // .corner_radius(crate::ui::spacing::RADIUS_MD)
+                                // .inner_margin(spacing::SPACING_SM as i8)
                                 .show(ui, |ui| {
                                     ui.vertical(|ui| {
                                         // 1. Configuration Row: Agent & Repo side-by-side
@@ -357,58 +325,44 @@ impl LaReviewApp {
 
                                         ui.add_space(spacing::SPACING_SM);
 
-                                        let btn = cyber_button(
-                                            ui,
-                                            "RUN AGENT",
-                                            run_enabled,
-                                            self.state.is_generating,
-                                        );
+                                        ui.horizontal(|ui| {
+                                            ui.spacing_mut().item_spacing.x = spacing::SPACING_SM;
 
-                                        if btn.clicked() && run_enabled {
-                                            trigger_generate = true;
-                                        }
+                                            let reset_width = 80.0;
+                                            let run_width = ui.available_width()
+                                                - reset_width
+                                                - ui.spacing().item_spacing.x;
+
+                                            let btn = cyber_button(
+                                                ui,
+                                                "RUN AGENT",
+                                                run_enabled,
+                                                self.state.is_generating,
+                                                None,
+                                                Some(run_width),
+                                            );
+
+                                            if btn.clicked() && run_enabled {
+                                                trigger_generate = true;
+                                            }
+
+                                            let reset_btn = cyber_button(
+                                                ui,
+                                                "RESET",
+                                                true,
+                                                false,
+                                                Some(egui::Color32::from_rgb(200, 60, 60)),
+                                                Some(reset_width),
+                                            );
+
+                                            if reset_btn.clicked() {
+                                                trigger_reset = true;
+                                            }
+                                        });
                                     });
                                 });
 
                             ui.add_space(spacing::SPACING_SM);
-
-                            // Status Section
-
-                            egui::Frame::group(ui.style())
-                                .inner_margin(egui::Margin::symmetric(
-                                    spacing::SPACING_SM as i8,
-                                    spacing::SPACING_XS as i8,
-                                ))
-                                .show(ui, |ui| {
-                                    ui.horizontal(|ui| {
-                                        ui.label(
-                                            egui::RichText::new("STATUS")
-                                                .size(11.0)
-                                                .color(current_theme().text_muted),
-                                        );
-
-                                        ui.with_layout(
-                                            egui::Layout::right_to_left(egui::Align::Center),
-                                            |ui| {
-                                                ui.add_space(spacing::SPACING_XS);
-
-                                                let status_text = if self.state.is_generating {
-                                                    "Agent is working..."
-                                                } else if self.state.diff_text.trim().is_empty() {
-                                                    "Waiting for input..."
-                                                } else {
-                                                    "Ready."
-                                                };
-
-                                                ui.label(
-                                                    egui::RichText::new(status_text)
-                                                        .color(current_theme().text_muted)
-                                                        .size(12.0),
-                                                );
-                                            },
-                                        );
-                                    });
-                                });
 
                             // Plan Section
 

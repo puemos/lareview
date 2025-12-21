@@ -1,13 +1,20 @@
 use crate::ui::theme::current_theme;
 use egui::{Color32, FontId, Rect, Response, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
 
-pub fn cyber_button(ui: &mut Ui, text: &str, enabled: bool, is_generating: bool) -> Response {
+pub fn cyber_button(
+    ui: &mut Ui,
+    text: &str,
+    enabled: bool,
+    is_generating: bool,
+    color: Option<Color32>,
+    fixed_width: Option<f32>,
+) -> Response {
     let theme = current_theme();
     let time = ui.input(|i| i.time);
 
     // 1. Layout Specs
     let height = 32.0;
-    let width = ui.available_width();
+    let width = fixed_width.unwrap_or_else(|| ui.available_width());
     let (rect, response) = ui.allocate_exact_size(
         vec2(width, height),
         if enabled {
@@ -20,6 +27,9 @@ pub fn cyber_button(ui: &mut Ui, text: &str, enabled: bool, is_generating: bool)
     // Repaint triggers for animations
     if is_generating || (response.hovered() && enabled) {
         ui.ctx().request_repaint();
+        if enabled {
+            ui.output_mut(|o| o.cursor_icon = egui::CursorIcon::PointingHand);
+        }
     }
 
     let hover_ratio = ui
@@ -31,12 +41,15 @@ pub fn cyber_button(ui: &mut Ui, text: &str, enabled: bool, is_generating: bool)
     }
 
     let painter = ui.painter();
+    let accent_color = color.unwrap_or(theme.brand);
 
     // --- 2. BACKGROUND & ACCENT ---
     let bg_color = if is_generating {
         theme.bg_secondary.gamma_multiply(0.4)
     } else if enabled {
-        theme.bg_card.lerp_to_gamma(theme.brand, hover_ratio * 0.08)
+        theme
+            .bg_card
+            .lerp_to_gamma(accent_color, hover_ratio * 0.08)
     } else {
         theme.bg_muted.gamma_multiply(0.3)
     };
@@ -46,9 +59,9 @@ pub fn cyber_button(ui: &mut Ui, text: &str, enabled: bool, is_generating: bool)
     // Status Notch (Left Edge)
     let notch_rect = Rect::from_min_size(rect.min, vec2(2.0, rect.height()));
     let notch_color = if is_generating {
-        theme.brand.linear_multiply((time * 8.0).sin().abs() as f32)
+        accent_color.linear_multiply((time * 8.0).sin().abs() as f32)
     } else if enabled {
-        theme.brand.gamma_multiply(0.4 + (hover_ratio * 0.6))
+        accent_color.gamma_multiply(0.4 + (hover_ratio * 0.6))
     } else {
         theme.border.gamma_multiply(0.5)
     };
@@ -56,7 +69,7 @@ pub fn cyber_button(ui: &mut Ui, text: &str, enabled: bool, is_generating: bool)
 
     // Border
     let border_color = if enabled {
-        theme.border.lerp_to_gamma(theme.brand, hover_ratio)
+        theme.border.lerp_to_gamma(accent_color, hover_ratio)
     } else {
         theme.border.gamma_multiply(0.2)
     };
@@ -71,9 +84,14 @@ pub fn cyber_button(ui: &mut Ui, text: &str, enabled: bool, is_generating: bool)
     let content_color = if is_generating {
         theme.text_accent
     } else if enabled {
-        theme
-            .text_primary
-            .lerp_to_gamma(theme.text_accent, hover_ratio)
+        theme.text_primary.lerp_to_gamma(
+            if color.is_some() {
+                accent_color
+            } else {
+                theme.text_accent
+            },
+            hover_ratio,
+        )
     } else {
         theme.text_disabled
     };
@@ -98,22 +116,34 @@ pub fn cyber_button(ui: &mut Ui, text: &str, enabled: bool, is_generating: bool)
                 radius_min: 2.0,
                 radius_max: 5.0,
                 time,
-                color: theme.brand,
+                color: accent_color,
                 n_arms: 4,
                 stroke_width: 1.2,
             },
         );
     } else {
-        // Static Diamond (Idle)
-        // When hovered, it slowly rotates 45 degrees
+        // Dynamic Diamond (One-shot animation on hover)
+        let is_custom = color.is_some();
+
+        // Use hover_ratio to drive a "one-shot" feel.
+        // sin(ratio * PI) goes 0 -> 1 -> 0, creating a perfect pulse.
+        let pulse = 1.0 + (hover_ratio * std::f32::consts::PI).sin() * 0.2;
+
         let angle = if enabled {
-            hover_ratio * std::f32::consts::PI / 4.0
+            if is_custom {
+                // Reset: A satisfying 180-degree flip
+                hover_ratio * std::f32::consts::PI
+            } else {
+                // Run: Professional 45-degree shift
+                hover_ratio * std::f32::consts::PI / 4.0
+            }
         } else {
             0.0
         };
+
         let cos_a = angle.cos();
         let sin_a = angle.sin();
-        let r = 4.0;
+        let r = 4.0 * pulse;
 
         let corners = [vec2(0.0, -r), vec2(r, 0.0), vec2(0.0, r), vec2(-r, 0.0)].map(|v| {
             let rx = v.x * cos_a - v.y * sin_a;
@@ -127,9 +157,9 @@ pub fn cyber_button(ui: &mut Ui, text: &str, enabled: bool, is_generating: bool)
             Stroke::new(1.2, content_color.gamma_multiply(0.8)),
         ));
 
-        // Add a tiny dot in center if hovered
-        if hover_ratio > 0.1 {
-            painter.circle_filled(icon_center, 1.0 * hover_ratio, theme.brand);
+        // Center dot also pulses
+        if hover_ratio > 0.01 {
+            painter.circle_filled(icon_center, 1.0 * hover_ratio * pulse, accent_color);
         }
     }
 

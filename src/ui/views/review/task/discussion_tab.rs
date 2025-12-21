@@ -11,6 +11,10 @@ impl LaReviewApp {
         ui: &mut egui::Ui,
         task: &crate::domain::ReviewTask,
     ) {
+        if ui.available_width() < 50.0 {
+            return;
+        }
+
         if let Some(thread_ctx) = &self.state.active_thread {
             let view = crate::ui::views::review::thread_detail::ThreadDetailView {
                 task_id: task.id.clone(),

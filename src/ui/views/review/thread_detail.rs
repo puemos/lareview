@@ -21,6 +21,10 @@ pub struct ThreadDetailView {
 impl LaReviewApp {
     #[allow(dead_code)]
     pub(crate) fn render_thread_detail(&mut self, ui: &mut egui::Ui, view: &ThreadDetailView) {
+        if ui.available_width() < 50.0 {
+            return;
+        }
+
         let theme = current_theme();
 
         let mut thread = view
