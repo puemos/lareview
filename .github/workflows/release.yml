@@ -221,6 +221,12 @@ jobs:
           cd "target/${{ matrix.target }}/release"
           ditto -c -k --keepParent "LaReview.app" "../../../${{ matrix.artifact_name }}"
 
+      - name: Checksum (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          shasum -a 256 "${{ matrix.artifact_name }}" | awk '{print $1}' > "${{ matrix.artifact_name }}.sha256"
+
       - name: Package (Linux)
         if: runner.os == 'Linux'
         shell: bash
@@ -239,4 +245,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: ${{ matrix.artifact_name }}
+          files: |
+            ${{ matrix.artifact_name }}
+            ${{ matrix.artifact_name }}.sha256
