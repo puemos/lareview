@@ -1,5 +1,6 @@
 //! UI layer - GPUI components and views
 
+pub mod animations;
 pub mod app;
 pub mod components;
 pub mod diagram;

@@ -140,17 +140,16 @@ impl LaReviewApp {
                                                 available,
                                                 egui::Sense::hover(),
                                             );
-                                            ui.scope_builder(
-                                                egui::UiBuilder::new().max_rect(rect),
-                                                |ui| {
-                                                    ui.centered_and_justified(|ui| {
-                                                        ui.horizontal(|ui| {
-                                                            ui.spinner();
-                                                            ui.label("Fetching PR preview...");
-                                                        });
-                                                    });
-                                                },
+                                            let painter = ui.painter_at(rect);
+                                            crate::ui::animations::cyber::paint_cyber_loader(
+                                                &painter,
+                                                rect.center(),
+                                                "Fetching PR preview...",
+                                                ui.input(|i| i.time),
+                                                current_theme().brand,
+                                                current_theme().text_muted,
                                             );
+                                            ui.ctx().request_repaint();
                                             return;
                                         }
 

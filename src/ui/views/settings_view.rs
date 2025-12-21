@@ -210,7 +210,7 @@ impl LaReviewApp {
                 if self.state.is_d2_installing {
                     ui.add_space(12.0);
                     ui.horizontal(|ui| {
-                        ui.spinner();
+                        crate::ui::animations::cyber::cyber_spinner(ui, theme.brand);
                         ui.label("Processing...");
                     });
                 }

@@ -125,7 +125,10 @@ impl LaReviewApp {
 
                                 if self.state.is_exporting {
                                     ui.add_space(spacing::SPACING_XS);
-                                    ui.spinner();
+                                    crate::ui::animations::cyber::cyber_spinner(
+                                        ui,
+                                        current_theme().brand,
+                                    );
                                 }
                             }
 

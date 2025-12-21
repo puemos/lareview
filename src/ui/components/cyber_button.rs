@@ -91,15 +91,18 @@ pub fn cyber_button(ui: &mut Ui, text: &str, enabled: bool, is_generating: bool)
     // DRAW GEOMETRIC ICON
     if is_generating {
         // Rotating Reticle (Running)
-        let angle = (time * 6.0) as f32;
-        for i in 0..4 {
-            let arm_angle = angle + (i as f32 * std::f32::consts::PI / 2.0);
-            let direction = vec2(arm_angle.cos(), arm_angle.sin());
-            painter.line_segment(
-                [icon_center + direction * 2.0, icon_center + direction * 5.0],
-                Stroke::new(1.2, theme.brand),
-            );
-        }
+        crate::ui::animations::cyber::rotating_reticle(
+            painter,
+            crate::ui::animations::cyber::ReticleParams {
+                center: icon_center,
+                radius_min: 2.0,
+                radius_max: 5.0,
+                time,
+                color: theme.brand,
+                n_arms: 4,
+                stroke_width: 1.2,
+            },
+        );
     } else {
         // Static Diamond (Idle)
         // When hovered, it slowly rotates 45 degrees

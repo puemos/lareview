@@ -52,18 +52,15 @@ lazy_static::lazy_static! {
 
     static ref FONT_DB: Arc<fontdb::Database> = {
         let mut db = fontdb::Database::new();
-        if let Some(font_data) = crate::assets::get_content("assets/fonts/Geist.ttf") {
-            db.load_font_data(font_data.to_vec());
-        }
         if let Some(font_data) = crate::assets::get_content("assets/fonts/GeistMono.ttf") {
             db.load_font_data(font_data.to_vec());
         }
         // Set Geist as the fallback for all generic families, with Geist Mono for monospace
-        db.set_serif_family("Geist");
-        db.set_sans_serif_family("Geist");
+        db.set_serif_family("Geist Mono");
+        db.set_sans_serif_family("Geist Mono");
         db.set_monospace_family("Geist Mono");
-        db.set_cursive_family("Geist");
-        db.set_fantasy_family("Geist");
+        db.set_cursive_family("Geist Mono");
+        db.set_fantasy_family("Geist Mono");
         Arc::new(db)
     };
 }
@@ -314,28 +311,27 @@ fn render_diagram(
 ) -> Option<egui::Response> {
     match state {
         DiagramState::Loading | DiagramState::PixelsReady(_) => {
+            let theme = current_theme();
+            let time = ui.input(|i| i.time);
+
             // Use available width but force a reasonable height for centering if it's too small
             let available = ui.available_size();
             let min_height = 200.0;
             let size = egui::vec2(available.x, available.y.max(min_height));
             let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
 
-            ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
-                ui.centered_and_justified(|ui| {
-                    ui.vertical_centered(|ui| {
-                        ui.label(
-                            egui::RichText::new("Loading diagram...")
-                                .color(current_theme().text_muted),
-                        );
-                        ui.add_space(8.0);
-                        ui.add(
-                            egui::ProgressBar::new(0.0)
-                                .animate(true)
-                                .desired_width(120.0),
-                        );
-                    });
-                });
-            });
+            let painter = ui.painter_at(rect);
+            let center = rect.center();
+
+            crate::ui::animations::cyber::paint_cyber_loader(
+                &painter,
+                center,
+                "Rendering Diagram...",
+                time,
+                theme.brand,
+                theme.text_muted,
+            );
+
             ui.ctx().request_repaint();
             None
         }
