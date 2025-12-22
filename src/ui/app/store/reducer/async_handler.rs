@@ -6,7 +6,9 @@ use super::review::apply_review_data;
 
 pub fn reduce(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
     match action {
-        AsyncAction::GenerationMessage(msg) => reduce_msg(state, *msg),
+        AsyncAction::GenerationMessage(msg) => {
+            reduce_msg(&mut state.ui, &mut state.session, &mut state.domain, *msg)
+        }
         AsyncAction::GhStatusLoaded(result) => {
             state.session.is_gh_status_checking = false;
             match result {

@@ -10,10 +10,10 @@ use super::command::Command;
 
 pub fn reduce(state: &mut AppState, action: Action) -> Vec<Command> {
     match action {
-        Action::Navigation(action) => navigation::reduce(state, action),
-        Action::Generate(action) => generate::reduce(state, action),
+        Action::Navigation(action) => navigation::reduce(&mut state.ui, &mut state.session, action),
+        Action::Generate(action) => generate::reduce(&mut state.ui, &mut state.session, action),
         Action::Review(action) => review::reduce(state, action),
-        Action::Settings(action) => settings::reduce(state, action),
+        Action::Settings(action) => settings::reduce(&mut state.ui, &mut state.session, action),
         Action::Async(action) => async_handler::reduce(state, action),
     }
 }

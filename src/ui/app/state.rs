@@ -82,6 +82,78 @@ pub struct SessionState {
     pub is_gh_status_checking: bool,
 }
 
+impl SessionState {
+    pub fn reset_agent_timeline(&mut self) {
+        self.agent_timeline.clear();
+        self.agent_timeline_index.clear();
+        self.next_agent_timeline_seq = 0;
+        self.latest_plan = None;
+    }
+
+    pub fn ingest_progress(&mut self, evt: ProgressEvent) {
+        let seq = self.next_agent_timeline_seq;
+        self.next_agent_timeline_seq = self.next_agent_timeline_seq.saturating_add(1);
+
+        match evt {
+            ProgressEvent::LocalLog(line) => {
+                self.agent_timeline.push(TimelineItem {
+                    seq,
+                    stream_key: None,
+                    content: TimelineContent::LocalLog(line),
+                });
+            }
+            ProgressEvent::Update(ref boxed_update) => {
+                let update = &**boxed_update;
+                if let SessionUpdate::Plan(plan) = update {
+                    self.latest_plan = Some(crate::domain::Plan::from(plan.clone()));
+                }
+
+                let key = super::timeline::stream_key_for_update(update);
+
+                if let Some(key) = key {
+                    if let Some(&idx) = self.agent_timeline_index.get(&key) {
+                        super::timeline::merge_update_in_place(
+                            &mut self.agent_timeline[idx],
+                            update,
+                        );
+                        return;
+                    }
+                    let idx = self.agent_timeline.len();
+                    self.agent_timeline_index.insert(key.clone(), idx);
+                    self.agent_timeline.push(TimelineItem {
+                        seq,
+                        stream_key: Some(key),
+                        content: TimelineContent::Update(Box::new(update.clone())),
+                    });
+                    return;
+                }
+
+                if let Some(last) = self.agent_timeline.last_mut()
+                    && super::timeline::can_merge_contiguous(last, update)
+                {
+                    super::timeline::merge_update_in_place(last, update);
+                    return;
+                }
+
+                self.agent_timeline.push(TimelineItem {
+                    seq,
+                    stream_key: None,
+                    content: TimelineContent::Update(Box::new(update.clone())),
+                });
+            }
+
+            ProgressEvent::Finalized => {
+                self.is_generating = false;
+                self.agent_timeline.push(TimelineItem {
+                    seq,
+                    stream_key: None,
+                    content: TimelineContent::LocalLog("Review finalized.".into()),
+                });
+            }
+        }
+    }
+}
+
 /// Transient UI state.
 #[derive(Default)]
 pub struct UiState {
@@ -138,74 +210,11 @@ pub struct FullDiffView {
 
 impl AppState {
     pub fn reset_agent_timeline(&mut self) {
-        self.session.agent_timeline.clear();
-        self.session.agent_timeline_index.clear();
-        self.session.next_agent_timeline_seq = 0;
-        self.session.latest_plan = None;
+        self.session.reset_agent_timeline();
     }
 
     pub fn ingest_progress(&mut self, evt: ProgressEvent) {
-        let seq = self.session.next_agent_timeline_seq;
-        self.session.next_agent_timeline_seq =
-            self.session.next_agent_timeline_seq.saturating_add(1);
-
-        match evt {
-            ProgressEvent::LocalLog(line) => {
-                self.session.agent_timeline.push(TimelineItem {
-                    seq,
-                    stream_key: None,
-                    content: TimelineContent::LocalLog(line),
-                });
-            }
-            ProgressEvent::Update(ref boxed_update) => {
-                let update = &**boxed_update;
-                if let SessionUpdate::Plan(plan) = update {
-                    self.session.latest_plan = Some(crate::domain::Plan::from(plan.clone()));
-                }
-
-                let key = super::timeline::stream_key_for_update(update);
-
-                if let Some(key) = key {
-                    if let Some(&idx) = self.session.agent_timeline_index.get(&key) {
-                        super::timeline::merge_update_in_place(
-                            &mut self.session.agent_timeline[idx],
-                            update,
-                        );
-                        return;
-                    }
-                    let idx = self.session.agent_timeline.len();
-                    self.session.agent_timeline_index.insert(key.clone(), idx);
-                    self.session.agent_timeline.push(TimelineItem {
-                        seq,
-                        stream_key: Some(key),
-                        content: TimelineContent::Update(Box::new(update.clone())),
-                    });
-                    return;
-                }
-
-                if let Some(last) = self.session.agent_timeline.last_mut()
-                    && super::timeline::can_merge_contiguous(last, update)
-                {
-                    super::timeline::merge_update_in_place(last, update);
-                    return;
-                }
-
-                self.session.agent_timeline.push(TimelineItem {
-                    seq,
-                    stream_key: None,
-                    content: TimelineContent::Update(Box::new(update.clone())),
-                });
-            }
-
-            ProgressEvent::Finalized => {
-                self.session.is_generating = false;
-                self.session.agent_timeline.push(TimelineItem {
-                    seq,
-                    stream_key: None,
-                    content: TimelineContent::LocalLog("Review finalized.".into()),
-                });
-            }
-        }
+        self.session.ingest_progress(evt);
     }
 
     pub fn tasks(&self) -> Vec<ReviewTask> {
