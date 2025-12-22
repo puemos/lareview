@@ -2,12 +2,12 @@
 
 mod center_pane;
 mod nav;
-mod screen;
 mod task;
 mod task_detail;
 mod thread;
 mod thread_detail;
 mod toolbar;
+mod view;
 mod visuals;
 
 pub(super) fn format_timestamp(value: &str) -> String {

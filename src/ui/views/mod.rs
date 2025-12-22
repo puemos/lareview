@@ -1,6 +1,6 @@
 //! Views module
 
 pub mod generate;
-pub mod repos_view;
+pub mod repos;
 pub mod review;
-pub mod settings_view;
+pub mod settings;
