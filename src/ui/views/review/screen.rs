@@ -9,6 +9,9 @@ use crate::ui::theme::current_theme;
 use eframe::egui;
 use egui_phosphor::regular as icons;
 
+use crate::ui::views::review::nav::render_navigation_tree;
+use crate::ui::views::review::toolbar::render_header_selectors;
+
 // Optimized header height for a "Toolbar" feel
 const TOP_HEADER_HEIGHT: f32 = 52.0;
 
@@ -17,6 +20,8 @@ impl LaReviewApp {
         if ui.available_width() < 100.0 {
             return;
         }
+
+        let theme = current_theme();
 
         // --- 1. Data Preparation ---
         let tasks_by_sub_flow = self.state.tasks_by_sub_flow();
@@ -75,7 +80,14 @@ impl LaReviewApp {
                     |ui| {
                         // A. Left Side: Context Selectors
                         ui.horizontal(|ui| {
-                            self.render_header_selectors(ui);
+                            if let Some(action) = render_header_selectors(
+                                ui,
+                                &self.state.domain.reviews,
+                                self.state.ui.selected_review_id.as_ref(),
+                                &theme,
+                            ) {
+                                self.dispatch(Action::Review(action));
+                            }
                         });
 
                         // B. Spacer
@@ -91,7 +103,7 @@ impl LaReviewApp {
                                     icons::TRASH_SIMPLE,
                                     "Delete",
                                     review_selected,
-                                    current_theme().border,
+                                    theme.border,
                                 )
                                 .on_hover_text("Delete the selected review")
                                 .clicked()
@@ -106,7 +118,7 @@ impl LaReviewApp {
                                     icons::EXPORT,
                                     "Export",
                                     review_selected,
-                                    current_theme().border,
+                                    theme.border,
                                 )
                                 .on_hover_text("Export as markdown")
                                 .clicked()
@@ -118,10 +130,7 @@ impl LaReviewApp {
 
                                 if self.state.ui.is_exporting {
                                     ui.add_space(spacing::SPACING_XS);
-                                    crate::ui::animations::cyber::cyber_spinner(
-                                        ui,
-                                        current_theme().brand,
-                                    );
+                                    crate::ui::animations::cyber::cyber_spinner(ui, theme.brand);
                                 }
                             }
 
@@ -136,9 +145,9 @@ impl LaReviewApp {
                                     .size(12.0)
                                     .color(
                                         if done_tasks == total_tasks {
-                                            current_theme().success
+                                            theme.success
                                         } else {
-                                            current_theme().text_muted
+                                            theme.text_muted
                                         },
                                     ),
                                 );
@@ -156,8 +165,7 @@ impl LaReviewApp {
             ),
             egui::vec2(content_rect.width(), 1.0),
         );
-        ui.painter()
-            .rect_filled(bar_rect, 0.0, current_theme().border);
+        ui.painter().rect_filled(bar_rect, 0.0, theme.border);
 
         // Handle delayed actions
         if trigger_delete_review {
@@ -175,7 +183,13 @@ impl LaReviewApp {
 
         // Handle "No Review" state early
         if display_order_tasks.is_empty() {
-            self.render_empty_state(ui);
+            self.render_center_pane(
+                ui,
+                &all_tasks,
+                display_order_tasks.len(),
+                open_tasks,
+                next_open_id,
+            );
             return;
         }
 
@@ -241,7 +255,14 @@ impl LaReviewApp {
                         .auto_shrink([false, false])
                         .show(ui, |ui| {
                             ui.spacing_mut().item_spacing.x = 0.0;
-                            self.render_navigation_tree(ui, &tasks_by_sub_flow);
+                            if let Some(action) = render_navigation_tree(
+                                ui,
+                                &tasks_by_sub_flow,
+                                self.state.ui.selected_task_id.as_ref(),
+                                &theme,
+                            ) {
+                                self.dispatch(Action::Review(action));
+                            }
                         });
                 });
         }
@@ -267,9 +288,9 @@ impl LaReviewApp {
         // Draw a subtle line in the center of the handle
         let line_x = resize_rect.center().x + 3.5;
         let line_color = if hover_active {
-            current_theme().accent
+            theme.accent
         } else {
-            current_theme().border
+            theme.border
         };
         ui.painter().line_segment(
             [
@@ -283,8 +304,7 @@ impl LaReviewApp {
         {
             let mut center_ui = ui.new_child(egui::UiBuilder::new().max_rect(center_rect));
             egui::Frame::NONE
-                .fill(current_theme().bg_primary)
-                // REMOVED: .inner_margin(spacing::SPACING_XL) - We handle padding manually per view
+                .fill(theme.bg_primary)
                 .show(&mut center_ui, |ui| {
                     self.render_center_pane(
                         ui,

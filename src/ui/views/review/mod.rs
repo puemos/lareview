@@ -3,7 +3,6 @@
 mod center_pane;
 mod nav;
 mod screen;
-mod selection;
 mod task;
 mod task_detail;
 mod thread_detail;
