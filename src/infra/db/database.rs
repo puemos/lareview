@@ -95,9 +95,12 @@ impl Database {
         let existing_version: i32 =
             conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
 
-        if existing_version != SCHEMA_VERSION {
-            // Breaking change: reset schema and bump version.
-            Self::reset_schema(&conn)?;
+        // Always ensure schema exists (using CREATE TABLE IF NOT EXISTS)
+        Self::create_schema(&conn)?;
+
+        if existing_version < SCHEMA_VERSION {
+            // In the future, individual migration steps would go here.
+            // For now, we just ensure the schema is up to date and bump the version.
             conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
         }
 
@@ -107,25 +110,6 @@ impl Database {
     /// Get a reference to the connection
     pub fn connection(&self) -> Arc<Mutex<Connection>> {
         self.conn.clone()
-    }
-
-    fn reset_schema(conn: &Connection) -> Result<()> {
-        conn.execute_batch(
-            r#"
-            DROP TABLE IF EXISTS repos;
-            DROP TABLE IF EXISTS repo_remotes;
-            DROP TABLE IF EXISTS diffs;
-            DROP TABLE IF EXISTS plans;
-            DROP TABLE IF EXISTS thread_links;
-            DROP TABLE IF EXISTS comments;
-            DROP TABLE IF EXISTS threads;
-            DROP TABLE IF EXISTS tasks;
-            DROP TABLE IF EXISTS review_runs;
-            DROP TABLE IF EXISTS reviews;
-            DROP TABLE IF EXISTS pull_requests;
-            "#,
-        )?;
-        Self::create_schema(conn)
     }
 
     fn create_schema(conn: &Connection) -> Result<()> {
