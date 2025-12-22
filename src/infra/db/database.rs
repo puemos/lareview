@@ -88,7 +88,7 @@ impl Database {
     /// Initialize database schema
     fn init(&self) -> Result<()> {
         let conn = self.conn.lock().unwrap();
-        const SCHEMA_VERSION: i32 = 8;
+        const SCHEMA_VERSION: i32 = 9;
 
         conn.execute_batch("PRAGMA foreign_keys = ON;")?;
 
@@ -98,9 +98,14 @@ impl Database {
         // Always ensure schema exists (using CREATE TABLE IF NOT EXISTS)
         Self::create_schema(&conn)?;
 
-        if existing_version < SCHEMA_VERSION {
-            // In the future, individual migration steps would go here.
-            // For now, we just ensure the schema is up to date and bump the version.
+        if existing_version == 0 {
+            // Fresh database - skip migrations and go directly to current version
+            conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+        } else if existing_version < SCHEMA_VERSION {
+            // Existing database - run migrations to bring it up to date
+            for version in (existing_version + 1)..=SCHEMA_VERSION {
+                Self::run_migration(&conn, version)?;
+            }
             conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
         }
 
@@ -195,7 +200,7 @@ impl Database {
                 review_id TEXT NOT NULL,
                 task_id TEXT,
                 title TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'todo' CHECK (status IN ('todo','wip','done','reject')),
+                status TEXT NOT NULL DEFAULT 'todo' CHECK (status IN ('todo','in_progress','done','ignored','wip','reject')),
                 impact TEXT NOT NULL DEFAULT 'nitpick' CHECK (impact IN ('blocking','nice_to_have','nitpick')),
                 anchor_file_path TEXT,
                 anchor_line INTEGER,
@@ -238,6 +243,60 @@ impl Database {
             CREATE INDEX IF NOT EXISTS idx_comments_thread_created_at ON comments(thread_id, created_at);
             "#,
         )?;
+        Ok(())
+    }
+
+    /// Run a migration by loading and executing the corresponding SQL file
+    fn run_migration(conn: &Connection, version: i32) -> Result<()> {
+        // Migration files are expected to be in migrations/ folder at the project root
+        // with naming pattern: {version:04}_description.sql
+
+        // Find the migration file for this version
+        let migrations_dir = std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().map(|p| p.to_path_buf()))
+            .and_then(|mut p| {
+                // Try relative to executable first (for installed builds)
+                p.push("migrations");
+                if p.exists() {
+                    Some(p)
+                } else {
+                    // Fall back to workspace root for development
+                    std::env::current_dir()
+                        .ok()
+                        .map(|cwd| cwd.join("migrations"))
+                }
+            })
+            .unwrap_or_else(|| PathBuf::from("migrations"));
+
+        // Find migration file matching this version
+        let version_prefix = format!("{:04}_", version);
+
+        let migration_file = std::fs::read_dir(&migrations_dir)
+            .map_err(|e| anyhow::anyhow!("Failed to read migrations directory: {}", e))?
+            .filter_map(|entry| entry.ok())
+            .find(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(&version_prefix)
+                    && entry.file_name().to_string_lossy().ends_with(".sql")
+            })
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Migration file not found for version {} in {}",
+                    version,
+                    migrations_dir.display()
+                )
+            })?;
+
+        // Read and execute the migration SQL
+        let sql = std::fs::read_to_string(migration_file.path())
+            .map_err(|e| anyhow::anyhow!("Failed to read migration file: {}", e))?;
+
+        conn.execute_batch(&sql)
+            .map_err(|e| anyhow::anyhow!("Failed to execute migration {}: {}", version, e))?;
+
         Ok(())
     }
 }
