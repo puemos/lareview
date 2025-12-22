@@ -16,6 +16,7 @@ static SYNTAX_SET: Lazy<SyntaxSet> = Lazy::new(SyntaxSet::load_defaults_newlines
 static THEME_SET: Lazy<ThemeSet> = Lazy::new(ThemeSet::load_defaults);
 
 const CODE_HIGHLIGHT_CACHE_CAPACITY: usize = 128;
+const MARKDOWN_CACHE_CAPACITY: usize = 50;
 
 #[derive(Default, Clone)]
 struct CodeHighlightCache {
@@ -96,37 +97,381 @@ fn code_cache_key(content_hash: u64, lang: &str, wrap_px: u32, theme_hash: u64) 
     key
 }
 
+/// Quantize a width to the nearest step (default 40px) to reduce text re-layout frequency.
+const WRAP_WIDTH_STEP: f32 = 40.0;
+
+fn quantize_width(width: f32) -> f32 {
+    (width / WRAP_WIDTH_STEP).floor() * WRAP_WIDTH_STEP
+}
+
+// --- Markdown Caching Types ---
+
+#[derive(Clone)]
+enum ItemDecoration {
+    None,
+    Bullet(String),
+    Check(bool, egui::Color32),
+    BlockQuote,
+}
+
+#[derive(Clone)]
+enum MarkdownItem {
+    Text {
+        job: Arc<egui::text::LayoutJob>,
+        link: Option<String>,
+        decoration: ItemDecoration,
+    },
+    CodeBlock {
+        content: String,
+        lang: String,
+        hash: u64,
+    },
+    Table {
+        rows: Vec<Vec<Arc<egui::text::LayoutJob>>>,
+    },
+    Space(f32),
+}
+
+#[derive(Default, Clone)]
+struct MarkdownCache {
+    inner: Arc<Mutex<LruMarkdownCache>>,
+}
+
+#[derive(Default)]
+struct LruMarkdownCache {
+    map: HashMap<u64, Arc<Vec<MarkdownItem>>>,
+    order: VecDeque<u64>,
+}
+
+impl MarkdownCache {
+    fn get_or_insert_with(
+        &self,
+        key: u64,
+        compute: impl FnOnce() -> Arc<Vec<MarkdownItem>>,
+    ) -> Arc<Vec<MarkdownItem>> {
+        let mut inner = self.inner.lock().unwrap();
+
+        if let Some(items) = inner.map.get(&key).cloned() {
+            inner.touch(key);
+            return items;
+        }
+
+        let items = compute();
+        inner.insert(key, items.clone());
+        items
+    }
+}
+
+impl LruMarkdownCache {
+    fn touch(&mut self, key: u64) {
+        if let Some(pos) = self.order.iter().position(|&k| k == key) {
+            self.order.remove(pos);
+        }
+        self.order.push_back(key);
+    }
+
+    fn insert(&mut self, key: u64, items: Arc<Vec<MarkdownItem>>) {
+        self.map.insert(key, items);
+        self.touch(key);
+
+        while self.order.len() > MARKDOWN_CACHE_CAPACITY {
+            if let Some(old) = self.order.pop_front() {
+                self.map.remove(&old);
+            } else {
+                break;
+            }
+        }
+    }
+}
+
+fn markdown_cache_id() -> egui::Id {
+    egui::Id::new("markdown_parse_cache")
+}
+
 pub fn render_markdown(ui: &mut egui::Ui, text: &str) {
     let theme = current_theme();
 
+    ui.spacing_mut().item_spacing.y = 6.0;
+
+    let theme_hash = egui::util::hash((
+        theme.bg_tertiary,
+        theme.text_primary,
+        theme.text_secondary,
+        theme.brand,
+        theme.success,
+        theme.text_muted,
+        theme.bg_secondary,
+        theme.border_secondary,
+    ));
+
+    let content_hash = egui::util::hash(text);
+    let cache_key = mix_u64(content_hash, theme_hash);
+
+    let items: Arc<Vec<MarkdownItem>> = ui.ctx().memory_mut(|mem| {
+        let cache = mem
+            .data
+            .get_temp_mut_or_default::<MarkdownCache>(markdown_cache_id());
+
+        cache.get_or_insert_with(cache_key, || Arc::new(parse_markdown(text, theme)))
+    });
+
+    let mut code_block_counter = 0;
+
+    for item in items.iter() {
+        match item {
+            MarkdownItem::Text {
+                job,
+                link,
+                decoration,
+            } => {
+                render_text_item(ui, job, link.clone(), decoration, theme);
+            }
+            MarkdownItem::CodeBlock {
+                content,
+                lang,
+                hash,
+            } => {
+                code_block_counter += 1;
+                render_code_block(ui, content, lang, *hash, code_block_counter, theme);
+            }
+            MarkdownItem::Table { rows } => {
+                render_table(ui, rows, theme);
+            }
+            MarkdownItem::Space(height) => {
+                ui.add_space(*height);
+            }
+        }
+    }
+}
+
+fn render_text_item(
+    ui: &mut egui::Ui,
+    job: &Arc<egui::text::LayoutJob>,
+    link: Option<String>,
+    decoration: &ItemDecoration,
+    theme: Theme,
+) {
+    let render_job = |ui: &mut egui::Ui, job: &egui::text::LayoutJob, link: Option<String>| {
+        let available_width = quantize_width(ui.available_width()).max(32.0);
+        let mut job = job.clone();
+        job.wrap.max_width = available_width;
+
+        let mut label = egui::Label::new(job).wrap_mode(egui::TextWrapMode::Wrap);
+
+        if link.is_some() {
+            label = label.sense(egui::Sense::click());
+        }
+
+        let response = ui.add(label);
+
+        if let Some(url) = link {
+            let response = response.on_hover_text(&url);
+
+            if response.clicked() {
+                ui.ctx().open_url(egui::OpenUrl { url, new_tab: true });
+            }
+        }
+    };
+
+    match decoration {
+        ItemDecoration::None => {
+            render_job(ui, job, link);
+        }
+        ItemDecoration::Bullet(bullet) => {
+            ui.horizontal(|ui| {
+                ui.add_space(16.0);
+                ui.label(
+                    egui::RichText::new(bullet)
+                        .color(theme.text_secondary)
+                        .size(15.0),
+                );
+                render_job(ui, job, link);
+            });
+        }
+        ItemDecoration::Check(checked, color) => {
+            ui.horizontal(|ui| {
+                ui.add_space(16.0);
+                let icon = if *checked {
+                    icons::CHECK_SQUARE
+                } else {
+                    icons::SQUARE
+                };
+                ui.label(egui::RichText::new(icon).color(*color).size(16.0));
+                render_job(ui, job, link);
+            });
+        }
+        ItemDecoration::BlockQuote => {
+            let available_width = ui.available_width();
+            let text_max_w = quantize_width((available_width - 32.0).max(32.0)).max(32.0);
+
+            let mut job = job.as_ref().clone();
+            job.wrap.max_width = text_max_w;
+
+            egui::Frame::NONE
+                .fill(theme.bg_secondary.gamma_multiply(0.3))
+                .stroke(egui::Stroke::new(1.0, theme.border_secondary))
+                .corner_radius(crate::ui::spacing::RADIUS_MD)
+                .inner_margin(egui::Margin::same(spacing::SPACING_SM as i8))
+                .show(ui, |ui| {
+                    let rect = ui.available_rect_before_wrap();
+                    ui.painter().line_segment(
+                        [
+                            rect.left_top().add(egui::vec2(-12.0, 0.0)),
+                            rect.left_bottom().add(egui::vec2(-12.0, 0.0)),
+                        ],
+                        egui::Stroke::new(2.0, theme.brand),
+                    );
+                    render_job(ui, &job, link);
+                });
+        }
+    }
+
+    ui.add_space(2.0);
+}
+
+fn render_code_block(
+    ui: &mut egui::Ui,
+    content: &str,
+    lang: &str,
+    content_hash: u64,
+    counter: usize,
+    theme: Theme,
+) {
+    if content.trim().is_empty() {
+        return;
+    }
+
+    // This affects both the highlight cache key and the layout.
+    // Quantize to reduce cache misses during resize.
+    let wrap_px = quantize_width((ui.available_width() - (spacing::SPACING_MD * 2.0)).max(32.0))
+        .round() as u32;
+
+    let theme_hash = egui::util::hash((
+        theme.bg_tertiary,
+        theme.text_primary,
+        theme.text_secondary,
+        theme.brand,
+    ));
+
+    let cache_key = code_cache_key(content_hash, lang, wrap_px, theme_hash);
+
+    let job: Arc<egui::text::LayoutJob> = ui.ctx().memory_mut(|mem| {
+        let cache = mem
+            .data
+            .get_temp_mut_or_default::<CodeHighlightCache>(code_cache_id());
+
+        cache.get_or_insert_with(cache_key, || {
+            let syntax = SYNTAX_SET
+                .find_syntax_by_token(lang)
+                .unwrap_or_else(|| SYNTAX_SET.find_syntax_plain_text());
+
+            let mut h = HighlightLines::new(syntax, &THEME_SET.themes["base16-ocean.dark"]);
+
+            let mono = egui::FontId::monospace(13.0);
+            let mut job = egui::text::LayoutJob::default();
+            job.wrap.max_width = wrap_px as f32;
+
+            for line in LinesWithEndings::from(content) {
+                let Ok(ranges) = h.highlight_line(line, &SYNTAX_SET) else {
+                    continue;
+                };
+
+                for (style, text) in ranges {
+                    let color = egui::Color32::from_rgb(
+                        style.foreground.r,
+                        style.foreground.g,
+                        style.foreground.b,
+                    );
+
+                    job.append(
+                        text,
+                        0.0,
+                        egui::TextFormat {
+                            font_id: mono.clone(),
+                            color,
+                            ..Default::default()
+                        },
+                    );
+                }
+            }
+
+            Arc::new(job)
+        })
+    });
+
+    egui::Frame::NONE
+        .fill(theme.bg_tertiary)
+        .corner_radius(crate::ui::spacing::RADIUS_MD)
+        .inner_margin(egui::Margin::same(spacing::SPACING_MD as i8))
+        .show(ui, |ui| {
+            egui::ScrollArea::vertical()
+                .id_salt(ui.id().with("code_scroll").with(counter))
+                .max_height(260.0)
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    ui.add(egui::Label::new(job.clone()).wrap_mode(egui::TextWrapMode::Wrap));
+                });
+        });
+
+    ui.add_space(spacing::SPACING_SM);
+}
+
+fn render_table(ui: &mut egui::Ui, rows: &[Vec<Arc<egui::text::LayoutJob>>], theme: Theme) {
+    if rows.is_empty() {
+        return;
+    }
+
+    egui::Frame::NONE
+        .fill(theme.bg_tertiary.gamma_multiply(0.3))
+        .stroke(egui::Stroke::new(1.0, theme.border_secondary))
+        .corner_radius(crate::ui::spacing::RADIUS_MD)
+        .inner_margin(egui::Margin::same(spacing::SPACING_SM as i8))
+        .show(ui, |ui| {
+            let num_cols = rows[0].len();
+            egui::Grid::new(ui.id().with("table_grid"))
+                .num_columns(num_cols)
+                .spacing([12.0, 8.0])
+                .striped(true)
+                .show(ui, |ui| {
+                    for row in rows {
+                        for cell in row {
+                            ui.label(cell.as_ref().clone());
+                        }
+                        ui.end_row();
+                    }
+                });
+        });
+    ui.add_space(spacing::SPACING_SM);
+}
+
+fn parse_markdown(text: &str, theme: Theme) -> Vec<MarkdownItem> {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
     options.insert(Options::ENABLE_FOOTNOTES);
 
     let parser = Parser::new_ext(text, options);
 
-    ui.spacing_mut().item_spacing.y = 6.0;
-
     let mut state = MarkdownState::new(theme);
 
     for event in parser {
         match event {
-            Event::Start(tag) => state.start_tag(ui, tag),
-            Event::End(tag) => state.end_tag(ui, tag),
+            Event::Start(tag) => state.start_tag(tag),
+            Event::End(tag) => state.end_tag(tag),
             Event::Text(content) => state.text(&content),
             Event::Code(content) => state.inline_code(&content),
             Event::SoftBreak => state.soft_break(),
-            Event::HardBreak => state.hard_break(ui),
+            Event::HardBreak => state.hard_break(),
             Event::TaskListMarker(checked) => state.task_list_marker(checked),
             _ => {}
         }
     }
 
-    state.flush(ui);
+    state.complete()
 }
 
 struct MarkdownState {
     theme: Theme,
+    items: Vec<MarkdownItem>,
     job: egui::text::LayoutJob,
     is_bold: bool,
     is_italic: bool,
@@ -138,7 +483,6 @@ struct MarkdownState {
     code_block_lang: String,
     code_block_content: String,
     code_block_hash: u64,
-    code_block_counter: usize, // Added to track unique code blocks
     pending_bullet: Option<String>,
     pending_check: Option<(bool, egui::Color32)>,
     in_blockquote: bool,
@@ -153,6 +497,7 @@ impl MarkdownState {
     fn new(theme: Theme) -> Self {
         Self {
             theme,
+            items: Vec::new(),
             job: egui::text::LayoutJob::default(),
             is_bold: false,
             is_italic: false,
@@ -164,7 +509,6 @@ impl MarkdownState {
             code_block_lang: String::new(),
             code_block_content: String::new(),
             code_block_hash: FNV_OFFSET_BASIS,
-            code_block_counter: 0, // Initialize counter
             pending_bullet: None,
             pending_check: None,
             in_blockquote: false,
@@ -174,6 +518,11 @@ impl MarkdownState {
             active_link: None,
             job_has_link: None,
         }
+    }
+
+    fn complete(mut self) -> Vec<MarkdownItem> {
+        self.flush();
+        self.items
     }
 
     fn current_format(&self) -> egui::TextFormat {
@@ -218,15 +567,16 @@ impl MarkdownState {
         }
     }
 
-    fn start_tag(&mut self, ui: &mut egui::Ui, tag: Tag) {
+    fn start_tag(&mut self, tag: Tag) {
         match tag {
             Tag::Paragraph => {
                 self.in_paragraph = true;
                 self.job = egui::text::LayoutJob::default();
             }
             Tag::Heading { level, .. } => {
-                self.flush(ui);
-                ui.add_space(spacing::SPACING_SM);
+                self.flush();
+                // We handle spacing in render now
+                self.items.push(MarkdownItem::Space(spacing::SPACING_SM));
                 self.in_heading = Some(level as u32);
                 self.job = egui::text::LayoutJob::default();
             }
@@ -234,11 +584,11 @@ impl MarkdownState {
             Tag::Emphasis => self.is_italic = true,
             Tag::Strikethrough => self.is_strikethrough = true,
             Tag::List(first) => {
-                self.flush(ui);
+                self.flush();
                 self.list_stack.push(first);
             }
             Tag::Item => {
-                self.flush(ui);
+                self.flush();
                 let bullet = if let Some(Some(n)) = self.list_stack.last_mut() {
                     let b = format!("{}.", n);
                     *n += 1;
@@ -251,7 +601,7 @@ impl MarkdownState {
                 self.job = egui::text::LayoutJob::default();
             }
             Tag::CodeBlock(kind) => {
-                self.flush(ui);
+                self.flush();
                 self.in_code_block = true;
                 self.code_block_content.clear();
                 self.code_block_hash = FNV_OFFSET_BASIS;
@@ -262,11 +612,11 @@ impl MarkdownState {
                 }
             }
             Tag::BlockQuote(_) => {
-                self.flush(ui);
+                self.flush();
                 self.in_blockquote = true;
             }
             Tag::Table(_) => {
-                self.flush(ui);
+                self.flush();
                 self.in_table = true;
                 self.table_rows.clear();
             }
@@ -281,7 +631,7 @@ impl MarkdownState {
                 self.job_has_link = Some(dest_url.to_string());
             }
             Tag::FootnoteDefinition(label) => {
-                self.flush(ui);
+                self.flush();
                 self.job = egui::text::LayoutJob::default();
                 self.job
                     .append(&format!("{}: ", label), 0.0, self.current_format());
@@ -290,16 +640,16 @@ impl MarkdownState {
         }
     }
 
-    fn end_tag(&mut self, ui: &mut egui::Ui, tag: TagEnd) {
+    fn end_tag(&mut self, tag: TagEnd) {
         match tag {
             TagEnd::Paragraph => {
-                self.flush(ui);
+                self.flush();
                 self.in_paragraph = false;
             }
             TagEnd::Heading(_) => {
-                self.flush(ui);
+                self.flush();
                 self.in_heading = None;
-                ui.add_space(spacing::SPACING_XS);
+                self.items.push(MarkdownItem::Space(spacing::SPACING_XS));
             }
             TagEnd::Strong => self.is_bold = false,
             TagEnd::Emphasis => self.is_italic = false,
@@ -308,20 +658,26 @@ impl MarkdownState {
                 self.list_stack.pop();
             }
             TagEnd::Item => {
-                self.flush(ui);
+                self.flush();
                 self.in_paragraph = false;
             }
             TagEnd::CodeBlock => {
                 self.in_code_block = false;
-                self.render_code_block(ui);
+                self.items.push(MarkdownItem::CodeBlock {
+                    content: self.code_block_content.clone(),
+                    lang: self.code_block_lang.clone(),
+                    hash: self.code_block_hash,
+                });
             }
             TagEnd::BlockQuote(_) => {
-                self.flush(ui);
+                self.flush();
                 self.in_blockquote = false;
             }
             TagEnd::Table => {
-                self.render_table(ui);
                 self.in_table = false;
+                self.items.push(MarkdownItem::Table {
+                    rows: std::mem::take(&mut self.table_rows),
+                });
             }
             TagEnd::TableRow => {
                 self.table_rows
@@ -335,7 +691,7 @@ impl MarkdownState {
                 self.active_link = None;
             }
             TagEnd::FootnoteDefinition => {
-                self.flush(ui);
+                self.flush();
             }
             _ => {}
         }
@@ -368,12 +724,12 @@ impl MarkdownState {
         }
     }
 
-    fn hard_break(&mut self, ui: &mut egui::Ui) {
+    fn hard_break(&mut self) {
         if self.in_code_block {
             self.code_block_content.push('\n');
             self.code_block_hash = fnv1a_update(self.code_block_hash, b"\n");
         } else {
-            self.flush(ui);
+            self.flush();
         }
     }
 
@@ -388,205 +744,44 @@ impl MarkdownState {
         self.pending_check = Some((checked, color));
     }
 
-    fn flush(&mut self, ui: &mut egui::Ui) {
+    fn flush(&mut self) {
         if self.job.sections.is_empty() {
             return;
         }
 
-        let job = std::mem::take(&mut self.job);
+        let job = Arc::new(std::mem::take(&mut self.job));
         let link = self.job_has_link.take();
 
-        let render_job = |ui: &mut egui::Ui, job: egui::text::LayoutJob, link: Option<String>| {
-            let available_width = ui.available_width();
-            let mut job = job;
-            job.wrap.max_width = available_width;
+        if self.in_table {
+            // Table cells are handled in end_tag
+            self.job = egui::text::LayoutJob::default();
+            // If we were building up a job for a cell, we need to put it back or handle it differently
+            // Actually, in `start_tag(TableCell)`, we reset job. In `end_tag(TableCell)`, we push it.
+            // But if flush is called *during* a cell (e.g. hard break), we might split it?
+            // Markdown tables usually don't support hard breaks or complex blocks inside cells.
+            // For now, let's assume flush inside table is only happening at end of inline content
+            // which should be fine if we are accumulating into one job per cell.
+            // Wait, standard `flush` logic pushes to `self.items`. We don't want that for tables.
 
-            let mut label = egui::Label::new(job).wrap_mode(egui::TextWrapMode::Wrap);
+            // Revert the take if we are in table, because `end_tag` will handle it.
+            self.job = Arc::try_unwrap(job).unwrap_or_else(|arc| (*arc).clone());
+            return;
+        }
 
-            if link.is_some() {
-                label = label.sense(egui::Sense::click());
-            }
-
-            let response = ui.add(label);
-
-            if let Some(url) = link {
-                let response = response.on_hover_text(&url);
-
-                if response.clicked() {
-                    ui.ctx().open_url(egui::OpenUrl { url, new_tab: true });
-                }
-            }
+        let decoration = if let Some(bullet) = self.pending_bullet.take() {
+            ItemDecoration::Bullet(bullet)
+        } else if let Some((checked, color)) = self.pending_check.take() {
+            ItemDecoration::Check(checked, color)
+        } else if self.in_blockquote {
+            ItemDecoration::BlockQuote
+        } else {
+            ItemDecoration::None
         };
 
-        if self.in_table {
-            self.job = egui::text::LayoutJob::default();
-            return;
-        }
-
-        if let Some(bullet) = self.pending_bullet.take() {
-            ui.horizontal(|ui| {
-                ui.add_space(16.0);
-                ui.label(
-                    egui::RichText::new(bullet)
-                        .color(self.theme.text_secondary)
-                        .size(15.0),
-                );
-                render_job(ui, job, link);
-            });
-        } else if let Some((checked, color)) = self.pending_check.take() {
-            ui.horizontal(|ui| {
-                ui.add_space(16.0);
-                let icon = if checked {
-                    icons::CHECK_SQUARE
-                } else {
-                    icons::SQUARE
-                };
-                ui.label(egui::RichText::new(icon).color(color).size(16.0));
-                render_job(ui, job, link);
-            });
-        } else if self.in_blockquote {
-            let available_width = ui.available_width();
-            let text_max_w = (available_width - 32.0).max(32.0);
-
-            let mut job = job;
-            job.wrap.max_width = text_max_w;
-
-            egui::Frame::NONE
-                .fill(self.theme.bg_secondary.gamma_multiply(0.3))
-                .stroke(egui::Stroke::new(1.0, self.theme.border_secondary))
-                .corner_radius(crate::ui::spacing::RADIUS_MD)
-                .inner_margin(egui::Margin::same(spacing::SPACING_SM as i8))
-                .show(ui, |ui| {
-                    let rect = ui.available_rect_before_wrap();
-                    ui.painter().line_segment(
-                        [
-                            rect.left_top().add(egui::vec2(-12.0, 0.0)),
-                            rect.left_bottom().add(egui::vec2(-12.0, 0.0)),
-                        ],
-                        egui::Stroke::new(2.0, self.theme.brand),
-                    );
-                    render_job(ui, job, link);
-                });
-        } else {
-            render_job(ui, job, link);
-        }
-
-        ui.add_space(2.0);
-    }
-
-    fn render_code_block(&mut self, ui: &mut egui::Ui) {
-        let content = self.code_block_content.as_str();
-        if content.trim().is_empty() {
-            return;
-        }
-
-        self.code_block_counter += 1;
-
-        // This affects both the highlight cache key and the layout.
-        let wrap_px = (ui.available_width() - (spacing::SPACING_MD * 2.0))
-            .max(32.0)
-            .round() as u32;
-
-        let theme_hash = egui::util::hash((
-            self.theme.bg_tertiary,
-            self.theme.text_primary,
-            self.theme.text_secondary,
-            self.theme.brand,
-        ));
-
-        let cache_key = code_cache_key(
-            self.code_block_hash,
-            &self.code_block_lang,
-            wrap_px,
-            theme_hash,
-        );
-
-        let job: Arc<egui::text::LayoutJob> = ui.ctx().memory_mut(|mem| {
-            let cache = mem
-                .data
-                .get_temp_mut_or_default::<CodeHighlightCache>(code_cache_id());
-
-            cache.get_or_insert_with(cache_key, || {
-                let syntax = SYNTAX_SET
-                    .find_syntax_by_token(&self.code_block_lang)
-                    .unwrap_or_else(|| SYNTAX_SET.find_syntax_plain_text());
-
-                let mut h = HighlightLines::new(syntax, &THEME_SET.themes["base16-ocean.dark"]);
-
-                let mono = egui::FontId::monospace(13.0);
-                let mut job = egui::text::LayoutJob::default();
-                job.wrap.max_width = wrap_px as f32;
-
-                for line in LinesWithEndings::from(content) {
-                    let Ok(ranges) = h.highlight_line(line, &SYNTAX_SET) else {
-                        continue;
-                    };
-
-                    for (style, text) in ranges {
-                        let color = egui::Color32::from_rgb(
-                            style.foreground.r,
-                            style.foreground.g,
-                            style.foreground.b,
-                        );
-
-                        job.append(
-                            text,
-                            0.0,
-                            egui::TextFormat {
-                                font_id: mono.clone(),
-                                color,
-                                ..Default::default()
-                            },
-                        );
-                    }
-                }
-
-                Arc::new(job)
-            })
+        self.items.push(MarkdownItem::Text {
+            job,
+            link,
+            decoration,
         });
-
-        egui::Frame::NONE
-            .fill(self.theme.bg_tertiary)
-            .corner_radius(crate::ui::spacing::RADIUS_MD)
-            .inner_margin(egui::Margin::same(spacing::SPACING_MD as i8))
-            .show(ui, |ui| {
-                egui::ScrollArea::vertical()
-                    .id_salt(ui.id().with("code_scroll").with(self.code_block_counter))
-                    .max_height(260.0)
-                    .auto_shrink([false, false])
-                    .show(ui, |ui| {
-                        ui.add(egui::Label::new(job.clone()).wrap_mode(egui::TextWrapMode::Wrap));
-                    });
-            });
-
-        ui.add_space(spacing::SPACING_SM);
-    }
-
-    fn render_table(&mut self, ui: &mut egui::Ui) {
-        if self.table_rows.is_empty() {
-            return;
-        }
-
-        egui::Frame::NONE
-            .fill(self.theme.bg_tertiary.gamma_multiply(0.3))
-            .stroke(egui::Stroke::new(1.0, self.theme.border_secondary))
-            .corner_radius(crate::ui::spacing::RADIUS_MD)
-            .inner_margin(egui::Margin::same(spacing::SPACING_SM as i8))
-            .show(ui, |ui| {
-                let num_cols = self.table_rows[0].len();
-                egui::Grid::new(ui.id().with("table_grid"))
-                    .num_columns(num_cols)
-                    .spacing([12.0, 8.0])
-                    .striped(true)
-                    .show(ui, |ui| {
-                        for row in &self.table_rows {
-                            for cell in row {
-                                ui.label(cell.clone());
-                            }
-                            ui.end_row();
-                        }
-                    });
-            });
-        ui.add_space(spacing::SPACING_SM);
     }
 }
