@@ -1,4 +1,5 @@
 use crate::domain::{Plan, PlanStatus};
+use crate::ui::icons;
 use crate::ui::theme::current_theme;
 use eframe::egui;
 
@@ -20,7 +21,7 @@ pub(super) fn render_plan_panel(ui: &mut egui::Ui, plan: &Plan) {
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(
-                    egui::RichText::new(format!("{} PLAN", egui_phosphor::regular::LIST_CHECKS))
+                    egui::RichText::new(format!("{} PLAN", icons::ICON_PLAN))
                         .size(11.0)
                         .color(current_theme().text_muted),
                 );
@@ -33,12 +34,9 @@ pub(super) fn render_plan_panel(ui: &mut egui::Ui, plan: &Plan) {
                         .filter(|e| matches!(&e.status, PlanStatus::Completed))
                         .count();
                     ui.label(
-                        egui::RichText::new(format!(
-                            "{} {completed}/{total}",
-                            egui_phosphor::regular::CHECK_CIRCLE
-                        ))
-                        .size(11.0)
-                        .color(current_theme().text_muted),
+                        egui::RichText::new(format!("{} {completed}/{total}", icons::STATUS_DONE))
+                            .size(11.0)
+                            .color(current_theme().text_muted),
                     );
                 });
             });
@@ -54,12 +52,9 @@ pub(super) fn render_plan_panel(ui: &mut egui::Ui, plan: &Plan) {
 pub(super) fn render_plan_timeline_item(ui: &mut egui::Ui, plan: &Plan) {
     if plan.entries.is_empty() {
         ui.label(
-            egui::RichText::new(format!(
-                "{} Plan updated",
-                egui_phosphor::regular::LIST_CHECKS
-            ))
-            .color(current_theme().text_muted)
-            .size(12.0),
+            egui::RichText::new(format!("{} Plan updated", icons::ICON_PLAN))
+                .color(current_theme().text_muted)
+                .size(12.0),
         );
         return;
     }
@@ -76,12 +71,9 @@ pub(super) fn render_plan_timeline_item(ui: &mut egui::Ui, plan: &Plan) {
         .iter()
         .any(|e| matches!(&e.status, PlanStatus::InProgress | PlanStatus::Pending));
 
-    let header = egui::RichText::new(format!(
-        "{} Plan ({completed}/{total})",
-        egui_phosphor::regular::LIST_CHECKS
-    ))
-    .color(current_theme().text_muted)
-    .size(12.0);
+    let header = egui::RichText::new(format!("{} Plan ({completed}/{total})", icons::ICON_PLAN))
+        .color(current_theme().text_muted)
+        .size(12.0);
 
     egui::CollapsingHeader::new(header)
         .id_salt(("plan", "timeline"))
@@ -128,20 +120,8 @@ fn render_plan_entries(ui: &mut egui::Ui, plan: &Plan, dense: bool) {
 
 fn plan_entry_style(status: PlanStatus) -> (&'static str, egui::Color32, &'static str) {
     match status {
-        PlanStatus::Completed => (
-            egui_phosphor::regular::CHECK_CIRCLE,
-            current_theme().success,
-            "done",
-        ),
-        PlanStatus::InProgress => (
-            egui_phosphor::regular::CIRCLE_DASHED,
-            current_theme().warning,
-            "doing",
-        ),
-        PlanStatus::Pending => (
-            egui_phosphor::regular::CIRCLE,
-            current_theme().text_muted,
-            "todo",
-        ),
+        PlanStatus::Completed => (icons::STATUS_DONE, current_theme().success, "done"),
+        PlanStatus::InProgress => (icons::STATUS_TODO, current_theme().warning, "doing"),
+        PlanStatus::Pending => (icons::STATUS_PENDING, current_theme().text_muted, "todo"),
     }
 }

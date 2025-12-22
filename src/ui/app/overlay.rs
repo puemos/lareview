@@ -2,6 +2,7 @@ use eframe::egui;
 
 use super::{Action, LaReviewApp, ReviewAction, SettingsAction};
 use crate::ui::components::pills::pill_action_button;
+use crate::ui::icons;
 use crate::ui::spacing;
 
 impl LaReviewApp {
@@ -36,10 +37,7 @@ impl LaReviewApp {
             .title_bar(true)
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    if ui
-                        .button(format!("{} Close", egui_phosphor::regular::ARROW_SQUARE_IN))
-                        .clicked()
-                    {
+                    if ui.button(format!("{} Close", icons::ACTION_BACK)).clicked() {
                         self.dispatch(Action::Review(ReviewAction::CloseFullDiff));
                     }
                 });
@@ -89,7 +87,7 @@ impl LaReviewApp {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.add_space(spacing::SPACING_MD);
                         if ui
-                            .add(egui::Button::new(egui_phosphor::regular::X).frame(false))
+                            .add(egui::Button::new(icons::ACTION_CLOSE).frame(false))
                             .clicked()
                         {
                             self.dispatch(Action::Review(ReviewAction::CloseExportPreview));
@@ -142,7 +140,7 @@ impl LaReviewApp {
                     // Preview refresh button
                     let resp = pill_action_button(
                         ui,
-                        egui_phosphor::regular::ARROW_CLOCKWISE,
+                        icons::ACTION_REFRESH,
                         "Regenerate Preview",
                         true,
                         crate::ui::theme::current_theme().border,

@@ -3,10 +3,10 @@ use crate::application::review::ordering::{
 };
 use crate::domain::ReviewTask;
 use crate::ui::app::ReviewAction;
+use crate::ui::icons;
 use crate::ui::spacing;
 use crate::ui::theme::Theme;
 use eframe::egui;
-use egui_phosphor::regular as icons;
 
 /// Renders the logic for the Left Panel (Navigation)
 pub(crate) fn render_navigation_tree(
@@ -109,13 +109,9 @@ pub(crate) fn render_nav_item(
     };
 
     let (risk_icon, risk_color, risk_label) = match task.stats.risk {
-        crate::domain::RiskLevel::High => (
-            icons::CARET_CIRCLE_DOUBLE_UP,
-            theme.destructive,
-            "High risk",
-        ),
-        crate::domain::RiskLevel::Medium => (icons::CARET_CIRCLE_UP, theme.warning, "Medium risk"),
-        crate::domain::RiskLevel::Low => (icons::CARET_CIRCLE_DOWN, theme.accent, "Low risk"),
+        crate::domain::RiskLevel::High => (icons::RISK_HIGH, theme.destructive, "High risk"),
+        crate::domain::RiskLevel::Medium => (icons::RISK_MEDIUM, theme.warning, "Medium risk"),
+        crate::domain::RiskLevel::Low => (icons::RISK_LOW, theme.accent, "Low risk"),
     };
 
     let mut title_text = egui::RichText::new(&task.title)

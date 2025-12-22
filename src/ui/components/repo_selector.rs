@@ -1,4 +1,5 @@
 use crate::domain::LinkedRepo;
+use crate::ui::icons;
 use crate::ui::spacing::SPACING_XS;
 use crate::ui::theme::current_theme;
 use eframe::egui;
@@ -66,8 +67,8 @@ pub fn repo_selector(
 
                 // Icon
                 ui.label(
-                    egui::RichText::new(egui_phosphor::regular::FOLDER)
-                        .size(14.0)
+                    egui::RichText::new(icons::VIEW_REPOS)
+                        .size(16.0)
                         .color(current_theme().text_muted),
                 );
                 ui.add_space(6.0);

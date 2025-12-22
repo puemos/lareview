@@ -4,10 +4,10 @@ use crate::application::review::ordering::tasks_in_display_order;
 use crate::ui::app::{Action, LaReviewApp, ReviewAction};
 use crate::ui::components::pills::pill_action_button;
 use crate::ui::components::status::error_banner;
+use crate::ui::icons;
 use crate::ui::spacing;
 use crate::ui::theme::current_theme;
 use eframe::egui;
-use egui_phosphor::regular as icons;
 
 use crate::ui::views::review::nav::render_navigation_tree;
 use crate::ui::views::review::toolbar::render_header_selectors;
@@ -100,7 +100,7 @@ impl LaReviewApp {
                             if review_selected {
                                 if pill_action_button(
                                     ui,
-                                    icons::TRASH_SIMPLE,
+                                    icons::ACTION_DELETE,
                                     "Delete",
                                     review_selected,
                                     theme.border,
@@ -115,7 +115,7 @@ impl LaReviewApp {
                                 // Export Button
                                 if pill_action_button(
                                     ui,
-                                    icons::EXPORT,
+                                    icons::ACTION_EXPORT,
                                     "Export",
                                     review_selected,
                                     theme.border,

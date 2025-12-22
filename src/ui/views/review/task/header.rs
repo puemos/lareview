@@ -1,9 +1,9 @@
 use crate::domain::ReviewTask;
 use crate::ui::app::ReviewAction;
+use crate::ui::icons;
 use crate::ui::spacing;
 use crate::ui::theme::Theme;
 use eframe::egui;
-use egui_phosphor::regular as icons;
 
 pub(crate) fn render_task_header(
     ui: &mut egui::Ui,
@@ -30,10 +30,12 @@ pub(crate) fn render_task_header(
     let status_width = 140.0;
 
     let status_visuals = |status: crate::domain::TaskStatus| match status {
-        crate::domain::TaskStatus::Pending => (icons::CIRCLE, "To do", theme.brand),
-        crate::domain::TaskStatus::InProgress => (icons::CIRCLE_HALF, "In progress", theme.accent),
-        crate::domain::TaskStatus::Done => (icons::CHECK_CIRCLE, "Done", theme.success),
-        crate::domain::TaskStatus::Ignored => (icons::X_CIRCLE, "Ignored", theme.destructive),
+        crate::domain::TaskStatus::Pending => (icons::STATUS_PENDING, "To do", theme.brand),
+        crate::domain::TaskStatus::InProgress => {
+            (icons::STATUS_IN_PROGRESS, "In progress", theme.accent)
+        }
+        crate::domain::TaskStatus::Done => (icons::STATUS_DONE, "Done", theme.success),
+        crate::domain::TaskStatus::Ignored => (icons::STATUS_IGNORED, "Ignored", theme.destructive),
     };
 
     let status_widget_text =
@@ -99,17 +101,11 @@ pub(crate) fn render_task_header(
 
             // Risk Indicator
             let (risk_icon, risk_fg, risk_label) = match task.stats.risk {
-                crate::domain::RiskLevel::High => (
-                    icons::CARET_CIRCLE_DOUBLE_UP,
-                    theme.destructive,
-                    "High risk",
-                ),
-                crate::domain::RiskLevel::Medium => {
-                    (icons::CARET_CIRCLE_UP, theme.warning, "Med risk")
+                crate::domain::RiskLevel::High => {
+                    (icons::RISK_HIGH, theme.destructive, "High risk")
                 }
-                crate::domain::RiskLevel::Low => {
-                    (icons::CARET_CIRCLE_DOWN, theme.accent, "Low risk")
-                }
+                crate::domain::RiskLevel::Medium => (icons::RISK_MEDIUM, theme.warning, "Med risk"),
+                crate::domain::RiskLevel::Low => (icons::RISK_LOW, theme.accent, "Low risk"),
             };
 
             ui.horizontal(|ui| {

@@ -1,9 +1,9 @@
 use crate::domain::ReviewTask;
 use crate::ui::app::{DomainState, ReviewAction, UiState};
+use crate::ui::icons;
 use crate::ui::spacing;
 use crate::ui::theme::Theme;
 use eframe::egui;
-use egui_phosphor::regular as icons;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub(crate) enum ReviewTab {
@@ -79,19 +79,24 @@ pub(crate) fn render_task_tabs(
             }
         };
 
-        tab_button(ui, ReviewTab::Description, "Description", icons::FILE_TEXT);
+        tab_button(
+            ui,
+            ReviewTab::Description,
+            "Description",
+            icons::TAB_DESCRIPTION,
+        );
         if task.diagram.as_ref().is_some_and(|d| !d.is_empty()) {
-            tab_button(ui, ReviewTab::Diagram, "Diagram", icons::CHART_BAR);
+            tab_button(ui, ReviewTab::Diagram, "Diagram", icons::TAB_DIAGRAM);
         }
         if !task.diff_refs.is_empty() {
-            tab_button(ui, ReviewTab::Changes, "Changes", icons::GIT_DIFF);
+            tab_button(ui, ReviewTab::Changes, "Changes", icons::TAB_CHANGES);
         }
 
         tab_button(
             ui,
             ReviewTab::Discussion,
             &discussion_label,
-            icons::CHAT_CIRCLE,
+            icons::TAB_DISCUSSION,
         );
     });
 

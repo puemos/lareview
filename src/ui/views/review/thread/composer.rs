@@ -1,7 +1,7 @@
 use crate::ui::app::ReviewAction;
+use crate::ui::icons;
 use crate::ui::spacing;
 use eframe::egui;
-use egui_phosphor::regular as icons;
 
 pub(crate) fn render_reply_composer(
     ui: &mut egui::Ui,
@@ -41,7 +41,7 @@ pub(crate) fn render_reply_composer(
                 if ui
                     .add_enabled(
                         can_send,
-                        egui::Button::new(format!("{} Send Reply", icons::PAPER_PLANE_RIGHT)),
+                        egui::Button::new(format!("{} Send Reply", icons::ACTION_REPLY)),
                     )
                     .clicked()
                 {

@@ -1,10 +1,9 @@
-use eframe::egui;
-use egui_phosphor::regular as icons;
-
-use super::LaReviewApp;
-use super::state::AppView;
+use crate::ui::app::AppView;
+use crate::ui::app::LaReviewApp;
+use crate::ui::icons;
 use crate::ui::spacing::SPACING_MD;
 use crate::ui::theme;
+use eframe::egui;
 
 impl LaReviewApp {
     pub(super) fn render_header(&mut self, ctx: &egui::Context) {
@@ -30,7 +29,7 @@ impl LaReviewApp {
 
                         // Just the icon, slightly larger
                         ui.label(
-                            egui::RichText::new(icons::CIRCLE_HALF)
+                            egui::RichText::new(icons::STATUS_IN_PROGRESS)
                                 .size(22.0)
                                 .color(theme.brand),
                         );
@@ -74,7 +73,7 @@ impl LaReviewApp {
                             ui,
                             AppView::Generate,
                             "Generate",
-                            icons::GIT_DIFF,
+                            icons::VIEW_GENERATE,
                             tab_width,
                             nav_rounding,
                         );
@@ -82,7 +81,7 @@ impl LaReviewApp {
                             ui,
                             AppView::Review,
                             "Review",
-                            icons::COFFEE,
+                            icons::VIEW_REVIEW,
                             tab_width,
                             nav_rounding,
                         );
@@ -90,7 +89,7 @@ impl LaReviewApp {
                             ui,
                             AppView::Repos,
                             "Repos",
-                            icons::FOLDER,
+                            icons::VIEW_REPOS,
                             tab_width,
                             nav_rounding,
                         );
@@ -98,7 +97,7 @@ impl LaReviewApp {
                             ui,
                             AppView::Settings,
                             "Settings",
-                            icons::GEAR,
+                            icons::VIEW_SETTINGS,
                             tab_width,
                             nav_rounding,
                         );

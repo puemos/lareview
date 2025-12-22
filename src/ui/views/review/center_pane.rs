@@ -2,10 +2,10 @@ use crate::domain::ReviewTask;
 use crate::ui::app::{Action, LaReviewApp, ReviewAction};
 use crate::ui::components::action_button::action_button;
 use crate::ui::components::pills::pill_action_button;
+use crate::ui::icons;
 use crate::ui::spacing;
 use crate::ui::theme::Theme;
 use eframe::egui;
-use egui_phosphor::regular as icons;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum RightPaneState {
@@ -80,7 +80,7 @@ pub(crate) fn render_all_done_state(ui: &mut egui::Ui, theme: &Theme) {
             ui.vertical_centered(|ui| {
                 ui.add_space(ui.available_height() * 0.3);
                 ui.label(
-                    egui::RichText::new(icons::CHECK_CIRCLE)
+                    egui::RichText::new(icons::STATUS_DONE)
                         .size(64.0)
                         .color(theme.success),
                 );
@@ -119,7 +119,7 @@ pub(crate) fn render_ready_state(
 
                 // Hero Icon
                 ui.label(
-                    egui::RichText::new(icons::LIST_CHECKS)
+                    egui::RichText::new(icons::ICON_PLAN)
                         .size(64.0)
                         .color(theme.brand.gamma_multiply(0.8)),
                 );
@@ -138,7 +138,7 @@ pub(crate) fn render_ready_state(
                 let btn_enabled = next_open_id.is_some();
                 let resp = pill_action_button(
                     ui,
-                    icons::ARROW_RIGHT,
+                    icons::ICON_ARROW_RIGHT,
                     "Start Reviewing",
                     btn_enabled,
                     theme.brand,
@@ -174,7 +174,7 @@ pub(crate) fn render_empty_state(ui: &mut egui::Ui, theme: &Theme) -> Option<Act
             ui.vertical_centered(|ui| {
                 // Hero Icon
                 ui.label(
-                    egui::RichText::new(icons::BOUNDING_BOX)
+                    egui::RichText::new(icons::ICON_EMPTY)
                         .size(64.0)
                         .color(theme.border_secondary),
                 );

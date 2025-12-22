@@ -1,3 +1,4 @@
+use crate::ui::icons;
 use crate::ui::theme::current_theme;
 use egui::{Id, Image, Rect, TextureOptions, Ui, load::SizedTexture};
 use std::collections::HashMap;
@@ -241,7 +242,7 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<Arc<str>>, is_dark_mode: bool)
             .show(ui.ctx(), |ui| {
                 ui.horizontal(|ui| {
                     if ui
-                        .button(format!("{} Close", egui_phosphor::regular::X))
+                        .button(format!("{} Close", icons::ACTION_CLOSE))
                         .clicked()
                     {
                         next_is_expanded = false;

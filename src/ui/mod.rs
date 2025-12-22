@@ -4,6 +4,7 @@ pub mod animations;
 pub mod app;
 pub mod components;
 pub mod diagram;
+pub mod icons;
 pub mod layout;
 pub mod spacing;
 pub mod theme;

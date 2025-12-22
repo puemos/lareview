@@ -1,4 +1,5 @@
 use crate::ui::app::{TimelineContent, TimelineItem};
+use crate::ui::icons;
 use crate::ui::theme::current_theme;
 use eframe::egui;
 use eframe::egui::collapsing_header::CollapsingState;
@@ -144,7 +145,7 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                 .show_header(ui, |ui| {
                     ui.horizontal(|ui| {
                         ui.label(
-                            egui::RichText::new(egui_phosphor::regular::LIST_CHECKS)
+                            egui::RichText::new(icons::ICON_PLAN)
                                 .color(current_theme().text_accent),
                         );
                         ui.label(
