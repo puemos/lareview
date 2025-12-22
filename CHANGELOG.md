@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.9] - 2025-12-22
+
+### Added
+
+- Thread list component with status indicators and sorting by priority.
+- Database migration system with migration 0009 for ReviewStatus constraint updates.
+- LRU markdown caching for improved rendering performance during UI resize.
+- Reusable list item component for consistent UI patterns.
+
+### Changed
+
+- Renamed `TaskStatus` to `ReviewStatus` for broader applicability across tasks and threads.
+- Updated status enum variants: `Pending` → `Todo`, added `WIP` alias support.
+- Review view now uses three-panel layout with resizable thread list sidebar.
+- Improved markdown rendering with quantized width stepping to reduce layout thrashing.
+
+### Fixed
+
+- Database CHECK constraint now supports new status values (todo, in_progress, done, ignored) with backward compatibility.
+- Performance issues during panel resize by caching parsed markdown structures.
+
 ## [0.0.8] - 2025-12-22
 
 ### Added
