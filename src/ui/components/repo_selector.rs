@@ -15,7 +15,7 @@ pub fn repo_selector(
 
     let selected_label = selected_repo
         .map(|r| r.name.clone())
-        .unwrap_or_else(|| "No Repository Context".to_string());
+        .unwrap_or_else(|| "No Repo Context".to_string());
 
     ui.push_id("repo_selector_combo", |ui| {
         let id = ui.make_persistent_id("repo_selector_popup");

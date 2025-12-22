@@ -1,4 +1,4 @@
-use crate::domain::{TaskId, TaskStatus};
+use crate::domain::{ReviewStatus, TaskId};
 use crate::ui::app::state::AppView;
 use crate::ui::app::{FullDiffView, GenMsg, SelectedAgent};
 
@@ -53,7 +53,7 @@ pub enum ReviewAction {
     ClearSelection,
     UpdateTaskStatus {
         task_id: TaskId,
-        status: TaskStatus,
+        status: ReviewStatus,
     },
     DeleteReview,
     CreateThreadComment {
@@ -66,7 +66,7 @@ pub enum ReviewAction {
     },
     UpdateThreadStatus {
         thread_id: String,
-        status: crate::domain::ThreadStatus,
+        status: crate::domain::ReviewStatus,
     },
     UpdateThreadImpact {
         thread_id: String,
@@ -82,6 +82,7 @@ pub enum ReviewAction {
         file_path: Option<String>,
         line_number: Option<u32>,
     },
+    NavigateToThread(crate::domain::Thread),
     CloseThread,
     /// User is typing in the thread title field
     SetThreadTitleDraft {

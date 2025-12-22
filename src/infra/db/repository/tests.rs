@@ -46,7 +46,7 @@ fn test_task_save_and_load() -> anyhow::Result<()> {
         insight: None,
         diagram: None,
         ai_generated: false,
-        status: crate::domain::TaskStatus::Pending,
+        status: crate::domain::ReviewStatus::Todo,
         sub_flow: None,
     };
 
@@ -54,14 +54,14 @@ fn test_task_save_and_load() -> anyhow::Result<()> {
 
     let all_tasks = repo.find_all()?;
     assert_eq!(all_tasks.len(), 1);
-    assert_eq!(all_tasks[0].status, crate::domain::TaskStatus::Pending);
+    assert_eq!(all_tasks[0].status, crate::domain::ReviewStatus::Todo);
 
-    task.status = crate::domain::TaskStatus::Done;
+    task.status = crate::domain::ReviewStatus::Done;
     repo.save(&task)?;
 
     let all_tasks = repo.find_all()?;
     assert_eq!(all_tasks.len(), 1);
-    assert_eq!(all_tasks[0].status, crate::domain::TaskStatus::Done);
+    assert_eq!(all_tasks[0].status, crate::domain::ReviewStatus::Done);
 
     Ok(())
 }

@@ -12,7 +12,7 @@ pub const STATUS_DONE: &str = icons::CHECK_CIRCLE;
 pub const STATUS_IGNORED: &str = icons::X_CIRCLE;
 pub const STATUS_REJECTED: &str = icons::PROHIBIT;
 pub const STATUS_TODO: &str = icons::CIRCLE_DASHED;
-pub const STATUS_WIP: &str = icons::CIRCLE_NOTCH;
+pub const STATUS_WIP: &str = icons::CIRCLE_HALF;
 
 // --- Risk Levels ---
 pub const RISK_LOW: &str = icons::CARET_CIRCLE_DOWN;

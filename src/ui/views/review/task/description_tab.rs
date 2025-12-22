@@ -1,5 +1,5 @@
 use crate::ui::app::LaReviewApp;
-use crate::ui::spacing::{self, SPACING_XL};
+use crate::ui::spacing;
 use crate::ui::theme::current_theme;
 use eframe::egui;
 
@@ -10,30 +10,19 @@ impl LaReviewApp {
         task: &crate::domain::ReviewTask,
     ) {
         egui::Frame::NONE
-            .inner_margin(spacing::SPACING_XL)
+            .inner_margin(spacing::SPACING_LG) // Reduced from XL
             .show(ui, |ui| {
-                let max_width = 720.0;
-
                 ui.vertical(|ui| {
-                    ui.set_max_width(max_width);
                     ui.spacing_mut().item_spacing.y = 16.0;
 
                     let description = crate::infra::normalize_newlines(&task.description);
 
                     ui.scope(|ui| {
                         ui.spacing_mut().item_spacing.y = 16.0;
-                        ui.spacing_mut().indent = 24.0;
+                        ui.spacing_mut().indent = 0.0; // Removed extra indent
 
-                        egui::Frame::NONE
-                            .inner_margin(egui::Margin {
-                                right: (SPACING_XL * 2.0) as i8,
-                                bottom: 0,
-                                left: 0,
-                                top: 0,
-                            })
-                            .show(ui, |ui| {
-                                crate::ui::components::render_markdown(ui, &description);
-                            });
+                        // Removed inner frame with large right margin
+                        crate::ui::components::render_markdown(ui, &description);
 
                         if let Some(insight) = &task.insight {
                             ui.add_space(spacing::SPACING_XL);

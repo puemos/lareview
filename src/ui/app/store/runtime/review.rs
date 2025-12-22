@@ -3,7 +3,7 @@ use super::super::action::{
     Action, AsyncAction, ReviewAction, ReviewDataPayload, ReviewThreadsPayload,
 };
 use super::super::command::ReviewDataRefreshReason;
-use crate::domain::{Comment, ReviewId, Thread, ThreadAnchor, ThreadImpact, ThreadStatus};
+use crate::domain::{Comment, ReviewId, ReviewStatus, Thread, ThreadAnchor, ThreadImpact};
 use std::collections::HashMap;
 
 pub fn refresh_review_data(app: &mut LaReviewApp, reason: ReviewDataRefreshReason) {
@@ -60,7 +60,7 @@ pub fn load_review_threads(app: &mut LaReviewApp, review_id: ReviewId) {
 pub fn update_task_status(
     app: &mut LaReviewApp,
     task_id: crate::domain::TaskId,
-    status: crate::domain::TaskStatus,
+    status: crate::domain::ReviewStatus,
 ) {
     let result = app
         .task_repo
@@ -141,7 +141,7 @@ pub fn create_thread_comment(
                 review_id: review_id.clone(),
                 task_id: Some(task_id.clone()),
                 title,
-                status: ThreadStatus::Todo,
+                status: ReviewStatus::Todo,
                 impact: ThreadImpact::Nitpick,
                 anchor,
                 author: "User".to_string(),
@@ -190,7 +190,7 @@ pub fn create_thread_comment(
     }
 }
 
-pub fn update_thread_status(app: &mut LaReviewApp, thread_id: String, status: ThreadStatus) {
+pub fn update_thread_status(app: &mut LaReviewApp, thread_id: String, status: ReviewStatus) {
     let review_id = app.state.ui.selected_review_id.clone();
     let result = app
         .thread_repo

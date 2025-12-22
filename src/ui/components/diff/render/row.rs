@@ -36,20 +36,20 @@ pub fn render_unified_row(
         ),
         ChangeType::Delete => (
             "-",
-            theme.destructive.gamma_multiply(0.15),
+            theme.destructive.gamma_multiply(0.05),
             theme.destructive,
-            theme.destructive.gamma_multiply(0.25),
+            theme.destructive.gamma_multiply(0.05),
         ),
         ChangeType::Insert => (
             "+",
-            theme.success.gamma_multiply(0.15),
+            theme.success.gamma_multiply(0.05),
             theme.success,
-            theme.success.gamma_multiply(0.25),
+            theme.success.gamma_multiply(0.05),
         ),
     };
 
     if is_active {
-        let active_color = theme.accent.gamma_multiply(0.2);
+        let active_color = theme.accent.gamma_multiply(0.1);
         bg_color = active_color;
         line_num_bg = active_color;
     }

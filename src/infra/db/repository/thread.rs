@@ -1,5 +1,5 @@
 use super::DbConn;
-use crate::domain::{HunkRef, Thread, ThreadAnchor, ThreadImpact, ThreadSide, ThreadStatus};
+use crate::domain::{HunkRef, ReviewStatus, Thread, ThreadAnchor, ThreadImpact, ThreadSide};
 use anyhow::Result;
 use chrono::Utc;
 use rusqlite::Row;
@@ -53,7 +53,7 @@ impl ThreadRepository {
         Ok(())
     }
 
-    pub fn update_status(&self, id: &str, status: ThreadStatus) -> Result<usize> {
+    pub fn update_status(&self, id: &str, status: ReviewStatus) -> Result<usize> {
         let conn = self.conn.lock().unwrap();
         let updated = conn.execute(
             "UPDATE threads SET status = ?2, updated_at = ?3 WHERE id = ?1",
@@ -155,7 +155,7 @@ impl ThreadRepository {
             review_id: row.get(1)?,
             task_id: row.get(2)?,
             title: row.get(3)?,
-            status: ThreadStatus::from_str(&status).unwrap_or_default(),
+            status: ReviewStatus::from_str(&status).unwrap_or_default(),
             impact: ThreadImpact::from_str(&impact).unwrap_or_default(),
             anchor,
             author: row.get(11)?,

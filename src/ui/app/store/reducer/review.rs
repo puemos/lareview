@@ -1,11 +1,39 @@
 use super::super::super::state::{AppState, AppView};
 use super::super::action::{ReviewAction, ReviewDataPayload};
 use super::super::command::Command;
-use crate::domain::{TaskId, TaskStatus};
+use crate::domain::{ReviewStatus, TaskId};
 use chrono::Utc;
 
 pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
     match action {
+        ReviewAction::NavigateToThread(thread) => {
+            // 1. Select the task (this usually clears active_thread, so we do it first)
+            if let Some(task_id) = thread.task_id.clone() {
+                select_task(state, task_id.clone());
+
+                // 2. Set the active thread context
+                let file_path = thread.anchor.as_ref().and_then(|a| a.file_path.clone());
+                let line_number = thread.anchor.as_ref().and_then(|a| a.line_number);
+
+                state.ui.thread_title_draft = thread.title.clone();
+                state.ui.thread_reply_draft.clear();
+
+                state.ui.active_thread = Some(crate::ui::app::ThreadContext {
+                    thread_id: Some(thread.id),
+                    task_id,
+                    file_path,
+                    line_number,
+                });
+            } else {
+                state.ui.selected_task_id = None;
+                state.ui.active_thread = None;
+            }
+
+            // 3. Ensure we are on the Review view
+            state.ui.current_view = AppView::Review;
+
+            Vec::new()
+        }
         ReviewAction::RefreshFromDb { reason } => vec![Command::RefreshReviewData { reason }],
         ReviewAction::RefreshGitHubReview => {
             let Some(review_id) = state.ui.selected_review_id.clone() else {
@@ -231,7 +259,7 @@ pub fn select_default_task_for_current_run(state: &mut AppState) -> Vec<Command>
     let current_tasks = state.tasks();
     let Some(next_open) = current_tasks
         .iter()
-        .find(|t| matches!(t.status, TaskStatus::Pending | TaskStatus::InProgress))
+        .find(|t| matches!(t.status, ReviewStatus::Todo | ReviewStatus::InProgress))
     else {
         return Vec::new();
     };
@@ -303,7 +331,7 @@ pub fn apply_review_data(state: &mut AppState, payload: ReviewDataPayload) -> Ve
         if state.ui.selected_task_id.is_none()
             && let Some(next_open) = current_tasks
                 .iter()
-                .find(|t| matches!(t.status, TaskStatus::Pending | TaskStatus::InProgress))
+                .find(|t| matches!(t.status, ReviewStatus::Todo | ReviewStatus::InProgress))
         {
             state.ui.selected_task_id = Some(next_open.id.clone());
         }

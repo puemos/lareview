@@ -1,4 +1,4 @@
-use crate::domain::{ReviewId, TaskId, TaskStatus};
+use crate::domain::{ReviewId, ReviewStatus, TaskId};
 use crate::infra::acp::RunContext;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -43,7 +43,7 @@ pub enum Command {
     },
     UpdateTaskStatus {
         task_id: TaskId,
-        status: TaskStatus,
+        status: ReviewStatus,
     },
     DeleteReview {
         review_id: ReviewId,
@@ -59,7 +59,7 @@ pub enum Command {
     },
     UpdateThreadStatus {
         thread_id: String,
-        status: crate::domain::ThreadStatus,
+        status: crate::domain::ReviewStatus,
     },
     UpdateThreadImpact {
         thread_id: String,

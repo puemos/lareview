@@ -1,4 +1,4 @@
-use crate::domain::{ThreadImpact, ThreadStatus};
+use crate::domain::{ReviewStatus, ThreadImpact};
 use crate::ui::icons;
 use crate::ui::theme::Theme;
 use eframe::egui;
@@ -9,27 +9,27 @@ pub struct Visuals {
     pub color: egui::Color32,
 }
 
-pub fn status_visuals(status: ThreadStatus, theme: &Theme) -> Visuals {
+pub fn status_visuals(status: ReviewStatus, theme: &Theme) -> Visuals {
     match status {
-        ThreadStatus::Todo => Visuals {
-            label: "Todo",
+        ReviewStatus::Todo => Visuals {
+            label: "To Do",
             icon: icons::STATUS_TODO,
             color: theme.brand,
         },
-        ThreadStatus::Wip => Visuals {
-            label: "Wip",
+        ReviewStatus::InProgress => Visuals {
+            label: "In Progress",
             icon: icons::STATUS_WIP,
             color: theme.accent,
         },
-        ThreadStatus::Done => Visuals {
+        ReviewStatus::Done => Visuals {
             label: "Done",
             icon: icons::STATUS_DONE,
             color: theme.success,
         },
-        ThreadStatus::Reject => Visuals {
-            label: "Reject",
-            icon: icons::STATUS_REJECTED,
-            color: theme.destructive,
+        ReviewStatus::Ignored => Visuals {
+            label: "Ignored",
+            icon: icons::STATUS_IGNORED,
+            color: theme.text_muted,
         },
     }
 }

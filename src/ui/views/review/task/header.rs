@@ -29,13 +29,13 @@ pub(crate) fn render_task_header(
     let row_height = 28.0;
     let status_width = 140.0;
 
-    let status_visuals = |status: crate::domain::TaskStatus| match status {
-        crate::domain::TaskStatus::Pending => (icons::STATUS_PENDING, "To do", theme.brand),
-        crate::domain::TaskStatus::InProgress => {
-            (icons::STATUS_IN_PROGRESS, "In progress", theme.accent)
+    let status_visuals = |status: crate::domain::ReviewStatus| match status {
+        crate::domain::ReviewStatus::Todo => (icons::STATUS_TODO, "To Do", theme.brand),
+        crate::domain::ReviewStatus::InProgress => (icons::STATUS_WIP, "In Progress", theme.accent),
+        crate::domain::ReviewStatus::Done => (icons::STATUS_DONE, "Done", theme.success),
+        crate::domain::ReviewStatus::Ignored => {
+            (icons::STATUS_IGNORED, "Ignored", theme.text_muted)
         }
-        crate::domain::TaskStatus::Done => (icons::STATUS_DONE, "Done", theme.success),
-        crate::domain::TaskStatus::Ignored => (icons::STATUS_IGNORED, "Ignored", theme.destructive),
     };
 
     let status_widget_text =
@@ -77,10 +77,10 @@ pub(crate) fn render_task_header(
                 .width(status_width)
                 .show_ui(ui, |ui| {
                     for status in [
-                        crate::domain::TaskStatus::Pending,
-                        crate::domain::TaskStatus::InProgress,
-                        crate::domain::TaskStatus::Done,
-                        crate::domain::TaskStatus::Ignored,
+                        crate::domain::ReviewStatus::Todo,
+                        crate::domain::ReviewStatus::InProgress,
+                        crate::domain::ReviewStatus::Done,
+                        crate::domain::ReviewStatus::Ignored,
                     ] {
                         let (icon, label, color) = status_visuals(status);
                         let text = status_widget_text(icon, color, label, theme.text_primary);

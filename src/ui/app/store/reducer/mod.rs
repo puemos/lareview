@@ -21,9 +21,7 @@ pub fn reduce(state: &mut AppState, action: Action) -> Vec<Command> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{
-        Comment, ReviewTask, TaskStats, TaskStatus, Thread, ThreadImpact, ThreadStatus,
-    };
+    use crate::domain::{Comment, ReviewStatus, ReviewTask, TaskStats, Thread, ThreadImpact};
     use crate::ui::app::state::{AppState, AppView, SessionState, UiState};
     use crate::ui::app::store::action::{
         AsyncAction, GenerateAction, NavigationAction, ReviewAction, ReviewDataPayload,
@@ -44,7 +42,7 @@ mod tests {
             insight: None,
             diagram: None,
             ai_generated: false,
-            status: TaskStatus::Pending,
+            status: ReviewStatus::Todo,
             sub_flow: None,
         }
     }
@@ -154,14 +152,14 @@ mod tests {
             &mut state,
             Action::Review(ReviewAction::UpdateTaskStatus {
                 task_id: "t1".into(),
-                status: TaskStatus::Done,
+                status: ReviewStatus::Done,
             }),
         );
 
         assert!(
             matches!(
                 commands.as_slice(),
-                [Command::UpdateTaskStatus { task_id, status: TaskStatus::Done }]
+                [Command::UpdateTaskStatus { task_id, status: ReviewStatus::Done }]
                 if task_id == "t1"
             ),
             "expected status update command"
@@ -313,7 +311,7 @@ mod tests {
             &mut state,
             Action::Review(ReviewAction::UpdateThreadStatus {
                 thread_id: "thread-1".into(),
-                status: ThreadStatus::Wip,
+                status: ReviewStatus::InProgress,
             }),
         );
 
@@ -321,7 +319,7 @@ mod tests {
             matches!(
                 commands.as_slice(),
                 [Command::UpdateThreadStatus { thread_id, status }]
-                if thread_id == "thread-1" && *status == ThreadStatus::Wip
+                if thread_id == "thread-1" && *status == ReviewStatus::InProgress
             ),
             "expected UpdateThreadStatus command"
         );
@@ -342,7 +340,7 @@ mod tests {
             review_id: "review-1".into(),
             task_id: Some("task-1".into()),
             title: "Thread".into(),
-            status: ThreadStatus::Todo,
+            status: ReviewStatus::Todo,
             impact: ThreadImpact::Nitpick,
             anchor: None,
             author: "User".into(),

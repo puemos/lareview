@@ -135,6 +135,7 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<Arc<str>>, is_dark_mode: bool)
                         let opt = usvg::Options {
                             fontdb: FONT_DB.clone(),
                             font_family: "Geist".to_string(),
+                            font_size: 10.0,
                             ..Default::default()
                         };
                         let rtree = usvg::Tree::from_str(&svg_str, &opt);

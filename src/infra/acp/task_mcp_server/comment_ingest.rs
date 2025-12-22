@@ -1,6 +1,6 @@
 use super::config::ServerConfig;
 use super::task_ingest::{load_run_context, open_database};
-use crate::domain::{Comment, Thread, ThreadAnchor, ThreadImpact, ThreadSide, ThreadStatus};
+use crate::domain::{Comment, ReviewStatus, Thread, ThreadAnchor, ThreadImpact, ThreadSide};
 use crate::infra::db::{CommentRepository, TaskRepository, ThreadRepository};
 use crate::infra::diff_index::DiffIndex;
 use anyhow::{Context, Result, anyhow};
@@ -109,7 +109,7 @@ pub(super) fn save_agent_comment(config: &ServerConfig, args: Value) -> Result<S
         review_id: ctx.review_id.clone(),
         task_id: final_task_id,
         title,
-        status: ThreadStatus::Todo,
+        status: ReviewStatus::Todo,
         impact,
         anchor: Some(ThreadAnchor {
             file_path: Some(file.to_string()),

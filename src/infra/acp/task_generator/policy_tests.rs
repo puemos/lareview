@@ -37,7 +37,7 @@ fn sample_task(id: &str, files: &[&str]) -> crate::domain::ReviewTask {
             "Flow: { shape: sequence_diagram Reviewer -> Code: \"review\" }",
         )),
         ai_generated: true,
-        status: crate::domain::TaskStatus::Pending,
+        status: crate::domain::ReviewStatus::Todo,
         sub_flow: None,
     }
 }

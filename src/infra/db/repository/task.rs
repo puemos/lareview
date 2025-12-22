@@ -1,5 +1,5 @@
 use super::DbConn;
-use crate::domain::{ReviewRunId, ReviewTask, TaskId, TaskStatus};
+use crate::domain::{ReviewRunId, ReviewStatus, ReviewTask, TaskId};
 use anyhow::Result;
 use std::sync::Arc;
 
@@ -46,7 +46,7 @@ impl TaskRepository {
         Ok(())
     }
 
-    pub fn update_status(&self, task_id: &TaskId, new_status: TaskStatus) -> Result<()> {
+    pub fn update_status(&self, task_id: &TaskId, new_status: ReviewStatus) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let status_str = new_status.to_string();
         conn.execute(
@@ -116,7 +116,7 @@ impl TaskRepository {
                 sub_flow,
             ) = row?;
 
-            let status = TaskStatus::from_str(&status_str).unwrap_or_default();
+            let status = ReviewStatus::from_str(&status_str).unwrap_or_default();
 
             tasks.push(ReviewTask {
                 id,
@@ -193,7 +193,7 @@ impl TaskRepository {
                 sub_flow,
             ) = row?;
 
-            let status = TaskStatus::from_str(&status_str).unwrap_or_default();
+            let status = ReviewStatus::from_str(&status_str).unwrap_or_default();
 
             tasks.push(ReviewTask {
                 id,
@@ -263,7 +263,7 @@ impl TaskRepository {
                 sub_flow,
             ) = row?;
 
-            let status = TaskStatus::from_str(&status_str).unwrap_or_default();
+            let status = ReviewStatus::from_str(&status_str).unwrap_or_default();
 
             tasks.push(ReviewTask {
                 id,

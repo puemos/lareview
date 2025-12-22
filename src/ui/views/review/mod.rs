@@ -6,6 +6,7 @@ mod task;
 mod task_detail;
 mod thread;
 mod thread_detail;
+pub mod thread_list;
 mod toolbar;
 mod view;
 mod visuals;

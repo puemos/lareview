@@ -1,6 +1,5 @@
 use crate::domain::{
-    Comment, Review, ReviewRun, ReviewTask, RiskLevel, TaskStatus, Thread, ThreadImpact,
-    ThreadStatus,
+    Comment, Review, ReviewRun, ReviewStatus, ReviewTask, RiskLevel, Thread, ThreadImpact,
 };
 use crate::infra::d2::d2_to_svg_async;
 use anyhow::Result;
@@ -74,7 +73,7 @@ impl ReviewExporter {
         let completed_tasks = data
             .tasks
             .iter()
-            .filter(|t| t.status == TaskStatus::Done)
+            .filter(|t| t.status == ReviewStatus::Done)
             .count();
         let high_risk = data
             .tasks
@@ -166,8 +165,8 @@ impl ReviewExporter {
             let tasks = tasks_by_subflow.get(subflow).unwrap();
             for task in tasks {
                 let status_icon = match task.status {
-                    TaskStatus::Done => "[x]",
-                    TaskStatus::Ignored => "[~]",
+                    ReviewStatus::Done => "[x]",
+                    ReviewStatus::Ignored => "[~]",
                     _ => "[ ]",
                 };
 
@@ -318,12 +317,12 @@ impl ReviewExporter {
     }
 }
 
-fn thread_status_label(status: ThreadStatus) -> &'static str {
+fn thread_status_label(status: ReviewStatus) -> &'static str {
     match status {
-        ThreadStatus::Todo => "todo",
-        ThreadStatus::Wip => "wip",
-        ThreadStatus::Done => "done",
-        ThreadStatus::Reject => "reject",
+        ReviewStatus::Todo => "todo",
+        ReviewStatus::InProgress => "wip",
+        ReviewStatus::Done => "done",
+        ReviewStatus::Ignored => "ignored",
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::domain::{TaskId, TaskStatus};
+use crate::domain::{ReviewStatus, TaskId};
 
 use super::state::AppView;
 use super::{Action, LaReviewApp, NavigationAction, ReviewAction};
@@ -35,7 +35,7 @@ impl LaReviewApp {
         }));
     }
 
-    pub fn set_task_status(&mut self, task_id: &TaskId, new_status: TaskStatus) {
+    pub fn set_task_status(&mut self, task_id: &TaskId, new_status: ReviewStatus) {
         self.dispatch(Action::Review(ReviewAction::UpdateTaskStatus {
             task_id: task_id.clone(),
             status: new_status,

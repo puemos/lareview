@@ -1,4 +1,4 @@
-use crate::domain::{Thread, ThreadImpact, ThreadStatus};
+use crate::domain::{ReviewStatus, Thread, ThreadImpact};
 use crate::ui::app::ReviewAction;
 use crate::ui::components::{PopupOption, popup_selector};
 use crate::ui::spacing;
@@ -68,7 +68,7 @@ pub(crate) fn render_thread_header(
         let impact_choices = impact_options(theme);
 
         // Status selector
-        let status = thread.map(|t| t.status).unwrap_or(ThreadStatus::Todo);
+        let status = thread.map(|t| t.status).unwrap_or(ReviewStatus::Todo);
         if let Some(next_status) = popup_selector(
             ui,
             ui.make_persistent_id(("thread_status_popup", task_id, &thread_id)),
@@ -109,12 +109,12 @@ pub(crate) fn render_thread_header(
     action_out
 }
 
-fn status_options(theme: &Theme) -> [PopupOption<ThreadStatus>; 4] {
+fn status_options(theme: &Theme) -> [PopupOption<ReviewStatus>; 4] {
     [
-        ThreadStatus::Todo,
-        ThreadStatus::Wip,
-        ThreadStatus::Done,
-        ThreadStatus::Reject,
+        ReviewStatus::Todo,
+        ReviewStatus::InProgress,
+        ReviewStatus::Done,
+        ReviewStatus::Ignored,
     ]
     .map(|status| {
         let v = crate::ui::views::review::visuals::status_visuals(status, theme);

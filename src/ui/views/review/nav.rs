@@ -3,6 +3,7 @@ use crate::application::review::ordering::{
 };
 use crate::domain::ReviewTask;
 use crate::ui::app::ReviewAction;
+use crate::ui::components::list_item::ListItem;
 use crate::ui::icons;
 use crate::ui::spacing;
 use crate::ui::theme::Theme;
@@ -28,6 +29,21 @@ pub(crate) fn render_navigation_tree(
         });
         return None;
     }
+
+    egui::Frame::NONE
+        .inner_margin(egui::Margin::symmetric(spacing::SPACING_SM as i8, 0))
+        .show(ui, |ui| {
+            ui.add(
+                egui::Label::new(
+                    egui::RichText::new("Tasks")
+                        .strong()
+                        .color(theme.text_primary),
+                )
+                .wrap(),
+            );
+        });
+
+    ui.add_space(spacing::SPACING_SM);
 
     ui.spacing_mut().item_spacing = egui::vec2(0.0, spacing::SPACING_SM);
     ui.spacing_mut().indent = 12.0;
@@ -102,78 +118,52 @@ pub(crate) fn render_nav_item(
 ) -> Option<ReviewAction> {
     let is_selected = selected_task_id == Some(&task.id);
 
-    let (bg_color, text_color) = if is_selected {
-        (theme.bg_secondary.gamma_multiply(0.5), theme.text_primary)
-    } else {
-        (egui::Color32::TRANSPARENT, theme.text_muted)
+    // -- Status Icon --
+    let (status_icon, status_color) = match task.status {
+        crate::domain::ReviewStatus::Todo => (icons::STATUS_TODO, theme.text_muted),
+        crate::domain::ReviewStatus::InProgress => (icons::STATUS_WIP, theme.accent),
+        crate::domain::ReviewStatus::Done => (icons::STATUS_DONE, theme.success),
+        crate::domain::ReviewStatus::Ignored => (icons::STATUS_IGNORED, theme.text_muted),
     };
 
-    let (risk_icon, risk_color, risk_label) = match task.stats.risk {
-        crate::domain::RiskLevel::High => (icons::RISK_HIGH, theme.destructive, "High risk"),
-        crate::domain::RiskLevel::Medium => (icons::RISK_MEDIUM, theme.warning, "Medium risk"),
-        crate::domain::RiskLevel::Low => (icons::RISK_LOW, theme.accent, "Low risk"),
-    };
-
+    // -- Title --
     let mut title_text = egui::RichText::new(&task.title)
         .size(13.0)
-        .color(text_color);
-    if task.status.is_closed() {
-        title_text = title_text.color(theme.text_muted).strikethrough();
-    }
-
-    // Safety: If available width is less than the margin, we might panic on child allocation.
-    let min_needed_width = spacing::SPACING_SM + 4.0;
-    if ui.available_width() < min_needed_width {
-        return None;
-    }
-
-    let avail = ui.available_width();
-    let response = egui::Frame::NONE
-        .fill(bg_color)
-        .corner_radius(egui::CornerRadius {
-            nw: crate::ui::spacing::RADIUS_MD,
-            ne: 0,
-            sw: crate::ui::spacing::RADIUS_MD,
-            se: 0,
-        })
-        .inner_margin(egui::Margin {
-            left: spacing::SPACING_SM as i8,
-            right: 0,
-            top: (spacing::SPACING_XS + 1.0) as i8,
-            bottom: (spacing::SPACING_XS + 1.0) as i8,
-        })
-        .show(ui, |ui| {
-            ui.set_min_width(avail);
-            ui.horizontal(|ui| {
-                // Navigation: risk + crossed title (when closed)
-                ui.label(egui::RichText::new(risk_icon).size(15.0).color(risk_color))
-                    .on_hover_text(risk_label);
-
-                ui.add_space(4.0);
-
-                ui.add(
-                    egui::Label::new(title_text)
-                        .truncate()
-                        .show_tooltip_when_elided(true),
-                );
-            })
-            .response
-        })
-        .response;
-
-    // --- Cursor and Click Logic ---
-    let interact_response = response.interact(egui::Sense::click());
-
-    if interact_response.hovered() {
-        // Set cursor to pointer (hand) when the item is hovered
-        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-    }
-
-    if interact_response.clicked() {
-        return Some(ReviewAction::SelectTask {
-            task_id: task.id.clone(),
+        .color(if is_selected {
+            theme.text_primary
+        } else {
+            theme.text_secondary
         });
+
+    if task.status.is_closed() {
+        title_text = title_text.strikethrough().color(theme.text_muted);
+    } else if is_selected {
+        title_text = title_text.strong();
     }
 
-    None
+    // -- Risk / Subtitle --
+    let (risk_icon, risk_color, risk_label) = match task.stats.risk {
+        crate::domain::RiskLevel::High => (icons::RISK_HIGH, theme.destructive, "High Risk"),
+        crate::domain::RiskLevel::Medium => (icons::RISK_MEDIUM, theme.warning, "Medium Risk"),
+        crate::domain::RiskLevel::Low => (icons::RISK_LOW, theme.accent, "Low Risk"),
+    };
+
+    let subtitle = egui::RichText::new(format!("{}  {}", risk_icon, risk_label))
+        .size(11.0)
+        .color(risk_color);
+
+    let mut action_out = None;
+
+    ListItem::new(title_text)
+        .status_icon(status_icon, status_color)
+        .subtitle(subtitle)
+        .selected(is_selected)
+        .action(|| {
+            action_out = Some(ReviewAction::SelectTask {
+                task_id: task.id.clone(),
+            });
+        })
+        .show_with_bg(ui, theme);
+
+    action_out
 }

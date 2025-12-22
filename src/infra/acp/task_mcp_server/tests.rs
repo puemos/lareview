@@ -173,7 +173,7 @@ async fn test_return_task_tool_persists_to_db() {
     assert_eq!(tasks.len(), 1);
     assert_eq!(tasks[0].id, "task-123");
     assert_eq!(tasks[0].title, "DB Task");
-    assert_eq!(tasks[0].status, crate::domain::TaskStatus::Pending);
+    assert_eq!(tasks[0].status, crate::domain::ReviewStatus::Todo);
 
     // Restore original env var
     if let Some(original) = original_db_path {

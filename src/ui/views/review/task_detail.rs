@@ -3,6 +3,7 @@ use crate::ui::spacing;
 use crate::ui::theme::current_theme;
 use crate::ui::views::review::task::{ReviewTab, render_task_header, render_task_tabs};
 use eframe::egui;
+use egui::epaint::MarginF32;
 
 impl LaReviewApp {
     /// Renders the detailed view of the selected task
@@ -20,10 +21,12 @@ impl LaReviewApp {
         let theme = current_theme();
 
         egui::Frame::NONE
-            .inner_margin(egui::Margin::symmetric(
-                spacing::SPACING_XL as i8,
-                spacing::SPACING_XS as i8,
-            ))
+            .inner_margin(MarginF32 {
+                left: spacing::SPACING_XL,
+                right: spacing::SPACING_XL,
+                top: spacing::SPACING_XL,
+                bottom: spacing::SPACING_SM,
+            })
             .show(ui, |ui| {
                 if let Some(action) = render_task_header(ui, task, &theme) {
                     self.dispatch(Action::Review(action));
@@ -43,6 +46,7 @@ impl LaReviewApp {
         // 4. Content Area
         egui::ScrollArea::vertical()
             .id_salt(format!("detail_scroll_{}", task.id))
+            .auto_shrink([false, false])
             .show(ui, |ui| {
                 // Fetch active tab
                 let mut active_tab = ui

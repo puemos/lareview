@@ -1,4 +1,4 @@
-use crate::domain::{DiffRef, ReviewTask, RiskLevel, TaskStats, TaskStatus};
+use crate::domain::{DiffRef, ReviewStatus, ReviewTask, RiskLevel, TaskStats};
 use anyhow::Result;
 use serde::Deserialize;
 use serde_json::Value;
@@ -210,7 +210,7 @@ pub(crate) fn parse_task(args: Value) -> Result<ReviewTask> {
         insight: task.insight.map(Arc::from),
         diagram,
         ai_generated: true,
-        status: TaskStatus::Pending,
+        status: ReviewStatus::Todo,
         sub_flow: task.sub_flow,
     })
 }

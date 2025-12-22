@@ -8,8 +8,11 @@ use crate::ui::icons;
 use crate::ui::spacing;
 use crate::ui::theme::current_theme;
 use eframe::egui;
+use egui::Margin;
+use egui::epaint::MarginF32;
 
 use crate::ui::views::review::nav::render_navigation_tree;
+use crate::ui::views::review::thread_list::render_thread_list;
 use crate::ui::views::review::toolbar::render_header_selectors;
 
 // Optimized header height for a "Toolbar" feel
@@ -40,7 +43,7 @@ impl LaReviewApp {
             .filter(|t| {
                 matches!(
                     t.status,
-                    crate::domain::TaskStatus::Pending | crate::domain::TaskStatus::InProgress
+                    crate::domain::ReviewStatus::Todo | crate::domain::ReviewStatus::InProgress
                 )
             })
             .count();
@@ -48,11 +51,11 @@ impl LaReviewApp {
         // Find next actionable task
         let next_open_id = display_order_tasks
             .iter()
-            .find(|t| t.status == crate::domain::TaskStatus::Pending)
+            .find(|t| t.status == crate::domain::ReviewStatus::Todo)
             .or_else(|| {
                 display_order_tasks
                     .iter()
-                    .find(|t| t.status == crate::domain::TaskStatus::InProgress)
+                    .find(|t| t.status == crate::domain::ReviewStatus::InProgress)
             })
             .map(|t| t.id.clone());
 
@@ -201,46 +204,95 @@ impl LaReviewApp {
         let available_height = available_rect.height();
         let available_width = available_rect.width();
 
+        const MIN_CENTER_WIDTH: f32 = 450.0;
+        const MIN_SIDEBAR_WIDTH: f32 = 220.0;
+        let resize_handle_width = 8.0;
+
+        // --- Left Panel Width ---
         let tree_width_id = ui.id().with("tree_panel_width");
         let saved_tree_width = ui
             .memory(|mem| mem.data.get_temp::<f32>(tree_width_id))
             .unwrap_or(280.0);
-        let max_tree_width = (available_width - 100.0).max(0.0); // Leave at least 100px for center
-        let tree_width = crate::ui::layout::clamp_width(saved_tree_width, 220.0, max_tree_width);
 
-        let resize_handle_width = 8.0;
+        // Calculate available space for sidebars after reserving center width
+        // We also reserve space for resize handles (approx 16px)
+        let max_sidebar_budget =
+            (available_width - MIN_CENTER_WIDTH - (resize_handle_width * 2.0)).max(0.0);
 
-        // Rect Definitions
-        // Minimum width to avoid negative size panics (2 * SPACING_MD + some buffer)
-        let min_viable_width = spacing::SPACING_MD * 2.0 + 10.0;
-        let safe_tree_width = if available_width > min_viable_width + 50.0 {
-            tree_width.min(available_width - 50.0).max(0.0)
+        // Prioritize Left Panel
+        let tree_width = saved_tree_width.clamp(MIN_SIDEBAR_WIDTH, max_sidebar_budget);
+
+        // Determine actual visibility/width of Left Panel
+        // If budget is tiny, we might hide it or squeeze center.
+        // Strategy: Always show Left if at least MIN_SIDEBAR_WIDTH fits in budget.
+        let safe_tree_width = if max_sidebar_budget >= MIN_SIDEBAR_WIDTH {
+            tree_width
+        } else {
+            // If super narrow, check if we can fit it by squeezing center?
+            // For now, let's just clamp to 0 if we strictly enforce center min width.
+            // Or maybe we allow center to shrink if window is very small.
+            // Let's stick to the plan: Hide/Collapse if it doesn't fit.
+            if available_width > MIN_SIDEBAR_WIDTH + 200.0 {
+                // Allow center to go below min if needed
+                tree_width.min(available_width - 200.0)
+            } else {
+                0.0
+            }
+        };
+
+        // --- Right Panel Width ---
+        let threads_width_id = ui.id().with("threads_panel_width");
+        let saved_threads_width = ui
+            .memory(|mem| mem.data.get_temp::<f32>(threads_width_id))
+            .unwrap_or(300.0);
+
+        // Calculate remaining budget for Right Panel
+        let remaining_for_right = (max_sidebar_budget - safe_tree_width).max(0.0);
+
+        // Auto-hide Right Panel if not enough space
+        let safe_threads_width = if remaining_for_right >= MIN_SIDEBAR_WIDTH {
+            saved_threads_width.clamp(MIN_SIDEBAR_WIDTH, remaining_for_right)
         } else {
             0.0
         };
 
+        // --- Rect Definitions ---
         let left_rect = egui::Rect::from_min_size(
             available_rect.min,
             egui::vec2(safe_tree_width, available_height),
         );
-        let resize_rect = egui::Rect::from_min_size(
+        let left_resize_rect = egui::Rect::from_min_size(
             egui::pos2(left_rect.max.x, left_rect.min.y),
             egui::vec2(resize_handle_width, available_height),
         );
 
-        // Safety: Ensure center rect has non-negative width
-        let center_min_x = resize_rect.max.x;
-        let center_max_x = available_rect.max.x.max(center_min_x);
+        let right_rect = egui::Rect::from_min_size(
+            egui::pos2(
+                available_rect.max.x - safe_threads_width,
+                available_rect.min.y,
+            ),
+            egui::vec2(safe_threads_width, available_height),
+        );
+        let right_resize_rect = egui::Rect::from_min_size(
+            egui::pos2(right_rect.min.x - resize_handle_width, right_rect.min.y),
+            egui::vec2(resize_handle_width, available_height),
+        );
+
+        // Center Panel Rect
+        let center_min_x = left_resize_rect.max.x;
+        let center_max_x = right_resize_rect.min.x;
 
         let center_rect = egui::Rect::from_min_max(
             egui::pos2(center_min_x, available_rect.min.y),
-            egui::pos2(center_max_x, available_rect.max.y),
+            egui::pos2(center_max_x.max(center_min_x), available_rect.max.y),
         );
+
+        // Min viable width check for rendering content (sanity check)
+        let min_viable_width = spacing::SPACING_MD * 2.0;
 
         // --- A. Left Panel (Navigation Tree) ---
         if safe_tree_width > min_viable_width {
             let mut left_ui = ui.new_child(egui::UiBuilder::new().max_rect(left_rect));
-            // Slight contrast for navigation panel
             egui::Frame::NONE
                 .inner_margin(egui::Margin {
                     left: (spacing::SPACING_SM + 2.0) as i8,
@@ -267,9 +319,9 @@ impl LaReviewApp {
                 });
         }
 
-        // --- B. Resize Handle ---
+        // --- Left Resize Handle ---
         let resize_response = ui.interact(
-            resize_rect,
+            left_resize_rect,
             ui.id().with("resize_tree"),
             egui::Sense::drag(),
         );
@@ -280,13 +332,12 @@ impl LaReviewApp {
             ui.memory_mut(|mem| mem.data.insert_temp(tree_width_id, new_width));
         }
 
-        // Draw Resize Visuals
+        // Draw Left Resize Visuals
         let hover_active = resize_response.hovered() || resize_response.dragged();
         if hover_active {
             ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
         }
-        // Draw a subtle line in the center of the handle
-        let line_x = resize_rect.center().x + 3.5;
+        let line_x = left_resize_rect.center().x + 3.5;
         let line_color = if hover_active {
             theme.accent
         } else {
@@ -294,13 +345,13 @@ impl LaReviewApp {
         };
         ui.painter().line_segment(
             [
-                egui::pos2(line_x, resize_rect.min.y),
-                egui::pos2(line_x, resize_rect.max.y),
+                egui::pos2(line_x, left_resize_rect.min.y),
+                egui::pos2(line_x, left_resize_rect.max.y),
             ],
             egui::Stroke::new(1.0, line_color),
         );
 
-        // --- C. Center Panel (Task Detail or Status) ---
+        // --- B. Center Panel (Task Detail or Status) ---
         {
             let mut center_ui = ui.new_child(egui::UiBuilder::new().max_rect(center_rect));
             egui::Frame::NONE
@@ -313,6 +364,90 @@ impl LaReviewApp {
                         open_tasks,
                         next_open_id,
                     );
+                });
+        }
+
+        // --- C. Right Resize Handle ---
+        let right_resize_response = ui.interact(
+            right_resize_rect,
+            ui.id().with("resize_threads"),
+            egui::Sense::drag(),
+        );
+        if right_resize_response.dragged()
+            && let Some(pointer_pos) = ui.ctx().pointer_interact_pos()
+        {
+            // Dragging left increases width (since it's anchored right)
+            let new_width = available_rect.max.x - pointer_pos.x;
+            ui.memory_mut(|mem| mem.data.insert_temp(threads_width_id, new_width));
+        }
+
+        let right_hover_active = right_resize_response.hovered() || right_resize_response.dragged();
+        if right_hover_active {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+        }
+        let right_line_x = right_resize_rect.center().x - 3.5;
+        let right_line_color = if right_hover_active {
+            theme.accent
+        } else {
+            theme.border
+        };
+        ui.painter().line_segment(
+            [
+                egui::pos2(right_line_x, right_resize_rect.min.y),
+                egui::pos2(right_line_x, right_resize_rect.max.y),
+            ],
+            egui::Stroke::new(1.0, right_line_color),
+        );
+
+        // --- D. Right Panel (Thread List) ---
+        if safe_threads_width > min_viable_width {
+            let mut right_ui = ui.new_child(egui::UiBuilder::new().max_rect(right_rect));
+            egui::Frame::NONE
+                .inner_margin(MarginF32 {
+                    left: 0.0,
+                    right: 0.0,
+                    top: spacing::SPACING_LG,
+                    bottom: spacing::SPACING_SM,
+                })
+                .show(&mut right_ui, |ui| {
+                    egui::Frame::NONE
+                        .inner_margin(Margin::symmetric(spacing::SPACING_SM as i8, 0))
+                        .show(ui, |ui| {
+                            ui.add(
+                                egui::Label::new(
+                                    egui::RichText::new("All Threads")
+                                        .strong()
+                                        .color(theme.text_primary),
+                                )
+                                .wrap(),
+                            );
+                        });
+
+                    ui.add_space(spacing::SPACING_SM);
+                    if let Some(review_id) = &self.state.ui.selected_review_id {
+                        // Filter threads for current review
+                        let review_threads: Vec<_> = self
+                            .state
+                            .domain
+                            .threads
+                            .iter()
+                            .filter(|t| &t.review_id == review_id)
+                            .cloned()
+                            .collect();
+
+                        let active_thread_id = self
+                            .state
+                            .ui
+                            .active_thread
+                            .as_ref()
+                            .and_then(|t| t.thread_id.as_deref());
+
+                        if let Some(action) =
+                            render_thread_list(ui, &review_threads, active_thread_id, &theme)
+                        {
+                            self.dispatch(Action::Review(action));
+                        }
+                    }
                 });
         }
     }
