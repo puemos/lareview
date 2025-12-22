@@ -4,7 +4,97 @@ use crate::ui::theme::current_theme;
 use eframe::egui;
 use egui_phosphor::regular as icons;
 
+use crate::application::review::ordering::{
+    sub_flows_in_display_order, tasks_in_sub_flow_display_order,
+};
+
 impl LaReviewApp {
+    /// Renders the logic for the Left Panel (Navigation)
+    pub(super) fn render_navigation_tree(
+        &mut self,
+        ui: &mut egui::Ui,
+        tasks_by_sub_flow: &std::collections::HashMap<
+            Option<String>,
+            Vec<crate::domain::ReviewTask>,
+        >,
+    ) {
+        let sub_flows = sub_flows_in_display_order(tasks_by_sub_flow);
+
+        if sub_flows.is_empty() {
+            ui.vertical_centered(|ui| {
+                ui.add_space(20.0);
+                ui.label(
+                    egui::RichText::new("No tasks loaded")
+                        .italics()
+                        .color(current_theme().text_muted),
+                );
+            });
+            return;
+        }
+
+        ui.spacing_mut().item_spacing = egui::vec2(0.0, spacing::SPACING_SM);
+        ui.spacing_mut().indent = 12.0;
+        ui.visuals_mut().indent_has_left_vline = true;
+        ui.visuals_mut().widgets.noninteractive.bg_stroke =
+            egui::Stroke::new(1.0, current_theme().border);
+
+        for (sub_flow_name, tasks) in sub_flows {
+            let title = sub_flow_name.as_deref().unwrap_or("UNCATEGORIZED");
+            let title_upper = title.to_uppercase();
+            let total = tasks.len();
+            let finished = tasks.iter().filter(|t| t.status.is_closed()).count();
+            let is_done = finished == total && total > 0;
+
+            let header_id = ui.id().with(("sub_flow_collapse", title));
+
+            ui.set_width(ui.available_width());
+
+            egui::collapsing_header::CollapsingState::load_with_default_open(
+                ui.ctx(),
+                header_id,
+                true,
+            )
+            .show_header(ui, |ui| {
+                ui.horizontal(|ui| {
+                    let mut heading = egui::RichText::new(&title_upper)
+                        .family(egui::FontFamily::Proportional)
+                        .strong()
+                        .size(11.0)
+                        .extra_letter_spacing(0.5);
+
+                    if is_done {
+                        heading = heading.color(current_theme().text_muted);
+                    } else {
+                        heading = heading.color(current_theme().text_primary);
+                    }
+
+                    ui.label(heading);
+
+                    ui.add_space(spacing::SPACING_XS);
+
+                    let color = if is_done {
+                        current_theme().success
+                    } else {
+                        current_theme().text_muted
+                    };
+
+                    let count_text = egui::RichText::new(format!("{}/{}", finished, total))
+                        .size(11.0)
+                        .color(color);
+
+                    ui.label(count_text);
+                });
+            })
+            .body(|ui| {
+                ui.set_width(ui.available_width());
+                ui.spacing_mut().item_spacing = egui::vec2(0.0, spacing::SPACING_XS);
+                for task in tasks_in_sub_flow_display_order(tasks) {
+                    self.render_nav_item(ui, task);
+                }
+            });
+        }
+    }
+
     /// Renders a single task item in the sidebar
     pub(super) fn render_nav_item(&mut self, ui: &mut egui::Ui, task: &crate::domain::ReviewTask) {
         let is_selected = self.state.ui.selected_task_id.as_ref() == Some(&task.id);

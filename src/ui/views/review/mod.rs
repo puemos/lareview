@@ -1,11 +1,13 @@
 //! Review view module (split by feature parts).
 
+mod center_pane;
 mod nav;
 mod screen;
 mod selection;
 mod task;
 mod task_detail;
 mod thread_detail;
+mod toolbar;
 mod visuals;
 
 pub(super) fn format_timestamp(value: &str) -> String {
