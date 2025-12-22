@@ -61,8 +61,10 @@ impl LaReviewApp {
         }
 
         task_threads.sort_by(|a, b| {
-            b.updated_at
-                .cmp(&a.updated_at)
+            a.status
+                .rank()
+                .cmp(&b.status.rank())
+                .then_with(|| b.updated_at.cmp(&a.updated_at))
                 .then_with(|| b.created_at.cmp(&a.created_at))
         });
 

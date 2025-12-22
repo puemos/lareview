@@ -4,6 +4,8 @@ use anyhow::Result;
 use chrono::Utc;
 use rusqlite::Row;
 
+use std::str::FromStr;
+
 pub struct ThreadRepository {
     conn: DbConn,
 }
@@ -33,11 +35,14 @@ impl ThreadRepository {
                 thread.review_id,
                 thread.task_id,
                 thread.title,
-                Self::status_str(thread.status),
-                Self::impact_str(thread.impact),
+                thread.status.to_string(),
+                thread.impact.to_string(),
                 anchor.and_then(|a| a.file_path.clone()),
                 anchor.and_then(|a| a.line_number.map(|n| n as i32)),
-                anchor.and_then(|a| a.side).map(Self::side_str),
+                anchor.and_then(|a| a.side).map(|s| match s {
+                    ThreadSide::Old => "old",
+                    ThreadSide::New => "new",
+                }),
                 hunk_ref,
                 anchor.and_then(|a| a.head_sha.clone()),
                 thread.author,
@@ -52,7 +57,7 @@ impl ThreadRepository {
         let conn = self.conn.lock().unwrap();
         let updated = conn.execute(
             "UPDATE threads SET status = ?2, updated_at = ?3 WHERE id = ?1",
-            rusqlite::params![id, Self::status_str(status), Utc::now().to_rfc3339()],
+            rusqlite::params![id, status.to_string(), Utc::now().to_rfc3339()],
         )?;
         Ok(updated)
     }
@@ -61,7 +66,7 @@ impl ThreadRepository {
         let conn = self.conn.lock().unwrap();
         let updated = conn.execute(
             "UPDATE threads SET impact = ?2, updated_at = ?3 WHERE id = ?1",
-            rusqlite::params![id, Self::impact_str(impact), Utc::now().to_rfc3339()],
+            rusqlite::params![id, impact.to_string(), Utc::now().to_rfc3339()],
         )?;
         Ok(updated)
     }
@@ -150,53 +155,12 @@ impl ThreadRepository {
             review_id: row.get(1)?,
             task_id: row.get(2)?,
             title: row.get(3)?,
-            status: Self::status_from_str(&status),
-            impact: Self::impact_from_str(&impact),
+            status: ThreadStatus::from_str(&status).unwrap_or_default(),
+            impact: ThreadImpact::from_str(&impact).unwrap_or_default(),
             anchor,
             author: row.get(11)?,
             created_at: row.get(12)?,
             updated_at: row.get(13)?,
         })
-    }
-
-    fn status_str(status: ThreadStatus) -> &'static str {
-        match status {
-            ThreadStatus::Todo => "todo",
-            ThreadStatus::Wip => "wip",
-            ThreadStatus::Done => "done",
-            ThreadStatus::Reject => "reject",
-        }
-    }
-
-    fn impact_str(impact: ThreadImpact) -> &'static str {
-        match impact {
-            ThreadImpact::Blocking => "blocking",
-            ThreadImpact::NiceToHave => "nice_to_have",
-            ThreadImpact::Nitpick => "nitpick",
-        }
-    }
-
-    fn side_str(side: ThreadSide) -> &'static str {
-        match side {
-            ThreadSide::Old => "old",
-            ThreadSide::New => "new",
-        }
-    }
-
-    fn status_from_str(value: &str) -> ThreadStatus {
-        match value {
-            "wip" => ThreadStatus::Wip,
-            "done" => ThreadStatus::Done,
-            "reject" => ThreadStatus::Reject,
-            _ => ThreadStatus::Todo,
-        }
-    }
-
-    fn impact_from_str(value: &str) -> ThreadImpact {
-        match value {
-            "blocking" => ThreadImpact::Blocking,
-            "nice_to_have" => ThreadImpact::NiceToHave,
-            _ => ThreadImpact::Nitpick,
-        }
     }
 }

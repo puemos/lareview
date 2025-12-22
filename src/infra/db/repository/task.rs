@@ -2,6 +2,8 @@ use super::DbConn;
 use crate::domain::{ReviewRunId, ReviewTask, TaskId, TaskStatus};
 use anyhow::Result;
 
+use std::str::FromStr;
+
 /// Repository for task operations.
 pub struct TaskRepository {
     conn: DbConn,
@@ -12,22 +14,13 @@ impl TaskRepository {
         Self { conn }
     }
 
-    fn parse_task_status(status_str: &str) -> TaskStatus {
-        match status_str {
-            "DONE" | "REVIEWED" | "COMPLETED" => TaskStatus::Done,
-            "INPROGRESS" | "IN_PROGRESS" => TaskStatus::InProgress,
-            "IGNORED" => TaskStatus::Ignored,
-            _ => TaskStatus::Pending,
-        }
-    }
-
     pub fn save(&self, task: &ReviewTask) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let files_json = serde_json::to_string(&task.files)?;
         let stats_json = serde_json::to_string(&task.stats)?;
         let diff_refs_json = serde_json::to_string(&task.diff_refs)?;
 
-        let status_str = serde_json::to_string(&task.status)?.replace('"', "");
+        let status_str = task.status.to_string();
 
         conn.execute(
             r#"
@@ -54,7 +47,7 @@ impl TaskRepository {
 
     pub fn update_status(&self, task_id: &TaskId, new_status: TaskStatus) -> Result<()> {
         let conn = self.conn.lock().unwrap();
-        let status_str = serde_json::to_string(&new_status)?.replace('"', "");
+        let status_str = new_status.to_string();
         conn.execute(
             "UPDATE tasks SET status = ?1 WHERE id = ?2",
             (&status_str, task_id),
@@ -122,7 +115,7 @@ impl TaskRepository {
                 sub_flow,
             ) = row?;
 
-            let status = Self::parse_task_status(status_str.as_str());
+            let status = TaskStatus::from_str(&status_str).unwrap_or_default();
 
             tasks.push(ReviewTask {
                 id,
@@ -199,7 +192,7 @@ impl TaskRepository {
                 sub_flow,
             ) = row?;
 
-            let status = Self::parse_task_status(status_str.as_str());
+            let status = TaskStatus::from_str(&status_str).unwrap_or_default();
 
             tasks.push(ReviewTask {
                 id,
@@ -269,7 +262,7 @@ impl TaskRepository {
                 sub_flow,
             ) = row?;
 
-            let status = Self::parse_task_status(status_str.as_str());
+            let status = TaskStatus::from_str(&status_str).unwrap_or_default();
 
             tasks.push(ReviewTask {
                 id,

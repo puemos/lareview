@@ -6,6 +6,9 @@ use serde::{Deserialize, Serialize};
 pub mod repo;
 pub use repo::*;
 
+use std::fmt;
+use std::str::FromStr;
+
 /// Unique identifier for a pull request
 pub type ReviewId = String;
 
@@ -26,6 +29,28 @@ pub enum RiskLevel {
     Medium,
     /// High risk changes that require careful review
     High,
+}
+
+impl fmt::Display for RiskLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "LOW"),
+            Self::Medium => write!(f, "MEDIUM"),
+            Self::High => write!(f, "HIGH"),
+        }
+    }
+}
+
+impl FromStr for RiskLevel {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "LOW" => Ok(Self::Low),
+            "MEDIUM" => Ok(Self::Medium),
+            "HIGH" => Ok(Self::High),
+            _ => Err(format!("Unknown risk level: {}", s)),
+        }
+    }
 }
 
 impl RiskLevel {
@@ -156,6 +181,30 @@ pub enum TaskStatus {
     /// Task has been reviewed but was determined to be ignorable
     #[serde(alias = "IGNORED")]
     Ignored,
+}
+
+impl fmt::Display for TaskStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Pending => write!(f, "PENDING"),
+            Self::InProgress => write!(f, "IN_PROGRESS"),
+            Self::Done => write!(f, "DONE"),
+            Self::Ignored => write!(f, "IGNORED"),
+        }
+    }
+}
+
+impl FromStr for TaskStatus {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "PENDING" => Ok(Self::Pending),
+            "IN_PROGRESS" | "INPROGRESS" => Ok(Self::InProgress),
+            "DONE" | "REVIEWED" | "COMPLETED" => Ok(Self::Done),
+            "IGNORED" => Ok(Self::Ignored),
+            _ => Ok(Self::Pending),
+        }
+    }
 }
 
 impl TaskStatus {
@@ -307,6 +356,41 @@ pub enum ThreadStatus {
     Reject,
 }
 
+impl fmt::Display for ThreadStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Todo => write!(f, "todo"),
+            Self::Wip => write!(f, "wip"),
+            Self::Done => write!(f, "done"),
+            Self::Reject => write!(f, "reject"),
+        }
+    }
+}
+
+impl FromStr for ThreadStatus {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "todo" => Ok(Self::Todo),
+            "wip" => Ok(Self::Wip),
+            "done" => Ok(Self::Done),
+            "reject" => Ok(Self::Reject),
+            _ => Ok(Self::Todo),
+        }
+    }
+}
+
+impl ThreadStatus {
+    pub fn rank(self) -> u8 {
+        match self {
+            Self::Todo => 0,
+            Self::Wip => 1,
+            Self::Reject => 2,
+            Self::Done => 3,
+        }
+    }
+}
+
 /// Impact/severity level for a thread
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -319,6 +403,28 @@ pub enum ThreadImpact {
     /// Nice to have before/after merge
     #[serde(alias = "nice-to-have")]
     NiceToHave,
+}
+
+impl fmt::Display for ThreadImpact {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Nitpick => write!(f, "nitpick"),
+            Self::Blocking => write!(f, "blocking"),
+            Self::NiceToHave => write!(f, "nice_to_have"),
+        }
+    }
+}
+
+impl FromStr for ThreadImpact {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "nitpick" => Ok(Self::Nitpick),
+            "blocking" => Ok(Self::Blocking),
+            "nice_to_have" | "nice-to-have" => Ok(Self::NiceToHave),
+            _ => Ok(Self::Nitpick),
+        }
+    }
 }
 
 /// Side of a diff line
