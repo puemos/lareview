@@ -161,56 +161,71 @@ pub struct TaskStats {
     pub tags: Vec<String>,
 }
 
-/// Status of a review task
+/// Status of a review item (task or thread)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "UPPERCASE")]
-pub enum TaskStatus {
-    /// Task has not been started yet
+pub enum ReviewStatus {
+    /// Work to do
     #[default]
     #[serde(alias = "PENDING")]
-    Pending,
-    /// Task is currently being worked on
+    #[serde(alias = "TODO")]
+    Todo,
+    /// Work in progress
     #[serde(alias = "INPROGRESS")]
     #[serde(alias = "IN_PROGRESS")]
     #[serde(alias = "inprogress")]
     #[serde(alias = "in_progress")]
+    #[serde(alias = "WIP")]
+    #[serde(alias = "wip")]
     InProgress,
-    /// Task has been completed
+    /// Work completed
     #[serde(alias = "REVIEWED")]
     #[serde(alias = "COMPLETED")]
+    #[serde(alias = "DONE")]
     Done,
-    /// Task has been reviewed but was determined to be ignorable
+    /// Work ignored or rejected
     #[serde(alias = "IGNORED")]
+    #[serde(alias = "REJECT")]
+    #[serde(alias = "REJECTED")]
     Ignored,
 }
 
-impl fmt::Display for TaskStatus {
+impl fmt::Display for ReviewStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Pending => write!(f, "PENDING"),
-            Self::InProgress => write!(f, "IN_PROGRESS"),
-            Self::Done => write!(f, "DONE"),
-            Self::Ignored => write!(f, "IGNORED"),
+            Self::Todo => write!(f, "todo"),
+            Self::InProgress => write!(f, "in_progress"),
+            Self::Done => write!(f, "done"),
+            Self::Ignored => write!(f, "ignored"),
         }
     }
 }
 
-impl FromStr for TaskStatus {
+impl FromStr for ReviewStatus {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_uppercase().as_str() {
-            "PENDING" => Ok(Self::Pending),
-            "IN_PROGRESS" | "INPROGRESS" => Ok(Self::InProgress),
+            "PENDING" | "TODO" => Ok(Self::Todo),
+            "IN_PROGRESS" | "INPROGRESS" | "WIP" => Ok(Self::InProgress),
             "DONE" | "REVIEWED" | "COMPLETED" => Ok(Self::Done),
-            "IGNORED" => Ok(Self::Ignored),
-            _ => Ok(Self::Pending),
+            "IGNORED" | "REJECT" | "REJECTED" => Ok(Self::Ignored),
+            _ => Ok(Self::Todo),
         }
     }
 }
 
-impl TaskStatus {
+impl ReviewStatus {
     pub fn is_closed(self) -> bool {
         matches!(self, Self::Done | Self::Ignored)
+    }
+
+    pub fn rank(self) -> u8 {
+        match self {
+            Self::Todo => 0,
+            Self::InProgress => 1,
+            Self::Ignored => 2,
+            Self::Done => 3,
+        }
     }
 }
 
@@ -241,7 +256,7 @@ pub struct ReviewTask {
     pub ai_generated: bool,
     /// Current review status of the task
     #[serde(default)]
-    pub status: TaskStatus,
+    pub status: ReviewStatus,
     /// Optional sub-flow name this task belongs to for organizational purposes
     #[serde(default)]
     pub sub_flow: Option<String>,
@@ -342,56 +357,6 @@ impl From<agent_client_protocol::PlanEntry> for PlanEntry {
     }
 }
 
-/// Status of a feedback thread
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum ThreadStatus {
-    /// Work to do
-    #[default]
-    Todo,
-    /// Work in progress
-    Wip,
-    /// Work completed
-    Done,
-    /// Declined or won't fix (can be reopened)
-    Reject,
-}
-
-impl fmt::Display for ThreadStatus {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Todo => write!(f, "todo"),
-            Self::Wip => write!(f, "wip"),
-            Self::Done => write!(f, "done"),
-            Self::Reject => write!(f, "reject"),
-        }
-    }
-}
-
-impl FromStr for ThreadStatus {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "todo" => Ok(Self::Todo),
-            "wip" => Ok(Self::Wip),
-            "done" => Ok(Self::Done),
-            "reject" => Ok(Self::Reject),
-            _ => Ok(Self::Todo),
-        }
-    }
-}
-
-impl ThreadStatus {
-    pub fn rank(self) -> u8 {
-        match self {
-            Self::Todo => 0,
-            Self::Wip => 1,
-            Self::Reject => 2,
-            Self::Done => 3,
-        }
-    }
-}
-
 /// Impact/severity level for a thread
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -459,7 +424,7 @@ pub struct Thread {
     #[serde(default)]
     pub task_id: Option<TaskId>,
     pub title: String,
-    pub status: ThreadStatus,
+    pub status: ReviewStatus,
     pub impact: ThreadImpact,
     #[serde(default)]
     pub anchor: Option<ThreadAnchor>,
