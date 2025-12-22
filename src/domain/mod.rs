@@ -2,12 +2,11 @@
 //! Defines the core data structures and business objects used throughout the application.
 
 use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::str::FromStr;
 
 pub mod repo;
 pub use repo::*;
-
-use std::fmt;
-use std::str::FromStr;
 
 /// Unique identifier for a pull request
 pub type ReviewId = String;

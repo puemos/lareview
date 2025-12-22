@@ -145,7 +145,6 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                     ui.horizontal(|ui| {
                         ui.label(
                             egui::RichText::new(egui_phosphor::regular::LIST_CHECKS)
-                                .monospace()
                                 .color(current_theme().text_accent),
                         );
                         ui.label(

@@ -37,7 +37,6 @@ pub(super) fn render_plan_panel(ui: &mut egui::Ui, plan: &Plan) {
                             "{} {completed}/{total}",
                             egui_phosphor::regular::CHECK_CIRCLE
                         ))
-                        .monospace()
                         .size(11.0)
                         .color(current_theme().text_muted),
                     );
@@ -102,12 +101,7 @@ fn render_plan_entries(ui: &mut egui::Ui, plan: &Plan, dense: bool) {
         ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
             ui.spacing_mut().item_spacing = egui::vec2(spacing::SPACING_SM, 0.0); // 8.0, 0.0
 
-            ui.label(
-                egui::RichText::new(icon)
-                    .size(14.0)
-                    .monospace()
-                    .color(color),
-            );
+            ui.label(egui::RichText::new(icon).size(14.0).color(color));
 
             let text_color = match status {
                 PlanStatus::Completed => current_theme().text_muted,
