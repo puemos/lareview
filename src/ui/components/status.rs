@@ -22,9 +22,28 @@ pub fn error_banner(ui: &mut egui::Ui, error_message: &str) {
             spacing::SPACING_SM as i8,
         ))
         .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("error:").color(theme.destructive));
-                ui.label(egui::RichText::new(error_message).color(theme.text_primary));
-            });
+            let mut job = egui::text::LayoutJob::default();
+            let font_id = egui::TextStyle::Body.resolve(ui.style());
+
+            job.append(
+                "error: ",
+                0.0,
+                egui::TextFormat {
+                    font_id: font_id.clone(),
+                    color: theme.destructive,
+                    ..Default::default()
+                },
+            );
+            job.append(
+                error_message,
+                0.0,
+                egui::TextFormat {
+                    font_id,
+                    color: theme.text_primary,
+                    ..Default::default()
+                },
+            );
+
+            ui.label(job);
         });
 }
