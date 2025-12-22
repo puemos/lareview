@@ -108,8 +108,32 @@ impl Database {
     }
 
     /// Get a reference to the connection
-    pub fn connection(&self) -> Arc<Mutex<Connection>> {
+    pub(crate) fn connection(&self) -> Arc<Mutex<Connection>> {
         self.conn.clone()
+    }
+
+    pub fn task_repo(&self) -> crate::infra::db::repository::TaskRepository {
+        crate::infra::db::repository::TaskRepository::new(self.connection())
+    }
+
+    pub fn thread_repo(&self) -> crate::infra::db::repository::ThreadRepository {
+        crate::infra::db::repository::ThreadRepository::new(self.connection())
+    }
+
+    pub fn comment_repo(&self) -> crate::infra::db::repository::CommentRepository {
+        crate::infra::db::repository::CommentRepository::new(self.connection())
+    }
+
+    pub fn review_repo(&self) -> crate::infra::db::repository::ReviewRepository {
+        crate::infra::db::repository::ReviewRepository::new(self.connection())
+    }
+
+    pub fn run_repo(&self) -> crate::infra::db::repository::ReviewRunRepository {
+        crate::infra::db::repository::ReviewRunRepository::new(self.connection())
+    }
+
+    pub fn repo_repo(&self) -> crate::infra::db::repository::RepoRepository {
+        crate::infra::db::repository::RepoRepository::new(self.connection())
     }
 
     fn create_schema(conn: &Connection) -> Result<()> {

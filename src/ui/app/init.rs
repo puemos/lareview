@@ -5,10 +5,7 @@ use eframe::egui::FontDefinitions;
 use egui::{FontData, FontFamily};
 use tokio::sync::mpsc;
 
-use crate::infra::db::{
-    CommentRepository, Database, ReviewRepository, ReviewRunRepository, TaskRepository,
-    ThreadRepository,
-};
+use crate::infra::db::Database;
 
 use super::LaReviewApp;
 use super::state::{AppState, AppView, SelectedAgent};
@@ -88,15 +85,12 @@ impl LaReviewApp {
 
         let db = Database::open().expect("db open");
 
-        let conn = db.connection();
-        let task_repo = Arc::new(TaskRepository::new(conn.clone()));
-        let thread_repo = Arc::new(ThreadRepository::new(conn.clone()));
-        let comment_repo = Arc::new(CommentRepository::new(conn.clone()));
-        let review_repo = Arc::new(ReviewRepository::new(conn.clone()));
-        let run_repo = Arc::new(ReviewRunRepository::new(conn.clone()));
-        let repo_repo = Arc::new(crate::infra::db::repository::RepoRepository::new(
-            conn.clone(),
-        ));
+        let task_repo = Arc::new(db.task_repo());
+        let thread_repo = Arc::new(db.thread_repo());
+        let comment_repo = Arc::new(db.comment_repo());
+        let review_repo = Arc::new(db.review_repo());
+        let run_repo = Arc::new(db.run_repo());
+        let repo_repo = Arc::new(db.repo_repo());
 
         let config = crate::infra::app_config::load_config();
 
