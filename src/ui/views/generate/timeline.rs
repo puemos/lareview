@@ -136,7 +136,8 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                 );
             });
         }
-        SessionUpdate::Plan(plan) => {
+        SessionUpdate::Plan(protocol_plan) => {
+            let plan = crate::domain::Plan::from(protocol_plan.clone());
             // Collapsed by default
             let id = ui.make_persistent_id(format!("plan_{}", plan.entries.len()));
             egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, false)
@@ -159,7 +160,7 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                     });
                 })
                 .body(|ui| {
-                    super::plan::render_plan_timeline_item(ui, plan);
+                    super::plan::render_plan_timeline_item(ui, &plan);
                 });
         }
         SessionUpdate::AvailableCommandsUpdate(_) => {

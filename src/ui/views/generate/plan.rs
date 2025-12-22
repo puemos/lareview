@@ -1,5 +1,5 @@
+use crate::domain::{Plan, PlanStatus};
 use crate::ui::theme::current_theme;
-use agent_client_protocol::{Plan, PlanEntryStatus};
 use eframe::egui;
 
 use crate::ui::spacing;
@@ -30,7 +30,7 @@ pub(super) fn render_plan_panel(ui: &mut egui::Ui, plan: &Plan) {
                     let completed = plan
                         .entries
                         .iter()
-                        .filter(|e| matches!(&e.status, PlanEntryStatus::Completed))
+                        .filter(|e| matches!(&e.status, PlanStatus::Completed))
                         .count();
                     ui.label(
                         egui::RichText::new(format!(
@@ -69,15 +69,13 @@ pub(super) fn render_plan_timeline_item(ui: &mut egui::Ui, plan: &Plan) {
     let completed = plan
         .entries
         .iter()
-        .filter(|e| matches!(&e.status, PlanEntryStatus::Completed))
+        .filter(|e| matches!(&e.status, PlanStatus::Completed))
         .count();
 
-    let default_open = plan.entries.iter().any(|e| {
-        matches!(
-            &e.status,
-            PlanEntryStatus::InProgress | PlanEntryStatus::Pending
-        )
-    });
+    let default_open = plan
+        .entries
+        .iter()
+        .any(|e| matches!(&e.status, PlanStatus::InProgress | PlanStatus::Pending));
 
     let header = egui::RichText::new(format!(
         "{} Plan ({completed}/{total})",
@@ -98,8 +96,8 @@ pub(super) fn render_plan_timeline_item(ui: &mut egui::Ui, plan: &Plan) {
 
 fn render_plan_entries(ui: &mut egui::Ui, plan: &Plan, dense: bool) {
     for (idx, entry) in plan.entries.iter().enumerate() {
-        let status = entry.status.clone();
-        let (icon, color, _label) = plan_entry_style(status.clone());
+        let status = entry.status;
+        let (icon, color, _label) = plan_entry_style(status);
 
         ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
             ui.spacing_mut().item_spacing = egui::vec2(spacing::SPACING_SM, 0.0); // 8.0, 0.0
@@ -112,10 +110,9 @@ fn render_plan_entries(ui: &mut egui::Ui, plan: &Plan, dense: bool) {
             );
 
             let text_color = match status {
-                PlanEntryStatus::Completed => current_theme().text_muted,
-                PlanEntryStatus::InProgress => current_theme().text_primary,
-                PlanEntryStatus::Pending => current_theme().text_primary,
-                _ => current_theme().text_primary,
+                PlanStatus::Completed => current_theme().text_muted,
+                PlanStatus::InProgress => current_theme().text_primary,
+                PlanStatus::Pending => current_theme().text_primary,
             };
 
             ui.add(
@@ -135,27 +132,22 @@ fn render_plan_entries(ui: &mut egui::Ui, plan: &Plan, dense: bool) {
     }
 }
 
-fn plan_entry_style(status: PlanEntryStatus) -> (&'static str, egui::Color32, &'static str) {
+fn plan_entry_style(status: PlanStatus) -> (&'static str, egui::Color32, &'static str) {
     match status {
-        PlanEntryStatus::Completed => (
+        PlanStatus::Completed => (
             egui_phosphor::regular::CHECK_CIRCLE,
             current_theme().success,
             "done",
         ),
-        PlanEntryStatus::InProgress => (
+        PlanStatus::InProgress => (
             egui_phosphor::regular::CIRCLE_DASHED,
             current_theme().warning,
             "doing",
         ),
-        PlanEntryStatus::Pending => (
+        PlanStatus::Pending => (
             egui_phosphor::regular::CIRCLE,
             current_theme().text_muted,
             "todo",
-        ),
-        _ => (
-            egui_phosphor::regular::CIRCLE,
-            current_theme().text_muted,
-            "unknown",
         ),
     }
 }

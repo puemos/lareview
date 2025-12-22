@@ -262,6 +262,36 @@ pub struct Plan {
     pub meta: Option<serde_json::Value>,
 }
 
+impl From<agent_client_protocol::Plan> for Plan {
+    fn from(p: agent_client_protocol::Plan) -> Self {
+        Self {
+            entries: p.entries.into_iter().map(PlanEntry::from).collect(),
+            meta: p.meta.map(serde_json::Value::Object),
+        }
+    }
+}
+
+impl From<agent_client_protocol::PlanEntry> for PlanEntry {
+    fn from(e: agent_client_protocol::PlanEntry) -> Self {
+        Self {
+            content: e.content,
+            priority: match e.priority {
+                agent_client_protocol::PlanEntryPriority::Low => PlanPriority::Low,
+                agent_client_protocol::PlanEntryPriority::Medium => PlanPriority::Medium,
+                agent_client_protocol::PlanEntryPriority::High => PlanPriority::High,
+                _ => PlanPriority::Medium,
+            },
+            status: match e.status {
+                agent_client_protocol::PlanEntryStatus::Pending => PlanStatus::Pending,
+                agent_client_protocol::PlanEntryStatus::InProgress => PlanStatus::InProgress,
+                agent_client_protocol::PlanEntryStatus::Completed => PlanStatus::Completed,
+                _ => PlanStatus::Pending,
+            },
+            meta: e.meta.map(serde_json::Value::Object),
+        }
+    }
+}
+
 /// Status of a feedback thread
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]

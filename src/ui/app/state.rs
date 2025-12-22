@@ -1,7 +1,7 @@
 use egui_commonmark::CommonMarkCache;
 use std::collections::HashMap;
 
-use agent_client_protocol::{Plan, SessionUpdate};
+use agent_client_protocol::SessionUpdate;
 
 use crate::domain::{Review, ReviewRunId, ReviewTask};
 use crate::infra::acp::ProgressEvent;
@@ -72,7 +72,7 @@ pub struct SessionState {
     pub is_generating: bool,
     pub generation_error: Option<String>,
     pub selected_agent: SelectedAgent,
-    pub latest_plan: Option<Plan>,
+    pub latest_plan: Option<crate::domain::Plan>,
     pub diff_text: String,
     pub generate_preview: Option<GeneratePreview>,
     pub is_preview_fetching: bool,
@@ -160,7 +160,7 @@ impl AppState {
             ProgressEvent::Update(ref boxed_update) => {
                 let update = &**boxed_update;
                 if let SessionUpdate::Plan(plan) = update {
-                    self.session.latest_plan = Some(plan.clone());
+                    self.session.latest_plan = Some(crate::domain::Plan::from(plan.clone()));
                 }
 
                 let key = super::timeline::stream_key_for_update(update);
