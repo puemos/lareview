@@ -1,4 +1,3 @@
-use egui_commonmark::CommonMarkCache;
 use std::collections::HashMap;
 
 use agent_client_protocol::SessionUpdate;
@@ -159,7 +158,6 @@ use std::sync::Arc;
 /// Transient UI state.
 #[derive(Default)]
 pub struct UiState {
-    pub markdown_cache: CommonMarkCache,
     pub current_view: AppView,
     pub selected_review_id: Option<String>,
     pub selected_run_id: Option<ReviewRunId>,

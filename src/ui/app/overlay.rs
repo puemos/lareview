@@ -122,11 +122,7 @@ impl LaReviewApp {
                                     ui.ctx().include_bytes(uri.clone(), bytes.clone());
                                 }
 
-                                egui_commonmark::CommonMarkViewer::new().show(
-                                    ui,
-                                    &mut self.state.ui.markdown_cache,
-                                    &preview,
-                                );
+                                crate::ui::components::render_markdown(ui, &preview);
                             });
                         });
                     });
