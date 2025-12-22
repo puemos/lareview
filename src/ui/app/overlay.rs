@@ -6,7 +6,7 @@ use crate::ui::spacing;
 
 impl LaReviewApp {
     pub(super) fn render_full_diff_overlay(&mut self, ctx: &egui::Context) {
-        let Some(full) = self.state.full_diff.clone() else {
+        let Some(full) = self.state.ui.full_diff.clone() else {
             return;
         };
 
@@ -55,7 +55,7 @@ impl LaReviewApp {
     }
 
     pub(super) fn render_export_preview_overlay(&mut self, ctx: &egui::Context) {
-        let Some(mut preview) = self.state.export_preview.clone() else {
+        let Some(mut preview) = self.state.ui.export_preview.clone() else {
             return;
         };
 
@@ -120,13 +120,13 @@ impl LaReviewApp {
                             cols[1].vertical(|ui| {
                                 ui.label(egui::RichText::new("Preview:").strong());
                                 // Register all generated assets so the preview can find them
-                                for (uri, bytes) in &self.state.export_assets {
+                                for (uri, bytes) in &self.state.ui.export_assets {
                                     ui.ctx().include_bytes(uri.clone(), bytes.clone());
                                 }
 
                                 egui_commonmark::CommonMarkViewer::new().show(
                                     ui,
-                                    &mut self.state.markdown_cache,
+                                    &mut self.state.ui.markdown_cache,
                                     &preview,
                                 );
                             });
@@ -183,12 +183,12 @@ impl LaReviewApp {
             });
 
         // CRITICAL: Only update state if it's still "open".
-        // If we dispatched CloseExportPreview above, self.state.export_preview might have been set to None.
+        // If we dispatched CloseExportPreview above, self.state.ui.export_preview might have been set to None.
         // We must not overwrite it back to Some(preview) here.
-        if let Some(current_state_preview) = &self.state.export_preview
+        if let Some(current_state_preview) = &self.state.ui.export_preview
             && current_state_preview != &preview
         {
-            self.state.export_preview = Some(preview);
+            self.state.ui.export_preview = Some(preview);
         }
 
         if !open {
@@ -197,7 +197,7 @@ impl LaReviewApp {
     }
 
     pub(super) fn render_requirements_overlay(&mut self, ctx: &egui::Context) {
-        if !self.state.show_requirements_modal {
+        if !self.state.ui.show_requirements_modal {
             return;
         }
 

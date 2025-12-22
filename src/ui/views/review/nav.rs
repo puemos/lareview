@@ -7,7 +7,7 @@ use egui_phosphor::regular as icons;
 impl LaReviewApp {
     /// Renders a single task item in the sidebar
     pub(super) fn render_nav_item(&mut self, ui: &mut egui::Ui, task: &crate::domain::ReviewTask) {
-        let is_selected = self.state.selected_task_id.as_ref() == Some(&task.id);
+        let is_selected = self.state.ui.selected_task_id.as_ref() == Some(&task.id);
 
         let (bg_color, text_color) = if is_selected {
             (

@@ -24,7 +24,7 @@ mod tests {
     use crate::domain::{
         Comment, ReviewTask, TaskStats, TaskStatus, Thread, ThreadImpact, ThreadStatus,
     };
-    use crate::ui::app::state::AppView;
+    use crate::ui::app::state::{AppState, AppView, SessionState, UiState};
     use crate::ui::app::store::action::{
         AsyncAction, GenerateAction, NavigationAction, ReviewAction, ReviewDataPayload,
         ReviewThreadsPayload,
@@ -52,14 +52,17 @@ mod tests {
     #[test]
     fn generate_run_requested_emits_command() {
         let mut state = AppState {
-            diff_text: "diff --git a b".into(),
-            selected_agent: SelectedAgent::new("agent-1"),
+            session: SessionState {
+                diff_text: "diff --git a b".into(),
+                selected_agent: SelectedAgent::new("agent-1"),
+                ..Default::default()
+            },
             ..Default::default()
         };
 
         let commands = reduce(&mut state, Action::Generate(GenerateAction::RunRequested));
 
-        assert!(state.is_generating);
+        assert!(state.session.is_generating);
         assert!(
             matches!(
                 commands.as_slice(),
@@ -73,7 +76,10 @@ mod tests {
     #[test]
     fn generation_done_triggers_review_refresh() {
         let mut state = AppState {
-            is_generating: true,
+            session: SessionState {
+                is_generating: true,
+                ..Default::default()
+            },
             ..Default::default()
         };
 
@@ -88,7 +94,7 @@ mod tests {
             ))))),
         );
 
-        assert!(!state.is_generating);
+        assert!(!state.session.is_generating);
         assert!(
             matches!(
                 commands.as_slice(),
@@ -128,9 +134,9 @@ mod tests {
             }),
         );
 
-        assert_eq!(state.selected_review_id.as_deref(), Some("rev1"));
-        assert_eq!(state.selected_run_id.as_deref(), Some("run1"));
-        assert_eq!(state.selected_task_id.as_deref(), Some("t1"));
+        assert_eq!(state.ui.selected_review_id.as_deref(), Some("rev1"));
+        assert_eq!(state.ui.selected_run_id.as_deref(), Some("run1"));
+        assert_eq!(state.ui.selected_task_id.as_deref(), Some("t1"));
         assert!(
             matches!(
                 commands.as_slice(),
@@ -160,14 +166,17 @@ mod tests {
             ),
             "expected status update command"
         );
-        assert!(state.review_error.is_none());
+        assert!(state.ui.review_error.is_none());
     }
 
     #[test]
     fn settings_install_only_when_allowed() {
         let mut state = AppState {
-            allow_d2_install: false,
-            is_d2_installing: false,
+            ui: UiState {
+                allow_d2_install: false,
+                is_d2_installing: false,
+                ..Default::default()
+            },
             ..Default::default()
         };
 
@@ -176,14 +185,14 @@ mod tests {
             Action::Settings(SettingsAction::RequestD2Install),
         );
         assert!(none.is_empty());
-        assert!(!state.is_d2_installing);
+        assert!(!state.ui.is_d2_installing);
 
-        state.allow_d2_install = true;
+        state.ui.allow_d2_install = true;
         let commands = reduce(
             &mut state,
             Action::Settings(SettingsAction::RequestD2Install),
         );
-        assert!(state.is_d2_installing);
+        assert!(state.ui.is_d2_installing);
         assert!(
             matches!(
                 commands.as_slice(),
@@ -203,7 +212,7 @@ mod tests {
             Action::Navigation(NavigationAction::SwitchTo(AppView::Review)),
         );
 
-        assert_eq!(state.current_view, AppView::Review);
+        assert_eq!(state.ui.current_view, AppView::Review);
         assert!(
             matches!(
                 commands.as_slice(),
@@ -230,15 +239,18 @@ mod tests {
             }),
         );
 
-        assert!(state.selected_review_id.is_none());
-        assert!(state.selected_run_id.is_none());
+        assert!(state.ui.selected_review_id.is_none());
+        assert!(state.ui.selected_run_id.is_none());
         assert!(commands.is_empty(), "no note load without tasks");
     }
 
     #[test]
     fn review_data_after_generation_with_no_tasks_stays_on_generate() {
         let mut state = AppState {
-            current_view: AppView::Generate,
+            ui: UiState {
+                current_view: AppView::Generate,
+                ..Default::default()
+            },
             ..Default::default()
         };
 
@@ -255,9 +267,9 @@ mod tests {
         );
 
         assert!(commands.is_empty());
-        assert_eq!(state.current_view, AppView::Generate);
+        assert_eq!(state.ui.current_view, AppView::Generate);
         assert_eq!(
-            state.generation_error.as_deref(),
+            state.session.generation_error.as_deref(),
             Some("No tasks generated")
         );
     }
@@ -265,7 +277,10 @@ mod tests {
     #[test]
     fn create_thread_comment_emits_command() {
         let mut state = AppState {
-            selected_review_id: Some("review-1".into()),
+            ui: UiState {
+                selected_review_id: Some("review-1".into()),
+                ..Default::default()
+            },
             ..AppState::default()
         };
 
@@ -315,7 +330,10 @@ mod tests {
     #[test]
     fn review_threads_loaded_updates_state_for_selected_review() {
         let mut state = AppState {
-            selected_review_id: Some("review-1".into()),
+            ui: UiState {
+                selected_review_id: Some("review-1".into()),
+                ..Default::default()
+            },
             ..AppState::default()
         };
 
@@ -355,9 +373,10 @@ mod tests {
         );
 
         assert!(commands.is_empty());
-        assert_eq!(state.threads.len(), 1);
+        assert_eq!(state.domain.threads.len(), 1);
         assert_eq!(
             state
+                .domain
                 .thread_comments
                 .get("thread-1")
                 .map(|items| items.len()),

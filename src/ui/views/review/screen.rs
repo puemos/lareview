@@ -95,7 +95,7 @@ impl LaReviewApp {
                             ui.add_space(spacing::SPACING_XS);
 
                             // Delete Button
-                            let review_selected = self.state.selected_review_id.is_some();
+                            let review_selected = self.state.ui.selected_review_id.is_some();
                             if review_selected {
                                 if pill_action_button(
                                     ui,
@@ -127,7 +127,7 @@ impl LaReviewApp {
                                     ));
                                 }
 
-                                if self.state.is_exporting {
+                                if self.state.ui.is_exporting {
                                     ui.add_space(spacing::SPACING_XS);
                                     crate::ui::animations::cyber::cyber_spinner(
                                         ui,
@@ -177,7 +177,7 @@ impl LaReviewApp {
         }
 
         // Error Banner
-        if let Some(err) = &self.state.review_error {
+        if let Some(err) = &self.state.ui.review_error {
             ui.add_space(6.0);
             error_banner(ui, err);
         }
@@ -310,12 +310,12 @@ impl LaReviewApp {
 
     /// Renders the dropdowns for Review and Run selection in the header
     fn render_header_selectors(&mut self, ui: &mut egui::Ui) {
-        if self.state.reviews.is_empty() {
+        if self.state.domain.reviews.is_empty() {
             return;
         }
 
-        let current_id = self.state.selected_review_id.clone();
-        let reviews = self.state.reviews.clone();
+        let current_id = self.state.ui.selected_review_id.clone();
+        let reviews = self.state.domain.reviews.clone();
 
         // Find label
         let current_label = current_id
@@ -465,11 +465,11 @@ impl LaReviewApp {
         open_count: usize,
         next_open_id: Option<String>,
     ) {
-        let state = if self.state.selected_task_id.is_some() {
+        let state = if self.state.ui.selected_task_id.is_some() {
             // Validate selection still exists
             if all_tasks
                 .iter()
-                .any(|t| Some(&t.id) == self.state.selected_task_id.as_ref())
+                .any(|t| Some(&t.id) == self.state.ui.selected_task_id.as_ref())
             {
                 RightPaneState::TaskSelected
             } else {
@@ -485,7 +485,7 @@ impl LaReviewApp {
 
         match state {
             RightPaneState::TaskSelected => {
-                if let Some(task_id) = &self.state.selected_task_id
+                if let Some(task_id) = &self.state.ui.selected_task_id
                     && let Some(task) = all_tasks.iter().find(|t| &t.id == task_id)
                 {
                     self.render_task_detail(ui, task);
@@ -590,20 +590,21 @@ impl LaReviewApp {
 
     fn handle_auto_selection(
         &mut self,
-        display_tasks: &[&crate::domain::ReviewTask],
+        _display_tasks: &[&crate::domain::ReviewTask],
         _next_open_id: Option<String>,
     ) {
         // Only enforce logic if selection is invalid or missing when it shouldn't be
         let selection_valid = self
             .state
+            .ui
             .selected_task_id
             .as_ref()
-            .is_some_and(|id| display_tasks.iter().any(|t| &t.id == id));
+            .is_some_and(|id| self.state.domain.all_tasks.iter().any(|t| &t.id == id));
 
-        if !selection_valid && !self.state.is_exporting {
+        if !selection_valid && !self.state.ui.is_exporting {
             // Logic: If user was doing something, clear it. If just starting, maybe wait?
             // Current logic: clear if invalid.
-            if self.state.selected_task_id.is_some() {
+            if self.state.ui.selected_task_id.is_some() {
                 self.dispatch(Action::Review(ReviewAction::ClearSelection));
             }
         }

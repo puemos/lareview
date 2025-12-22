@@ -101,35 +101,40 @@ impl LaReviewApp {
         let config = crate::infra::app_config::load_config();
 
         let mut state = AppState {
-            current_view: AppView::Generate,
-            selected_agent: SelectedAgent::new("codex"),
-            diff_text: String::new(),
+            session: crate::ui::app::state::SessionState {
+                selected_agent: SelectedAgent::new("codex"),
+                ..Default::default()
+            },
+            ui: crate::ui::app::state::UiState {
+                current_view: AppView::Generate,
+                ..Default::default()
+            },
             ..Default::default()
         };
 
-        state.extra_path = config.extra_path.clone().unwrap_or_default();
-        state.has_seen_requirements = config.has_seen_requirements;
-        state.show_requirements_modal = !config.has_seen_requirements;
+        state.ui.extra_path = config.extra_path.clone().unwrap_or_default();
+        state.ui.has_seen_requirements = config.has_seen_requirements;
+        state.ui.show_requirements_modal = !config.has_seen_requirements;
 
-        if !state.extra_path.trim().is_empty() {
+        if !state.ui.extra_path.trim().is_empty() {
             // set_var is currently unsafe on nightly; this is limited to process-local config.
             unsafe {
-                std::env::set_var("LAREVIEW_EXTRA_PATH", state.extra_path.clone());
+                std::env::set_var("LAREVIEW_EXTRA_PATH", state.ui.extra_path.clone());
             }
         }
 
         if let Ok(repos) = repo_repo.find_all() {
-            state.linked_repos = repos;
+            state.domain.linked_repos = repos;
         }
 
         if let Ok(reviews) = review_repo.list_all() {
-            state.reviews = reviews;
-            if let Some(first) = state.reviews.first() {
-                state.selected_review_id = Some(first.id.clone());
-                state.selected_run_id = first.active_run_id.clone();
+            state.domain.reviews = reviews;
+            if let Some(first) = state.domain.reviews.first() {
+                state.ui.selected_review_id = Some(first.id.clone());
+                state.ui.selected_run_id = first.active_run_id.clone();
             }
         } else {
-            state.review_error = Some("Failed to load reviews".to_string());
+            state.ui.review_error = Some("Failed to load reviews".to_string());
         }
 
         let (gen_tx, gen_rx) = mpsc::channel(32);

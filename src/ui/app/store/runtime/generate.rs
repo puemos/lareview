@@ -43,6 +43,7 @@ pub fn refresh_github_review(app: &mut LaReviewApp, review_id: String, selected_
     let gen_tx = app.gen_tx.clone();
     let review = app
         .state
+        .domain
         .reviews
         .iter()
         .find(|r| r.id == review_id)
@@ -108,9 +109,10 @@ pub fn start_generation(
 
     let repo_root = app
         .state
+        .ui
         .selected_repo_id
         .as_ref()
-        .and_then(|id| app.state.linked_repos.iter().find(|r| &r.id == id))
+        .and_then(|id| app.state.domain.linked_repos.iter().find(|r| &r.id == id))
         .map(|r| r.path.clone());
 
     let input = GenerateTasksInput {

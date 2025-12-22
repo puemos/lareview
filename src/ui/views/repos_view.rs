@@ -31,7 +31,7 @@ impl LaReviewApp {
         ui.separator();
 
         // --- Content Section ---
-        if self.state.linked_repos.is_empty() {
+        if self.state.domain.linked_repos.is_empty() {
             egui::Frame::NONE
                 .inner_margin(egui::Margin::symmetric(
                     spacing::SPACING_LG as i8,
@@ -41,8 +41,15 @@ impl LaReviewApp {
                     ui.weak("No repositories linked. Link a local Git repo to allow the agent to read file contents.");
                 });
         } else {
-            let total_repos = self.state.linked_repos.len();
-            for (index, repo) in self.state.linked_repos.clone().into_iter().enumerate() {
+            let total_repos = self.state.domain.linked_repos.len();
+            for (index, repo) in self
+                .state
+                .domain
+                .linked_repos
+                .clone()
+                .into_iter()
+                .enumerate()
+            {
                 egui::Frame::NONE
                     .inner_margin(egui::Margin::symmetric(
                         spacing::SPACING_LG as i8,

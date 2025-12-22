@@ -30,10 +30,10 @@ impl LaReviewApp {
         let mut thread = view
             .thread_id
             .as_ref()
-            .and_then(|id| self.state.threads.iter().find(|t| &t.id == id));
+            .and_then(|id| self.state.domain.threads.iter().find(|t| &t.id == id));
 
         if thread.is_none() {
-            thread = self.state.threads.iter().find(|t| {
+            thread = self.state.domain.threads.iter().find(|t| {
                 t.task_id.as_ref() == Some(&view.task_id)
                     && t.anchor.as_ref().and_then(|a| a.file_path.as_ref())
                         == view.file_path.as_ref()
@@ -45,7 +45,7 @@ impl LaReviewApp {
         let thread_id = thread.as_ref().map(|t| t.id.clone());
         let comments = thread_id
             .as_ref()
-            .and_then(|id| self.state.thread_comments.get(id))
+            .and_then(|id| self.state.domain.thread_comments.get(id))
             .cloned()
             .unwrap_or_default();
 
@@ -76,7 +76,7 @@ impl LaReviewApp {
                     let title_width = (ui.available_width() - selector_total_width).max(120.0);
 
                     // Edit Title - use centralized draft state
-                    let mut edit_text = self.state.thread_title_draft.clone();
+                    let mut edit_text = self.state.ui.thread_title_draft.clone();
 
                     let response = ui
                         .scope(|ui| {
@@ -235,7 +235,7 @@ impl LaReviewApp {
                     // 4. Input Area
                     ui.add_space(spacing::SPACING_MD);
                     ui.vertical(|ui| {
-                        let mut text = self.state.thread_reply_draft.clone();
+                        let mut text = self.state.ui.thread_reply_draft.clone();
 
                         let response = ui.add(
                             egui::TextEdit::multiline(&mut text)
@@ -273,7 +273,7 @@ impl LaReviewApp {
                                         .clicked()
                                     {
                                         // Dispatch save
-                                        let title = self.state.thread_title_draft.clone();
+                                        let title = self.state.ui.thread_title_draft.clone();
                                         let title = if title.trim().is_empty() {
                                             None
                                         } else {
@@ -310,7 +310,12 @@ impl LaReviewApp {
     ) -> Option<String> {
         let tasks = self.state.tasks();
         let task = tasks.iter().find(|t| t.id == task_id)?;
-        let run = self.state.runs.iter().find(|r| r.id == task.run_id)?;
+        let run = self
+            .state
+            .domain
+            .runs
+            .iter()
+            .find(|r| r.id == task.run_id)?;
         diff_snippet_for_anchor(&run.diff_text, file_path, line_number)
     }
 

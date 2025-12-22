@@ -15,7 +15,7 @@ impl LaReviewApp {
             return;
         }
 
-        if let Some(thread_ctx) = &self.state.active_thread {
+        if let Some(thread_ctx) = &self.state.ui.active_thread {
             let view = crate::ui::views::review::thread_detail::ThreadDetailView {
                 task_id: task.id.clone(),
                 thread_id: thread_ctx.thread_id.clone(),
@@ -29,6 +29,7 @@ impl LaReviewApp {
         let theme = current_theme();
         let mut task_threads: Vec<crate::domain::Thread> = self
             .state
+            .domain
             .threads
             .iter()
             .filter(|thread| thread.task_id.as_ref() == Some(&task.id))
@@ -86,8 +87,10 @@ impl LaReviewApp {
             let status_v = crate::ui::views::review::visuals::status_visuals(thread.status, &theme);
             let impact_v = crate::ui::views::review::visuals::impact_visuals(thread.impact, &theme);
 
-            let comments = self.state.thread_comments.get(&thread.id);
-            let reply_count = comments.map(|items| items.len()).unwrap_or(0);
+            let comments = self.state.domain.thread_comments.get(&thread.id);
+            let reply_count = comments
+                .map(|items: &Vec<crate::domain::Comment>| items.len())
+                .unwrap_or(0);
             let updated_label = format_timestamp(&thread.updated_at);
 
             let bg_shape_idx = ui.painter().add(egui::Shape::Noop);
@@ -155,7 +158,7 @@ impl LaReviewApp {
 
                             ui.label(egui::RichText::new("·").color(theme.text_muted).size(12.0));
 
-                            let metadata = if path.is_empty() {
+                            let metadata: String = if path.is_empty() {
                                 format!("{} comments", reply_count)
                             } else {
                                 format!("{} comments • {}", reply_count, path)

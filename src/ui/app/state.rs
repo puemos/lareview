@@ -52,25 +52,27 @@ pub struct ThreadContext {
     pub line_number: Option<u32>,
 }
 
-/// All app state in one struct.
+/// Domain-related persistent state.
 #[derive(Default)]
-pub struct AppState {
-    pub markdown_cache: CommonMarkCache,
-    pub current_view: AppView,
-    /// All review tasks fetched from the database, to be filtered by selected PR.
+pub struct DomainState {
     pub all_tasks: Vec<ReviewTask>,
+    pub reviews: Vec<Review>,
+    pub runs: Vec<crate::domain::ReviewRun>,
+    pub threads: Vec<crate::domain::Thread>,
+    pub thread_comments: HashMap<String, Vec<crate::domain::Comment>>,
+    pub linked_repos: Vec<crate::domain::LinkedRepo>,
+}
 
-    /// Canonical unified timeline of agent session updates.
+/// State related to the active agent session.
+#[derive(Default)]
+pub struct SessionState {
     pub agent_timeline: Vec<TimelineItem>,
-    /// In-memory index: stream key -> timeline item index.
     pub agent_timeline_index: HashMap<String, usize>,
-    /// Monotonic counter for deterministic ordering at ingestion.
     pub next_agent_timeline_seq: u64,
-
     pub is_generating: bool,
     pub generation_error: Option<String>,
     pub selected_agent: SelectedAgent,
-
+    pub latest_plan: Option<Plan>,
     pub diff_text: String,
     pub generate_preview: Option<GeneratePreview>,
     pub is_preview_fetching: bool,
@@ -78,55 +80,42 @@ pub struct AppState {
     pub gh_status: Option<crate::ui::app::GhStatusPayload>,
     pub gh_status_error: Option<String>,
     pub is_gh_status_checking: bool,
+}
 
-    /// Latest agent-provided plan (if any).
-    pub latest_plan: Option<Plan>,
-
-    pub reviews: Vec<Review>,
-    pub runs: Vec<crate::domain::ReviewRun>,
+/// Transient UI state.
+#[derive(Default)]
+pub struct UiState {
+    pub markdown_cache: CommonMarkCache,
+    pub current_view: AppView,
     pub selected_review_id: Option<String>,
     pub selected_run_id: Option<ReviewRunId>,
-
     pub selected_task_id: Option<String>,
-
+    pub selected_repo_id: Option<String>,
     pub review_error: Option<String>,
-
-    pub threads: Vec<crate::domain::Thread>,
-    pub thread_comments: HashMap<String, Vec<crate::domain::Comment>>,
-
     pub full_diff: Option<FullDiffView>,
-
     pub export_preview: Option<String>,
     pub export_assets: HashMap<String, Vec<u8>>,
-
     pub cached_unified_diff: Option<(Vec<crate::domain::DiffRef>, String)>,
-
-    pub active_thread: Option<ThreadContext>, // Default is None which matches Option default
-
+    pub active_thread: Option<ThreadContext>,
     pub is_exporting: bool,
     pub d2_install_output: String,
     pub is_d2_installing: bool,
     pub allow_d2_install: bool,
-
-    /// All linked repositories loaded from DB
-    pub linked_repos: Vec<crate::domain::LinkedRepo>,
-    /// Currently selected repo for the Generate view
-    pub selected_repo_id: Option<String>,
-
-    /// Extra PATH entries for locating tools in GUI sessions.
     pub extra_path: String,
     pub show_requirements_modal: bool,
     pub has_seen_requirements: bool,
-
-    // UI state for Generate view
     pub agent_panel_collapsed: bool,
     pub plan_panel_collapsed: bool,
-
-    // UI state for Thread editing
-    /// Draft text for the title being edited in ThreadDetailView
     pub thread_title_draft: String,
-    /// Draft text for the reply composer in ThreadDetailView
     pub thread_reply_draft: String,
+}
+
+/// All app state in one struct.
+#[derive(Default)]
+pub struct AppState {
+    pub domain: DomainState,
+    pub session: SessionState,
+    pub ui: UiState,
 }
 
 #[derive(Debug, Clone)]
@@ -149,19 +138,20 @@ pub struct FullDiffView {
 
 impl AppState {
     pub fn reset_agent_timeline(&mut self) {
-        self.agent_timeline.clear();
-        self.agent_timeline_index.clear();
-        self.next_agent_timeline_seq = 0;
-        self.latest_plan = None;
+        self.session.agent_timeline.clear();
+        self.session.agent_timeline_index.clear();
+        self.session.next_agent_timeline_seq = 0;
+        self.session.latest_plan = None;
     }
 
     pub fn ingest_progress(&mut self, evt: ProgressEvent) {
-        let seq = self.next_agent_timeline_seq;
-        self.next_agent_timeline_seq = self.next_agent_timeline_seq.saturating_add(1);
+        let seq = self.session.next_agent_timeline_seq;
+        self.session.next_agent_timeline_seq =
+            self.session.next_agent_timeline_seq.saturating_add(1);
 
         match evt {
             ProgressEvent::LocalLog(line) => {
-                self.agent_timeline.push(TimelineItem {
+                self.session.agent_timeline.push(TimelineItem {
                     seq,
                     stream_key: None,
                     content: TimelineContent::LocalLog(line),
@@ -170,22 +160,22 @@ impl AppState {
             ProgressEvent::Update(ref boxed_update) => {
                 let update = &**boxed_update;
                 if let SessionUpdate::Plan(plan) = update {
-                    self.latest_plan = Some(plan.clone());
+                    self.session.latest_plan = Some(plan.clone());
                 }
 
                 let key = super::timeline::stream_key_for_update(update);
 
                 if let Some(key) = key {
-                    if let Some(&idx) = self.agent_timeline_index.get(&key) {
+                    if let Some(&idx) = self.session.agent_timeline_index.get(&key) {
                         super::timeline::merge_update_in_place(
-                            &mut self.agent_timeline[idx],
+                            &mut self.session.agent_timeline[idx],
                             update,
                         );
                         return;
                     }
-                    let idx = self.agent_timeline.len();
-                    self.agent_timeline_index.insert(key.clone(), idx);
-                    self.agent_timeline.push(TimelineItem {
+                    let idx = self.session.agent_timeline.len();
+                    self.session.agent_timeline_index.insert(key.clone(), idx);
+                    self.session.agent_timeline.push(TimelineItem {
                         seq,
                         stream_key: Some(key),
                         content: TimelineContent::Update(Box::new(update.clone())),
@@ -193,14 +183,14 @@ impl AppState {
                     return;
                 }
 
-                if let Some(last) = self.agent_timeline.last_mut()
+                if let Some(last) = self.session.agent_timeline.last_mut()
                     && super::timeline::can_merge_contiguous(last, update)
                 {
                     super::timeline::merge_update_in_place(last, update);
                     return;
                 }
 
-                self.agent_timeline.push(TimelineItem {
+                self.session.agent_timeline.push(TimelineItem {
                     seq,
                     stream_key: None,
                     content: TimelineContent::Update(Box::new(update.clone())),
@@ -208,8 +198,8 @@ impl AppState {
             }
 
             ProgressEvent::Finalized => {
-                self.is_generating = false;
-                self.agent_timeline.push(TimelineItem {
+                self.session.is_generating = false;
+                self.session.agent_timeline.push(TimelineItem {
                     seq,
                     stream_key: None,
                     content: TimelineContent::LocalLog("Review finalized.".into()),
@@ -219,10 +209,11 @@ impl AppState {
     }
 
     pub fn tasks(&self) -> Vec<ReviewTask> {
-        let Some(selected_run_id) = self.selected_run_id.as_ref() else {
-            return self.all_tasks.clone();
+        let Some(selected_run_id) = self.ui.selected_run_id.as_ref() else {
+            return self.domain.all_tasks.clone();
         };
-        self.all_tasks
+        self.domain
+            .all_tasks
             .iter()
             .filter(|task| &task.run_id == selected_run_id)
             .cloned()

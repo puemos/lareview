@@ -117,7 +117,7 @@ impl LaReviewApp {
         width: f32,
         rounding: f32,
     ) {
-        let is_active = self.state.current_view == view;
+        let is_active = self.state.ui.current_view == view;
         let theme = theme::current_theme();
 
         let (bg, stroke) = if is_active {

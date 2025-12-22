@@ -59,8 +59,8 @@ impl eframe::App for LaReviewApp {
 
         if action_updated
             || agent_content_updated
-            || self.state.is_generating
-            || self.state.is_exporting
+            || self.state.session.is_generating
+            || self.state.ui.is_exporting
         {
             ctx.request_repaint_after(std::time::Duration::from_millis(100));
         }
@@ -72,7 +72,7 @@ impl eframe::App for LaReviewApp {
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical()
                     .auto_shrink([false; 2])
-                    .show(ui, |ui| match self.state.current_view {
+                    .show(ui, |ui| match self.state.ui.current_view {
                         AppView::Generate => self.ui_generate(ui),
                         AppView::Review => self.ui_review(ui),
                         AppView::Repos => self.ui_repos(ui),

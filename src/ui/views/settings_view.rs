@@ -23,10 +23,10 @@ impl LaReviewApp {
                 ui.horizontal(|ui| {
                     ui.strong("GitHub CLI Integration");
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if self.state.is_gh_status_checking {
+                        if self.state.session.is_gh_status_checking {
                             ui.label(egui::RichText::new("Checking...").color(theme.warning));
-                        } else if self.state.gh_status.is_some()
-                            && self.state.gh_status_error.is_none()
+                        } else if self.state.session.gh_status.is_some()
+                            && self.state.session.gh_status_error.is_none()
                         {
                             ui.colored_label(theme.success, "✔ Ready");
                         } else {
@@ -44,10 +44,10 @@ impl LaReviewApp {
                     .show(ui, |ui| {
                         ui.label("Connection:");
                         ui.horizontal(|ui| {
-                            if let Some(err) = &self.state.gh_status_error {
+                            if let Some(err) = &self.state.session.gh_status_error {
                                 ui.colored_label(theme.destructive, "Disconnected");
                                 ui.weak(format!("(Error: {})", err));
-                            } else if let Some(status) = &self.state.gh_status {
+                            } else if let Some(status) = &self.state.session.gh_status {
                                 ui.colored_label(theme.success, "Connected");
                                 if let Some(login) = &status.login {
                                     ui.label(
@@ -62,7 +62,7 @@ impl LaReviewApp {
                         });
                         ui.end_row();
 
-                        if let Some(status) = &self.state.gh_status {
+                        if let Some(status) = &self.state.session.gh_status {
                             ui.label("Executable Path:");
                             ui.monospace(&status.gh_path);
                             ui.end_row();
@@ -72,14 +72,14 @@ impl LaReviewApp {
                 ui.add_space(spacing::SPACING_MD);
 
                 ui.horizontal(|ui| {
-                    let btn_label = if self.state.is_gh_status_checking {
+                    let btn_label = if self.state.session.is_gh_status_checking {
                         "Checking..."
                     } else {
                         "Refresh Status"
                     };
                     if ui
                         .add_enabled(
-                            !self.state.is_gh_status_checking,
+                            !self.state.session.is_gh_status_checking,
                             egui::Button::new(btn_label),
                         )
                         .clicked()
@@ -89,7 +89,9 @@ impl LaReviewApp {
                 });
 
                 // Troubleshooting
-                if self.state.gh_status.is_none() || self.state.gh_status_error.is_some() {
+                if self.state.session.gh_status.is_none()
+                    || self.state.session.gh_status_error.is_some()
+                {
                     ui.add_space(spacing::SPACING_LG);
                     egui::CollapsingHeader::new(
                         egui::RichText::new("Setup Instructions")
@@ -136,7 +138,7 @@ impl LaReviewApp {
                 ui.horizontal(|ui| {
                     ui.strong("D2 Diagram Engine");
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if self.state.is_d2_installing {
+                        if self.state.ui.is_d2_installing {
                             ui.label(egui::RichText::new("Installing...").color(theme.warning));
                         } else if d2_installed {
                             ui.colored_label(theme.success, "✔ Installed");
@@ -162,7 +164,7 @@ impl LaReviewApp {
 
                         ui.add_space(spacing::SPACING_SM);
                         let btn = egui::Button::new("Run Uninstall Script").fill(theme.bg_card);
-                        if ui.add_enabled(!self.state.is_d2_installing, btn).clicked() {
+                        if ui.add_enabled(!self.state.ui.is_d2_installing, btn).clicked() {
                             self.dispatch(Action::Settings(SettingsAction::RequestD2Uninstall));
                         }
                     });
@@ -183,7 +185,7 @@ impl LaReviewApp {
 
                     ui.add_space(spacing::SPACING_MD);
 
-                    let mut allow = self.state.allow_d2_install;
+                    let mut allow = self.state.ui.allow_d2_install;
                     if ui
                         .checkbox(&mut allow, "I understand and want to proceed")
                         .changed()
@@ -195,7 +197,7 @@ impl LaReviewApp {
 
                     ui.horizontal(|ui| {
                         let can_install =
-                            self.state.allow_d2_install && !self.state.is_d2_installing;
+                            self.state.ui.allow_d2_install && !self.state.ui.is_d2_installing;
                         if ui
                             .add_enabled(can_install, egui::Button::new("Install Automatically"))
                             .clicked()
@@ -211,7 +213,7 @@ impl LaReviewApp {
                     self.ui_copyable_command(ui, "Manual Install Command", install_cmd);
                 }
 
-                if self.state.is_d2_installing {
+                if self.state.ui.is_d2_installing {
                     ui.add_space(12.0);
                     ui.horizontal(|ui| {
                         crate::ui::animations::cyber::cyber_spinner(ui, theme.brand);
@@ -219,7 +221,7 @@ impl LaReviewApp {
                     });
                 }
 
-                if !self.state.d2_install_output.is_empty() {
+                if !self.state.ui.d2_install_output.is_empty() {
                     ui.add_space(12.0);
                     egui::CollapsingHeader::new("Script Output Log")
                         .default_open(true)
@@ -229,7 +231,7 @@ impl LaReviewApp {
                                 .show(ui, |ui| {
                                     ui.add(
                                         egui::TextEdit::multiline(
-                                            &mut self.state.d2_install_output.as_str(),
+                                            &mut self.state.ui.d2_install_output.as_str(),
                                         )
                                         .font(egui::TextStyle::Monospace)
                                         .desired_width(f32::INFINITY)

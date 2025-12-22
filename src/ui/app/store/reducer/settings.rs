@@ -5,33 +5,33 @@ use super::super::command::{Command, D2Command};
 pub fn reduce(state: &mut AppState, action: SettingsAction) -> Vec<Command> {
     match action {
         SettingsAction::SetAllowD2Install(allow) => {
-            state.allow_d2_install = allow;
+            state.ui.allow_d2_install = allow;
             Vec::new()
         }
         SettingsAction::CheckGitHubStatus => {
-            if state.is_gh_status_checking {
+            if state.session.is_gh_status_checking {
                 return Vec::new();
             }
-            state.is_gh_status_checking = true;
-            state.gh_status_error = None;
+            state.session.is_gh_status_checking = true;
+            state.session.gh_status_error = None;
             vec![Command::CheckGitHubStatus]
         }
         SettingsAction::RequestD2Install => {
-            if !state.allow_d2_install || state.is_d2_installing {
+            if !state.ui.allow_d2_install || state.ui.is_d2_installing {
                 return Vec::new();
             }
-            state.is_d2_installing = true;
-            state.d2_install_output.clear();
+            state.ui.is_d2_installing = true;
+            state.ui.d2_install_output.clear();
             vec![Command::RunD2 {
                 command: D2Command::Install,
             }]
         }
         SettingsAction::RequestD2Uninstall => {
-            if !state.allow_d2_install || state.is_d2_installing {
+            if !state.ui.allow_d2_install || state.ui.is_d2_installing {
                 return Vec::new();
             }
-            state.is_d2_installing = true;
-            state.d2_install_output.clear();
+            state.ui.is_d2_installing = true;
+            state.ui.d2_install_output.clear();
             vec![Command::RunD2 {
                 command: D2Command::Uninstall,
             }]
@@ -43,19 +43,19 @@ pub fn reduce(state: &mut AppState, action: SettingsAction) -> Vec<Command> {
             vec![Command::DeleteRepo { repo_id }]
         }
         SettingsAction::UpdateExtraPath(extra_path) => {
-            state.extra_path = extra_path;
+            state.ui.extra_path = extra_path;
             Vec::new()
         }
         SettingsAction::SaveExtraPath => vec![Command::SaveAppConfig {
-            extra_path: state.extra_path.clone(),
-            has_seen_requirements: state.has_seen_requirements,
+            extra_path: state.ui.extra_path.clone(),
+            has_seen_requirements: state.ui.has_seen_requirements,
         }],
         SettingsAction::DismissRequirements => {
-            state.show_requirements_modal = false;
-            state.has_seen_requirements = true;
+            state.ui.show_requirements_modal = false;
+            state.ui.has_seen_requirements = true;
             vec![Command::SaveAppConfig {
-                extra_path: state.extra_path.clone(),
-                has_seen_requirements: state.has_seen_requirements,
+                extra_path: state.ui.extra_path.clone(),
+                has_seen_requirements: state.ui.has_seen_requirements,
             }]
         }
     }

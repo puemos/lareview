@@ -13,13 +13,13 @@ impl LaReviewApp {
             return;
         }
 
-        let unified_diff = match &self.state.cached_unified_diff {
+        let unified_diff = match &self.state.ui.cached_unified_diff {
             Some((cached_diff_refs, diff_string)) if cached_diff_refs == &task.diff_refs => {
                 diff_string.clone()
             }
             _ => {
                 let new_diff = if !task.diff_refs.is_empty() {
-                    let run = self.state.runs.iter().find(|r| r.id == task.run_id);
+                    let run = self.state.domain.runs.iter().find(|r| r.id == task.run_id);
                     match run {
                         Some(run) => match crate::infra::diff_index::DiffIndex::new(&run.diff_text)
                         {
@@ -36,7 +36,8 @@ impl LaReviewApp {
                     String::new()
                 };
 
-                self.state.cached_unified_diff = Some((task.diff_refs.clone(), new_diff.clone()));
+                self.state.ui.cached_unified_diff =
+                    Some((task.diff_refs.clone(), new_diff.clone()));
                 new_diff
             }
         };
@@ -85,6 +86,7 @@ impl LaReviewApp {
                             } => {
                                 let thread_id = self
                                     .state
+                                    .domain
                                     .threads
                                     .iter()
                                     .find(|thread| {

@@ -191,7 +191,7 @@ pub fn create_thread_comment(
 }
 
 pub fn update_thread_status(app: &mut LaReviewApp, thread_id: String, status: ThreadStatus) {
-    let review_id = app.state.selected_review_id.clone();
+    let review_id = app.state.ui.selected_review_id.clone();
     let result = app
         .thread_repo
         .update_status(&thread_id, status)
@@ -208,7 +208,7 @@ pub fn update_thread_status(app: &mut LaReviewApp, thread_id: String, status: Th
 }
 
 pub fn update_thread_impact(app: &mut LaReviewApp, thread_id: String, impact: ThreadImpact) {
-    let review_id = app.state.selected_review_id.clone();
+    let review_id = app.state.ui.selected_review_id.clone();
     let result = app
         .thread_repo
         .update_impact(&thread_id, impact)
@@ -225,7 +225,7 @@ pub fn update_thread_impact(app: &mut LaReviewApp, thread_id: String, impact: Th
 }
 
 pub fn update_thread_title(app: &mut LaReviewApp, thread_id: String, title: String) {
-    let review_id = app.state.selected_review_id.clone();
+    let review_id = app.state.ui.selected_review_id.clone();
     let result = app
         .thread_repo
         .update_title(&thread_id, &title)

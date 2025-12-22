@@ -18,17 +18,18 @@ impl LaReviewApp {
         // New: Trigger for auto-fetching PRs
         let mut trigger_fetch_pr: Option<String> = None;
 
-        let _action_text = if self.state.is_generating {
+        let _action_text = if self.state.session.is_generating {
             format!("{} Generating...", egui_phosphor::regular::HOURGLASS_HIGH)
         } else {
             format!("{} Run", egui_phosphor::regular::PLAY)
         };
 
         let theme = theme::current_theme();
-        let has_content =
-            !self.state.diff_text.trim().is_empty() || self.state.generate_preview.is_some();
-        let run_enabled =
-            has_content && !self.state.is_generating && !self.state.is_preview_fetching;
+        let has_content = !self.state.session.diff_text.trim().is_empty()
+            || self.state.session.generate_preview.is_some();
+        let run_enabled = has_content
+            && !self.state.session.is_generating
+            && !self.state.session.is_preview_fetching;
 
         let side_margin = 0.0;
         {
@@ -87,10 +88,10 @@ impl LaReviewApp {
                                 // We prioritize the fetched preview if it exists.
                                 // If not, we use the raw text from the input box.
                                 let (active_diff_text, is_from_github) =
-                                    if let Some(preview) = &self.state.generate_preview {
+                                    if let Some(preview) = &self.state.session.generate_preview {
                                         (preview.diff_text.clone(), true)
                                     } else {
-                                        (self.state.diff_text.clone(), false)
+                                        (self.state.session.diff_text.clone(), false)
                                     };
 
                                 let input_trimmed = active_diff_text.trim();
@@ -110,7 +111,7 @@ impl LaReviewApp {
                                     .inner_margin(egui::Margin::same(spacing::SPACING_XS as i8))
                                     .show(ui, |ui| {
                                         // Loading Spinner Override
-                                        if self.state.is_preview_fetching && !is_from_github {
+                                        if self.state.session.is_preview_fetching && !is_from_github {
                                             let available = ui.available_size();
                                             let (rect, _) = ui.allocate_exact_size(
                                                 available,
@@ -133,7 +134,7 @@ impl LaReviewApp {
                                             // === UNIFIED VIEW ===
 
                                             // A. Render GitHub Metadata Card (If available)
-                                            if let Some(preview) = &self.state.generate_preview
+                                            if let Some(preview) = &self.state.session.generate_preview
                                                 && let Some(gh) = &preview.github
                                             {
                                                 egui::Frame::group(ui.style())
@@ -191,7 +192,7 @@ impl LaReviewApp {
                                         } else {
                                             // === INPUT MODE ===
                                             // Render the text area for pasting
-                                            let mut output = self.state.diff_text.clone();
+                                            let mut output = self.state.session.diff_text.clone();
 
                                             let available = ui.available_size();
                                             let row_height =
@@ -213,7 +214,7 @@ impl LaReviewApp {
                                             let response = ui.add_sized(available, editor);
 
                                             if response.changed() {
-                                                self.state.diff_text = output.clone();
+                                                self.state.session.diff_text = output.clone();
                                                 // Trigger auto-fetch if valid URL
                                                 if crate::infra::github::parse_pr_ref(&output)
                                                     .is_some()
@@ -273,7 +274,7 @@ impl LaReviewApp {
                             ui.spacing_mut().item_spacing =
                                 egui::vec2(spacing::BUTTON_PADDING.0, spacing::BUTTON_PADDING.1);
 
-                            if let Some(err) = &self.state.generation_error {
+                            if let Some(err) = &self.state.session.generation_error {
                                 ui.add_space(spacing::SPACING_XS);
 
                                 error_banner(ui, err);
@@ -292,14 +293,15 @@ impl LaReviewApp {
                                         // 1. Configuration Row: Agent & Repo side-by-side
 
                                         ui.horizontal(|ui| {
-                                            let mut temp_agent = self.state.selected_agent.clone();
+                                            let mut temp_agent =
+                                                self.state.session.selected_agent.clone();
 
                                             crate::ui::components::agent_selector::agent_selector(
                                                 ui,
                                                 &mut temp_agent,
                                             );
 
-                                            if temp_agent != self.state.selected_agent {
+                                            if temp_agent != self.state.session.selected_agent {
                                                 self.dispatch(Action::Generate(
                                                     GenerateAction::SelectAgent(temp_agent),
                                                 ));
@@ -308,15 +310,15 @@ impl LaReviewApp {
                                             ui.add_space(spacing::SPACING_SM);
 
                                             let mut temp_repo_id =
-                                                self.state.selected_repo_id.clone();
+                                                self.state.ui.selected_repo_id.clone();
 
                                             crate::ui::components::repo_selector::repo_selector(
                                                 ui,
                                                 &mut temp_repo_id,
-                                                &self.state.linked_repos,
+                                                &self.state.domain.linked_repos,
                                             );
 
-                                            if temp_repo_id != self.state.selected_repo_id {
+                                            if temp_repo_id != self.state.ui.selected_repo_id {
                                                 self.dispatch(Action::Generate(
                                                     GenerateAction::SelectRepo(temp_repo_id),
                                                 ));
@@ -337,7 +339,7 @@ impl LaReviewApp {
                                                 ui,
                                                 "RUN AGENT",
                                                 run_enabled,
-                                                self.state.is_generating,
+                                                self.state.session.is_generating,
                                                 None,
                                                 Some(run_width),
                                             );
@@ -366,7 +368,7 @@ impl LaReviewApp {
 
                             // Plan Section
 
-                            if let Some(plan) = self.state.latest_plan.as_ref() {
+                            if let Some(plan) = self.state.session.latest_plan.as_ref() {
                                 ui.add_space(spacing::SPACING_SM);
 
                                 super::plan::render_plan_panel(ui, plan);
@@ -394,7 +396,7 @@ impl LaReviewApp {
                                     |ui| {
                                         ui.add_space(spacing::SPACING_SM);
 
-                                        if !self.state.agent_timeline.is_empty()
+                                        if !self.state.session.agent_timeline.is_empty()
                                             && ui
                                                 .small_button(
                                                     egui::RichText::new(format!(
@@ -427,7 +429,7 @@ impl LaReviewApp {
                                 .show(ui, |ui| {
                                     ui.add_space(spacing::SPACING_XS);
 
-                                    for item in &self.state.agent_timeline {
+                                    for item in &self.state.session.agent_timeline {
                                         super::timeline::render_timeline_item(ui, item);
                                     }
                                 });

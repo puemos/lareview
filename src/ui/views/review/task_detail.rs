@@ -226,12 +226,13 @@ impl LaReviewApp {
                     .unwrap_or(ReviewTab::Description);
 
                 // Force Discussion tab if thread is active
-                if self.state.active_thread.is_some() {
+                if self.state.ui.active_thread.is_some() {
                     active_tab = ReviewTab::Discussion;
                 }
 
                 let note_count = self
                     .state
+                    .domain
                     .threads
                     .iter()
                     .filter(|thread| thread.task_id.as_ref() == Some(&task.id))
@@ -270,7 +271,7 @@ impl LaReviewApp {
                             let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
 
                             if resp.clicked() {
-                                if self.state.active_thread.is_some() {
+                                if self.state.ui.active_thread.is_some() {
                                     self.dispatch(Action::Review(ReviewAction::CloseThread));
                                 }
                                 active_tab = tab;
@@ -308,7 +309,7 @@ impl LaReviewApp {
                     .ctx()
                     .data(|d| d.get_temp::<ReviewTab>(egui::Id::new(("active_tab", &task.id))))
                     .unwrap_or(ReviewTab::Description);
-                if self.state.active_thread.is_some() {
+                if self.state.ui.active_thread.is_some() {
                     active_tab = ReviewTab::Discussion;
                 }
 
