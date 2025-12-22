@@ -1,14 +1,13 @@
-use super::format_timestamp;
-use crate::domain::{Comment, ThreadImpact, ThreadStatus};
-use crate::ui::app::{Action, LaReviewApp, ReviewAction};
-use crate::ui::components::{PopupOption, popup_selector, render_diff_editor_full_view};
+use crate::ui::app::{Action, LaReviewApp};
 use crate::ui::spacing;
 use crate::ui::theme::current_theme;
 use eframe::egui;
-use egui::Color32;
 use egui::epaint::MarginF32;
-use egui_phosphor::regular as icons;
 use unidiff::PatchSet;
+
+use crate::ui::views::review::thread::{
+    render_comment_list, render_reply_composer, render_thread_context, render_thread_header,
+};
 
 #[allow(dead_code)]
 pub struct ThreadDetailView {
@@ -27,31 +26,34 @@ impl LaReviewApp {
 
         let theme = current_theme();
 
-        let mut thread = view
+        let thread = view
             .thread_id
             .as_ref()
-            .and_then(|id| self.state.domain.threads.iter().find(|t| &t.id == id));
+            .and_then(|id| self.state.domain.threads.iter().find(|t| &t.id == id))
+            .cloned();
 
-        if thread.is_none() {
-            thread = self.state.domain.threads.iter().find(|t| {
-                t.task_id.as_ref() == Some(&view.task_id)
-                    && t.anchor.as_ref().and_then(|a| a.file_path.as_ref())
-                        == view.file_path.as_ref()
-                    && t.anchor.as_ref().and_then(|a| a.line_number) == view.line_number
-            });
-        }
+        let thread = if thread.is_none() {
+            self.state
+                .domain
+                .threads
+                .iter()
+                .find(|t| {
+                    t.task_id.as_ref() == Some(&view.task_id)
+                        && t.anchor.as_ref().and_then(|a| a.file_path.as_ref())
+                            == view.file_path.as_ref()
+                        && t.anchor.as_ref().and_then(|a| a.line_number) == view.line_number
+                })
+                .cloned()
+        } else {
+            thread
+        };
 
-        let thread = thread.cloned();
         let thread_id = thread.as_ref().map(|t| t.id.clone());
         let comments = thread_id
             .as_ref()
             .and_then(|id| self.state.domain.thread_comments.get(id))
             .cloned()
             .unwrap_or_default();
-
-        // 1. Breadcrumbs / Header
-        let status_choices = status_options(&theme);
-        let impact_choices = impact_options(&theme);
 
         egui::Frame::NONE
             .inner_margin(MarginF32 {
@@ -61,156 +63,31 @@ impl LaReviewApp {
                 bottom: 0.0,
             })
             .show(ui, |ui| {
-                // 2. Title and Status/Impact
-                let existing_title = thread
-                    .as_ref()
-                    .map(|t| t.title.clone())
-                    .unwrap_or_else(|| "".to_string());
-                let can_edit_thread = thread_id.is_some();
-
-                ui.horizontal(|ui| {
-                    let status_width = 120.0;
-                    let impact_width = 150.0;
-                    let selector_gap = spacing::SPACING_MD;
-                    let selector_total_width = status_width + impact_width + selector_gap;
-                    let title_width = (ui.available_width() - selector_total_width).max(120.0);
-
-                    // Edit Title - use centralized draft state
-                    let mut edit_text = self.state.ui.thread_title_draft.clone();
-
-                    let response = ui
-                        .scope(|ui| {
-                            ui.add(
-                                egui::TextEdit::singleline(&mut edit_text)
-                                    .hint_text("Discussion Title")
-                                    .desired_width(title_width)
-                                    .text_color(Color32::WHITE)
-                                    .text_color_opt(Some(theme.text_muted))
-                                    .font(egui::FontId::proportional(16.0))
-                                    .frame(false)
-                                    .margin(egui::vec2(0.0, 0.0)),
-                            )
-                        })
-                        .inner;
-
-                    if response.changed() {
-                        self.dispatch(Action::Review(ReviewAction::SetThreadTitleDraft {
-                            text: edit_text.clone(),
-                        }));
-                    }
-
-                    if response.lost_focus()
-                        && edit_text != existing_title
-                        && let Some(thread_id) = thread_id.clone()
-                    {
-                        self.dispatch(Action::Review(ReviewAction::UpdateThreadTitle {
-                            thread_id,
-                            title: edit_text.clone(),
-                        }));
-                    }
-
-                    // Disable automatic item spacing for precise control
-                    let old_spacing = ui.spacing().item_spacing.x;
-                    ui.spacing_mut().item_spacing.x = 0.0;
-
-                    // Status selector (left)
-                    let status = thread
-                        .as_ref()
-                        .map(|t| t.status)
-                        .unwrap_or(ThreadStatus::Todo);
-                    if let Some(next_status) = popup_selector(
-                        ui,
-                        ui.make_persistent_id(("thread_status_popup", &view.task_id, &thread_id)),
-                        status,
-                        &status_choices,
-                        status_width,
-                        can_edit_thread,
-                    ) && let Some(thread_id) = thread_id.clone()
-                    {
-                        self.dispatch(Action::Review(ReviewAction::UpdateThreadStatus {
-                            thread_id,
-                            status: next_status,
-                        }));
-                    }
-
-                    // Manual spacing between selectors
-                    ui.add_space(selector_gap);
-
-                    // Impact selector (right)
-                    let impact = thread
-                        .as_ref()
-                        .map(|t| t.impact)
-                        .unwrap_or(ThreadImpact::Nitpick);
-                    if let Some(next_impact) = popup_selector(
-                        ui,
-                        ui.make_persistent_id(("thread_impact_popup", &view.task_id, &thread_id)),
-                        impact,
-                        &impact_choices,
-                        impact_width,
-                        can_edit_thread,
-                    ) && let Some(thread_id) = thread_id.clone()
-                    {
-                        self.dispatch(Action::Review(ReviewAction::UpdateThreadImpact {
-                            thread_id,
-                            impact: next_impact,
-                        }));
-                    }
-
-                    // Restore spacing
-                    ui.spacing_mut().item_spacing.x = old_spacing;
-                });
-
-                // Context
-                if let (Some(file_path), Some(line_number)) =
-                    (view.file_path.as_ref(), view.line_number)
-                    && line_number > 0
-                {
-                    let updated_label = thread
-                        .as_ref()
-                        .map(|t| format_timestamp(&t.updated_at))
-                        .unwrap_or_else(|| "".to_string());
-
-                    ui.horizontal(|ui| {
-                        let display_path = file_path.split('/').next_back().unwrap_or(file_path);
-                        ui.label(
-                            egui::RichText::new(format!("{display_path}:{line_number}"))
-                                .color(theme.text_muted)
-                                .size(12.0),
-                        );
-                        if !updated_label.is_empty() {
-                            ui.label(
-                                egui::RichText::new(format!("• Updated {}", updated_label))
-                                    .color(theme.text_muted)
-                                    .size(11.0),
-                            );
-                        }
-                    });
-
-                    if let Some(diff_snippet) =
-                        self.thread_diff_snippet(&view.task_id, file_path, line_number)
-                    {
-                        ui.add_space(spacing::SPACING_MD);
-                        ui.label(
-                            egui::RichText::new("Diff context")
-                                .size(12.0)
-                                .color(theme.text_muted),
-                        );
-                        ui.add_space(spacing::SPACING_XS);
-
-                        egui::Frame::NONE
-                            .fill(theme.bg_tertiary)
-                            .stroke(egui::Stroke::new(1.0, theme.border_secondary))
-                            .corner_radius(crate::ui::spacing::RADIUS_MD)
-                            .inner_margin(egui::Margin::same(spacing::SPACING_SM as i8))
-                            .show(ui, |ui| {
-                                egui::ScrollArea::vertical()
-                                    .max_height(220.0)
-                                    .show(ui, |ui| {
-                                        render_diff_editor_full_view(ui, &diff_snippet, "diff");
-                                    });
-                            });
-                    }
+                if let Some(action) = render_thread_header(
+                    ui,
+                    thread.as_ref(),
+                    &self.state.ui.thread_title_draft,
+                    &theme,
+                    &view.task_id,
+                ) {
+                    self.dispatch(Action::Review(action));
                 }
+
+                let diff_snippet =
+                    if let (Some(path), Some(line)) = (view.file_path.as_ref(), view.line_number) {
+                        self.thread_diff_snippet(&view.task_id, path, line)
+                    } else {
+                        None
+                    };
+
+                render_thread_context(
+                    ui,
+                    thread.as_ref(),
+                    view.file_path.as_ref(),
+                    view.line_number,
+                    diff_snippet,
+                    &theme,
+                );
             });
 
         ui.add_space(spacing::SPACING_MD);
@@ -227,77 +104,21 @@ impl LaReviewApp {
             })
             .show(ui, |ui| {
                 ui.vertical(|ui| {
-                    for comment in &comments {
-                        self.render_comment_bubble(ui, comment);
-                        ui.add_space(spacing::SPACING_MD);
-                    }
+                    render_comment_list(ui, &comments, &theme);
 
                     // 4. Input Area
                     ui.add_space(spacing::SPACING_MD);
-                    ui.vertical(|ui| {
-                        let mut text = self.state.ui.thread_reply_draft.clone();
-
-                        let response = ui.add(
-                            egui::TextEdit::multiline(&mut text)
-                                .hint_text("Reply...")
-                                .font(egui::TextStyle::Body)
-                                .frame(false)
-                                .desired_rows(3)
-                                .desired_width(f32::INFINITY)
-                                .margin(egui::vec2(0.0, 0.0))
-                                .lock_focus(true),
-                        );
-
-                        if response.changed() {
-                            self.dispatch(Action::Review(ReviewAction::SetThreadReplyDraft {
-                                text: text.clone(),
-                            }));
-                        }
-
-                        ui.add_space(spacing::SPACING_SM);
-                        ui.horizontal(|ui| {
-                            ui.with_layout(
-                                egui::Layout::right_to_left(egui::Align::Center),
-                                |ui| {
-                                    let can_send = !text.trim().is_empty();
-                                    let old_padding = ui.spacing().button_padding;
-                                    ui.spacing_mut().button_padding = egui::vec2(14.0, 8.0);
-                                    if ui
-                                        .add_enabled(
-                                            can_send,
-                                            egui::Button::new(format!(
-                                                "{} Send Reply",
-                                                icons::PAPER_PLANE_RIGHT
-                                            )),
-                                        )
-                                        .clicked()
-                                    {
-                                        // Dispatch save
-                                        let title = self.state.ui.thread_title_draft.clone();
-                                        let title = if title.trim().is_empty() {
-                                            None
-                                        } else {
-                                            Some(title)
-                                        };
-                                        self.dispatch(Action::Review(
-                                            ReviewAction::CreateThreadComment {
-                                                task_id: view.task_id.clone(),
-                                                thread_id: thread_id.clone(),
-                                                file_path: view.file_path.clone(),
-                                                line_number: view.line_number,
-                                                title,
-                                                body: text.trim().to_string(),
-                                            },
-                                        ));
-                                        self.dispatch(Action::Review(
-                                            ReviewAction::ClearThreadReplyDraft,
-                                        ));
-                                    }
-                                    ui.spacing_mut().button_padding = old_padding;
-                                },
-                            );
-                        });
-                    });
+                    if let Some(action) = render_reply_composer(
+                        ui,
+                        &self.state.ui.thread_reply_draft,
+                        &self.state.ui.thread_title_draft,
+                        &view.task_id,
+                        thread_id,
+                        view.file_path.clone(),
+                        view.line_number,
+                    ) {
+                        self.dispatch(Action::Review(action));
+                    }
                 });
             });
     }
@@ -317,33 +138,6 @@ impl LaReviewApp {
             .iter()
             .find(|r| r.id == task.run_id)?;
         diff_snippet_for_anchor(&run.diff_text, file_path, line_number)
-    }
-
-    fn render_comment_bubble(&self, ui: &mut egui::Ui, comment: &Comment) {
-        let theme = current_theme();
-        let timestamp = format_timestamp(&comment.created_at);
-
-        ui.vertical(|ui| {
-            ui.horizontal(|ui| {
-                ui.label(
-                    egui::RichText::new(&comment.author)
-                        .strong()
-                        .size(13.0)
-                        .color(theme.text_primary),
-                );
-                ui.label(
-                    egui::RichText::new(format!("• {}", timestamp))
-                        .size(10.0)
-                        .color(theme.text_muted),
-                );
-            });
-
-            ui.label(
-                egui::RichText::new(&comment.body)
-                    .color(theme.text_secondary)
-                    .line_height(Some(26.0)),
-            );
-        });
     }
 }
 
@@ -469,48 +263,13 @@ fn diff_snippet_for_anchor(diff_text: &str, file_path: &str, line_number: u32) -
     None
 }
 
-fn status_options(theme: &crate::ui::theme::Theme) -> [PopupOption<ThreadStatus>; 4] {
-    [
-        ThreadStatus::Todo,
-        ThreadStatus::Wip,
-        ThreadStatus::Done,
-        ThreadStatus::Reject,
-    ]
-    .map(|status| {
-        let v = super::visuals::status_visuals(status, theme);
-        PopupOption {
-            label: v.label,
-            value: status,
-            fg: v.color,
-            icon: Some(v.icon),
-        }
-    })
-}
-
-fn impact_options(theme: &crate::ui::theme::Theme) -> [PopupOption<ThreadImpact>; 3] {
-    [
-        ThreadImpact::Blocking,
-        ThreadImpact::NiceToHave,
-        ThreadImpact::Nitpick,
-    ]
-    .map(|impact| {
-        let v = super::visuals::impact_visuals(impact, theme);
-        PopupOption {
-            label: v.label,
-            value: impact,
-            fg: v.color,
-            icon: Some(v.icon),
-        }
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::diff_snippet_for_anchor;
 
     #[test]
     fn diff_snippet_does_not_fall_through_to_other_files() {
-        let diff = r#"diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+        let diff = r###"diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
 --- a/pnpm-lock.yaml
 +++ b/pnpm-lock.yaml
 @@ -100,3 +100,3 @@
@@ -522,7 +281,7 @@ diff --git a/src/App.tsx b/src/App.tsx
 @@ -1,3 +1,6 @@
 +import React from "react";
  const App = () => null;
-"#;
+"###;
 
         let snippet = diff_snippet_for_anchor(diff, "pnpm-lock.yaml", 3);
         assert!(snippet.is_none());
@@ -530,7 +289,7 @@ diff --git a/src/App.tsx b/src/App.tsx
 
     #[test]
     fn diff_snippet_limits_context_window() {
-        let diff = r#"diff --git a/src/foo.rs b/src/foo.rs
+        let diff = r###"diff --git a/src/foo.rs b/src/foo.rs
 --- a/src/foo.rs
 +++ b/src/foo.rs
 @@ -1,12 +1,12 @@
@@ -546,7 +305,7 @@ diff --git a/src/App.tsx b/src/App.tsx
  line10
  line11
  line12
-"#;
+"###;
 
         let snippet =
             diff_snippet_for_anchor(diff, "src/foo.rs", 10).expect("snippet should exist");

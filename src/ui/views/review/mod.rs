@@ -5,6 +5,7 @@ mod nav;
 mod screen;
 mod task;
 mod task_detail;
+mod thread;
 mod thread_detail;
 mod toolbar;
 mod visuals;

@@ -1,0 +1,62 @@
+use crate::domain::Thread;
+use crate::ui::components::render_diff_editor_full_view;
+use crate::ui::spacing;
+use crate::ui::theme::Theme;
+use crate::ui::views::review::format_timestamp;
+use eframe::egui;
+
+pub(crate) fn render_thread_context(
+    ui: &mut egui::Ui,
+    thread: Option<&Thread>,
+    file_path: Option<&String>,
+    line_number: Option<u32>,
+    diff_snippet: Option<String>,
+    theme: &Theme,
+) {
+    if let (Some(file_path), Some(line_number)) = (file_path, line_number)
+        && line_number > 0
+    {
+        let updated_label = thread
+            .map(|t| format_timestamp(&t.updated_at))
+            .unwrap_or_default();
+
+        ui.horizontal(|ui| {
+            let display_path = file_path.split('/').next_back().unwrap_or(file_path);
+            ui.label(
+                egui::RichText::new(format!("{display_path}:{line_number}"))
+                    .color(theme.text_muted)
+                    .size(12.0),
+            );
+            if !updated_label.is_empty() {
+                ui.label(
+                    egui::RichText::new(format!("• Updated {}", updated_label))
+                        .color(theme.text_muted)
+                        .size(11.0),
+                );
+            }
+        });
+
+        if let Some(diff_snippet) = diff_snippet {
+            ui.add_space(spacing::SPACING_MD);
+            ui.label(
+                egui::RichText::new("Diff context")
+                    .size(12.0)
+                    .color(theme.text_muted),
+            );
+            ui.add_space(spacing::SPACING_XS);
+
+            egui::Frame::NONE
+                .fill(theme.bg_tertiary)
+                .stroke(egui::Stroke::new(1.0, theme.border_secondary))
+                .corner_radius(crate::ui::spacing::RADIUS_MD)
+                .inner_margin(egui::Margin::same(spacing::SPACING_SM as i8))
+                .show(ui, |ui| {
+                    egui::ScrollArea::vertical()
+                        .max_height(220.0)
+                        .show(ui, |ui| {
+                            render_diff_editor_full_view(ui, &diff_snippet, "diff");
+                        });
+                });
+        }
+    }
+}
