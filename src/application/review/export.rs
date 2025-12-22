@@ -7,6 +7,8 @@ use anyhow::Result;
 use futures::future::join_all;
 use std::collections::HashMap;
 
+use std::sync::Arc;
+
 pub struct ExportData {
     pub review: Review,
     pub run: ReviewRun,
@@ -34,7 +36,7 @@ pub struct ReviewExporter;
 impl ReviewExporter {
     pub async fn export_to_markdown(data: &ExportData, for_preview: bool) -> Result<ExportResult> {
         // Collect all unique diagrams to render in parallel
-        let mut diagrams_to_render = Vec::new();
+        let mut diagrams_to_render: Vec<Arc<str>> = Vec::new();
         for task in &data.tasks {
             if let Some(diagram_code) = &task.diagram
                 && !diagrams_to_render.contains(diagram_code)
@@ -54,7 +56,7 @@ impl ReviewExporter {
             }
         });
 
-        let render_results: HashMap<String, Result<String, String>> =
+        let render_results: HashMap<Arc<str>, Result<String, String>> =
             join_all(render_tasks).await.into_iter().collect();
 
         let mut md = String::new();

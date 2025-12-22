@@ -154,6 +154,8 @@ impl SessionState {
     }
 }
 
+use std::sync::Arc;
+
 /// Transient UI state.
 #[derive(Default)]
 pub struct UiState {
@@ -167,7 +169,7 @@ pub struct UiState {
     pub full_diff: Option<FullDiffView>,
     pub export_preview: Option<String>,
     pub export_assets: HashMap<String, Vec<u8>>,
-    pub cached_unified_diff: Option<(Vec<crate::domain::DiffRef>, String)>,
+    pub cached_unified_diff: Option<(Vec<crate::domain::DiffRef>, Arc<str>)>,
     pub active_thread: Option<ThreadContext>,
     pub is_exporting: bool,
     pub d2_install_output: String,
@@ -192,7 +194,7 @@ pub struct AppState {
 
 #[derive(Debug, Clone)]
 pub struct GeneratePreview {
-    pub diff_text: String,
+    pub diff_text: Arc<str>,
     pub github: Option<GitHubPreview>,
 }
 
@@ -205,7 +207,7 @@ pub struct GitHubPreview {
 #[derive(Debug, Clone)]
 pub struct FullDiffView {
     pub title: String,
-    pub text: String,
+    pub text: Arc<str>,
 }
 
 impl AppState {

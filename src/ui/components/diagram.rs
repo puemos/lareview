@@ -70,7 +70,7 @@ lazy_static::lazy_static! {
 /// Returns true if the user clicks the "Go to Settings" link.
 ///
 /// This is fully self-contained - just pass the diagram code and dark mode flag.
-pub fn diagram_view(ui: &mut Ui, diagram: &Option<String>, is_dark_mode: bool) -> bool {
+pub fn diagram_view(ui: &mut Ui, diagram: &Option<Arc<str>>, is_dark_mode: bool) -> bool {
     let mut go_to_settings = false;
 
     // Generate stable ID for memory storage

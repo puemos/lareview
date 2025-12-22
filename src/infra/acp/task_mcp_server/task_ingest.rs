@@ -278,7 +278,7 @@ pub(super) fn load_run_context(config: &ServerConfig) -> RunContext {
         run_id: "local-run".to_string(),
         agent_id: "unknown".to_string(),
         input_ref: "unknown".to_string(),
-        diff_text: String::new(),
+        diff_text: String::new().into(),
         diff_hash: String::new(),
         source: crate::domain::ReviewSource::DiffPaste {
             diff_hash: String::new(),

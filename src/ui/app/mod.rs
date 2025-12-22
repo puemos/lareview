@@ -18,7 +18,9 @@ mod update;
 
 pub use messages::{GenMsg, GenResultPayload, GhMsg, GhStatusPayload};
 pub use root::LaReviewApp;
-pub use state::{AppView, DomainState, FullDiffView, SelectedAgent, ThreadContext, UiState};
+pub use state::{
+    AppView, DomainState, FullDiffView, GeneratePreview, SelectedAgent, ThreadContext, UiState,
+};
 pub use timeline::{TimelineContent, TimelineItem};
 
 pub(crate) use store::{

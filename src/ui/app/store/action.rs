@@ -22,6 +22,7 @@ pub enum NavigationAction {
 pub enum GenerateAction {
     Reset,
     RunRequested,
+    UpdateDiffText(String),
     FetchPrContext(String),
     SelectAgent(SelectedAgent),
     ClearTimeline,

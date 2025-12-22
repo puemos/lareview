@@ -1,6 +1,8 @@
 use crate::domain::{DiffRef, HunkRef, ReviewSource};
 use crate::infra::acp::RunContext;
 
+use std::sync::Arc;
+
 fn sample_run(diff_text: &str) -> RunContext {
     let diff_hash = format!("{:016x}", crate::infra::hash::hash64(diff_text));
     RunContext {
@@ -8,7 +10,7 @@ fn sample_run(diff_text: &str) -> RunContext {
         run_id: "run-1".into(),
         agent_id: "agent-1".into(),
         input_ref: "input".into(),
-        diff_text: diff_text.to_string(),
+        diff_text: Arc::from(diff_text),
         diff_hash: diff_hash.clone(),
         source: ReviewSource::DiffPaste { diff_hash },
         initial_title: None,
@@ -31,7 +33,9 @@ fn sample_task(id: &str, files: &[&str]) -> crate::domain::ReviewTask {
         },
         diff_refs: vec![],
         insight: None,
-        diagram: Some("Flow: { shape: sequence_diagram Reviewer -> Code: \"review\" }".to_string()),
+        diagram: Some(Arc::from(
+            "Flow: { shape: sequence_diagram Reviewer -> Code: \"review\" }",
+        )),
         ai_generated: true,
         status: crate::domain::TaskStatus::Pending,
         sub_flow: None,

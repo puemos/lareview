@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use std::sync::Arc;
 
 use crate::domain::Review;
 use crate::domain::ReviewSource;
@@ -29,6 +30,7 @@ pub async fn resolve_generate_input(
     if looks_like_unified_diff(&trimmed) {
         let diff_hash = format!("{:016x}", crate::infra::hash::hash64(&trimmed));
         let run_id = uuid::Uuid::new_v4().to_string();
+        let diff_arc: Arc<str> = Arc::from(trimmed.as_str());
 
         return Ok(GenerateResolvedPayload {
             run_context: RunContext {
@@ -36,7 +38,7 @@ pub async fn resolve_generate_input(
                 run_id,
                 agent_id: selected_agent_id,
                 input_ref: trimmed.clone(),
-                diff_text: trimmed.clone(),
+                diff_text: diff_arc.clone(),
                 diff_hash: diff_hash.clone(),
                 source: ReviewSource::DiffPaste {
                     diff_hash: diff_hash.clone(),
@@ -45,7 +47,7 @@ pub async fn resolve_generate_input(
                 created_at: Some(chrono::Utc::now().to_rfc3339()),
             },
             preview: GeneratePreview {
-                diff_text: trimmed,
+                diff_text: diff_arc,
                 github: None,
             },
         });
@@ -64,6 +66,7 @@ pub async fn resolve_generate_input(
 
     let diff_hash = format!("{:016x}", crate::infra::hash::hash64(&diff));
     let run_id = uuid::Uuid::new_v4().to_string();
+    let diff_arc: Arc<str> = Arc::from(diff.as_str());
 
     Ok(GenerateResolvedPayload {
         run_context: RunContext {
@@ -71,7 +74,7 @@ pub async fn resolve_generate_input(
             run_id,
             agent_id: selected_agent_id,
             input_ref: trimmed,
-            diff_text: diff.clone(),
+            diff_text: diff_arc.clone(),
             diff_hash: diff_hash.clone(),
             source: ReviewSource::GitHubPr {
                 owner: pr_ref.owner.clone(),
@@ -85,7 +88,7 @@ pub async fn resolve_generate_input(
             created_at: Some(chrono::Utc::now().to_rfc3339()),
         },
         preview: GeneratePreview {
-            diff_text: diff,
+            diff_text: diff_arc,
             github: Some(GitHubPreview { pr: pr_ref, meta }),
         },
     })
@@ -105,7 +108,7 @@ pub async fn resolve_pr_preview(input_text: String) -> Result<GeneratePreview> {
         .with_context(|| format!("Fetch PR diff via `gh` ({})", pr_ref.url))?;
 
     Ok(GeneratePreview {
-        diff_text: diff,
+        diff_text: Arc::from(diff.as_str()),
         github: Some(GitHubPreview { pr: pr_ref, meta }),
     })
 }
@@ -147,6 +150,7 @@ pub async fn resolve_github_refresh(
 
     let diff_hash = format!("{:016x}", crate::infra::hash::hash64(&diff));
     let run_id = uuid::Uuid::new_v4().to_string();
+    let diff_arc: Arc<str> = Arc::from(diff.as_str());
 
     Ok(GenerateResolvedPayload {
         run_context: RunContext {
@@ -154,7 +158,7 @@ pub async fn resolve_github_refresh(
             run_id,
             agent_id: selected_agent_id,
             input_ref: pr_ref.url.clone(),
-            diff_text: diff.clone(),
+            diff_text: diff_arc.clone(),
             diff_hash: diff_hash.clone(),
             source: ReviewSource::GitHubPr {
                 owner: pr_ref.owner.clone(),
@@ -168,7 +172,7 @@ pub async fn resolve_github_refresh(
             created_at: Some(chrono::Utc::now().to_rfc3339()),
         },
         preview: GeneratePreview {
-            diff_text: diff,
+            diff_text: diff_arc,
             github: Some(GitHubPreview { pr: pr_ref, meta }),
         },
     })

@@ -156,6 +156,8 @@ fn normalize_single_task_payload(args: Value) -> Result<Value> {
     ))
 }
 
+use std::sync::Arc;
+
 pub(crate) fn parse_task(args: Value) -> Result<ReviewTask> {
     let normalized = normalize_single_task_payload(args)?;
     let task: SingleTaskPayload = serde_json::from_value(normalized)?;
@@ -189,7 +191,7 @@ pub(crate) fn parse_task(args: Value) -> Result<ReviewTask> {
 
     // Validate D2 if present
     if let Some(ref d) = diagram {
-        crate::infra::d2::validate_d2(d).map_err(|e| anyhow::anyhow!(e))?;
+        crate::infra::d2::validate_d2(d.as_ref()).map_err(|e| anyhow::anyhow!(e))?;
     }
 
     Ok(ReviewTask {
@@ -205,7 +207,7 @@ pub(crate) fn parse_task(args: Value) -> Result<ReviewTask> {
             tags: stats.tags,
         },
         diff_refs: task.diff_refs,
-        insight: task.insight,
+        insight: task.insight.map(Arc::from),
         diagram,
         ai_generated: true,
         status: TaskStatus::Pending,
@@ -213,7 +215,7 @@ pub(crate) fn parse_task(args: Value) -> Result<ReviewTask> {
     })
 }
 
-fn clean_d2_code(code: String) -> Option<String> {
+fn clean_d2_code(code: String) -> Option<Arc<str>> {
     let trimmed = code.trim();
     if trimmed.is_empty() {
         return None;
@@ -240,7 +242,7 @@ fn clean_d2_code(code: String) -> Option<String> {
     if cleaned.is_empty() {
         None
     } else {
-        Some(cleaned.to_string())
+        Some(Arc::from(cleaned))
     }
 }
 
@@ -252,20 +254,20 @@ mod tests {
     fn test_clean_d2_code() {
         // Case 1: Clean code stays clean
         let clean = "x -> y";
-        assert_eq!(clean_d2_code(clean.to_string()), Some(clean.to_string()));
+        assert_eq!(clean_d2_code(clean.to_string()), Some(Arc::from(clean)));
 
         // Case 2: Markdown block with language
         let md_lang = "```d2\nx -> y\n```";
         assert_eq!(
             clean_d2_code(md_lang.to_string()),
-            Some("x -> y".to_string())
+            Some(Arc::from("x -> y"))
         );
 
         // Case 3: Markdown block without language
         let md_plain = "```\nx -> y\n```";
         assert_eq!(
             clean_d2_code(md_plain.to_string()),
-            Some("x -> y".to_string())
+            Some(Arc::from("x -> y"))
         );
 
         // Case 4: Empty block

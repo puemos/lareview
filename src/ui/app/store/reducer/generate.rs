@@ -38,6 +38,25 @@ pub fn reduce(
             }]
         }
 
+        GenerateAction::UpdateDiffText(text) => {
+            session.diff_text = text.clone();
+
+            // Auto-fetch PR context if it looks like a GitHub PR ref
+            if crate::infra::github::parse_pr_ref(&text).is_some()
+                && !session.is_preview_fetching
+                && session.last_preview_input_ref.as_deref() != Some(text.trim())
+            {
+                session.is_preview_fetching = true;
+                session.last_preview_input_ref = Some(text.trim().to_string());
+                session.generation_error = None;
+                session.generate_preview = None;
+                return vec![Command::FetchPrContextPreview {
+                    input_ref: text.trim().to_string(),
+                }];
+            }
+            Vec::new()
+        }
+
         GenerateAction::FetchPrContext(input_ref) => {
             let input_ref = input_ref.trim().to_string();
             if input_ref.is_empty() {

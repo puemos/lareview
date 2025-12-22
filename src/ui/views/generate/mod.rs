@@ -1,9 +1,10 @@
-//! Generate view UI for LaReview.
-//!
-//! Handles the task generation interface where users can input diffs and select AI agents to
-//! generate review tasks.
+pub mod agent_pane;
+pub mod input_pane;
+pub mod plan;
+pub mod screen;
+pub mod timeline;
+pub mod timeline_pane;
 
-mod actions;
-mod plan;
-mod screen;
-mod timeline;
+pub(crate) use agent_pane::render_agent_pane;
+pub(crate) use input_pane::render_input_pane;
+pub(crate) use timeline_pane::render_timeline_pane;

@@ -1,6 +1,7 @@
 use super::DbConn;
 use crate::domain::{ReviewRunId, ReviewTask, TaskId, TaskStatus};
 use anyhow::Result;
+use std::sync::Arc;
 
 use std::str::FromStr;
 
@@ -124,11 +125,11 @@ impl TaskRepository {
                 description,
                 files: serde_json::from_str(&files_json).unwrap_or_default(),
                 stats: serde_json::from_str(&stats_json).unwrap_or_default(),
-                insight,
+                insight: insight.map(Arc::from),
                 diff_refs: diff_refs_json
                     .map(|s| serde_json::from_str(&s).unwrap_or_default())
                     .unwrap_or_default(),
-                diagram,
+                diagram: diagram.map(Arc::from),
                 ai_generated: ai_generated != 0,
                 status,
                 sub_flow,
@@ -201,11 +202,11 @@ impl TaskRepository {
                 description,
                 files: serde_json::from_str(&files_json).unwrap_or_default(),
                 stats: serde_json::from_str(&stats_json).unwrap_or_default(),
-                insight,
+                insight: insight.map(Arc::from),
                 diff_refs: diff_refs_json
                     .map(|s| serde_json::from_str(&s).unwrap_or_default())
                     .unwrap_or_default(),
-                diagram,
+                diagram: diagram.map(Arc::from),
                 ai_generated: ai_generated != 0,
                 status,
                 sub_flow,
@@ -271,11 +272,11 @@ impl TaskRepository {
                 description,
                 files: serde_json::from_str(&files_json).unwrap_or_default(),
                 stats: serde_json::from_str(&stats_json).unwrap_or_default(),
-                insight,
+                insight: insight.map(Arc::from),
                 diff_refs: diff_refs_json
                     .map(|s| serde_json::from_str(&s).unwrap_or_default())
                     .unwrap_or_default(),
-                diagram,
+                diagram: diagram.map(Arc::from),
                 ai_generated: ai_generated != 0,
                 status,
                 sub_flow,
