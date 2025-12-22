@@ -5,6 +5,7 @@ pub mod columns;
 pub mod cyber_button;
 pub mod diagram;
 pub mod diff;
+pub mod list_item;
 pub mod markdown;
 pub mod pills;
 pub mod popup_selector;
