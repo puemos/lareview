@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.10] - 2025-12-23
+
+### Added
+- **Generate View**: Enhanced generation timeline with better visual feedback.
+- **Review View**: Added custom review selector dropdown with improved interactivity, sorting (selected first), and visual styling (brand colors, pointer cursors).
+
+### Changed
+- **UI/UX**: Unified status colors across the application:
+    - `Todo` is now consistently gray (`text_muted`).
+    - `Ignored` is now consistently red (`destructive`).
+    - `InProgress` plan items now match the global accent color.
+- **Assets**: Optimized application assets by converting screenshots to WebP format, reducing bundle size.
+- **Documentation**: Updated README and Architecture docs; removed obsolete planning documents.
+- **Review View**: Refined center pane layout and navigation tree styling.
+- **Infra**: Updates to ACP task generator client and type definitions.
+
+### Fixed
+- **Review Selector**: Resolved issues with item clickability, hover states, and deprecated popup API usage.
+- **Animations**: Improved cyber animation components.
+
 ## [0.0.9] - 2025-12-22
 
 ### Added
