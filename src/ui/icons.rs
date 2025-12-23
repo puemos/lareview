@@ -55,6 +55,7 @@ pub const ICON_PLUS: &str = icons::PLUS;
 pub const ICON_MINUS: &str = icons::MINUS;
 pub const ICON_DOT: &str = icons::DOT_OUTLINE;
 pub const ICON_ARROW_RIGHT: &str = icons::ARROW_RIGHT;
+pub const CHEVRON_DOWN: &str = icons::CARET_DOWN;
 
 // --- Impact ---
 pub const IMPACT_BLOCKING: &str = icons::WARNING_CIRCLE;
