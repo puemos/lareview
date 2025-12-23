@@ -8,6 +8,7 @@ pub enum ReviewDataRefreshReason {
     AfterGeneration,
     AfterStatusChange,
     AfterReviewDelete,
+    Incremental,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

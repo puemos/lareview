@@ -627,6 +627,18 @@ impl agent_client_protocol::Client for LaReviewClient {
                     || call.title.contains("finalize_review");
 
                 if is_return_task_tool {
+                    let task_id = call
+                        .raw_input
+                        .as_ref()
+                        .and_then(|v| v.get("id").and_then(|id| id.as_str()))
+                        .map(|s| s.to_string());
+
+                    if let Some(id) = task_id
+                        && let Some(tx) = &self.progress
+                    {
+                        let _ = tx.send(ProgressEvent::TaskStarted(id));
+                    }
+
                     // Handle streaming return_task
                     if let Some(ref input) = call.raw_input {
                         self.append_single_task_from_value(input.clone());
@@ -662,7 +674,7 @@ impl agent_client_protocol::Client for LaReviewClient {
                 }
             }
             SessionUpdate::ToolCallUpdate(update) => {
-                // Check if this is a finalize_review tool completing
+                // Check if this is a tool completing that requires a UI sync
                 let tool_id: &str = &update.tool_call_id.0;
                 let tool_name = update
                     .fields
@@ -688,12 +700,42 @@ impl agent_client_protocol::Client for LaReviewClient {
                 );
                 let is_finalize = matches!(tool_name.as_deref(), Some("finalize_review"))
                     || tool_id.contains("finalize_review");
+                let is_return_task = matches!(tool_name.as_deref(), Some("return_task"))
+                    || tool_id.contains("return_task");
+                let is_add_comment = matches!(tool_name.as_deref(), Some("add_comment"))
+                    || tool_id.contains("add_comment");
 
-                if is_finalize && is_completed {
-                    if std::env::var("ACP_DEBUG").is_ok() {
-                        eprintln!("[acp] finalize_review completed via ToolCallUpdate");
+                if is_completed {
+                    if is_finalize {
+                        if std::env::var("ACP_DEBUG").is_ok() {
+                            eprintln!("[acp] finalize_review completed via ToolCallUpdate");
+                        }
+                        self.mark_finalization_received();
+                        if let Some(tx) = &self.progress {
+                            let _ = tx.send(ProgressEvent::MetadataUpdated);
+                        }
+                    } else if is_return_task {
+                        let task_id = update
+                            .fields
+                            .raw_input
+                            .as_ref()
+                            .and_then(|v| v.get("id").and_then(|id| id.as_str()))
+                            .map(|s| s.to_string())
+                            .or_else(|| {
+                                update
+                                    .fields
+                                    .raw_output
+                                    .as_ref()
+                                    .and_then(|v| v.get("task_id").and_then(|id| id.as_str()))
+                                    .map(|s| s.to_string())
+                            });
+
+                        if let Some(tx) = &self.progress {
+                            let _ = tx.send(ProgressEvent::TaskAdded(task_id.unwrap_or_default()));
+                        }
+                    } else if is_add_comment && let Some(tx) = &self.progress {
+                        let _ = tx.send(ProgressEvent::CommentAdded);
                     }
-                    self.mark_finalization_received();
                 }
 
                 if is_completed || is_failed {

@@ -30,11 +30,11 @@ pub(crate) fn render_task_header(
     let status_width = 140.0;
 
     let status_visuals = |status: crate::domain::ReviewStatus| match status {
-        crate::domain::ReviewStatus::Todo => (icons::STATUS_TODO, "To Do", theme.brand),
+        crate::domain::ReviewStatus::Todo => (icons::STATUS_TODO, "To Do", theme.text_muted),
         crate::domain::ReviewStatus::InProgress => (icons::STATUS_WIP, "In Progress", theme.accent),
         crate::domain::ReviewStatus::Done => (icons::STATUS_DONE, "Done", theme.success),
         crate::domain::ReviewStatus::Ignored => {
-            (icons::STATUS_IGNORED, "Ignored", theme.text_muted)
+            (icons::STATUS_IGNORED, "Ignored", theme.destructive)
         }
     };
 

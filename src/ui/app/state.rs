@@ -79,6 +79,7 @@ pub struct SessionState {
     pub gh_status: Option<crate::ui::app::GhStatusPayload>,
     pub gh_status_error: Option<String>,
     pub is_gh_status_checking: bool,
+    pub generating_review_id: Option<String>,
 }
 
 impl SessionState {
@@ -87,6 +88,7 @@ impl SessionState {
         self.agent_timeline_index.clear();
         self.next_agent_timeline_seq = 0;
         self.latest_plan = None;
+        self.generating_review_id = None;
     }
 
     pub fn ingest_progress(&mut self, evt: ProgressEvent) {
@@ -143,10 +145,39 @@ impl SessionState {
 
             ProgressEvent::Finalized => {
                 self.is_generating = false;
+                self.generating_review_id = None;
                 self.agent_timeline.push(TimelineItem {
                     seq,
                     stream_key: None,
                     content: TimelineContent::LocalLog("Review finalized.".into()),
+                });
+            }
+            ProgressEvent::TaskStarted(id) => {
+                self.agent_timeline.push(TimelineItem {
+                    seq,
+                    stream_key: None,
+                    content: TimelineContent::LocalLog(format!("Generating task: {id}")),
+                });
+            }
+            ProgressEvent::TaskAdded(id) => {
+                self.agent_timeline.push(TimelineItem {
+                    seq,
+                    stream_key: None,
+                    content: TimelineContent::LocalLog(format!("Task {id} persisted to database.")),
+                });
+            }
+            ProgressEvent::CommentAdded => {
+                self.agent_timeline.push(TimelineItem {
+                    seq,
+                    stream_key: None,
+                    content: TimelineContent::LocalLog("Comment persisted to database.".into()),
+                });
+            }
+            ProgressEvent::MetadataUpdated => {
+                self.agent_timeline.push(TimelineItem {
+                    seq,
+                    stream_key: None,
+                    content: TimelineContent::LocalLog("Review metadata updated.".into()),
                 });
             }
         }

@@ -108,10 +108,12 @@ impl<'a> ListItem<'a> {
                         ui.label(self.title);
 
                         if let Some(sub) = self.subtitle {
+                            ui.add_space(spacing::SPACING_SM);
                             ui.label(sub);
                         }
 
                         if let Some(meta) = self.metadata {
+                            ui.add_space(spacing::SPACING_SM);
                             ui.label(meta);
                         }
                     });
@@ -204,10 +206,12 @@ impl<'a> ListItem<'a> {
                             ui.label(self.title);
 
                             if let Some(sub) = self.subtitle {
+                                ui.add_space(spacing::SPACING_SM);
                                 ui.label(sub);
                             }
 
                             if let Some(meta) = self.metadata {
+                                ui.add_space(spacing::SPACING_SM);
                                 ui.label(meta);
                             }
                         });

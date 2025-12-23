@@ -14,9 +14,34 @@ pub(crate) fn render_navigation_tree(
     ui: &mut egui::Ui,
     tasks_by_sub_flow: &std::collections::HashMap<Option<String>, Vec<ReviewTask>>,
     selected_task_id: Option<&String>,
+    is_generating: bool,
     theme: &Theme,
 ) -> Option<ReviewAction> {
     let sub_flows = sub_flows_in_display_order(tasks_by_sub_flow);
+
+    egui::Frame::NONE
+        .inner_margin(egui::Margin::symmetric(spacing::SPACING_SM as i8, 0))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.add(
+                    egui::Label::new(
+                        egui::RichText::new("Tasks")
+                            .strong()
+                            .color(theme.text_primary),
+                    )
+                    .wrap(),
+                );
+
+                if is_generating {
+                    ui.add_space(spacing::SPACING_XS);
+                    crate::ui::animations::cyber::cyber_spinner(
+                        ui,
+                        theme.brand,
+                        Some(crate::ui::animations::cyber::CyberSpinnerSize::Sm),
+                    );
+                }
+            });
+        });
 
     if sub_flows.is_empty() {
         ui.vertical_centered(|ui| {
@@ -29,19 +54,6 @@ pub(crate) fn render_navigation_tree(
         });
         return None;
     }
-
-    egui::Frame::NONE
-        .inner_margin(egui::Margin::symmetric(spacing::SPACING_SM as i8, 0))
-        .show(ui, |ui| {
-            ui.add(
-                egui::Label::new(
-                    egui::RichText::new("Tasks")
-                        .strong()
-                        .color(theme.text_primary),
-                )
-                .wrap(),
-            );
-        });
 
     ui.add_space(spacing::SPACING_SM);
 
@@ -123,7 +135,7 @@ pub(crate) fn render_nav_item(
         crate::domain::ReviewStatus::Todo => (icons::STATUS_TODO, theme.text_muted),
         crate::domain::ReviewStatus::InProgress => (icons::STATUS_WIP, theme.accent),
         crate::domain::ReviewStatus::Done => (icons::STATUS_DONE, theme.success),
-        crate::domain::ReviewStatus::Ignored => (icons::STATUS_IGNORED, theme.text_muted),
+        crate::domain::ReviewStatus::Ignored => (icons::STATUS_IGNORED, theme.destructive),
     };
 
     // -- Title --

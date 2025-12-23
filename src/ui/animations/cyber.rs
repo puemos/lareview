@@ -80,10 +80,33 @@ pub fn paint_cyber_loader(
     painter.galley(text_pos, galley, Color32::TRANSPARENT);
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CyberSpinnerSize {
+    #[default]
+    Sm,
+    Md,
+    Lg,
+}
+
+impl CyberSpinnerSize {
+    pub fn pixels(&self) -> f32 {
+        match self {
+            Self::Sm => 14.0,
+            Self::Md => 24.0,
+            Self::Lg => 48.0,
+        }
+    }
+}
+
 /// A smaller, inline version of the loader for lists or toolbars.
-pub fn cyber_spinner(ui: &mut egui::Ui, color: Color32) -> egui::Response {
-    let size = ui.spacing().interact_size.y;
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::hover());
+pub fn cyber_spinner(
+    ui: &mut egui::Ui,
+    color: Color32,
+    size: Option<CyberSpinnerSize>,
+) -> egui::Response {
+    let pixel_size = size.unwrap_or_default().pixels();
+    let (rect, response) =
+        ui.allocate_exact_size(egui::vec2(pixel_size, pixel_size), egui::Sense::hover());
 
     if ui.is_rect_visible(rect) {
         let painter = ui.painter();
@@ -94,12 +117,12 @@ pub fn cyber_spinner(ui: &mut egui::Ui, color: Color32) -> egui::Response {
             painter,
             ReticleParams {
                 center,
-                radius_min: 2.0,
-                radius_max: size / 2.0,
+                radius_min: pixel_size * 0.2,
+                radius_max: pixel_size / 2.0,
                 time,
                 color,
                 n_arms: 4,
-                stroke_width: 1.2,
+                stroke_width: if pixel_size > 20.0 { 1.5 } else { 1.2 },
             },
         );
         ui.ctx().request_repaint();

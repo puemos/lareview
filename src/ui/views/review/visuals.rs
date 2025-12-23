@@ -14,7 +14,7 @@ pub fn status_visuals(status: ReviewStatus, theme: &Theme) -> Visuals {
         ReviewStatus::Todo => Visuals {
             label: "To Do",
             icon: icons::STATUS_TODO,
-            color: theme.brand,
+            color: theme.text_muted,
         },
         ReviewStatus::InProgress => Visuals {
             label: "In Progress",
@@ -29,7 +29,7 @@ pub fn status_visuals(status: ReviewStatus, theme: &Theme) -> Visuals {
         ReviewStatus::Ignored => Visuals {
             label: "Ignored",
             icon: icons::STATUS_IGNORED,
-            color: theme.text_muted,
+            color: theme.destructive,
         },
     }
 }

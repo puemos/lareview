@@ -76,15 +76,21 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
 
                         CollapsingState::load_with_default_open(ui.ctx(), id, default_open)
                             .show_header(ui, |ui| {
+                                ui.set_min_width(ui.available_width());
                                 ui.horizontal(|ui| {
+                                    let full_label =
+                                        format!("{}: {}", tool_label.server, tool_label.tool);
+                                    let truncated_label = if full_label.len() > 40 {
+                                        format!("{}...", &full_label[..37])
+                                    } else {
+                                        full_label
+                                    };
+
                                     ui.label(
-                                        egui::RichText::new(format!(
-                                            "{}: {}",
-                                            tool_label.server, tool_label.tool
-                                        ))
-                                        .monospace()
-                                        .strong()
-                                        .color(current_theme().text_primary),
+                                        egui::RichText::new(truncated_label)
+                                            .monospace()
+                                            .strong()
+                                            .color(current_theme().text_primary),
                                     );
 
                                     ui.with_layout(
@@ -96,6 +102,17 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                                                     .color(status_color)
                                                     .size(11.0),
                                             );
+
+                                            if matches!(call.status, ToolCallStatus::InProgress) {
+                                                ui.add_space(4.0);
+                                                crate::ui::animations::cyber::cyber_spinner(
+                                                    ui,
+                                                    current_theme().brand,
+                                                    Some(
+                                                        crate::ui::animations::cyber::CyberSpinnerSize::Sm,
+                                                    ),
+                                                );
+                                            }
                                         },
                                     );
                                 });
@@ -123,12 +140,29 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
             );
 
             ui.horizontal(|ui| {
+                let full_label = format!("{}: {}", tool_label.server, tool_label.tool);
+                let truncated_label = if full_label.len() > 40 {
+                    format!("{}...", &full_label[..37])
+                } else {
+                    full_label
+                };
+
                 ui.label(
-                    egui::RichText::new(format!("{}: {}", tool_label.server, tool_label.tool))
+                    egui::RichText::new(truncated_label)
                         .monospace()
                         .color(current_theme().text_muted)
                         .size(12.0),
                 );
+
+                if matches!(status, ToolCallStatus::InProgress) {
+                    ui.add_space(4.0);
+                    crate::ui::animations::cyber::cyber_spinner(
+                        ui,
+                        current_theme().brand,
+                        Some(crate::ui::animations::cyber::CyberSpinnerSize::Sm),
+                    );
+                }
+
                 ui.label(
                     egui::RichText::new(format!("[{}]", label))
                         .monospace()

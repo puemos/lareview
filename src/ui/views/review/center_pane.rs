@@ -61,7 +61,9 @@ impl LaReviewApp {
                 render_all_done_state(ui, &theme);
             }
             RightPaneState::NoTasks => {
-                if let Some(action) = render_empty_state(ui, &theme) {
+                let is_generating_this = self.state.session.is_generating
+                    && self.state.ui.selected_review_id == self.state.session.generating_review_id;
+                if let Some(action) = render_empty_state(ui, &theme, is_generating_this) {
                     self.dispatch(action);
                 }
             }
@@ -165,34 +167,53 @@ pub(crate) fn render_ready_state(
 }
 
 /// Renders the "No Tasks" empty state
-pub(crate) fn render_empty_state(ui: &mut egui::Ui, theme: &Theme) -> Option<Action> {
+pub(crate) fn render_empty_state(
+    ui: &mut egui::Ui,
+    theme: &Theme,
+    is_generating: bool,
+) -> Option<Action> {
     let mut action_out = None;
     ui.allocate_ui_with_layout(
         ui.available_size(),
         egui::Layout::centered_and_justified(egui::Direction::TopDown),
         |ui| {
             ui.vertical_centered(|ui| {
-                // Hero Icon
-                ui.label(
-                    egui::RichText::new(icons::ICON_EMPTY)
-                        .size(64.0)
-                        .color(theme.border_secondary),
-                );
-                ui.add_space(spacing::SPACING_MD);
-                ui.heading("No review tasks yet");
-                ui.add_space(8.0);
-                ui.label(
-                    egui::RichText::new("Generate tasks from your diff to start reviewing.")
-                        .color(theme.text_muted),
-                );
-                ui.add_space(24.0);
+                if is_generating {
+                    crate::ui::animations::cyber::cyber_spinner(
+                        ui,
+                        theme.brand,
+                        Some(crate::ui::animations::cyber::CyberSpinnerSize::Md),
+                    );
+                    ui.add_space(spacing::SPACING_MD);
+                    ui.heading("Analyzing your code...");
+                    ui.add_space(8.0);
+                    ui.label(
+                        egui::RichText::new("The agent is currently generating review tasks.")
+                            .color(theme.text_muted),
+                    );
+                } else {
+                    // Hero Icon
+                    ui.label(
+                        egui::RichText::new(icons::ICON_EMPTY)
+                            .size(64.0)
+                            .color(theme.border_secondary),
+                    );
+                    ui.add_space(spacing::SPACING_MD);
+                    ui.heading("No review tasks yet");
+                    ui.add_space(8.0);
+                    ui.label(
+                        egui::RichText::new("Generate tasks from your diff to start reviewing.")
+                            .color(theme.text_muted),
+                    );
+                    ui.add_space(24.0);
 
-                if action_button(ui, "Generate tasks", true, theme.brand).clicked() {
-                    action_out = Some(Action::Navigation(
-                        crate::ui::app::NavigationAction::SwitchTo(
-                            crate::ui::app::AppView::Generate,
-                        ),
-                    ));
+                    if action_button(ui, "Generate tasks", true, theme.brand).clicked() {
+                        action_out = Some(Action::Navigation(
+                            crate::ui::app::NavigationAction::SwitchTo(
+                                crate::ui::app::AppView::Generate,
+                            ),
+                        ));
+                    }
                 }
             });
         },

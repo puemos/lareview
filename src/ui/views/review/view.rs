@@ -91,6 +91,18 @@ impl LaReviewApp {
                             ) {
                                 self.dispatch(Action::Review(action));
                             }
+
+                            if self.state.session.is_generating
+                                && self.state.ui.selected_review_id
+                                    == self.state.session.generating_review_id
+                            {
+                                ui.add_space(spacing::SPACING_XS);
+                                crate::ui::animations::cyber::cyber_spinner(
+                                    ui,
+                                    theme.brand,
+                                    Some(crate::ui::animations::cyber::CyberSpinnerSize::Sm),
+                                );
+                            }
                         });
 
                         // B. Spacer
@@ -133,7 +145,11 @@ impl LaReviewApp {
 
                                 if self.state.ui.is_exporting {
                                     ui.add_space(spacing::SPACING_XS);
-                                    crate::ui::animations::cyber::cyber_spinner(ui, theme.brand);
+                                    crate::ui::animations::cyber::cyber_spinner(
+                                        ui,
+                                        theme.brand,
+                                        Some(crate::ui::animations::cyber::CyberSpinnerSize::Sm),
+                                    );
                                 }
                             }
 
@@ -307,10 +323,14 @@ impl LaReviewApp {
                         .auto_shrink([false, false])
                         .show(ui, |ui| {
                             ui.spacing_mut().item_spacing.x = 0.0;
+                            let is_generating_this = self.state.session.is_generating
+                                && self.state.ui.selected_review_id
+                                    == self.state.session.generating_review_id;
                             if let Some(action) = render_navigation_tree(
                                 ui,
                                 &tasks_by_sub_flow,
                                 self.state.ui.selected_task_id.as_ref(),
+                                is_generating_this,
                                 &theme,
                             ) {
                                 self.dispatch(Action::Review(action));

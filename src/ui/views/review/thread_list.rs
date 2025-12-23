@@ -54,10 +54,10 @@ pub fn render_thread_list(
 
                 // -- Status Icon --
                 let (icon, color) = match thread.status {
-                    ReviewStatus::Todo => (icons::STATUS_TODO, theme.warning),
+                    ReviewStatus::Todo => (icons::STATUS_TODO, theme.text_muted),
                     ReviewStatus::InProgress => (icons::STATUS_WIP, theme.accent),
                     ReviewStatus::Done => (icons::STATUS_DONE, theme.success),
-                    ReviewStatus::Ignored => (icons::STATUS_IGNORED, theme.text_muted),
+                    ReviewStatus::Ignored => (icons::STATUS_IGNORED, theme.destructive),
                 };
 
                 // -- Title --
@@ -142,7 +142,8 @@ pub fn render_thread_list(
                 // Separator
                 ui.painter().line_segment(
                     [
-                        egui::pos2(response.rect.min.x, response.rect.max.y),
+                        // add 6.5 to make the line touch the left edge of the resize ha
+                        egui::pos2(response.rect.min.x - 6.5, response.rect.max.y),
                         egui::pos2(response.rect.max.x, response.rect.max.y),
                     ],
                     egui::Stroke::new(1.0, theme.border),

@@ -42,4 +42,12 @@ pub enum ProgressEvent {
     LocalLog(String),
     /// Signal that the agent has finished its work (received finalize_review).
     Finalized,
+    /// A new task is being generated.
+    TaskStarted(String),
+    /// A new task has been successfully persisted by the MCP server.
+    TaskAdded(String),
+    /// A new comment has been successfully persisted by the MCP server.
+    CommentAdded,
+    /// Review metadata (title/summary) has been updated by the MCP server.
+    MetadataUpdated,
 }

@@ -140,6 +140,7 @@ pub fn reduce_msg(
         GenMsg::InputResolved(result) => match *result {
             Ok(payload) => {
                 session.generate_preview = Some(payload.preview);
+                session.generating_review_id = Some(payload.run_context.review_id.clone());
                 ui.selected_review_id = Some(payload.run_context.review_id.clone());
                 ui.selected_run_id = Some(payload.run_context.run_id.clone());
                 vec![Command::StartGeneration {
@@ -154,11 +155,24 @@ pub fn reduce_msg(
             }
         },
         GenMsg::Progress(evt) => {
+            let mut commands = Vec::new();
+            match &*evt {
+                crate::infra::acp::ProgressEvent::TaskStarted(_)
+                | crate::infra::acp::ProgressEvent::TaskAdded(_)
+                | crate::infra::acp::ProgressEvent::CommentAdded
+                | crate::infra::acp::ProgressEvent::MetadataUpdated => {
+                    commands.push(Command::RefreshReviewData {
+                        reason: ReviewDataRefreshReason::Incremental,
+                    });
+                }
+                _ => {}
+            }
             session.ingest_progress(*evt);
-            Vec::new()
+            commands
         }
         GenMsg::Done(result) => {
             session.is_generating = false;
+            session.generating_review_id = None;
 
             match result {
                 Ok(_payload) => vec![Command::RefreshReviewData {

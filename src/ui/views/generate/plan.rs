@@ -121,7 +121,7 @@ fn render_plan_entries(ui: &mut egui::Ui, plan: &Plan, dense: bool) {
 fn plan_entry_style(status: PlanStatus) -> (&'static str, egui::Color32, &'static str) {
     match status {
         PlanStatus::Completed => (icons::STATUS_DONE, current_theme().success, "done"),
-        PlanStatus::InProgress => (icons::STATUS_TODO, current_theme().warning, "doing"),
+        PlanStatus::InProgress => (icons::STATUS_WIP, current_theme().accent, "doing"),
         PlanStatus::Pending => (icons::STATUS_PENDING, current_theme().text_muted, "todo"),
     }
 }
