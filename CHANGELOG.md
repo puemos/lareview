@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.11] - 2025-12-24
+
+### Added
+- **Home View**: Introduced a new Home view as the default entry point, showing recent reviews and available agents.
+- **Agent Discovery**: Added agent discovery and availability display on the Home view.
+- **Typography**: Added centralized typography utilities and migrated UI text to consistent font helpers.
+- **Icons**: Added Phosphor icon font integration and updated navigation icons.
+- **Navigation**: Added Home navigation tab and routing support.
+
+### Changed
+- **Navigation**: Updated header navigation layout with dynamic tab sizing and centered container.
+- **Default View**: Switched default app view from Generate to Home.
+- **Theming**: Standardized spacing constants and adjusted header height; refined theme text colors for better visual hierarchy.
+- **Reviews**: Updated review deletion flow to accept explicit review IDs and properly clear selection state.
+- **Components**: Reworked multiple UI components to use shared typography and spacing utilities.
+
+### Internal
+- **GEMINI.md**: Added Git workflow guidelines.
+- **CI**: Updated clippy invocation to include all targets and features.
+
 ## [0.0.10] - 2025-12-23
 
 ### Added
