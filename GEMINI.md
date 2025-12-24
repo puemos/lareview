@@ -46,11 +46,19 @@ To check if the code is formatted according to project standards:
 cargo fmt -- --check
 ```
 
+### Git
+
+1. Never commit without running `cargo fmt` and `cargo clippy`.
+2. Use `git rebase` instead of `git merge` to keep the commit history clean.
+3. Do not commit or push asking for review or approval.
+4. Commit structure should follow the conventional commit format `action(scope): subject`.
+5. Commit messages should be concise and descriptive and include all stuff done based on the diff.
+
 ### Linting
 
 To run the clippy linter and check for warnings:
 ```bash
-cargo clippy -- -D warnings
+cargo clippy --all-targets --all-features -- -D warnings
 ```
 
 ### Running Tests

@@ -67,8 +67,16 @@ impl LaReviewApp {
                         ui.spacing_mut().item_spacing = egui::vec2(spacing, 0.0);
 
                         // We split the width equally among tabs, accounting for spacing
-                        let tab_width = (tab_rect.width() - (3.0 * spacing)) / 4.0;
+                        let tab_width = (tab_rect.width() - (4.0 * spacing)) / 5.0;
 
+                        self.render_tab(
+                            ui,
+                            AppView::Home,
+                            "Home",
+                            icons::VIEW_HOME,
+                            tab_width,
+                            nav_rounding,
+                        );
                         self.render_tab(
                             ui,
                             AppView::Generate,
@@ -149,6 +157,7 @@ impl LaReviewApp {
 
             if ui.add(btn).clicked() {
                 match view {
+                    AppView::Home => self.switch_to_home(),
                     AppView::Generate => self.switch_to_generate(),
                     AppView::Review => self.switch_to_review(),
                     AppView::Repos => self.switch_to_repos(),

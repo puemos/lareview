@@ -20,6 +20,7 @@ pub const RISK_MEDIUM: &str = icons::CARET_CIRCLE_UP;
 pub const RISK_HIGH: &str = icons::CARET_CIRCLE_DOUBLE_UP;
 
 // --- Navigation & Views ---
+pub const VIEW_HOME: &str = icons::HOUSE;
 pub const VIEW_GENERATE: &str = icons::GIT_DIFF;
 pub const VIEW_REVIEW: &str = icons::COFFEE;
 pub const VIEW_REPOS: &str = icons::FOLDER;

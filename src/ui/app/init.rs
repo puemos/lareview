@@ -100,7 +100,7 @@ impl LaReviewApp {
                 ..Default::default()
             },
             ui: crate::ui::app::state::UiState {
-                current_view: AppView::Generate,
+                current_view: AppView::Home,
                 ..Default::default()
             },
             ..Default::default()

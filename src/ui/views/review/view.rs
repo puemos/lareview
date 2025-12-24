@@ -188,7 +188,9 @@ impl LaReviewApp {
 
         // Handle delayed actions
         if trigger_delete_review {
-            self.dispatch(Action::Review(ReviewAction::DeleteReview));
+            if let Some(id) = &self.state.ui.selected_review_id {
+                self.dispatch(Action::Review(ReviewAction::DeleteReview(id.clone())));
+            }
             return;
         }
 

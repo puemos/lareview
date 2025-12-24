@@ -73,6 +73,7 @@ impl eframe::App for LaReviewApp {
                 egui::ScrollArea::vertical()
                     .auto_shrink([false; 2])
                     .show(ui, |ui| match self.state.ui.current_view {
+                        AppView::Home => self.ui_home(ui),
                         AppView::Generate => self.ui_generate(ui),
                         AppView::Review => self.ui_review(ui),
                         AppView::Repos => self.ui_repos(ui),

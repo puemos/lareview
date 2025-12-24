@@ -55,7 +55,7 @@ pub enum ReviewAction {
         task_id: TaskId,
         status: ReviewStatus,
     },
-    DeleteReview,
+    DeleteReview(String),
     CreateThreadComment {
         task_id: TaskId,
         thread_id: Option<String>,

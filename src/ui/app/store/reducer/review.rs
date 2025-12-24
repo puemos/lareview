@@ -107,13 +107,16 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
             state.ui.review_error = None;
             vec![Command::UpdateTaskStatus { task_id, status }]
         }
-        ReviewAction::DeleteReview => {
-            if let Some(review_id) = state.ui.selected_review_id.clone() {
-                state.ui.review_error = None;
-                vec![Command::DeleteReview { review_id }]
-            } else {
-                Vec::new()
+        ReviewAction::DeleteReview(review_id) => {
+            state.ui.review_error = None;
+            // If the deleted review was selected, deselect it
+            if state.ui.selected_review_id.as_ref() == Some(&review_id) {
+                state.ui.selected_review_id = None;
+                state.ui.selected_run_id = None;
+                state.ui.selected_task_id = None;
+                state.ui.active_thread = None;
             }
+            vec![Command::DeleteReview { review_id }]
         }
         ReviewAction::CreateThreadComment {
             task_id,

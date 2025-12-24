@@ -11,6 +11,7 @@ use super::timeline::{TimelineContent, TimelineItem};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum AppView {
     #[default]
+    Home,
     Generate,
     Review,
     Repos,
