@@ -13,7 +13,16 @@ pub(crate) fn render_task_header(
     let mut status_action = None;
 
     // 1. Task Title
-// ...
+    ui.add(
+        egui::Label::new(
+            typography::h2(&task.title)
+                .line_height(Some(24.0))
+                .color(theme.text_primary),
+        )
+        .wrap(),
+    );
+
+    ui.add_space(spacing::SPACING_SM);
     // 2. Metadata row (Status + Risk + Stats)
     let row_height = 28.0;
     let status_width = 140.0;
@@ -57,7 +66,7 @@ pub(crate) fn render_task_header(
             }
 
             // Dot Separator
-// ...
+            // ...
             ui.add_space(spacing::SPACING_XS);
             ui.label(typography::body("·").color(theme.text_muted).size(14.0));
             ui.add_space(spacing::SPACING_XS);

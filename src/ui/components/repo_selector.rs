@@ -146,11 +146,8 @@ pub fn repo_selector(
                         ui.scope_builder(none_ui, |ui| {
                             ui.style_mut().interaction.selectable_labels = false;
                             ui.horizontal_centered(|ui| {
-                                let label = if none_selected {
-                                    typography::body("No Repository Context").color(none_text)
-                                } else {
-                                    typography::body("No Repository Context").color(none_text)
-                                };
+                                let label =
+                                    typography::body("No Repository Context").color(none_text);
                                 ui.add(egui::Label::new(label).selectable(false));
                             });
                         });

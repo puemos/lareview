@@ -46,7 +46,8 @@ impl LaReviewApp {
 
                 // --- 2. CENTER: Navigation Tabs ---
                 let spacing_between = 4.0;
-                let padding = 4.0;
+                let padding_y = 4.0;
+                let padding_x = 6.0;
 
                 let tabs_data = [
                     (AppView::Home, "Home", icons::VIEW_HOME),
@@ -68,7 +69,7 @@ impl LaReviewApp {
                 }
 
                 // Calculate total width needed
-                let mut total_width = padding * 2.0; // Left and right padding
+                let mut total_width = padding_x * 2.0; // Left and right padding
                 for width in &button_widths {
                     total_width += width;
                 }
@@ -90,7 +91,7 @@ impl LaReviewApp {
                     .rect_stroke(center_rect, rounding, stroke, egui::StrokeKind::Inside);
 
                 // Render tabs inside the container
-                let tab_rect = center_rect.shrink2(egui::vec2(padding, padding));
+                let tab_rect = center_rect.shrink2(egui::vec2(padding_x, padding_y));
                 ui.scope_builder(egui::UiBuilder::new().max_rect(tab_rect), |ui| {
                     ui.horizontal(|ui| {
                         ui.spacing_mut().item_spacing = egui::vec2(spacing_between, 0.0);
