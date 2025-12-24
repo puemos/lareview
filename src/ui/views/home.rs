@@ -1,10 +1,11 @@
 use crate::domain::{Review, ReviewSource};
-use crate::infra::acp::{list_agent_candidates, AgentCandidate};
+use crate::infra::acp::{AgentCandidate, list_agent_candidates};
 use crate::ui::app::{Action, AppView, LaReviewApp, NavigationAction, ReviewAction};
 use crate::ui::components::pills::pill_action_button;
 use crate::ui::icons;
 use crate::ui::spacing;
 use crate::ui::theme::current_theme;
+use crate::ui::typography;
 use eframe::egui;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -52,9 +53,7 @@ impl LaReviewApp {
                             .show(ui, |ui| {
                                 ui.horizontal(|ui| {
                                     ui.label(
-                                        egui::RichText::new("Recent Reviews")
-                                            .strong()
-                                            .size(18.0)
+                                        typography::bold("Recent Reviews")
                                             .color(theme.text_primary),
                                     );
                                     ui.with_layout(
@@ -113,9 +112,7 @@ impl LaReviewApp {
                             .show(ui, |ui| {
                                 ui.horizontal(|ui| {
                                     ui.label(
-                                        egui::RichText::new("Available Agents")
-                                            .strong()
-                                            .size(18.0)
+                                        typography::bold("Available Agents")
                                             .color(theme.text_primary),
                                     );
                                 });
@@ -123,8 +120,11 @@ impl LaReviewApp {
 
                         ui.separator();
 
-                        // --- 4. Agents List (Table-like) ---
-                        let agents = list_agent_candidates();
+                        // --- 4. Agents List (Simple) ---
+                        let mut agents = list_agent_candidates();
+                        // Sort by availability (Available first)
+                        agents.sort_by(|a, b| b.available.cmp(&a.available));
+
                         if agents.is_empty() {
                             egui::Frame::NONE
                                 .inner_margin(egui::Margin::symmetric(
@@ -135,14 +135,26 @@ impl LaReviewApp {
                                     ui.weak("No agents discovered.");
                                 });
                         } else {
-                            let total_agents = agents.len();
-                            for (index, agent) in agents.iter().enumerate() {
-                                self.render_agent_table_row(ui, agent);
+                            // Container Frame to match width/padding of other sections
+                            egui::Frame::NONE
+                                .inner_margin(egui::Margin::symmetric(
+                                    spacing::SPACING_XL as i8,
+                                    spacing::SPACING_LG as i8,
+                                ))
+                                .show(ui, |ui| {
+                                    ui.vertical(|ui| {
+                                        let total_agents = agents.len();
+                                        for (index, agent) in agents.iter().enumerate() {
+                                            self.render_simple_agent_row(ui, agent);
 
-                                if index + 1 < total_agents {
-                                    ui.separator();
-                                }
-                            }
+                                            if index + 1 < total_agents {
+                                                ui.add_space(spacing::SPACING_MD);
+                                                ui.separator();
+                                                ui.add_space(spacing::SPACING_MD);
+                                            }
+                                        }
+                                    });
+                                });
                         }
 
                         ui.add_space(spacing::SPACING_XL);
@@ -174,7 +186,7 @@ impl LaReviewApp {
 
                     // Content
                     ui.vertical(|ui| {
-                        ui.label(egui::RichText::new(&review.title).strong());
+                        ui.label(typography::bold(&review.title));
 
                         let time_str = if let Ok(dt) =
                             chrono::DateTime::parse_from_rfc3339(&review.updated_at)
@@ -221,73 +233,49 @@ impl LaReviewApp {
             });
     }
 
-    fn render_agent_table_row(&self, ui: &mut egui::Ui, agent: &AgentCandidate) {
+    fn render_simple_agent_row(&self, ui: &mut egui::Ui, agent: &AgentCandidate) {
         let theme = current_theme();
 
-        egui::Frame::NONE
-            .inner_margin(egui::Margin::symmetric(
-                spacing::SPACING_XL as i8,
-                spacing::SPACING_LG as i8,
-            ))
-            .show(ui, |ui| {
-                ui.horizontal_centered(|ui| {
-                    // Column 1: Logo (Fixed Width)
-                    ui.allocate_ui(egui::vec2(24.0, 20.0), |ui| {
-                        ui.centered_and_justified(|ui| {
-                            if let Some(logo_path) = &agent.logo
-                                && let Some(bytes) = load_logo_bytes(logo_path)
-                            {
-                                let uri = format!("bytes://{}", logo_path);
-                                let image = egui::Image::from_bytes(uri, bytes)
-                                    .fit_to_exact_size(egui::vec2(20.0, 20.0))
-                                    .corner_radius(4.0);
+        ui.horizontal(|ui| {
+            // 1. Logo
+            if let Some(logo_path) = &agent.logo
+                && let Some(bytes) = load_logo_bytes(logo_path)
+            {
+                let uri = format!("bytes://{}", logo_path);
+                let image = egui::Image::from_bytes(uri, bytes)
+                    .fit_to_exact_size(egui::vec2(20.0, 20.0))
+                    .corner_radius(4.0);
 
-                                if agent.available {
-                                    ui.add(image);
-                                } else {
-                                    ui.add(image.tint(egui::Color32::from_white_alpha(100)));
-                                }
-                            } else {
-                                ui.label(
-                                    egui::RichText::new(icons::VIEW_GENERATE)
-                                        .size(16.0)
-                                        .color(theme.text_disabled),
-                                );
-                            }
-                        });
-                    });
+                if agent.available {
+                    ui.add(image);
+                } else {
+                    ui.add(image.tint(egui::Color32::from_white_alpha(100)));
+                }
+            } else {
+                ui.label(
+                    egui::RichText::new(icons::VIEW_GENERATE)
+                        .size(16.0)
+                        .color(theme.text_disabled),
+                );
+            }
 
-                    ui.add_space(spacing::SPACING_MD);
+            ui.add_space(12.0);
 
-                    // Column 2: Name (Fixed Width for Alignment)
-                    ui.allocate_ui(egui::vec2(200.0, 20.0), |ui| {
-                        ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                            ui.label(
-                                egui::RichText::new(&agent.label)
-                                    .strong()
-                                    .color(theme.text_primary),
-                            );
-                        });
-                    });
+            // 2. Name
+            ui.label(typography::bold(&agent.label).color(theme.text_primary));
 
-                    ui.add_space(spacing::SPACING_MD);
-
-                    // Column 3: Status
-                    if agent.available {
-                        ui.label(
-                            egui::RichText::new("Ready")
-                                .color(theme.success)
-                                .size(11.0)
-                                .strong(),
-                        );
-                    } else {
-                        ui.label(
-                            egui::RichText::new("Unavailable")
-                                .color(theme.text_disabled)
-                                .size(11.0),
-                        );
-                    }
-                });
+            // 3. Status
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if agent.available {
+                    ui.label(egui::RichText::new("Ready").color(theme.success).size(11.0));
+                } else {
+                    ui.label(
+                        egui::RichText::new("Unavailable")
+                            .color(theme.text_disabled)
+                            .size(11.0),
+                    );
+                }
             });
+        });
     }
 }

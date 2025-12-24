@@ -8,5 +8,6 @@ pub mod icons;
 pub mod layout;
 pub mod spacing;
 pub mod theme;
+pub mod typography;
 pub mod views;
 pub mod window;
