@@ -1,5 +1,7 @@
 use eframe::egui;
 
+use crate::ui::theme;
+
 /// Returns a RichText configured with the GeistBold font family.
 pub fn bold(text: impl Into<String>) -> egui::RichText {
     egui::RichText::new(text).family(egui::FontFamily::Name("GeistBold".into()))
@@ -12,12 +14,14 @@ pub fn body(text: impl Into<String>) -> egui::RichText {
 
 /// Large bold heading
 pub fn h1(text: impl Into<String>) -> egui::RichText {
-    bold(text).size(20.0)
+    let theme = theme::current_theme();
+    body(text).size(20.0).color(theme.text_primary)
 }
 
 /// Medium bold heading
 pub fn h2(text: impl Into<String>) -> egui::RichText {
-    bold(text).size(16.0)
+    let theme = theme::current_theme();
+    body(text).size(16.0).color(theme.text_primary)
 }
 
 /// Standard UI label size (small)

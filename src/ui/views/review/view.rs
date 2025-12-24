@@ -4,6 +4,7 @@ use crate::application::review::ordering::tasks_in_display_order;
 use crate::ui::app::{Action, LaReviewApp, ReviewAction};
 use crate::ui::components::pills::pill_action_button;
 use crate::ui::components::status::error_banner;
+use crate::ui::spacing::TOP_HEADER_HEIGHT;
 use crate::ui::theme::current_theme;
 use crate::ui::{icons, spacing, typography};
 use eframe::egui;
@@ -13,9 +14,6 @@ use egui::epaint::MarginF32;
 use crate::ui::views::review::nav::render_navigation_tree;
 use crate::ui::views::review::thread_list::render_thread_list;
 use crate::ui::views::review::toolbar::render_header_selectors;
-
-// Optimized header height for a "Toolbar" feel
-const TOP_HEADER_HEIGHT: f32 = 52.0;
 
 impl LaReviewApp {
     pub fn ui_review(&mut self, ui: &mut egui::Ui) {

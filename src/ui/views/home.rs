@@ -1,9 +1,9 @@
-use crate::domain::{Review, ReviewSource, RiskLevel};
+use crate::domain::{Review, ReviewSource};
 use crate::infra::acp::{AgentCandidate, list_agent_candidates};
 use crate::ui::app::{Action, AppView, LaReviewApp, NavigationAction, ReviewAction};
 use crate::ui::components::pills::pill_action_button;
 use crate::ui::icons;
-use crate::ui::spacing;
+use crate::ui::spacing::{self, TOP_HEADER_HEIGHT};
 use crate::ui::theme::current_theme;
 use crate::ui::typography;
 use eframe::egui;
@@ -42,39 +42,44 @@ impl LaReviewApp {
                 egui::ScrollArea::vertical()
                     .auto_shrink([false; 2])
                     .show(ui, |ui| {
-                        ui.add_space(spacing::SPACING_LG);
-
-                        // --- 1. Header Section ---
                         egui::Frame::NONE
-                            .inner_margin(egui::Margin::symmetric(
-                                spacing::SPACING_XL as i8,
-                                spacing::SPACING_LG as i8,
-                            ))
+                            .inner_margin(egui::Margin::symmetric(spacing::SPACING_XL as i8, 0))
                             .show(ui, |ui| {
-                                ui.horizontal(|ui| {
-                                    ui.label(
-                                        typography::bold("Recent Reviews")
-                                            .color(theme.text_primary),
-                                    );
-                                    ui.with_layout(
-                                        egui::Layout::right_to_left(egui::Align::Center),
-                                        |ui| {
-                                            if pill_action_button(
-                                                ui,
-                                                icons::ICON_PLUS,
-                                                "New Review",
-                                                true,
-                                                theme.border,
-                                            )
-                                            .clicked()
-                                            {
-                                                self.dispatch(Action::Navigation(
-                                                    NavigationAction::SwitchTo(AppView::Generate),
-                                                ));
-                                            }
-                                        },
-                                    );
-                                });
+                                ui.set_min_height(TOP_HEADER_HEIGHT);
+                                ui.allocate_ui_with_layout(
+                                    egui::vec2(ui.available_width(), TOP_HEADER_HEIGHT),
+                                    egui::Layout::left_to_right(egui::Align::Center),
+                                    |ui| {
+                                        // A. Left Side: Context Selectors
+                                        ui.horizontal(|ui| {
+                                            ui.label(typography::h2("Recent Reviews"))
+                                        });
+
+                                        ui.with_layout(
+                                            egui::Layout::right_to_left(egui::Align::Center),
+                                            |ui| {
+                                                // C. Right Side: Actions
+                                                ui.add_space(spacing::SPACING_XS);
+
+                                                if pill_action_button(
+                                                    ui,
+                                                    icons::ICON_PLUS,
+                                                    "New Review",
+                                                    true,
+                                                    theme.border,
+                                                )
+                                                .clicked()
+                                                {
+                                                    self.dispatch(Action::Navigation(
+                                                        NavigationAction::SwitchTo(
+                                                            AppView::Generate,
+                                                        ),
+                                                    ));
+                                                }
+                                            },
+                                        );
+                                    },
+                                );
                             });
 
                         ui.separator();
@@ -103,13 +108,15 @@ impl LaReviewApp {
                             }
                         }
 
+                        ui.separator();
+
                         ui.add_space(spacing::SPACING_XL);
 
                         // --- 3. Agents Section ---
                         egui::Frame::NONE
                             .inner_margin(egui::Margin::symmetric(
                                 spacing::SPACING_XL as i8,
-                                spacing::SPACING_LG as i8,
+                                spacing::SPACING_SM as i8,
                             ))
                             .show(ui, |ui| {
                                 ui.horizontal(|ui| {
@@ -119,8 +126,6 @@ impl LaReviewApp {
                                     );
                                 });
                             });
-
-                        ui.separator();
 
                         // --- 4. Agents List ---
                         let mut agents = list_agent_candidates();
@@ -139,7 +144,7 @@ impl LaReviewApp {
                             egui::Frame::NONE
                                 .inner_margin(egui::Margin::symmetric(
                                     spacing::SPACING_XL as i8,
-                                    spacing::SPACING_LG as i8,
+                                    spacing::SPACING_SM as i8,
                                 ))
                                 .show(ui, |ui| {
                                     ui.vertical(|ui| {
@@ -147,8 +152,6 @@ impl LaReviewApp {
                                         for (i, agent) in agents.iter().enumerate() {
                                             self.render_simple_agent_row(ui, agent);
                                             if i + 1 < total {
-                                                ui.add_space(spacing::SPACING_MD);
-                                                ui.separator();
                                                 ui.add_space(spacing::SPACING_MD);
                                             }
                                         }
@@ -177,19 +180,6 @@ impl LaReviewApp {
         let total_tasks = tasks.len();
         let done_tasks = tasks.iter().filter(|t| t.status.is_closed()).count();
 
-        let high_risk = tasks
-            .iter()
-            .filter(|t| t.stats.risk == RiskLevel::High)
-            .count();
-        let med_risk = tasks
-            .iter()
-            .filter(|t| t.stats.risk == RiskLevel::Medium)
-            .count();
-        let low_risk = tasks
-            .iter()
-            .filter(|t| t.stats.risk == RiskLevel::Low)
-            .count();
-
         egui::Frame::NONE
             .inner_margin(egui::Margin::symmetric(
                 spacing::SPACING_XL as i8,
@@ -207,12 +197,6 @@ impl LaReviewApp {
 
                     // 2. Content Column (Title, Subtitle, Tasks)
                     ui.vertical(|ui| {
-                        ui.spacing_mut().item_spacing.y = 4.0;
-
-                        // Row 1: Title
-                        ui.label(typography::bold(&review.title).color(theme.text_primary));
-
-                        // Row 2: Subtitle (Meta + Updated)
                         let time_str = if let Ok(dt) =
                             chrono::DateTime::parse_from_rfc3339(&review.updated_at)
                         {
@@ -221,59 +205,25 @@ impl LaReviewApp {
                             review.updated_at.clone()
                         };
 
-                        ui.horizontal(|ui| {
+                        // Row 1: Title
+                        ui.horizontal_centered(|ui| {
+                            ui.label(typography::label(&review.title).color(theme.text_primary));
+                            ui.label(typography::tiny("•"));
+                            ui.label(typography::tiny(time_str));
                             let source_meta = match &review.source {
                                 ReviewSource::GitHubPr {
                                     owner,
                                     repo,
                                     number,
                                     ..
-                                } => format!("{owner}/{repo}#{number}"),
-                                ReviewSource::DiffPaste { .. } => "Pasted Diff".to_string(),
+                                } => Some(format!("{owner}/{repo}#{number}")),
+                                ReviewSource::DiffPaste { .. } => None,
                             };
-                            ui.label(typography::weak(source_meta));
-                            ui.label(typography::weak("•"));
-                            ui.label(typography::weak(format!("Updated {time_str}")));
+                            if let Some(source_meta) = source_meta {
+                                ui.label(typography::weak("•"));
+                                ui.label(typography::weak(source_meta));
+                            }
                         });
-
-                        // Row 3: Tasks Summary (Risk)
-                        if total_tasks > 0 {
-                            ui.horizontal(|ui| {
-                                ui.label(typography::tiny("Tasks:").color(theme.text_disabled));
-                                ui.add_space(4.0);
-
-                                if high_risk > 0 {
-                                    ui.label(
-                                        typography::tiny(icons::RISK_HIGH).color(theme.destructive),
-                                    );
-                                    ui.add_space(2.0);
-                                    ui.label(
-                                        typography::tiny(format!("{high_risk} High"))
-                                            .color(theme.text_muted),
-                                    );
-                                    ui.add_space(8.0);
-                                }
-                                if med_risk > 0 {
-                                    ui.label(
-                                        typography::tiny(icons::RISK_MEDIUM).color(theme.warning),
-                                    );
-                                    ui.add_space(2.0);
-                                    ui.label(
-                                        typography::tiny(format!("{med_risk} Medium"))
-                                            .color(theme.text_muted),
-                                    );
-                                    ui.add_space(8.0);
-                                }
-                                if low_risk > 0 {
-                                    ui.label(typography::tiny(icons::RISK_LOW).color(theme.accent));
-                                    ui.add_space(2.0);
-                                    ui.label(
-                                        typography::tiny(format!("{low_risk} Low"))
-                                            .color(theme.text_muted),
-                                    );
-                                }
-                            });
-                        }
                     });
 
                     // 3. Actions Column (Right Aligned)
@@ -341,13 +291,13 @@ impl LaReviewApp {
                 );
             }
 
-            ui.add_space(12.0);
+            ui.add_space(6.0);
 
             // 2. Name
             ui.label(typography::bold(&agent.label).color(theme.text_primary));
 
             // 3. Status
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                 if agent.available {
                     ui.label(typography::small("Ready").color(theme.success).strong());
                 } else {

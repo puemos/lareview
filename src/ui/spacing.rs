@@ -6,11 +6,16 @@
 //! All constants are f32 by default. Use .into() or as i8 when i8 values are needed
 //! for margin APIs.
 
+pub const TOP_HEADER_HEIGHT: f32 = 52.0;
+
 /// Extra small spacing value (4px)
 pub const SPACING_XS: f32 = 4.0;
 
 /// Thin resize handle width (1px)
 pub const RESIZE_HANDLE_WIDTH: f32 = 1.0;
+
+/// Small spacing value (8px)
+pub const SPACING_ZERO: f32 = 0.0;
 
 /// Small spacing value (8px)
 pub const SPACING_SM: f32 = 8.0;

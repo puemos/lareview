@@ -1,6 +1,7 @@
 use crate::ui::app::{Action, LaReviewApp, SettingsAction};
+use crate::ui::components::pills::pill_action_button;
 use crate::ui::icons;
-use crate::ui::spacing;
+use crate::ui::spacing::{self, TOP_HEADER_HEIGHT};
 use crate::ui::{theme, typography};
 use eframe::egui;
 
@@ -14,19 +15,34 @@ impl LaReviewApp {
 
         // --- Header Section ---
         egui::Frame::NONE
-            .inner_margin(egui::Margin::symmetric(
-                spacing::SPACING_XL as i8,
-                spacing::SPACING_LG as i8,
-            ))
+            .inner_margin(egui::Margin::symmetric(spacing::SPACING_XL as i8, 0))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label(typography::bold("Linked Repositories"));
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button("➕ Link Repository").clicked() {
-                            self.dispatch(Action::Settings(SettingsAction::LinkRepository));
-                        }
-                    });
-                });
+                ui.set_min_height(TOP_HEADER_HEIGHT);
+                ui.allocate_ui_with_layout(
+                    egui::vec2(ui.available_width(), TOP_HEADER_HEIGHT),
+                    egui::Layout::left_to_right(egui::Align::Center),
+                    |ui| {
+                        // A. Left Side: Context Selectors
+                        ui.horizontal(|ui| ui.label(typography::h2("Recent Reviews")));
+
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            // C. Right Side: Actions
+                            ui.add_space(spacing::SPACING_XS);
+
+                            if pill_action_button(
+                                ui,
+                                icons::ICON_PLUS,
+                                "Add Repository",
+                                true,
+                                theme.border,
+                            )
+                            .clicked()
+                            {
+                                self.dispatch(Action::Settings(SettingsAction::LinkRepository));
+                            }
+                        });
+                    },
+                );
             });
 
         ui.separator();
@@ -71,14 +87,17 @@ impl LaReviewApp {
                                 ui.spacing_mut().item_spacing.y = 4.0;
 
                                 // Name
-                                ui.label(typography::body(&repo.name).color(theme.text_primary));
+                                ui.horizontal_centered(|ui| {
+                                    ui.label(
+                                        typography::body(&repo.name).color(theme.text_primary),
+                                    );
+                                    ui.label(typography::tiny("•"));
 
+                                    ui.label(typography::tiny(repo.path.to_string_lossy()));
+                                });
                                 // Subtitle (Path + Remotes)
                                 ui.horizontal(|ui| {
-                                    ui.label(typography::weak(repo.path.to_string_lossy()));
-
                                     if !repo.remotes.is_empty() {
-                                        ui.label(typography::weak("•"));
                                         let remotes_str = repo.remotes.join(", ");
                                         ui.label(typography::weak(remotes_str));
                                     }

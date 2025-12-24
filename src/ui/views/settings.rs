@@ -1,4 +1,5 @@
 use crate::ui::app::{Action, LaReviewApp, SettingsAction};
+use crate::ui::spacing::TOP_HEADER_HEIGHT;
 use crate::ui::{spacing, typography};
 use eframe::egui;
 
@@ -12,16 +13,32 @@ impl LaReviewApp {
 
         let theme = theme::current_theme();
 
+        egui::Frame::NONE
+            .inner_margin(egui::Margin::symmetric(spacing::SPACING_XL as i8, 0))
+            .show(ui, |ui| {
+                ui.set_min_height(TOP_HEADER_HEIGHT);
+                ui.allocate_ui_with_layout(
+                    egui::vec2(ui.available_width(), TOP_HEADER_HEIGHT),
+                    egui::Layout::left_to_right(egui::Align::Center),
+                    |ui| {
+                        // A. Left Side: Context Selectors
+                        ui.horizontal(|ui| ui.label(typography::h2("Settings")));
+                    },
+                );
+            });
+
+        ui.separator();
+
         // --- GitHub Section ---
         egui::Frame::NONE
             .inner_margin(egui::Margin::symmetric(
-                spacing::SPACING_LG as i8,
+                spacing::SPACING_XL as i8,
                 spacing::SPACING_MD as i8,
             ))
             .show(ui, |ui| {
                 // Title Block
                 ui.horizontal(|ui| {
-                    ui.label(typography::bold("GitHub CLI Integration"));
+                    ui.label(typography::label("GitHub CLI Integration").color(theme.text_primary));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if self.state.session.is_gh_status_checking {
                             ui.label(typography::body("Checking...").color(theme.warning));
@@ -126,14 +143,14 @@ impl LaReviewApp {
         // --- D2 Section ---
         egui::Frame::NONE
             .inner_margin(egui::Margin::symmetric(
-                spacing::SPACING_LG as i8,
+                spacing::SPACING_XL as i8,
                 spacing::SPACING_MD as i8,
             ))
             .show(ui, |ui| {
                 let d2_installed = crate::infra::brew::find_bin("d2").is_some();
 
                 ui.horizontal(|ui| {
-                    ui.label(typography::bold("D2 Diagram Engine"));
+                    ui.label(typography::label("D2 Diagram Engine").color(theme.text_primary));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if self.state.ui.is_d2_installing {
                             ui.label(typography::body("Installing...").color(theme.warning));

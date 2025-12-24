@@ -21,8 +21,8 @@ pub const RISK_HIGH: &str = icons::CARET_CIRCLE_DOUBLE_UP;
 
 // --- Navigation & Views ---
 pub const VIEW_HOME: &str = icons::HOUSE;
-pub const VIEW_GENERATE: &str = icons::GIT_DIFF;
-pub const VIEW_REVIEW: &str = icons::COFFEE;
+pub const VIEW_GENERATE: &str = icons::ASTERISK;
+pub const VIEW_REVIEW: &str = icons::EYES;
 pub const VIEW_REPOS: &str = icons::FOLDER;
 pub const VIEW_SETTINGS: &str = icons::GEAR;
 
