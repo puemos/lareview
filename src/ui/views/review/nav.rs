@@ -13,7 +13,7 @@ pub(crate) fn render_navigation_tree(
     ui: &mut egui::Ui,
     tasks_by_sub_flow: &std::collections::HashMap<Option<String>, Vec<ReviewTask>>,
     selected_task_id: Option<&String>,
-    is_generating: bool,
+    _is_generating: bool,
     theme: &Theme,
 ) -> Option<ReviewAction> {
     let sub_flows = sub_flows_in_display_order(tasks_by_sub_flow);

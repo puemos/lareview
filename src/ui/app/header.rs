@@ -8,15 +8,11 @@ use eframe::egui;
 impl LaReviewApp {
     pub(super) fn render_header(&mut self, ctx: &egui::Context) {
         let theme = theme::current_theme();
-
-        // 1. Define styling constants for a "Pro" feel
         let header_height = 52.0;
-        let nav_rounding = 6.0;
 
         egui::TopBottomPanel::top("header")
             .exact_height(header_height)
             .show(ctx, |ui| {
-                // Setup layout for 3 columns: Left (Logo), Center (Nav), Right (actions)
                 let rect = ui.available_rect_before_wrap();
 
                 // --- 1. LEFT: App Identity ---
@@ -24,18 +20,13 @@ impl LaReviewApp {
                     egui::Rect::from_min_size(rect.min, egui::vec2(200.0, rect.height()));
                 ui.scope_builder(egui::UiBuilder::new().max_rect(left_rect), |ui| {
                     ui.horizontal_centered(|ui| {
-                        ui.add_space(spacing::SPACING_SM); // SPACE FOR MACOS TRAFFIC LIGHTS
-
-                        // Just the icon, slightly larger
+                        ui.add_space(spacing::SPACING_SM);
                         ui.label(
                             egui::RichText::new(icons::STATUS_IN_PROGRESS)
                                 .size(22.0)
                                 .color(theme.brand),
                         );
-
                         ui.add_space(2.0);
-
-                        // App Name - slightly muted to let content shine
                         ui.label(
                             typography::bold("LaReview")
                                 .size(14.0)
@@ -45,10 +36,6 @@ impl LaReviewApp {
                 });
 
                 // --- 2. CENTER: Navigation Tabs ---
-                let spacing_between = 4.0;
-                let padding_y = 4.0;
-                let padding_x = 6.0;
-
                 let tabs_data = [
                     (AppView::Home, "Home", icons::VIEW_HOME),
                     (AppView::Generate, "Generate", icons::VIEW_GENERATE),
@@ -57,54 +44,59 @@ impl LaReviewApp {
                     (AppView::Settings, "Settings", icons::VIEW_SETTINGS),
                 ];
 
-                // Measure each button's desired width
-                // Since you always use the same font, we can estimate based on character count
-                let mut button_widths = Vec::new();
+                let font_id = typography::body_font(13.0);
+                let icon_font_id = typography::body_font(14.0);
+                let spacing_between = 4.0;
+                let item_spacing = 6.0;
+                let horizontal_padding = 10.0;
 
-                for (_, label, _) in &tabs_data {
-                    // Approximate character width for 13.0 size font + padding
-                    // Icon takes ~15px, each char ~7-8px for size 13
-                    let estimated_width = 15.0 + (label.len() as f32 * 6.5) + 20.0; // padding
-                    button_widths.push(estimated_width);
+                let mut total_tabs_width = 0.0;
+                let mut tab_widths = Vec::new();
+
+                for (_, label, icon) in &tabs_data {
+                    let l_g = ui.painter().layout_no_wrap(
+                        label.to_string(),
+                        font_id.clone(),
+                        theme.text_primary,
+                    );
+                    let i_g = ui.painter().layout_no_wrap(
+                        icon.to_string(),
+                        icon_font_id.clone(),
+                        theme.text_primary,
+                    );
+                    let w = i_g.size().x + item_spacing + l_g.size().x + (horizontal_padding * 2.0);
+                    tab_widths.push(w);
+                    total_tabs_width += w;
                 }
+                total_tabs_width += spacing_between * (tabs_data.len() - 1) as f32;
 
-                // Calculate total width needed
-                let mut total_width = padding_x * 2.0; // Left and right padding
-                for width in &button_widths {
-                    total_width += width;
-                }
-                total_width += spacing_between * (tabs_data.len() - 1) as f32;
-
-                // Create centered container rect based on measured width
+                let container_width = total_tabs_width + 12.0; // 6.0 inner margin on each side
                 let container_height = 34.0;
                 let center_rect = egui::Rect::from_center_size(
                     rect.center(),
-                    egui::vec2(total_width, container_height),
+                    egui::vec2(container_width, container_height),
                 );
 
-                // Draw background container
-                let rounding = egui::CornerRadius::same(nav_rounding as u8);
-                let stroke = egui::Stroke::new(1.0, theme.border);
-                ui.painter()
-                    .rect_filled(center_rect, rounding, theme.bg_secondary);
-                ui.painter()
-                    .rect_stroke(center_rect, rounding, stroke, egui::StrokeKind::Inside);
+                ui.put(center_rect, |ui: &mut egui::Ui| {
+                    egui::Frame::default()
+                        .fill(theme.bg_secondary)
+                        .stroke(egui::Stroke::new(1.0, theme.border))
+                        .corner_radius(egui::CornerRadius::same(6))
+                        .inner_margin(egui::Margin::symmetric(6, 4))
+                        .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                ui.spacing_mut().item_spacing.x = spacing_between;
 
-                // Render tabs inside the container
-                let tab_rect = center_rect.shrink2(egui::vec2(padding_x, padding_y));
-                ui.scope_builder(egui::UiBuilder::new().max_rect(tab_rect), |ui| {
-                    ui.horizontal(|ui| {
-                        ui.spacing_mut().item_spacing = egui::vec2(spacing_between, 0.0);
-
-                        for (i, (view, label, icon)) in tabs_data.iter().enumerate() {
-                            self.render_tab(ui, *view, label, icon, button_widths[i], nav_rounding);
-                        }
-                    });
+                                for (i, (view, label, icon)) in tabs_data.iter().enumerate() {
+                                    self.render_tab(ui, *view, label, icon, tab_widths[i]);
+                                }
+                            });
+                        })
+                        .response
                 });
             });
     }
 
-    // Helper for the "Segmented Control" style tabs
     fn render_tab(
         &mut self,
         ui: &mut egui::Ui,
@@ -112,49 +104,85 @@ impl LaReviewApp {
         label: &str,
         icon: &str,
         width: f32,
-        rounding: f32,
     ) {
         let is_active = self.state.ui.current_view == view;
+        let is_generating = view == AppView::Generate && self.state.session.is_generating;
         let theme = theme::current_theme();
 
-        let (bg, stroke) = if is_active {
-            (
-                theme.bg_primary,
-                egui::Stroke::new(1.0, theme.border.gamma_multiply(0.7)),
-            )
-        } else {
-            (
-                egui::Color32::TRANSPARENT,
-                egui::Stroke::new(1.0, egui::Color32::TRANSPARENT),
-            )
-        };
+        let height = 26.0;
+        let (rect, response) =
+            ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::click());
 
-        let mut text = typography::label(format!("{} {}", icon, label));
-
-        if is_active {
-            text = text.color(theme.brand);
+        if response.clicked() {
+            match view {
+                AppView::Home => self.switch_to_home(),
+                AppView::Generate => self.switch_to_generate(),
+                AppView::Review => self.switch_to_review(),
+                AppView::Repos => self.switch_to_repos(),
+                AppView::Settings => self.switch_to_settings(),
+            }
         }
 
-        ui.scope(|ui| {
-            let visuals = &mut ui.style_mut().visuals.widgets;
-            visuals.inactive.fg_stroke.color = theme.text_secondary;
-            visuals.hovered.fg_stroke.color = theme.text_primary;
+        let mut text_color = if is_active {
+            theme.brand
+        } else if response.hovered() {
+            theme.text_primary
+        } else {
+            theme.text_secondary
+        };
 
-            let btn = egui::Button::new(text)
-                .fill(bg)
-                .stroke(stroke)
-                .corner_radius(rounding - 2.0)
-                .min_size(egui::vec2(width, 26.0));
+        // Ensure full opacity
+        let c = text_color.to_array();
+        text_color = egui::Color32::from_rgba_unmultiplied(c[0], c[1], c[2], 255);
 
-            if ui.add(btn).clicked() {
-                match view {
-                    AppView::Home => self.switch_to_home(),
-                    AppView::Generate => self.switch_to_generate(),
-                    AppView::Review => self.switch_to_review(),
-                    AppView::Repos => self.switch_to_repos(),
-                    AppView::Settings => self.switch_to_settings(),
-                }
-            }
-        });
+        let painter = ui.painter();
+        let font_id = typography::body_font(13.0);
+        let icon_font_id = typography::body_font(14.0);
+        let horizontal_padding = 10.0;
+        let item_spacing = 6.0;
+
+        // Draw Icon
+        let icon_galley =
+            painter.layout_no_wrap(icon.to_string(), icon_font_id.clone(), text_color);
+        let icon_size = icon_galley.size();
+        let icon_x = rect.min.x + horizontal_padding + (icon_size.x / 2.0);
+        let icon_center = egui::pos2(icon_x, rect.center().y);
+
+        if is_generating {
+            let time = ui.input(|i| i.time);
+            let angle = (time * 3.0) as f32;
+            let rot = egui::emath::Rot2::from_angle(angle);
+            let pos = icon_center - rot * (icon_galley.rect.center().to_vec2());
+
+            painter.add(egui::Shape::Text(egui::epaint::TextShape {
+                pos,
+                galley: icon_galley,
+                underline: egui::Stroke::NONE,
+                override_text_color: Some(text_color),
+                angle,
+                fallback_color: text_color,
+                opacity_factor: 1.0,
+            }));
+        } else {
+            painter.text(
+                icon_center,
+                egui::Align2::CENTER_CENTER,
+                icon,
+                icon_font_id,
+                text_color,
+            );
+        }
+
+        // Draw Label
+        let label_x = rect.min.x + horizontal_padding + icon_size.x + item_spacing;
+        let label_pos = egui::pos2(label_x, rect.center().y);
+
+        painter.text(
+            label_pos,
+            egui::Align2::LEFT_CENTER,
+            label,
+            font_id,
+            text_color,
+        );
     }
 }

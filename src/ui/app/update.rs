@@ -57,12 +57,12 @@ impl eframe::App for LaReviewApp {
         let action_updated = self.poll_action_messages();
         let agent_content_updated = self.poll_generation_messages();
 
-        if action_updated
-            || agent_content_updated
-            || self.state.session.is_generating
-            || self.state.ui.is_exporting
-        {
-            ctx.request_repaint_after(std::time::Duration::from_millis(100));
+        if action_updated || agent_content_updated {
+            ctx.request_repaint();
+        }
+
+        if self.state.session.is_generating || self.state.ui.is_exporting {
+            ctx.request_repaint_after(std::time::Duration::from_millis(16));
         }
 
         self.render_header(ctx);
