@@ -15,6 +15,7 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
         Command::FetchPrContextPreview { input_ref } => {
             generate::fetch_pr_context_preview(app, input_ref)
         }
+        Command::AbortGeneration => generate::abort_generation(app),
         Command::CheckGitHubStatus => settings::check_github_status(app),
         Command::RefreshGitHubReview {
             review_id,

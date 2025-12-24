@@ -33,6 +33,7 @@ pub const TAB_DISCUSSION: &str = icons::CHAT_CIRCLE;
 
 // --- Common Actions ---
 pub const ACTION_RUN: &str = icons::PLAY;
+pub const ACTION_STOP: &str = icons::STOP;
 pub const ACTION_DELETE: &str = icons::TRASH_SIMPLE;
 pub const ACTION_TRASH: &str = icons::TRASH;
 pub const ACTION_EXPORT: &str = icons::EXPORT;

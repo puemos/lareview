@@ -123,6 +123,7 @@ fn test_real_codex_acp_integration() {
         progress_tx: Some(tx),
         mcp_server_binary: None,
         timeout_secs: Some(300),
+        cancel_token: None,
         debug: true,
     };
 
@@ -214,6 +215,7 @@ fn test_real_codex_acp_persist() -> anyhow::Result<()> {
         progress_tx: Some(tx),
         mcp_server_binary: None,
         timeout_secs: Some(300),
+        cancel_token: None,
         debug: true,
     };
 

@@ -64,11 +64,28 @@ pub fn refresh_github_review(app: &mut LaReviewApp, review_id: String, selected_
     });
 }
 
+pub fn abort_generation(app: &mut LaReviewApp) {
+    if let Some(token) = app.agent_cancel_token.take() {
+        token.cancel();
+    }
+    if let Some(task) = app.agent_task.take() {
+        task.abort();
+    }
+}
+
 pub fn start_generation(
     app: &mut LaReviewApp,
     run_context: crate::infra::acp::RunContext,
     selected_agent_id: String,
 ) {
+    // Abort existing if any
+    if let Some(token) = app.agent_cancel_token.take() {
+        token.cancel();
+    }
+    if let Some(task) = app.agent_task.take() {
+        task.abort();
+    }
+
     let candidates: Vec<_> = list_agent_candidates()
         .into_iter()
         .filter(|c| c.available)
@@ -99,6 +116,7 @@ pub fn start_generation(
     )));
 
     let (progress_tx, mut progress_rx) = tokio::sync::mpsc::unbounded_channel();
+    let cancel_token = tokio_util::sync::CancellationToken::new();
 
     let start_log = format!(
         "agent: {} ({} {})",
@@ -123,12 +141,13 @@ pub fn start_generation(
         progress_tx: Some(progress_tx),
         mcp_server_binary: None,
         timeout_secs: Some(5000),
+        cancel_token: Some(cancel_token.clone()),
         debug: std::env::var("ACP_DEBUG").is_ok(),
     };
 
     let gen_tx = app.gen_tx.clone();
 
-    tokio::spawn(async move {
+    let task = tokio::spawn(async move {
         let mut result_fut = std::pin::pin!(generate_tasks_with_acp(input));
 
         loop {
@@ -158,4 +177,7 @@ pub fn start_generation(
             }
         }
     });
+
+    app.agent_task = Some(task);
+    app.agent_cancel_token = Some(cancel_token);
 }

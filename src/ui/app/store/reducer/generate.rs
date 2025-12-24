@@ -18,7 +18,7 @@ pub fn reduce(
             session.is_generating = false;
             session.reset_agent_timeline();
             ui.current_view = AppView::Generate;
-            Vec::new()
+            vec![Command::AbortGeneration]
         }
         GenerateAction::RunRequested => {
             if session.diff_text.trim().is_empty() {

@@ -54,14 +54,26 @@ pub async fn generate_tasks_with_acp(input: GenerateTasksInput) -> Result<Genera
             Ok(rt) => {
                 let local = LocalSet::new();
                 local.block_on(&rt, async move {
-                    tokio::time::timeout(
-                        Duration::from_secs(timeout_secs),
-                        generate_tasks_with_acp_inner(input),
-                    )
-                    .await
-                    .map_err(|_| {
-                        anyhow::anyhow!(format!("Agent timed out after {timeout_secs}s"))
-                    })?
+                    let cancel_token = input.cancel_token.clone();
+                    tokio::select! {
+                        res = tokio::time::timeout(
+                            Duration::from_secs(timeout_secs),
+                            generate_tasks_with_acp_inner(input),
+                        ) => {
+                            res.map_err(|_| {
+                                anyhow::anyhow!(format!("Agent timed out after {timeout_secs}s"))
+                            })?
+                        }
+                        _ = async {
+                            if let Some(token) = cancel_token {
+                                token.cancelled().await;
+                            } else {
+                                std::future::pending::<()>().await;
+                            }
+                        } => {
+                            Err(anyhow::anyhow!("Agent generation cancelled by user"))
+                        }
+                    }
                 })
             }
             Err(e) => Err(e.into()),
@@ -85,6 +97,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
         progress_tx,
         mcp_server_binary,
         timeout_secs: _,
+        cancel_token,
         debug,
     }: GenerateTasksInput = input;
 
@@ -110,19 +123,27 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
 
     log_fn(format!("spawn: {} {}", agent_command, agent_args.join(" ")));
 
-    let mut child = Command::new(&agent_command)
-        .args(&agent_args)
+    let mut cmd = Command::new(&agent_command);
+    cmd.args(&agent_args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .spawn()
-        .with_context(|| {
-            format!(
-                "Failed to spawn agent process: {} {}",
-                agent_command,
-                agent_args.join(" ")
-            )
-        })?;
+        .kill_on_drop(true);
+
+    #[cfg(unix)]
+    {
+        #[allow(unused_imports)]
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+    }
+
+    let mut child = cmd.spawn().with_context(|| {
+        format!(
+            "Failed to spawn agent process: {} {}",
+            agent_command,
+            agent_args.join(" ")
+        )
+    })?;
 
     log_fn(format!("spawned pid: {}", child.id().unwrap_or(0)));
 
@@ -316,13 +337,17 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
                         format!("failed to wait on child after kill: {}", e),
                         debug,
                     );
-                    // If we can't wait, we assume it's gone or broken, but we need a status.
-                    // We'll construct a synthetic success status if possible, or just break.
-                    // Since `ExitStatus` isn't easily constructible, we'll try to rely on previous wait or just panic/error?
-                    // Actually, if wait fails, we can propagate the error.
                     break child.wait().await?;
                 }
             }
+        }
+
+        if let Some(token) = &cancel_token
+            && token.is_cancelled()
+        {
+            push_log(&logs, "cancellation received; killing agent", debug);
+            let _ = child.start_kill();
+            return Err(anyhow::anyhow!("Agent generation cancelled by user"));
         }
 
         tokio::select! {

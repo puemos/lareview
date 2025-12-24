@@ -37,4 +37,7 @@ pub struct LaReviewApp {
 
     pub action_tx: mpsc::Sender<crate::ui::app::Action>,
     pub action_rx: mpsc::Receiver<crate::ui::app::Action>,
+
+    pub agent_task: Option<tokio::task::JoinHandle<()>>,
+    pub agent_cancel_token: Option<tokio_util::sync::CancellationToken>,
 }

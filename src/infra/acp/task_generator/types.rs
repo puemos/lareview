@@ -21,6 +21,8 @@ pub struct GenerateTasksInput {
     pub mcp_server_binary: Option<PathBuf>,
     /// Timeout in seconds for agent execution.
     pub timeout_secs: Option<u64>,
+    /// Optional cancellation token to stop the agent.
+    pub cancel_token: Option<tokio_util::sync::CancellationToken>,
     /// Enable debug logging.
     pub debug: bool,
 }

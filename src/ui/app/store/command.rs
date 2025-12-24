@@ -27,6 +27,7 @@ pub enum Command {
     FetchPrContextPreview {
         input_ref: String,
     },
+    AbortGeneration,
     CheckGitHubStatus,
     RefreshGitHubReview {
         review_id: String,

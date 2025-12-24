@@ -161,6 +161,8 @@ impl LaReviewApp {
             d2_install_rx,
             action_tx,
             action_rx,
+            agent_task: None,
+            agent_cancel_token: None,
         };
 
         if let Some(image_bytes) = crate::assets::get_content("assets/icons/icon-512.png")

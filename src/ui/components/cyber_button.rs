@@ -1,5 +1,5 @@
 use crate::ui::theme::current_theme;
-use egui::{Color32, FontId, Rect, Response, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
+use egui::{Color32, FontId, Response, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
 
 pub fn cyber_button(
     ui: &mut Ui,
@@ -13,7 +13,7 @@ pub fn cyber_button(
     let time = ui.input(|i| i.time);
 
     // 1. Layout Specs
-    let height = 32.0;
+    let height = 28.0;
     let width = fixed_width.unwrap_or_else(|| ui.available_width());
     let (rect, response) = ui.allocate_exact_size(
         vec2(width, height),
@@ -54,18 +54,7 @@ pub fn cyber_button(
         theme.bg_muted.gamma_multiply(0.3)
     };
 
-    painter.rect_filled(rect, 0.0, bg_color);
-
-    // Status Notch (Left Edge)
-    let notch_rect = Rect::from_min_size(rect.min, vec2(2.0, rect.height()));
-    let notch_color = if is_generating {
-        accent_color.linear_multiply((time * 8.0).sin().abs() as f32)
-    } else if enabled {
-        accent_color.gamma_multiply(0.4 + (hover_ratio * 0.6))
-    } else {
-        theme.border.gamma_multiply(0.5)
-    };
-    painter.rect_filled(notch_rect, 0.0, notch_color);
+    painter.rect_filled(rect, egui::CornerRadius::same(5), bg_color);
 
     // Border
     let border_color = if enabled {
@@ -75,7 +64,7 @@ pub fn cyber_button(
     };
     painter.rect_stroke(
         rect,
-        0.0,
+        egui::CornerRadius::same(5),
         Stroke::new(1.0, border_color),
         StrokeKind::Inside,
     );

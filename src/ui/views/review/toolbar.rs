@@ -1,8 +1,9 @@
 use crate::domain::Review;
 use crate::ui::app::ReviewAction;
 use crate::ui::theme::Theme;
-use crate::ui::{icons, typography};
+use crate::ui::typography;
 use eframe::egui;
+use egui_phosphor::regular;
 
 /// Renders the dropdowns for Review and Run selection in the header
 pub(crate) fn render_header_selectors(
@@ -40,7 +41,7 @@ pub(crate) fn render_header_selectors(
         visuals.widgets.active.bg_stroke = egui::Stroke::NONE;
         visuals.widgets.open.bg_stroke = egui::Stroke::NONE;
 
-        let text_content = format!("{} {}", current_label, icons::CHEVRON_DOWN);
+        let text_content = format!("{} {}", current_label, regular::CARET_UP_DOWN);
         let mut text = typography::body(text_content).size(16.0);
 
         // 1. Calculate size

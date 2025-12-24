@@ -70,8 +70,8 @@ impl LaReviewApp {
         let ui = &mut content_ui;
 
         // --- 3. Top Header (Toolbar) ---
-        let header_response = egui::Frame::NONE
-            .inner_margin(egui::Margin::symmetric(spacing::SPACING_MD as i8, 0))
+        let _header_response = egui::Frame::NONE
+            .inner_margin(egui::Margin::symmetric(spacing::SPACING_XL as i8, 0))
             .show(ui, |ui| {
                 ui.set_min_height(TOP_HEADER_HEIGHT);
                 ui.allocate_ui_with_layout(
@@ -174,14 +174,7 @@ impl LaReviewApp {
             });
 
         // Draw Full-Width Separator
-        let bar_rect = egui::Rect::from_min_size(
-            egui::pos2(
-                content_rect.left(),
-                header_response.response.rect.bottom() + 2.0,
-            ),
-            egui::vec2(content_rect.width(), 1.0),
-        );
-        ui.painter().rect_filled(bar_rect, 0.0, theme.border);
+        ui.separator();
 
         // Handle delayed actions
         if trigger_delete_review {
@@ -277,8 +270,8 @@ impl LaReviewApp {
             egui::vec2(safe_tree_width, available_height),
         );
         let left_resize_rect = egui::Rect::from_min_size(
-            egui::pos2(left_rect.max.x, left_rect.min.y),
-            egui::vec2(resize_handle_width, available_height),
+            egui::pos2(left_rect.max.x, left_rect.min.y - 6.0),
+            egui::vec2(resize_handle_width, available_height + 6.0),
         );
 
         let right_rect = egui::Rect::from_min_size(
@@ -289,8 +282,11 @@ impl LaReviewApp {
             egui::vec2(safe_threads_width, available_height),
         );
         let right_resize_rect = egui::Rect::from_min_size(
-            egui::pos2(right_rect.min.x - resize_handle_width, right_rect.min.y),
-            egui::vec2(resize_handle_width, available_height),
+            egui::pos2(
+                right_rect.min.x - resize_handle_width,
+                right_rect.min.y - 6.0,
+            ),
+            egui::vec2(resize_handle_width, available_height + 6.0),
         );
 
         // Center Panel Rect

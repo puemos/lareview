@@ -25,15 +25,6 @@ pub(crate) fn render_navigation_tree(
                 ui.add(
                     egui::Label::new(typography::bold("Tasks").color(theme.text_primary)).wrap(),
                 );
-
-                if is_generating {
-                    ui.add_space(spacing::SPACING_XS);
-                    crate::ui::animations::cyber::cyber_spinner(
-                        ui,
-                        theme.brand,
-                        Some(crate::ui::animations::cyber::CyberSpinnerSize::Sm),
-                    );
-                }
             });
         });
 
