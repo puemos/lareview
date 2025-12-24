@@ -13,6 +13,14 @@ use super::state::{AppState, AppView, SelectedAgent};
 impl LaReviewApp {
     pub fn new_egui(cc: &eframe::CreationContext<'_>) -> Self {
         let mut fonts = FontDefinitions::default();
+        egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+
+        let phosphor_font = fonts
+            .font_data
+            .keys()
+            .find(|name| name.to_lowercase().contains("phosphor"))
+            .cloned()
+            .unwrap_or_else(|| "phosphor-regular".to_owned());
 
         // Load Geist for proportional text
         fonts.font_data.insert(
@@ -55,44 +63,24 @@ impl LaReviewApp {
             .families
             .entry(FontFamily::Proportional)
             .or_default()
-            .extend([
-                "Geist".to_owned(),
-                "GeistBold".to_owned(),
-                "GeistItalic".to_owned(),
-            ]);
+            .insert(0, "Geist".to_owned());
 
         fonts
             .families
-            .insert(FontFamily::Name("Geist".into()), vec!["Geist".to_owned()]);
+            .insert(FontFamily::Name("Geist".into()), vec!["Geist".to_owned(), phosphor_font.clone()]);
         fonts.families.insert(
             FontFamily::Name("GeistBold".into()),
-            vec!["GeistBold".to_owned()],
+            vec!["GeistBold".to_owned(), phosphor_font.clone()],
         );
         fonts.families.insert(
             FontFamily::Name("GeistItalic".into()),
-            vec!["GeistItalic".to_owned()],
+            vec!["GeistItalic".to_owned(), phosphor_font],
         );
         fonts
             .families
             .entry(FontFamily::Monospace)
             .or_default()
             .insert(0, "GeistMono".to_owned());
-
-        egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
-
-        // Ensure icons are available in our custom named families too
-        if let Some(phosphor_font) = fonts
-            .families
-            .get(&FontFamily::Proportional)
-            .and_then(|list| list.last())
-            .cloned()
-        {
-            for family in ["Geist", "GeistBold", "GeistItalic"] {
-                if let Some(list) = fonts.families.get_mut(&FontFamily::Name(family.into())) {
-                    list.push(phosphor_font.clone());
-                }
-            }
-        }
 
         cc.egui_ctx.set_fonts(fonts);
         egui_extras::install_image_loaders(&cc.egui_ctx);
