@@ -1,6 +1,6 @@
 use crate::ui::app::LaReviewApp;
-use crate::ui::spacing;
 use crate::ui::theme::current_theme;
+use crate::ui::{spacing, typography};
 use eframe::egui;
 
 impl LaReviewApp {
@@ -44,8 +44,7 @@ impl LaReviewApp {
 
                                         ui.horizontal(|ui| {
                                             ui.label(
-                                                egui::RichText::new("Insight")
-                                                    .strong()
+                                                typography::bold("Insight")
                                                     .size(13.0)
                                                     .color(current_theme().warning),
                                             );

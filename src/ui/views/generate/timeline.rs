@@ -1,6 +1,6 @@
 use crate::ui::app::{TimelineContent, TimelineItem};
-use crate::ui::icons;
 use crate::ui::theme::current_theme;
+use crate::ui::{icons, typography};
 use eframe::egui;
 use eframe::egui::collapsing_header::CollapsingState;
 
@@ -13,9 +13,8 @@ pub(super) fn render_timeline_item(ui: &mut egui::Ui, item: &TimelineItem) {
         TimelineContent::LocalLog(line) => {
             ui.add(
                 egui::Label::new(
-                    egui::RichText::new(line)
+                    typography::small_mono(line)
                         .color(current_theme().text_muted)
-                        .monospace()
                         .size(11.0),
                 )
                 .wrap(),
@@ -42,9 +41,8 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
         SessionUpdate::UserMessageChunk(chunk) => {
             ui.horizontal(|ui| {
                 ui.label(
-                    egui::RichText::new("User")
+                    typography::bold("User")
                         .color(current_theme().text_accent)
-                        .strong()
                         .size(12.0),
                 );
                 render_content_chunk(ui, chunk, current_theme().text_primary, false);
@@ -87,9 +85,8 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                                     };
 
                                     ui.label(
-                                        egui::RichText::new(truncated_label)
-                                            .monospace()
-                                            .strong()
+                                        typography::bold_label(truncated_label)
+                                            .family(egui::FontFamily::Monospace)
                                             .color(current_theme().text_primary),
                                     );
 
@@ -97,8 +94,7 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                                         egui::Layout::right_to_left(egui::Align::Center),
                                         |ui| {
                                             ui.label(
-                                                egui::RichText::new(format!("[{}]", status_label))
-                                                    .monospace()
+                                                typography::small_mono(format!("[{}]", status_label))
                                                     .color(status_color)
                                                     .size(11.0),
                                             );
@@ -148,8 +144,7 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                 };
 
                 ui.label(
-                    egui::RichText::new(truncated_label)
-                        .monospace()
+                    typography::small_mono(truncated_label)
                         .color(current_theme().text_muted)
                         .size(12.0),
                 );
@@ -164,8 +159,7 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                 }
 
                 ui.label(
-                    egui::RichText::new(format!("[{}]", label))
-                        .monospace()
+                    typography::small_mono(format!("[{}]", label))
                         .color(color)
                         .size(12.0),
                 );
@@ -179,16 +173,15 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                 .show_header(ui, |ui| {
                     ui.horizontal(|ui| {
                         ui.label(
-                            egui::RichText::new(icons::ICON_PLAN)
+                            typography::body(icons::ICON_PLAN)
                                 .color(current_theme().text_accent),
                         );
                         ui.label(
-                            egui::RichText::new(format!(
+                            typography::bold_label(format!(
                                 "Review Plan ({} steps)",
                                 plan.entries.len()
                             ))
-                            .monospace()
-                            .strong()
+                            .family(egui::FontFamily::Monospace)
                             .color(current_theme().text_primary),
                         );
                     });
@@ -200,37 +193,30 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
         SessionUpdate::AvailableCommandsUpdate(_) => {
             // Minimal system log
             ui.label(
-                egui::RichText::new("System: Commands updated")
+                typography::small_mono("System: Commands updated")
                     .color(current_theme().text_muted)
-                    .monospace()
-                    .italics()
-                    .size(10.0),
+                    .italics(),
             );
         }
         SessionUpdate::CurrentModeUpdate(mode) => {
             ui.horizontal(|ui| {
                 ui.label(
-                    egui::RichText::new("Mode switch:")
-                        .monospace()
+                    typography::small_mono("Mode switch:")
                         .color(current_theme().text_muted)
                         .size(11.0),
                 );
                 ui.label(
-                    egui::RichText::new(mode.current_mode_id.to_string())
+                    typography::small_mono(mode.current_mode_id.to_string())
                         .color(current_theme().text_muted)
-                        .background_color(current_theme().bg_secondary)
-                        .monospace()
-                        .size(10.0),
+                        .background_color(current_theme().bg_secondary),
                 );
             });
         }
         _ => {
             ui.add(
                 egui::Label::new(
-                    egui::RichText::new(format!("{:?}", update))
-                        .color(current_theme().text_muted)
-                        .monospace()
-                        .size(10.0),
+                    typography::small_mono(format!("{:?}", update))
+                        .color(current_theme().text_muted),
                 )
                 .wrap(),
             );
@@ -246,8 +232,7 @@ fn render_content_chunk(
 ) {
     match &chunk.content {
         ContentBlock::Text(text) => {
-            let mut rt = egui::RichText::new(&text.text)
-                .monospace()
+            let mut rt = typography::mono(&text.text)
                 .color(color)
                 .size(13.0); // Slightly larger
             if italics {
@@ -256,9 +241,8 @@ fn render_content_chunk(
             ui.add(egui::Label::new(rt).wrap());
         }
         other => {
-            let mut rt = egui::RichText::new(format!("{:?}", other))
+            let mut rt = typography::small_mono(format!("{:?}", other))
                 .color(color)
-                .monospace()
                 .size(11.0);
             if italics {
                 rt = rt.italics();
@@ -386,10 +370,9 @@ fn fallback_server_for_tool(tool: &str) -> Option<&'static str> {
 
 fn render_kv_json(ui: &mut egui::Ui, label: &str, value: &serde_json::Value) {
     ui.label(
-        egui::RichText::new(label)
-            .size(11.0)
+        typography::bold_label(label)
             .color(current_theme().text_muted)
-            .strong(),
+            .size(11.0),
     );
 
     if let serde_json::Value::Object(map) = value {
@@ -401,9 +384,7 @@ fn render_kv_json(ui: &mut egui::Ui, label: &str, value: &serde_json::Value) {
             .show(ui, |ui| {
                 for (k, v) in map {
                     ui.label(
-                        egui::RichText::new(k)
-                            .monospace()
-                            .size(11.0)
+                        typography::small_mono(k)
                             .color(current_theme().accent),
                     );
 
@@ -421,9 +402,7 @@ fn render_kv_json(ui: &mut egui::Ui, label: &str, value: &serde_json::Value) {
 
                     ui.add(
                         egui::Label::new(
-                            egui::RichText::new(shown_v)
-                                .monospace()
-                                .size(11.0)
+                            typography::small_mono(shown_v)
                                 .color(current_theme().text_muted),
                         )
                         .wrap(),
@@ -436,7 +415,7 @@ fn render_kv_json(ui: &mut egui::Ui, label: &str, value: &serde_json::Value) {
         let pretty = serde_json::to_string_pretty(value).unwrap_or_else(|_| value.to_string());
         ui.add(
             egui::TextEdit::multiline(&mut pretty.as_str())
-                .font(egui::FontId::monospace(11.0))
+                .font(typography::mono_font(11.0))
                 .code_editor()
                 .desired_rows(4)
                 .desired_width(ui.available_width())

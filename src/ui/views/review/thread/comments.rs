@@ -1,5 +1,6 @@
 use crate::domain::Comment;
 use crate::ui::theme::Theme;
+use crate::ui::typography;
 use crate::ui::views::review::format_timestamp;
 use eframe::egui;
 
@@ -18,20 +19,18 @@ fn render_comment_bubble(ui: &mut egui::Ui, comment: &Comment, theme: &Theme) {
     ui.vertical(|ui| {
         ui.horizontal(|ui| {
             ui.label(
-                egui::RichText::new(&comment.author)
-                    .strong()
+                typography::bold(&comment.author)
                     .size(13.0)
                     .color(theme.text_primary),
             );
             ui.label(
-                egui::RichText::new(format!("• {}", timestamp))
-                    .size(10.0)
+                typography::tiny(format!("• {}", timestamp))
                     .color(theme.text_muted),
             );
         });
 
         ui.label(
-            egui::RichText::new(&comment.body)
+            typography::body(&comment.body)
                 .color(theme.text_secondary)
                 .line_height(Some(26.0)),
         );

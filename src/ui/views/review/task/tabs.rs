@@ -3,6 +3,7 @@ use crate::ui::app::{DomainState, ReviewAction, UiState};
 use crate::ui::icons;
 use crate::ui::spacing;
 use crate::ui::theme::Theme;
+use crate::ui::typography;
 use eframe::egui;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
@@ -50,9 +51,9 @@ pub(crate) fn render_task_tabs(
             let is_selected = active_tab == tab;
             let text = format!("{} {}", icon, label);
 
-            let mut text = egui::RichText::new(text).size(13.0);
+            let mut text = typography::body(text).size(13.0);
             if is_selected {
-                text = text.strong().color(theme.brand);
+                text = typography::bold(text.text()).size(13.0).color(theme.brand);
             } else {
                 text = text.color(theme.text_muted);
             };

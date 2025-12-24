@@ -1,7 +1,7 @@
 use crate::domain::Review;
 use crate::ui::app::ReviewAction;
-use crate::ui::icons;
 use crate::ui::theme::Theme;
+use crate::ui::{icons, typography};
 use eframe::egui;
 
 /// Renders the dropdowns for Review and Run selection in the header
@@ -41,12 +41,14 @@ pub(crate) fn render_header_selectors(
         visuals.widgets.open.bg_stroke = egui::Stroke::NONE;
 
         let text_content = format!("{} {}", current_label, icons::CHEVRON_DOWN);
-        let font_id = egui::FontId::proportional(16.0);
+        let mut text = typography::body(text_content).size(16.0);
 
         // 1. Calculate size
-        let galley = ui
-            .painter()
-            .layout_no_wrap(text_content, font_id.clone(), theme.text_primary);
+        let galley = ui.painter().layout_no_wrap(
+            text.text().to_string(),
+            typography::body_font(16.0),
+            theme.text_primary,
+        );
 
         // 2. Allocate
         let (rect, response) = ui.allocate_exact_size(galley.size(), egui::Sense::click());
@@ -59,13 +61,18 @@ pub(crate) fn render_header_selectors(
             theme.text_primary
         };
 
-        // 4. Draw
-        // Re-layout with correct color:
-        let galley = ui
-            .painter()
-            .layout_no_wrap(galley.text().to_string(), font_id, text_color);
+        text = text.color(text_color);
 
-        ui.painter().galley(rect.min, galley, text_color);
+        // 4. Draw
+        ui.painter().galley(
+            rect.min,
+            ui.painter().layout_no_wrap(
+                text.text().to_string(),
+                typography::body_font(16.0),
+                text_color,
+            ),
+            text_color,
+        );
 
         if response.clicked() {
             egui::Popup::toggle_id(ui.ctx(), id);

@@ -2,8 +2,7 @@ use crate::domain::ReviewTask;
 use crate::ui::app::{Action, LaReviewApp, ReviewAction};
 use crate::ui::components::action_button::action_button;
 use crate::ui::components::pills::pill_action_button;
-use crate::ui::icons;
-use crate::ui::spacing;
+use crate::ui::{icons, spacing, typography};
 use crate::ui::theme::Theme;
 use eframe::egui;
 
@@ -82,13 +81,13 @@ pub(crate) fn render_all_done_state(ui: &mut egui::Ui, theme: &Theme) {
             ui.vertical_centered(|ui| {
                 ui.add_space(ui.available_height() * 0.3);
                 ui.label(
-                    egui::RichText::new(icons::STATUS_DONE)
+                    typography::body(icons::STATUS_DONE)
                         .size(64.0)
                         .color(theme.success),
                 );
                 ui.add_space(16.0);
-                ui.heading("All tasks completed!");
-                ui.label(egui::RichText::new("Great job.").color(theme.text_muted));
+                ui.label(typography::h1("All tasks completed!"));
+                ui.label(typography::weak("Great job."));
             });
         });
 }
@@ -121,16 +120,16 @@ pub(crate) fn render_ready_state(
 
                 // Hero Icon
                 ui.label(
-                    egui::RichText::new(icons::ICON_PLAN)
+                    typography::body(icons::ICON_PLAN)
                         .size(64.0)
                         .color(theme.brand.gamma_multiply(0.8)),
                 );
                 ui.add_space(24.0);
 
-                ui.heading("Ready to Review");
+                ui.label(typography::h1("Ready to Review"));
                 ui.add_space(8.0);
                 ui.label(
-                    egui::RichText::new("Select a task from the sidebar or start the queue.")
+                    typography::body("Select a task from the sidebar or start the queue.")
                         .color(theme.text_secondary),
                 );
 
@@ -149,8 +148,7 @@ pub(crate) fn render_ready_state(
                 // Hint for keyboard shortcut
                 ui.add_space(8.0);
                 ui.label(
-                    egui::RichText::new("Press [Enter] to start")
-                        .size(10.0)
+                    typography::tiny("Press [Enter] to start")
                         .color(theme.text_disabled),
                 );
 
@@ -185,25 +183,23 @@ pub(crate) fn render_empty_state(
                         Some(crate::ui::animations::cyber::CyberSpinnerSize::Md),
                     );
                     ui.add_space(spacing::SPACING_MD);
-                    ui.heading("Analyzing your code...");
+                    ui.label(typography::h1("Analyzing your code..."));
                     ui.add_space(8.0);
                     ui.label(
-                        egui::RichText::new("The agent is currently generating review tasks.")
-                            .color(theme.text_muted),
+                        typography::weak("The agent is currently generating review tasks."),
                     );
                 } else {
                     // Hero Icon
                     ui.label(
-                        egui::RichText::new(icons::ICON_EMPTY)
+                        typography::body(icons::ICON_EMPTY)
                             .size(64.0)
                             .color(theme.border_secondary),
                     );
                     ui.add_space(spacing::SPACING_MD);
-                    ui.heading("No review tasks yet");
+                    ui.label(typography::h1("No review tasks yet"));
                     ui.add_space(8.0);
                     ui.label(
-                        egui::RichText::new("Generate tasks from your diff to start reviewing.")
-                            .color(theme.text_muted),
+                        typography::weak("Generate tasks from your diff to start reviewing."),
                     );
                     ui.add_space(24.0);
 

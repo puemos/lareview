@@ -1,6 +1,6 @@
 use crate::domain::Thread;
 use crate::ui::components::render_diff_editor_full_view;
-use crate::ui::spacing;
+use crate::ui::{spacing, typography};
 use crate::ui::theme::Theme;
 use crate::ui::views::review::format_timestamp;
 use eframe::egui;
@@ -23,13 +23,13 @@ pub(crate) fn render_thread_context(
         ui.horizontal(|ui| {
             let display_path = file_path.split('/').next_back().unwrap_or(file_path);
             ui.label(
-                egui::RichText::new(format!("{display_path}:{line_number}"))
+                typography::body(format!("{display_path}:{line_number}"))
                     .color(theme.text_muted)
                     .size(12.0),
             );
             if !updated_label.is_empty() {
                 ui.label(
-                    egui::RichText::new(format!("• Updated {}", updated_label))
+                    typography::body(format!("• Updated {}", updated_label))
                         .color(theme.text_muted)
                         .size(11.0),
                 );
@@ -39,7 +39,7 @@ pub(crate) fn render_thread_context(
         if let Some(diff_snippet) = diff_snippet {
             ui.add_space(spacing::SPACING_MD);
             ui.label(
-                egui::RichText::new("Diff context")
+                typography::body("Diff context")
                     .size(12.0)
                     .color(theme.text_muted),
             );

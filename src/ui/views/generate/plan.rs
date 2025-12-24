@@ -1,5 +1,5 @@
 use crate::domain::{Plan, PlanStatus};
-use crate::ui::icons;
+use crate::ui::{icons, typography};
 use crate::ui::theme::current_theme;
 use eframe::egui;
 
@@ -21,7 +21,7 @@ pub(super) fn render_plan_panel(ui: &mut egui::Ui, plan: &Plan) {
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(
-                    egui::RichText::new(format!("{} PLAN", icons::ICON_PLAN))
+                    typography::body(format!("{} PLAN", icons::ICON_PLAN))
                         .size(11.0)
                         .color(current_theme().text_muted),
                 );
@@ -34,7 +34,7 @@ pub(super) fn render_plan_panel(ui: &mut egui::Ui, plan: &Plan) {
                         .filter(|e| matches!(&e.status, PlanStatus::Completed))
                         .count();
                     ui.label(
-                        egui::RichText::new(format!("{} {completed}/{total}", icons::STATUS_DONE))
+                        typography::body(format!("{} {completed}/{total}", icons::STATUS_DONE))
                             .size(11.0)
                             .color(current_theme().text_muted),
                     );
@@ -52,7 +52,7 @@ pub(super) fn render_plan_panel(ui: &mut egui::Ui, plan: &Plan) {
 pub(super) fn render_plan_timeline_item(ui: &mut egui::Ui, plan: &Plan) {
     if plan.entries.is_empty() {
         ui.label(
-            egui::RichText::new(format!("{} Plan updated", icons::ICON_PLAN))
+            typography::body(format!("{} Plan updated", icons::ICON_PLAN))
                 .color(current_theme().text_muted)
                 .size(12.0),
         );
@@ -71,7 +71,7 @@ pub(super) fn render_plan_timeline_item(ui: &mut egui::Ui, plan: &Plan) {
         .iter()
         .any(|e| matches!(&e.status, PlanStatus::InProgress | PlanStatus::Pending));
 
-    let header = egui::RichText::new(format!("{} Plan ({completed}/{total})", icons::ICON_PLAN))
+    let header = typography::body(format!("{} Plan ({completed}/{total})", icons::ICON_PLAN))
         .color(current_theme().text_muted)
         .size(12.0);
 
@@ -93,7 +93,7 @@ fn render_plan_entries(ui: &mut egui::Ui, plan: &Plan, dense: bool) {
         ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
             ui.spacing_mut().item_spacing = egui::vec2(spacing::SPACING_SM, 0.0); // 8.0, 0.0
 
-            ui.label(egui::RichText::new(icon).size(14.0).color(color));
+            ui.label(typography::body(icon).size(14.0).color(color));
 
             let text_color = match status {
                 PlanStatus::Completed => current_theme().text_muted,
@@ -103,8 +103,7 @@ fn render_plan_entries(ui: &mut egui::Ui, plan: &Plan, dense: bool) {
 
             ui.add(
                 egui::Label::new(
-                    egui::RichText::new(&entry.content)
-                        .monospace()
+                    typography::small_mono(&entry.content)
                         .color(text_color)
                         .size(if dense { 12.0 } else { 12.5 }),
                 )

@@ -1,7 +1,7 @@
 use crate::domain::{ReviewStatus, Thread, ThreadImpact};
 use crate::ui::app::ReviewAction;
 use crate::ui::components::{PopupOption, popup_selector};
-use crate::ui::spacing;
+use crate::ui::{spacing, typography};
 use crate::ui::theme::Theme;
 use eframe::egui;
 use egui::Color32;
@@ -37,7 +37,7 @@ pub(crate) fn render_thread_header(
                         .desired_width(title_width)
                         .text_color(Color32::WHITE)
                         .text_color_opt(Some(theme.text_muted))
-                        .font(egui::FontId::proportional(16.0))
+                        .font(typography::body_font(16.0))
                         .frame(false)
                         .margin(egui::vec2(0.0, 0.0)),
                 )

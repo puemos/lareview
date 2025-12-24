@@ -1,6 +1,5 @@
 use crate::ui::app::{GenerateAction, TimelineItem};
-use crate::ui::icons;
-use crate::ui::spacing;
+use crate::ui::{icons, spacing, typography};
 use crate::ui::theme::Theme;
 use eframe::egui;
 
@@ -19,7 +18,7 @@ pub(crate) fn render_timeline_pane(
                 ui.horizontal(|ui| {
                     ui.add_space(spacing::SPACING_SM);
                     ui.label(
-                        egui::RichText::new("ACTIVITY")
+                        typography::body("ACTIVITY")
                             .size(11.0)
                             .color(theme.text_muted),
                     );
@@ -29,7 +28,7 @@ pub(crate) fn render_timeline_pane(
                         if !agent_timeline.is_empty()
                             && ui
                                 .small_button(
-                                    egui::RichText::new(format!("{} Clear", icons::ACTION_CLEAR))
+                                    typography::body(format!("{} Clear", icons::ACTION_CLEAR))
                                         .color(theme.text_muted),
                                 )
                                 .clicked()

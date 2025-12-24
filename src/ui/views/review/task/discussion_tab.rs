@@ -1,7 +1,7 @@
 use crate::ui::app::{Action, LaReviewApp, ReviewAction};
-use crate::ui::spacing;
 use crate::ui::theme::current_theme;
 use crate::ui::views::review::format_timestamp;
+use crate::ui::{spacing, typography};
 use eframe::egui;
 use egui_phosphor::regular as icons;
 
@@ -43,17 +43,16 @@ impl LaReviewApp {
                     ui.vertical_centered(|ui| {
                         ui.add_space(40.0);
                         ui.label(
-                            egui::RichText::new(icons::CHAT_CIRCLE)
+                            typography::body(icons::CHAT_CIRCLE)
                                 .size(44.0)
                                 .color(theme.text_disabled),
                         );
                         ui.add_space(spacing::SPACING_MD);
-                        ui.heading("No discussions yet");
+                        ui.label(typography::h1("No discussions yet"));
                         ui.label(
-                            egui::RichText::new(
+                            typography::weak(
                                 "Add comments in the 'Changes' tab or start a general thread.",
-                            )
-                            .color(theme.text_muted),
+                            ),
                         );
                     });
                 });
@@ -106,8 +105,7 @@ impl LaReviewApp {
                     ui.vertical(|ui| {
                         ui.horizontal(|ui| {
                             ui.label(
-                                egui::RichText::new(&title)
-                                    .strong()
+                                typography::bold(&title)
                                     .color(theme.text_primary),
                             );
 
@@ -115,9 +113,8 @@ impl LaReviewApp {
                                 egui::Layout::right_to_left(egui::Align::Center),
                                 |ui| {
                                     ui.label(
-                                        egui::RichText::new(updated_label)
-                                            .color(theme.text_muted)
-                                            .size(11.0),
+                                        typography::tiny(updated_label)
+                                            .color(theme.text_muted),
                                     );
                                 },
                             );
@@ -131,34 +128,34 @@ impl LaReviewApp {
                             ui.horizontal(|ui| {
                                 ui.spacing_mut().item_spacing.x = 4.0;
                                 ui.label(
-                                    egui::RichText::new(status_v.icon)
+                                    typography::body(status_v.icon)
                                         .color(status_v.color)
                                         .size(12.0),
                                 );
                                 ui.label(
-                                    egui::RichText::new(status_v.label)
+                                    typography::body(status_v.label)
                                         .color(theme.text_secondary)
                                         .size(12.0),
                                 );
                             });
 
-                            ui.label(egui::RichText::new("·").color(theme.text_muted).size(12.0));
+                            ui.label(typography::body("·").color(theme.text_muted).size(12.0));
 
                             ui.horizontal(|ui| {
                                 ui.spacing_mut().item_spacing.x = 4.0;
                                 ui.label(
-                                    egui::RichText::new(impact_v.icon)
+                                    typography::body(impact_v.icon)
                                         .color(impact_v.color)
                                         .size(12.0),
                                 );
                                 ui.label(
-                                    egui::RichText::new(impact_v.label)
+                                    typography::body(impact_v.label)
                                         .color(theme.text_secondary)
                                         .size(12.0),
                                 );
                             });
 
-                            ui.label(egui::RichText::new("·").color(theme.text_muted).size(12.0));
+                            ui.label(typography::body("·").color(theme.text_muted).size(12.0));
 
                             let metadata: String = if path.is_empty() {
                                 format!("{} comments", reply_count)
@@ -167,7 +164,7 @@ impl LaReviewApp {
                             };
 
                             ui.label(
-                                egui::RichText::new(metadata)
+                                typography::body(metadata)
                                     .color(theme.text_secondary)
                                     .size(12.0),
                             );

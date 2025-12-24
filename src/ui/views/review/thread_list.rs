@@ -1,11 +1,9 @@
-use eframe::egui;
-
 use crate::domain::{ReviewStatus, Thread};
 use crate::ui::app::ReviewAction;
 use crate::ui::components::list_item::ListItem;
-use crate::ui::icons;
-use crate::ui::spacing;
+use crate::ui::{icons, spacing, typography};
 use crate::ui::theme::Theme;
+use eframe::egui;
 
 pub fn render_thread_list(
     ui: &mut egui::Ui,
@@ -19,13 +17,13 @@ pub fn render_thread_list(
         ui.vertical_centered(|ui| {
             ui.add_space(spacing::SPACING_XL);
             ui.label(
-                egui::RichText::new(icons::ICON_EMPTY)
+                typography::body(icons::ICON_EMPTY)
                     .size(24.0)
                     .color(theme.text_muted),
             );
             ui.add_space(spacing::SPACING_XS);
             ui.label(
-                egui::RichText::new("No threads yet")
+                typography::body("No threads yet")
                     .size(14.0)
                     .color(theme.text_muted),
             );
@@ -61,9 +59,8 @@ pub fn render_thread_list(
                 };
 
                 // -- Title --
-                let title_text = egui::RichText::new(&thread.title)
-                    .color(theme.text_primary)
-                    .strong();
+                let title_text = typography::bold(&thread.title)
+                    .color(theme.text_primary);
 
                 // -- Metadata (Impact + Time) --
                 let (impact_icon, impact_label, impact_color) = match thread.impact {

@@ -4,8 +4,7 @@ use crate::application::review::ordering::{
 use crate::domain::ReviewTask;
 use crate::ui::app::ReviewAction;
 use crate::ui::components::list_item::ListItem;
-use crate::ui::icons;
-use crate::ui::spacing;
+use crate::ui::{icons, spacing, typography};
 use crate::ui::theme::Theme;
 use eframe::egui;
 
@@ -25,8 +24,7 @@ pub(crate) fn render_navigation_tree(
             ui.horizontal(|ui| {
                 ui.add(
                     egui::Label::new(
-                        egui::RichText::new("Tasks")
-                            .strong()
+                        typography::bold("Tasks")
                             .color(theme.text_primary),
                     )
                     .wrap(),
@@ -47,7 +45,7 @@ pub(crate) fn render_navigation_tree(
         ui.vertical_centered(|ui| {
             ui.add_space(20.0);
             ui.label(
-                egui::RichText::new("No tasks loaded")
+                typography::body("No tasks loaded")
                     .italics()
                     .color(theme.text_muted),
             );
@@ -78,9 +76,7 @@ pub(crate) fn render_navigation_tree(
         egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), header_id, true)
             .show_header(ui, |ui| {
                 ui.horizontal(|ui| {
-                    let mut heading = egui::RichText::new(&title_upper)
-                        .family(egui::FontFamily::Proportional)
-                        .strong()
+                    let mut heading = typography::bold(&title_upper)
                         .size(11.0)
                         .extra_letter_spacing(0.5);
 
@@ -100,7 +96,7 @@ pub(crate) fn render_navigation_tree(
                         theme.text_muted
                     };
 
-                    let count_text = egui::RichText::new(format!("{}/{}", finished, total))
+                    let count_text = typography::body(format!("{}/{}", finished, total))
                         .size(11.0)
                         .color(color);
 
@@ -139,7 +135,7 @@ pub(crate) fn render_nav_item(
     };
 
     // -- Title --
-    let mut title_text = egui::RichText::new(&task.title)
+    let mut title_text = typography::body(&task.title)
         .size(13.0)
         .color(if is_selected {
             theme.text_primary
@@ -150,7 +146,7 @@ pub(crate) fn render_nav_item(
     if task.status.is_closed() {
         title_text = title_text.strikethrough().color(theme.text_muted);
     } else if is_selected {
-        title_text = title_text.strong();
+        title_text = typography::bold(&task.title).size(13.0).color(theme.text_primary);
     }
 
     // -- Risk / Subtitle --
@@ -160,7 +156,7 @@ pub(crate) fn render_nav_item(
         crate::domain::RiskLevel::Low => (icons::RISK_LOW, theme.accent, "Low Risk"),
     };
 
-    let subtitle = egui::RichText::new(format!("{}  {}", risk_icon, risk_label))
+    let subtitle = typography::body(format!("{}  {}", risk_icon, risk_label))
         .size(11.0)
         .color(risk_color);
 

@@ -80,6 +80,20 @@ impl LaReviewApp {
 
         egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
 
+        // Ensure icons are available in our custom named families too
+        if let Some(phosphor_font) = fonts
+            .families
+            .get(&FontFamily::Proportional)
+            .and_then(|list| list.last())
+            .cloned()
+        {
+            for family in ["Geist", "GeistBold", "GeistItalic"] {
+                if let Some(list) = fonts.families.get_mut(&FontFamily::Name(family.into())) {
+                    list.push(phosphor_font.clone());
+                }
+            }
+        }
+
         cc.egui_ctx.set_fonts(fonts);
         egui_extras::install_image_loaders(&cc.egui_ctx);
 

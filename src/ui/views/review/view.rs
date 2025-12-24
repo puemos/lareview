@@ -4,8 +4,7 @@ use crate::application::review::ordering::tasks_in_display_order;
 use crate::ui::app::{Action, LaReviewApp, ReviewAction};
 use crate::ui::components::pills::pill_action_button;
 use crate::ui::components::status::error_banner;
-use crate::ui::icons;
-use crate::ui::spacing;
+use crate::ui::{icons, spacing, typography};
 use crate::ui::theme::current_theme;
 use eframe::egui;
 use egui::Margin;
@@ -157,7 +156,7 @@ impl LaReviewApp {
                             if total_tasks > 0 {
                                 ui.add_space(spacing::SPACING_MD);
                                 ui.label(
-                                    egui::RichText::new(format!(
+                                    typography::body(format!(
                                         "{}/{} Tasks",
                                         done_tasks, total_tasks
                                     ))

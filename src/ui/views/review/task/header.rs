@@ -1,7 +1,6 @@
 use crate::domain::ReviewTask;
 use crate::ui::app::ReviewAction;
-use crate::ui::icons;
-use crate::ui::spacing;
+use crate::ui::{icons, spacing, typography};
 use crate::ui::theme::Theme;
 use eframe::egui;
 
@@ -15,7 +14,7 @@ pub(crate) fn render_task_header(
     // 1. Task Title
     ui.add(
         egui::Label::new(
-            egui::RichText::new(&task.title)
+            typography::bold(&task.title)
                 .size(22.0)
                 .line_height(Some(32.0))
                 .color(theme.text_primary),
@@ -96,7 +95,7 @@ pub(crate) fn render_task_header(
 
             // Dot Separator
             ui.add_space(spacing::SPACING_XS);
-            ui.label(egui::RichText::new("·").color(theme.text_muted).size(14.0));
+            ui.label(typography::body("·").color(theme.text_muted).size(14.0));
             ui.add_space(spacing::SPACING_XS);
 
             // Risk Indicator
@@ -110,9 +109,9 @@ pub(crate) fn render_task_header(
 
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 4.0;
-                ui.label(egui::RichText::new(risk_icon).color(risk_fg).size(14.0));
+                ui.label(typography::body(risk_icon).color(risk_fg).size(14.0));
                 ui.label(
-                    egui::RichText::new(risk_label)
+                    typography::body(risk_label)
                         .color(theme.text_muted)
                         .size(12.0),
                 );
@@ -120,36 +119,36 @@ pub(crate) fn render_task_header(
 
             // Dot Separator
             ui.add_space(spacing::SPACING_XS);
-            ui.label(egui::RichText::new("·").color(theme.text_muted).size(14.0));
+            ui.label(typography::body("·").color(theme.text_muted).size(14.0));
             ui.add_space(spacing::SPACING_XS);
 
             // Stats
             ui.label(
-                egui::RichText::new(format!("{} files", task.files.len()))
+                typography::body(format!("{} files", task.files.len()))
                     .color(theme.text_muted)
                     .size(12.0),
             );
 
             ui.label(
-                egui::RichText::new("|")
+                typography::body("|")
                     .color(theme.text_disabled)
                     .size(12.0),
             );
 
             ui.label(
-                egui::RichText::new(format!("+{}", task.stats.additions))
+                typography::body(format!("+{}", task.stats.additions))
                     .color(theme.success)
                     .size(12.0),
             );
 
             ui.label(
-                egui::RichText::new(format!("-{}", task.stats.deletions))
+                typography::body(format!("-{}", task.stats.deletions))
                     .color(theme.destructive)
                     .size(12.0),
             );
 
             ui.label(
-                egui::RichText::new("lines")
+                typography::body("lines")
                     .color(theme.text_muted)
                     .size(12.0),
             );

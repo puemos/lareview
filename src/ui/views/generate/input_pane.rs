@@ -1,5 +1,5 @@
 use crate::ui::app::{GenerateAction, GeneratePreview};
-use crate::ui::spacing;
+use crate::ui::{spacing, typography};
 use crate::ui::theme::Theme;
 use eframe::egui;
 use std::sync::Arc;
@@ -62,13 +62,13 @@ pub(crate) fn render_input_pane(
                             ui.set_min_width(ui.available_width());
                             ui.horizontal(|ui| {
                                 ui.label(
-                                    egui::RichText::new(egui_phosphor::regular::GITHUB_LOGO)
+                                    typography::body(egui_phosphor::regular::GITHUB_LOGO)
                                         .size(16.0),
                                 );
                                 ui.vertical(|ui| {
                                     ui.horizontal(|ui| {
                                         ui.label(
-                                            egui::RichText::new(format!(
+                                            typography::body(format!(
                                                 "{}/{}",
                                                 gh.pr.owner, gh.pr.repo
                                             ))
@@ -76,14 +76,13 @@ pub(crate) fn render_input_pane(
                                             .size(11.0),
                                         );
                                         ui.label(
-                                            egui::RichText::new(format!("#{}", gh.pr.number))
+                                            typography::body(format!("#{}", gh.pr.number))
                                                 .color(theme.text_muted)
                                                 .size(11.0),
                                         );
                                     });
                                     ui.label(
-                                        egui::RichText::new(&gh.meta.title)
-                                            .strong()
+                                        typography::bold(&gh.meta.title)
                                             .color(theme.text_primary),
                                     );
                                 });
