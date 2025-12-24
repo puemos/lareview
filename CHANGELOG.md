@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.12] - 2025-12-24
+
+### Added
+- **Generate View**: Added a spinning animation to the "Generate" tab icon when a review is being generated.
+- **Agent Generation**: Added the ability to abort/cancel agent generation from the UI.
+- **Licensing**: Project is now dual-licensed under MIT OR Apache-2.0.
+
+### Changed
+- **Navigation**: Simplified and improved the header navigation layout with better centering and more robust width calculations.
+- **UI Performance**: Increased the UI repaint frequency (to 16ms) during active generation to ensure smooth animations.
+- **Contributing**: Added licensing information to contributing guidelines.
+
+### Fixed
+- **UI Consistency**: Ensured consistent text opacity and alignment across header tabs.
+- **Cleanup**: Fixed unused variable warnings in the review navigation component.
+
 ## [0.0.11] - 2025-12-24
 
 ### Added
