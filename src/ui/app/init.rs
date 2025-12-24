@@ -65,6 +65,12 @@ impl LaReviewApp {
             .or_default()
             .insert(0, "Geist".to_owned());
 
+        fonts
+            .families
+            .entry(FontFamily::Monospace)
+            .or_default()
+            .insert(0, "GeistMono".to_owned());
+
         fonts.families.insert(
             FontFamily::Name("Geist".into()),
             vec!["Geist".to_owned(), phosphor_font.clone()],
@@ -75,13 +81,12 @@ impl LaReviewApp {
         );
         fonts.families.insert(
             FontFamily::Name("GeistItalic".into()),
-            vec!["GeistItalic".to_owned(), phosphor_font],
+            vec!["GeistItalic".to_owned(), phosphor_font.clone()],
         );
-        fonts
-            .families
-            .entry(FontFamily::Monospace)
-            .or_default()
-            .insert(0, "GeistMono".to_owned());
+        fonts.families.insert(
+            FontFamily::Name("GeistMono".into()),
+            vec!["GeistMono".to_owned(), phosphor_font.clone()],
+        );
 
         cc.egui_ctx.set_fonts(fonts);
         egui_extras::install_image_loaders(&cc.egui_ctx);

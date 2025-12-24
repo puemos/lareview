@@ -436,9 +436,7 @@ impl LaReviewApp {
                         .show(ui, |ui| {
                             ui.add(
                                 egui::Label::new(
-                                    egui::RichText::new("All Threads")
-                                        .strong()
-                                        .color(theme.text_primary),
+                                    typography::bold_label("All Threads").color(theme.text_primary),
                                 )
                                 .wrap(),
                             );

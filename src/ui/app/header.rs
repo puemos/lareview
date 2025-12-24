@@ -1,7 +1,7 @@
 use crate::ui::app::AppView;
 use crate::ui::app::LaReviewApp;
 use crate::ui::icons;
-use crate::ui::spacing::SPACING_MD;
+use crate::ui::spacing;
 use crate::ui::{theme, typography};
 use eframe::egui;
 
@@ -20,12 +20,11 @@ impl LaReviewApp {
                 let rect = ui.available_rect_before_wrap();
 
                 // --- 1. LEFT: App Identity ---
-                // We use allocate_ui_at_rect to pin this to the left
                 let left_rect =
                     egui::Rect::from_min_size(rect.min, egui::vec2(200.0, rect.height()));
                 ui.scope_builder(egui::UiBuilder::new().max_rect(left_rect), |ui| {
                     ui.horizontal_centered(|ui| {
-                        ui.add_space(SPACING_MD); // SPACE FOR MACOS TRAFFIC LIGHTS
+                        ui.add_space(spacing::SPACING_SM); // SPACE FOR MACOS TRAFFIC LIGHTS
 
                         // Just the icon, slightly larger
                         ui.label(
@@ -34,7 +33,7 @@ impl LaReviewApp {
                                 .color(theme.brand),
                         );
 
-                        ui.add_space(4.0);
+                        ui.add_space(2.0);
 
                         // App Name - slightly muted to let content shine
                         ui.label(
@@ -46,68 +45,59 @@ impl LaReviewApp {
                 });
 
                 // --- 2. CENTER: Navigation Tabs ---
-                // Absolute center positioning looks best for tools
-                let center_width = 380.0;
-                let center_rect =
-                    egui::Rect::from_center_size(rect.center(), egui::vec2(center_width, 32.0));
-                // Slightly inset the tabs from the pill background to give breathing room
-                let tab_rect = center_rect.shrink2(egui::vec2(6.0, 3.0));
+                let spacing_between = 4.0;
+                let padding = 4.0;
 
+                let tabs_data = [
+                    (AppView::Home, "Home", icons::VIEW_HOME),
+                    (AppView::Generate, "Generate", icons::VIEW_GENERATE),
+                    (AppView::Review, "Review", icons::VIEW_REVIEW),
+                    (AppView::Repos, "Repos", icons::VIEW_REPOS),
+                    (AppView::Settings, "Settings", icons::VIEW_SETTINGS),
+                ];
+
+                // Measure each button's desired width
+                // Since you always use the same font, we can estimate based on character count
+                let mut button_widths = Vec::new();
+
+                for (_, label, _) in &tabs_data {
+                    // Approximate character width for 13.0 size font + padding
+                    // Icon takes ~15px, each char ~7-8px for size 13
+                    let estimated_width = 15.0 + (label.len() as f32 * 6.5) + 20.0; // padding
+                    button_widths.push(estimated_width);
+                }
+
+                // Calculate total width needed
+                let mut total_width = padding * 2.0; // Left and right padding
+                for width in &button_widths {
+                    total_width += width;
+                }
+                total_width += spacing_between * (tabs_data.len() - 1) as f32;
+
+                // Create centered container rect based on measured width
+                let container_height = 34.0;
+                let center_rect = egui::Rect::from_center_size(
+                    rect.center(),
+                    egui::vec2(total_width, container_height),
+                );
+
+                // Draw background container
+                let rounding = egui::CornerRadius::same(nav_rounding as u8);
+                let stroke = egui::Stroke::new(1.0, theme.border);
+                ui.painter()
+                    .rect_filled(center_rect, rounding, theme.bg_secondary);
+                ui.painter()
+                    .rect_stroke(center_rect, rounding, stroke, egui::StrokeKind::Inside);
+
+                // Render tabs inside the container
+                let tab_rect = center_rect.shrink2(egui::vec2(padding, padding));
                 ui.scope_builder(egui::UiBuilder::new().max_rect(tab_rect), |ui| {
-                    // Draw a background container for the tabs (Segmented Control style)
-                    ui.painter().rect_filled(
-                        center_rect,
-                        egui::CornerRadius::same(nav_rounding as u8),
-                        theme.bg_secondary, // Darker background for the pill container
-                    );
-
                     ui.horizontal(|ui| {
-                        let spacing = 4.0;
-                        ui.spacing_mut().item_spacing = egui::vec2(spacing, 0.0);
+                        ui.spacing_mut().item_spacing = egui::vec2(spacing_between, 0.0);
 
-                        // We split the width equally among tabs, accounting for spacing
-                        let tab_width = (tab_rect.width() - (4.0 * spacing)) / 5.0;
-
-                        self.render_tab(
-                            ui,
-                            AppView::Home,
-                            "Home",
-                            icons::VIEW_HOME,
-                            tab_width,
-                            nav_rounding,
-                        );
-                        self.render_tab(
-                            ui,
-                            AppView::Generate,
-                            "Generate",
-                            icons::VIEW_GENERATE,
-                            tab_width,
-                            nav_rounding,
-                        );
-                        self.render_tab(
-                            ui,
-                            AppView::Review,
-                            "Review",
-                            icons::VIEW_REVIEW,
-                            tab_width,
-                            nav_rounding,
-                        );
-                        self.render_tab(
-                            ui,
-                            AppView::Repos,
-                            "Repos",
-                            icons::VIEW_REPOS,
-                            tab_width,
-                            nav_rounding,
-                        );
-                        self.render_tab(
-                            ui,
-                            AppView::Settings,
-                            "Settings",
-                            icons::VIEW_SETTINGS,
-                            tab_width,
-                            nav_rounding,
-                        );
+                        for (i, (view, label, icon)) in tabs_data.iter().enumerate() {
+                            self.render_tab(ui, *view, label, icon, button_widths[i], nav_rounding);
+                        }
                     });
                 });
             });
@@ -127,7 +117,10 @@ impl LaReviewApp {
         let theme = theme::current_theme();
 
         let (bg, stroke) = if is_active {
-            (theme.bg_primary, egui::Stroke::new(1.0, theme.border))
+            (
+                theme.bg_primary,
+                egui::Stroke::new(1.0, theme.border.gamma_multiply(0.7)),
+            )
         } else {
             (
                 egui::Color32::TRANSPARENT,
@@ -135,7 +128,7 @@ impl LaReviewApp {
             )
         };
 
-        let mut text = typography::bold_label(format!("{} {}", icon, label));
+        let mut text = typography::label(format!("{} {}", icon, label));
 
         if is_active {
             text = text.color(theme.brand);
@@ -149,8 +142,8 @@ impl LaReviewApp {
             let btn = egui::Button::new(text)
                 .fill(bg)
                 .stroke(stroke)
-                .corner_radius(rounding - 2.0) // Slightly less rounding than container
-                .min_size(egui::vec2(width, 26.0)); // Fill the segment while leaving pill padding
+                .corner_radius(rounding - 2.0)
+                .min_size(egui::vec2(width, 26.0));
 
             if ui.add(btn).clicked() {
                 match view {

@@ -103,10 +103,10 @@ impl Theme {
             text_primary: egui::Color32::from_rgb(230, 233, 239), // Brighter white (Mocha text is slightly muted)
 
             bg_secondary: MOCHA.mantle, // Elevated surfaces (Sidebars, Header)
-            text_secondary: egui::Color32::from_rgb(230, 233, 239),
+            text_secondary: egui::Color32::from_rgb(186, 194, 222),
 
             bg_tertiary: MOCHA.surface0, // Elevated surfaces (Cards, focus areas)
-            text_tertiary: egui::Color32::from_rgb(230, 233, 239),
+            text_tertiary: egui::Color32::from_rgb(166, 173, 200),
 
             bg_surface: MOCHA.mantle, // Dialogs and dropdowns
             text_surface: egui::Color32::from_rgb(230, 233, 239),

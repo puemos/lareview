@@ -4,6 +4,7 @@ use crate::ui::spacing::SPACING_XS;
 use crate::ui::theme::current_theme;
 use crate::ui::typography;
 use eframe::egui;
+use egui_phosphor::regular;
 
 pub fn repo_selector(
     ui: &mut egui::Ui,
@@ -89,7 +90,10 @@ pub fn repo_selector(
                 // Chevron
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.add_space(2.0);
-                    ui.label(typography::body("⏷").color(current_theme().text_disabled));
+                    ui.label(
+                        typography::body(regular::CARET_UP_DOWN)
+                            .color(current_theme().text_disabled),
+                    );
                 });
             });
         });
@@ -143,7 +147,7 @@ pub fn repo_selector(
                             ui.style_mut().interaction.selectable_labels = false;
                             ui.horizontal_centered(|ui| {
                                 let label = if none_selected {
-                                    typography::bold("No Repository Context").color(none_text)
+                                    typography::body("No Repository Context").color(none_text)
                                 } else {
                                     typography::body("No Repository Context").color(none_text)
                                 };
@@ -169,11 +173,9 @@ pub fn repo_selector(
                                 .on_hover_cursor(egui::CursorIcon::PointingHand);
 
                             let mut item_bg = egui::Color32::TRANSPARENT;
-                            let mut text_color = current_theme().text_primary;
 
                             if is_selected {
                                 item_bg = selected_bg;
-                                text_color = selected_text;
                             } else if item_response.hovered() {
                                 item_bg = current_theme().bg_secondary;
                             }
@@ -190,9 +192,11 @@ pub fn repo_selector(
                                 ui.style_mut().interaction.selectable_labels = false;
                                 ui.horizontal_centered(|ui| {
                                     let label = if is_selected {
-                                        typography::bold(&repo.name).color(text_color)
+                                        typography::body(&repo.name)
+                                            .color(current_theme().text_primary)
                                     } else {
-                                        typography::body(&repo.name).color(text_color)
+                                        typography::body(&repo.name)
+                                            .color(current_theme().text_tertiary)
                                     };
                                     ui.add(egui::Label::new(label).selectable(false));
                                 });

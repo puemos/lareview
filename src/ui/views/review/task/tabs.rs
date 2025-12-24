@@ -53,7 +53,7 @@ pub(crate) fn render_task_tabs(
 
             let mut text = typography::body(text).size(13.0);
             if is_selected {
-                text = typography::bold(text.text()).size(13.0).color(theme.brand);
+                text = typography::body(text.text()).size(13.0).color(theme.brand);
             } else {
                 text = text.color(theme.text_muted);
             };

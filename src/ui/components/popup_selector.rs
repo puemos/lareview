@@ -85,8 +85,11 @@ pub fn popup_selector<T: Copy + PartialEq>(
                 |ui| {
                     ui.add_space(2.0);
                     ui.add(
-                        egui::Label::new(typography::body("⏷").color(theme.text_disabled))
-                            .selectable(false),
+                        egui::Label::new(
+                            typography::body(icons::CARET_UP_DOWN)
+                                .color(current_theme().text_disabled),
+                        )
+                        .selectable(false),
                     );
                 },
             );

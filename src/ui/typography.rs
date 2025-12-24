@@ -47,7 +47,7 @@ pub fn weak(text: impl Into<String>) -> egui::RichText {
 
 /// Returns a RichText configured with the GeistMono font family.
 pub fn mono(text: impl Into<String>) -> egui::RichText {
-    egui::RichText::new(text).family(egui::FontFamily::Monospace)
+    egui::RichText::new(text).family(egui::FontFamily::Name("GeistMono".into()))
 }
 
 /// Small monospace text
@@ -66,5 +66,5 @@ pub fn body_font(size: f32) -> egui::FontId {
 }
 
 pub fn mono_font(size: f32) -> egui::FontId {
-    egui::FontId::new(size, egui::FontFamily::Monospace)
+    egui::FontId::new(size, egui::FontFamily::Name("GeistMono".into()))
 }

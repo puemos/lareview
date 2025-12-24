@@ -1,4 +1,5 @@
 use eframe::egui;
+use egui_phosphor::regular;
 use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,
@@ -116,7 +117,8 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
                         ui.add_space(2.0);
                         ui.add(
                             egui::Label::new(
-                                typography::body("⏷").color(current_theme().text_disabled),
+                                typography::body(regular::CARET_UP_DOWN)
+                                    .color(current_theme().text_disabled),
                             )
                             .selectable(false),
                         );
@@ -214,12 +216,7 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
                                         text_color
                                     };
 
-                                    let label = if is_selected {
-                                        typography::bold(&agent.label)
-                                            .color(final_text_color)
-                                    } else {
-                                        typography::body(&agent.label).color(final_text_color)
-                                    };
+                                    let label = typography::body(&agent.label).color(final_text_color);
                                     ui.add(egui::Label::new(label).selectable(false));
                                 });
                             });
