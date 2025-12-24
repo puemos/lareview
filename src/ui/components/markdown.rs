@@ -1,5 +1,6 @@
 use crate::ui::spacing;
 use crate::ui::theme::{Theme, current_theme};
+use crate::ui::typography;
 use eframe::egui;
 use egui_phosphor::regular as icons;
 use once_cell::sync::Lazy;
@@ -281,7 +282,7 @@ fn render_text_item(
             ui.horizontal(|ui| {
                 ui.add_space(16.0);
                 ui.label(
-                    egui::RichText::new(bullet)
+                    typography::body(bullet)
                         .color(theme.text_secondary)
                         .size(15.0),
                 );
@@ -296,7 +297,7 @@ fn render_text_item(
                 } else {
                     icons::SQUARE
                 };
-                ui.label(egui::RichText::new(icon).color(*color).size(16.0));
+                ui.label(typography::body(icon).color(*color).size(16.0));
                 render_job(ui, job, link);
             });
         }

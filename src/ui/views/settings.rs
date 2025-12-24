@@ -1,5 +1,5 @@
 use crate::ui::app::{Action, LaReviewApp, SettingsAction};
-use crate::ui::spacing;
+use crate::ui::{spacing, typography};
 use eframe::egui;
 
 use crate::ui::theme;
@@ -21,10 +21,10 @@ impl LaReviewApp {
             .show(ui, |ui| {
                 // Title Block
                 ui.horizontal(|ui| {
-                    ui.strong("GitHub CLI Integration");
+                    ui.label(typography::bold("GitHub CLI Integration"));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if self.state.session.is_gh_status_checking {
-                            ui.label(egui::RichText::new("Checking...").color(theme.warning));
+                            ui.label(typography::body("Checking...").color(theme.warning));
                         } else if self.state.session.gh_status.is_some()
                             && self.state.session.gh_status_error.is_none()
                         {
@@ -46,14 +46,13 @@ impl LaReviewApp {
                         ui.horizontal(|ui| {
                             if let Some(err) = &self.state.session.gh_status_error {
                                 ui.colored_label(theme.destructive, "Disconnected");
-                                ui.weak(format!("(Error: {})", err));
+                                ui.label(typography::weak(format!("(Error: {})", err)));
                             } else if let Some(status) = &self.state.session.gh_status {
                                 ui.colored_label(theme.success, "Connected");
                                 if let Some(login) = &status.login {
                                     ui.label(
-                                        egui::RichText::new(format!("(@{})", login))
-                                            .color(theme.text_disabled)
-                                            .strong(),
+                                        typography::bold(format!("(@{})", login))
+                                            .color(theme.text_disabled),
                                     );
                                 }
                             } else {
@@ -64,7 +63,7 @@ impl LaReviewApp {
 
                         if let Some(status) = &self.state.session.gh_status {
                             ui.label("Executable Path:");
-                            ui.monospace(&status.gh_path);
+                            ui.label(typography::mono(&status.gh_path));
                             ui.end_row();
                         }
                     });
@@ -94,8 +93,7 @@ impl LaReviewApp {
                 {
                     ui.add_space(spacing::SPACING_LG);
                     egui::CollapsingHeader::new(
-                        egui::RichText::new("Setup Instructions")
-                            .strong()
+                        typography::bold("Setup Instructions")
                             .color(theme.text_secondary),
                     )
                     .default_open(true)
@@ -136,10 +134,10 @@ impl LaReviewApp {
                 let d2_installed = crate::infra::brew::find_bin("d2").is_some();
 
                 ui.horizontal(|ui| {
-                    ui.strong("D2 Diagram Engine");
+                    ui.label(typography::bold("D2 Diagram Engine"));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if self.state.ui.is_d2_installing {
-                            ui.label(egui::RichText::new("Installing...").color(theme.warning));
+                            ui.label(typography::body("Installing...").color(theme.warning));
                         } else if d2_installed {
                             ui.colored_label(theme.success, "✔ Installed");
                         } else {
@@ -175,9 +173,9 @@ impl LaReviewApp {
                         .stroke(egui::Stroke::new(1.0, theme.warning))
                         .show(ui, |ui| {
                             ui.horizontal(|ui| {
-                                ui.label(egui::RichText::new("⚠").color(theme.warning).size(16.0));
+                                ui.label(typography::body("⚠").color(theme.warning).size(16.0));
                                 ui.vertical(|ui| {
-                                    ui.strong("Remote Script Warning");
+                                    ui.label(typography::bold("Remote Script Warning"));
                                     ui.label("Installation requires running a remote shell script. You can run it manually or allow LaReview to run it.");
                                 });
                             });
@@ -237,7 +235,7 @@ impl LaReviewApp {
                                         egui::TextEdit::multiline(
                                             &mut self.state.ui.d2_install_output.as_str(),
                                         )
-                                        .font(egui::TextStyle::Monospace)
+                                        .font(typography::mono_font(13.0))
                                         .desired_width(f32::INFINITY)
                                         .lock_focus(true),
                                     );
@@ -258,7 +256,7 @@ impl LaReviewApp {
                 .inner_margin(spacing::SPACING_SM) // Using SPACING_SM (8.0) as closest to 6.0
                 .corner_radius(4.0)
                 .show(ui, |ui| {
-                    ui.monospace(cmd);
+                    ui.label(typography::mono(cmd));
                 });
 
             // Copy button

@@ -1,9 +1,7 @@
-use eframe::egui;
-
 use super::{Action, LaReviewApp, ReviewAction, SettingsAction};
 use crate::ui::components::pills::pill_action_button;
-use crate::ui::icons;
-use crate::ui::spacing;
+use crate::ui::{icons, spacing, typography};
+use eframe::egui;
 
 impl LaReviewApp {
     pub(super) fn render_full_diff_overlay(&mut self, ctx: &egui::Context) {
@@ -80,9 +78,7 @@ impl LaReviewApp {
                 ui.horizontal(|ui| {
                     ui.add_space(spacing::SPACING_MD);
                     ui.label(
-                        egui::RichText::new("Export Review Preview")
-                            .heading()
-                            .strong(),
+                        typography::h1("Export Review Preview"),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.add_space(spacing::SPACING_MD);
@@ -106,17 +102,17 @@ impl LaReviewApp {
                     .show(ui, |ui| {
                         ui.columns(2, |cols| {
                             cols[0].vertical(|ui| {
-                                ui.label(egui::RichText::new("Edit Markdown:").strong());
+                                ui.label(typography::bold("Edit Markdown:"));
                                 ui.add(
                                     egui::TextEdit::multiline(&mut preview)
-                                        .font(egui::TextStyle::Monospace)
+                                        .font(typography::mono_font(13.0))
                                         .desired_width(f32::INFINITY)
                                         .frame(false),
                                 );
                             });
 
                             cols[1].vertical(|ui| {
-                                ui.label(egui::RichText::new("Preview:").strong());
+                                ui.label(typography::bold("Preview:"));
                                 // Register all generated assets so the preview can find them
                                 for (uri, bytes) in &self.state.ui.export_assets {
                                     ui.ctx().include_bytes(uri.clone(), bytes.clone());
@@ -156,9 +152,8 @@ impl LaReviewApp {
                         if ui
                             .add(
                                 egui::Button::new(
-                                    egui::RichText::new("Save Review...")
-                                        .color(crate::ui::theme::current_theme().bg_primary)
-                                        .strong(),
+                                    typography::bold("Save Review...")
+                                        .color(crate::ui::theme::current_theme().bg_primary),
                                 )
                                 .fill(crate::ui::theme::current_theme().brand),
                             )
@@ -219,9 +214,9 @@ impl LaReviewApp {
                     .num_columns(3)
                     .spacing([spacing::SPACING_LG, spacing::SPACING_SM])
                     .show(ui, |ui| {
-                        ui.strong("Tool");
-                        ui.strong("Status");
-                        ui.strong("Path");
+                        ui.label(typography::bold("Tool"));
+                        ui.label(typography::bold("Status"));
+                        ui.label(typography::bold("Path"));
                         ui.end_row();
 
                         render_requirement_row(ui, "GitHub CLI (gh)", &gh_path, theme);

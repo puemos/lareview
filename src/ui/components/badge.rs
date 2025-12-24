@@ -1,6 +1,7 @@
 use eframe::egui;
 
 use crate::ui::spacing;
+use crate::ui::typography;
 
 pub fn badge(
     ui: &mut egui::Ui,
@@ -10,7 +11,7 @@ pub fn badge(
 ) -> egui::Response {
     let text = match text.into() {
         egui::WidgetText::RichText(rich) => {
-            egui::WidgetText::RichText((*rich).clone().size(10.0).color(fg).into())
+            egui::WidgetText::RichText(typography::body((*rich).text()).size(10.0).color(fg).into())
         }
         other => other,
     };

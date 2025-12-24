@@ -2,7 +2,7 @@ use crate::ui::app::AppView;
 use crate::ui::app::LaReviewApp;
 use crate::ui::icons;
 use crate::ui::spacing::SPACING_MD;
-use crate::ui::theme;
+use crate::ui::{theme, typography};
 use eframe::egui;
 
 impl LaReviewApp {
@@ -38,8 +38,7 @@ impl LaReviewApp {
 
                         // App Name - slightly muted to let content shine
                         ui.label(
-                            egui::RichText::new("LaReview")
-                                .strong()
+                            typography::bold("LaReview")
                                 .size(14.0)
                                 .color(theme.text_primary),
                         );
@@ -136,9 +135,7 @@ impl LaReviewApp {
             )
         };
 
-        let mut text = egui::RichText::new(format!("{} {}", icon, label))
-            .size(13.0)
-            .strong();
+        let mut text = typography::bold_label(format!("{} {}", icon, label));
 
         if is_active {
             text = text.color(theme.brand);

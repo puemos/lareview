@@ -1,5 +1,6 @@
 use crate::ui::spacing;
 use crate::ui::theme::Theme;
+use crate::ui::typography;
 use eframe::egui;
 
 pub struct ListItem<'a> {
@@ -98,7 +99,7 @@ impl<'a> ListItem<'a> {
                             // But usually straight top align is fine if fonts match.
                             // Let's add a tiny bit of spacing if the font size difference is large.
                             // Assuming standard icon size 16.0 and text 13.0/14.0.
-                            ui.label(egui::RichText::new(icon).color(color).size(16.0));
+                            ui.label(typography::body(icon).color(color).size(16.0));
                         });
 
                         ui.add_space(spacing::SPACING_SM);
@@ -196,7 +197,7 @@ impl<'a> ListItem<'a> {
                             // Icon Column
                             ui.vertical(|ui| {
                                 // ensure icon is positioned correctly, maybe add small Y offset to optical center with text
-                                ui.label(egui::RichText::new(icon).color(color).size(16.0));
+                                ui.label(typography::body(icon).color(color).size(16.0));
                             });
                             ui.add_space(spacing::SPACING_SM);
                         }

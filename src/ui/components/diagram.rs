@@ -1,4 +1,4 @@
-use crate::ui::icons;
+use crate::ui::{icons, typography};
 use crate::ui::theme::current_theme;
 use egui::{Id, Image, Rect, TextureOptions, Ui, load::SizedTexture};
 use std::collections::HashMap;
@@ -79,7 +79,7 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<Arc<str>>, is_dark_mode: bool)
 
     let Some(d2_code) = diagram else {
         ui.centered_and_justified(|ui| {
-            ui.label(egui::RichText::new("No diagram code provided").weak());
+            ui.label(typography::weak("No diagram code provided"));
         });
         return false;
     };
@@ -87,7 +87,7 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<Arc<str>>, is_dark_mode: bool)
     let trimmed_code = normalize_d2_code(d2_code);
     if trimmed_code.is_empty() {
         ui.centered_and_justified(|ui| {
-            ui.label(egui::RichText::new("Enter D2 code to render a diagram").weak());
+            ui.label(typography::weak("Enter D2 code to render a diagram"));
         });
         return false;
     }
@@ -410,10 +410,10 @@ fn render_error(ui: &mut Ui, error: &str, trimmed_code: &str, go_to_settings: &m
     ui.centered_and_justified(|ui| {
         ui.vertical_centered(|ui| {
             ui.label(
-                egui::RichText::new("Failed to load diagram.").color(current_theme().destructive),
+                typography::body("Failed to load diagram.").color(current_theme().destructive),
             );
             ui.add_space(8.0);
-            ui.label(egui::RichText::new(error).color(current_theme().text_muted));
+            ui.label(typography::weak(error));
 
             if error.contains("D2 executable not found") {
                 ui.add_space(8.0);

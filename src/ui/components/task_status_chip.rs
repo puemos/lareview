@@ -1,7 +1,5 @@
+use crate::ui::{spacing, theme, typography};
 use eframe::egui;
-
-use crate::ui::spacing;
-use crate::ui::theme;
 
 #[allow(dead_code)]
 pub fn task_status_chip(
@@ -18,7 +16,7 @@ pub fn task_status_chip(
         (theme.bg_secondary, theme.border, theme.text_disabled)
     };
 
-    let text = egui::RichText::new(format!("{icon} {label}"))
+    let text = typography::body(format!("{icon} {label}"))
         .size(10.0)
         .color(fg);
 

@@ -1,5 +1,6 @@
 use crate::ui::spacing::SPACING_XS;
 use crate::ui::theme::current_theme;
+use crate::ui::typography;
 use eframe::egui;
 use egui_phosphor::regular as icons;
 
@@ -73,14 +74,14 @@ pub fn popup_selector<T: Copy + PartialEq>(
             ui.add_space(2.0);
             let icon = selected_option.icon.unwrap_or(icons::DOT_OUTLINE);
             ui.label(
-                egui::RichText::new(icon)
+                typography::body(icon)
                     .size(12.0)
                     .color(selected_option.fg),
             );
             ui.add_space(6.0);
             ui.add(
                 egui::Label::new(
-                    egui::RichText::new(selected_option.label).color(theme.text_primary),
+                    typography::body(selected_option.label).color(theme.text_primary),
                 )
                 .selectable(false),
             );
@@ -90,7 +91,7 @@ pub fn popup_selector<T: Copy + PartialEq>(
                 |ui| {
                     ui.add_space(2.0);
                     ui.add(
-                        egui::Label::new(egui::RichText::new("⏷").color(theme.text_disabled))
+                        egui::Label::new(typography::body("⏷").color(theme.text_disabled))
                             .selectable(false),
                     );
                 },
@@ -146,12 +147,12 @@ pub fn popup_selector<T: Copy + PartialEq>(
                             ui.style_mut().interaction.selectable_labels = false;
                             ui.horizontal_centered(|ui| {
                                 let icon = option.icon.unwrap_or(icons::DOT_OUTLINE);
-                                ui.label(egui::RichText::new(icon).size(12.0).color(option.fg));
+                                ui.label(typography::body(icon).size(12.0).color(option.fg));
                                 ui.add_space(6.0);
                                 let label = if is_selected {
-                                    egui::RichText::new(option.label).color(text_color).strong()
+                                    typography::bold(option.label).color(text_color)
                                 } else {
-                                    egui::RichText::new(option.label).color(text_color)
+                                    typography::body(option.label).color(text_color)
                                 };
                                 ui.add(egui::Label::new(label).selectable(false));
                             });

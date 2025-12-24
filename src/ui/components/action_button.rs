@@ -1,6 +1,7 @@
 use eframe::egui;
 
 use crate::ui::theme;
+use crate::ui::typography;
 
 /// Common action button component
 pub fn action_button(
@@ -10,7 +11,7 @@ pub fn action_button(
     color_if_enabled: egui::Color32,
 ) -> egui::Response {
     let theme = theme::current_theme();
-    let button_text = egui::RichText::new(label).size(15.0).color(if enabled {
+    let button_text = typography::body(label).size(15.0).color(if enabled {
         theme.text_inverse
     } else {
         theme.text_disabled

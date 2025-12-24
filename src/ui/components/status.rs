@@ -1,12 +1,11 @@
-use eframe::egui;
-
 use crate::ui::spacing;
-use crate::ui::theme;
+use crate::ui::{theme, typography};
+use eframe::egui;
 
 /// Common status label component
 #[allow(dead_code)]
 pub fn status_label(ui: &mut egui::Ui, text: &str, color: egui::Color32) {
-    ui.label(egui::RichText::new(text).color(color).size(12.0));
+    ui.label(typography::body(text).color(color).size(12.0));
 }
 
 /// Common error banner component

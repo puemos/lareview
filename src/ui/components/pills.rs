@@ -1,7 +1,6 @@
-use eframe::egui;
-
 use crate::ui::spacing;
 use crate::ui::theme;
+use eframe::egui;
 
 pub fn pill_divider(ui: &mut egui::Ui) {
     let theme = theme::current_theme();

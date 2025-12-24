@@ -178,7 +178,7 @@ impl LaReviewApp {
                         ReviewSource::DiffPaste { .. } => icons::ICON_FILES,
                     };
                     ui.label(
-                        egui::RichText::new(icon)
+                        typography::body(icon)
                             .size(16.0)
                             .color(theme.text_secondary),
                     );
@@ -198,14 +198,11 @@ impl LaReviewApp {
 
                         ui.horizontal(|ui| {
                             ui.label(
-                                egui::RichText::new(&review.id)
-                                    .size(10.0)
-                                    .monospace()
+                                typography::small_mono(&review.id)
                                     .color(theme.text_disabled),
                             );
                             ui.label(
-                                egui::RichText::new(format!("• Updated {}", time_str))
-                                    .size(11.0)
+                                typography::small(format!("• Updated {}", time_str))
                                     .color(theme.text_muted),
                             );
                         });
@@ -253,7 +250,7 @@ impl LaReviewApp {
                 }
             } else {
                 ui.label(
-                    egui::RichText::new(icons::VIEW_GENERATE)
+                    typography::body(icons::VIEW_GENERATE)
                         .size(16.0)
                         .color(theme.text_disabled),
                 );
@@ -267,12 +264,11 @@ impl LaReviewApp {
             // 3. Status
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if agent.available {
-                    ui.label(egui::RichText::new("Ready").color(theme.success).size(11.0));
+                    ui.label(typography::small("Ready").color(theme.success).strong());
                 } else {
                     ui.label(
-                        egui::RichText::new("Unavailable")
-                            .color(theme.text_disabled)
-                            .size(11.0),
+                        typography::small("Unavailable")
+                            .color(theme.text_disabled),
                     );
                 }
             });

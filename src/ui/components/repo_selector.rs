@@ -2,6 +2,7 @@ use crate::domain::LinkedRepo;
 use crate::ui::icons;
 use crate::ui::spacing::SPACING_XS;
 use crate::ui::theme::current_theme;
+use crate::ui::typography;
 use eframe::egui;
 
 pub fn repo_selector(
@@ -67,7 +68,7 @@ pub fn repo_selector(
 
                 // Icon
                 ui.label(
-                    egui::RichText::new(icons::VIEW_REPOS)
+                    typography::body(icons::VIEW_REPOS)
                         .size(16.0)
                         .color(current_theme().text_muted),
                 );
@@ -75,7 +76,7 @@ pub fn repo_selector(
 
                 // Text
                 ui.add(
-                    egui::Label::new(egui::RichText::new(selected_label).color(
+                    egui::Label::new(typography::body(selected_label).color(
                         if selected_repo_id.is_some() {
                             current_theme().text_primary
                         } else {
@@ -88,7 +89,7 @@ pub fn repo_selector(
                 // Chevron
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.add_space(2.0);
-                    ui.label(egui::RichText::new("⏷").color(current_theme().text_disabled));
+                    ui.label(typography::body("⏷").color(current_theme().text_disabled));
                 });
             });
         });
@@ -142,11 +143,10 @@ pub fn repo_selector(
                             ui.style_mut().interaction.selectable_labels = false;
                             ui.horizontal_centered(|ui| {
                                 let label = if none_selected {
-                                    egui::RichText::new("No Repository Context")
+                                    typography::bold("No Repository Context")
                                         .color(none_text)
-                                        .strong()
                                 } else {
-                                    egui::RichText::new("No Repository Context").color(none_text)
+                                    typography::body("No Repository Context").color(none_text)
                                 };
                                 ui.add(egui::Label::new(label).selectable(false));
                             });
@@ -191,9 +191,9 @@ pub fn repo_selector(
                                 ui.style_mut().interaction.selectable_labels = false;
                                 ui.horizontal_centered(|ui| {
                                     let label = if is_selected {
-                                        egui::RichText::new(&repo.name).color(text_color).strong()
+                                        typography::bold(&repo.name).color(text_color)
                                     } else {
-                                        egui::RichText::new(&repo.name).color(text_color)
+                                        typography::body(&repo.name).color(text_color)
                                     };
                                     ui.add(egui::Label::new(label).selectable(false));
                                 });

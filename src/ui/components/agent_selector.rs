@@ -8,6 +8,7 @@ use std::{
 use crate::ui::app::SelectedAgent;
 use crate::ui::spacing::SPACING_XS;
 use crate::ui::theme::current_theme;
+use crate::ui::typography;
 
 static LOGO_BYTES_CACHE: Lazy<Mutex<HashMap<String, Arc<[u8]>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
@@ -102,7 +103,7 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
                 // Text
                 ui.add(
                     egui::Label::new(
-                        egui::RichText::new(selected_label).color(current_theme().text_primary),
+                        typography::body(selected_label).color(current_theme().text_primary),
                     )
                     .selectable(false),
                 );
@@ -115,7 +116,7 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
                         ui.add_space(2.0);
                         ui.add(
                             egui::Label::new(
-                                egui::RichText::new("⏷").color(current_theme().text_disabled),
+                                typography::body("⏷").color(current_theme().text_disabled),
                             )
                             .selectable(false),
                         );
@@ -214,11 +215,10 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
                                     };
 
                                     let label = if is_selected {
-                                        egui::RichText::new(&agent.label)
+                                        typography::bold(&agent.label)
                                             .color(final_text_color)
-                                            .strong()
                                     } else {
-                                        egui::RichText::new(&agent.label).color(final_text_color)
+                                        typography::body(&agent.label).color(final_text_color)
                                     };
                                     ui.add(egui::Label::new(label).selectable(false));
                                 });

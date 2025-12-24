@@ -1,6 +1,6 @@
 use crate::ui::app::{Action, LaReviewApp, SettingsAction};
 use crate::ui::spacing;
-use crate::ui::theme;
+use crate::ui::{theme, typography};
 use eframe::egui;
 
 impl LaReviewApp {
@@ -19,7 +19,7 @@ impl LaReviewApp {
             ))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.strong("Linked Repositories");
+                    ui.label(typography::bold("Linked Repositories"));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui.button("➕ Link Repository").clicked() {
                             self.dispatch(Action::Settings(SettingsAction::LinkRepository));
@@ -38,7 +38,7 @@ impl LaReviewApp {
                     spacing::SPACING_MD as i8,
                 ))
                 .show(ui, |ui| {
-                    ui.weak("No repositories linked. Link a local Git repo to allow the agent to read file contents.");
+                    ui.label(typography::weak("No repositories linked. Link a local Git repo to allow the agent to read file contents."));
                 });
         } else {
             let total_repos = self.state.domain.linked_repos.len();
@@ -58,8 +58,8 @@ impl LaReviewApp {
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
                             ui.vertical(|ui| {
-                                ui.label(egui::RichText::new(&repo.name).strong());
-                                ui.monospace(repo.path.to_string_lossy());
+                                ui.label(typography::bold(&repo.name));
+                                ui.label(typography::mono(repo.path.to_string_lossy()));
                             });
 
                             ui.with_layout(
@@ -77,11 +77,10 @@ impl LaReviewApp {
                         if !repo.remotes.is_empty() {
                             ui.add_space(spacing::SPACING_XS);
                             ui.horizontal(|ui| {
-                                ui.weak("Remotes: ");
+                                ui.label(typography::weak("Remotes: "));
                                 for remote in &repo.remotes {
                                     ui.label(
-                                        egui::RichText::new(remote)
-                                            .small()
+                                        typography::small(remote)
                                             .color(theme.text_disabled),
                                     );
                                 }
