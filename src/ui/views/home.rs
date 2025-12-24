@@ -88,7 +88,9 @@ impl LaReviewApp {
                                     spacing::SPACING_LG as i8,
                                 ))
                                 .show(ui, |ui| {
-                                    ui.weak("No reviews yet. Start one to see it here.");
+                                    ui.label(typography::weak(
+                                        "No reviews yet. Start one to see it here.",
+                                    ));
                                 });
                         } else {
                             let total_reviews = reviews.len();
@@ -120,9 +122,8 @@ impl LaReviewApp {
 
                         ui.separator();
 
-                        // --- 4. Agents List (Simple) ---
+                        // --- 4. Agents List ---
                         let mut agents = list_agent_candidates();
-                        // Sort by availability (Available first)
                         agents.sort_by(|a, b| b.available.cmp(&a.available));
 
                         if agents.is_empty() {
@@ -132,10 +133,9 @@ impl LaReviewApp {
                                     spacing::SPACING_LG as i8,
                                 ))
                                 .show(ui, |ui| {
-                                    ui.weak("No agents discovered.");
+                                    ui.label(typography::weak("No agents discovered."));
                                 });
                         } else {
-                            // Container Frame to match width/padding of other sections
                             egui::Frame::NONE
                                 .inner_margin(egui::Margin::symmetric(
                                     spacing::SPACING_XL as i8,
@@ -143,11 +143,10 @@ impl LaReviewApp {
                                 ))
                                 .show(ui, |ui| {
                                     ui.vertical(|ui| {
-                                        let total_agents = agents.len();
-                                        for (index, agent) in agents.iter().enumerate() {
+                                        let total = agents.len();
+                                        for (i, agent) in agents.iter().enumerate() {
                                             self.render_simple_agent_row(ui, agent);
-
-                                            if index + 1 < total_agents {
+                                            if i + 1 < total {
                                                 ui.add_space(spacing::SPACING_MD);
                                                 ui.separator();
                                                 ui.add_space(spacing::SPACING_MD);
@@ -206,14 +205,14 @@ impl LaReviewApp {
                     ui.label(typography::body(icon).size(16.0).color(theme.text_primary));
                     ui.add_space(8.0);
 
-                    // 2. Content Column (Title, Subtitle, Risk)
+                    // 2. Content Column (Title, Subtitle, Tasks)
                     ui.vertical(|ui| {
-                        ui.spacing_mut().item_spacing.y = 4.0; // Consistent vertical gap
+                        ui.spacing_mut().item_spacing.y = 4.0;
 
-                        // Title
+                        // Row 1: Title
                         ui.label(typography::bold(&review.title).color(theme.text_primary));
 
-                        // Subtitle
+                        // Row 2: Subtitle (Meta + Updated)
                         let time_str = if let Ok(dt) =
                             chrono::DateTime::parse_from_rfc3339(&review.updated_at)
                         {
@@ -237,7 +236,7 @@ impl LaReviewApp {
                             ui.label(typography::weak(format!("Updated {time_str}")));
                         });
 
-                        // Tasks Summary (Risk)
+                        // Row 3: Tasks Summary (Risk)
                         if total_tasks > 0 {
                             ui.horizontal(|ui| {
                                 ui.label(typography::tiny("Tasks:").color(theme.text_disabled));
@@ -247,7 +246,7 @@ impl LaReviewApp {
                                     ui.label(
                                         typography::tiny(icons::RISK_HIGH).color(theme.destructive),
                                     );
-                                    ui.add_space(2.0); // Reduced gap
+                                    ui.add_space(2.0);
                                     ui.label(
                                         typography::tiny(format!("{high_risk} High"))
                                             .color(theme.text_muted),
@@ -258,7 +257,7 @@ impl LaReviewApp {
                                     ui.label(
                                         typography::tiny(icons::RISK_MEDIUM).color(theme.warning),
                                     );
-                                    ui.add_space(2.0); // Reduced gap
+                                    ui.add_space(2.0);
                                     ui.label(
                                         typography::tiny(format!("{med_risk} Medium"))
                                             .color(theme.text_muted),
@@ -267,7 +266,7 @@ impl LaReviewApp {
                                 }
                                 if low_risk > 0 {
                                     ui.label(typography::tiny(icons::RISK_LOW).color(theme.accent));
-                                    ui.add_space(2.0); // Reduced gap
+                                    ui.add_space(2.0);
                                     ui.label(
                                         typography::tiny(format!("{low_risk} Low"))
                                             .color(theme.text_muted),

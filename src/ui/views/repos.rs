@@ -1,4 +1,5 @@
 use crate::ui::app::{Action, LaReviewApp, SettingsAction};
+use crate::ui::icons;
 use crate::ui::spacing;
 use crate::ui::{theme, typography};
 use eframe::egui;
@@ -14,8 +15,8 @@ impl LaReviewApp {
         // --- Header Section ---
         egui::Frame::NONE
             .inner_margin(egui::Margin::symmetric(
+                spacing::SPACING_XL as i8,
                 spacing::SPACING_LG as i8,
-                spacing::SPACING_MD as i8,
             ))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
@@ -34,8 +35,8 @@ impl LaReviewApp {
         if self.state.domain.linked_repos.is_empty() {
             egui::Frame::NONE
                 .inner_margin(egui::Margin::symmetric(
+                    spacing::SPACING_XL as i8,
                     spacing::SPACING_LG as i8,
-                    spacing::SPACING_MD as i8,
                 ))
                 .show(ui, |ui| {
                     ui.label(typography::weak("No repositories linked. Link a local Git repo to allow the agent to read file contents."));
@@ -52,20 +53,48 @@ impl LaReviewApp {
             {
                 egui::Frame::NONE
                     .inner_margin(egui::Margin::symmetric(
+                        spacing::SPACING_XL as i8,
                         spacing::SPACING_LG as i8,
-                        spacing::SPACING_MD as i8,
                     ))
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
+                            // 1. Icon (Far Left)
+                            ui.label(
+                                typography::body(icons::VIEW_REPOS)
+                                    .size(16.0)
+                                    .color(theme.text_primary),
+                            );
+                            ui.add_space(8.0);
+
+                            // 2. Content Column (Name, Subtitle)
                             ui.vertical(|ui| {
-                                ui.label(typography::bold(&repo.name));
-                                ui.label(typography::mono(repo.path.to_string_lossy()));
+                                ui.spacing_mut().item_spacing.y = 4.0;
+
+                                // Name
+                                ui.label(typography::body(&repo.name).color(theme.text_primary));
+
+                                // Subtitle (Path + Remotes)
+                                ui.horizontal(|ui| {
+                                    ui.label(typography::weak(repo.path.to_string_lossy()));
+
+                                    if !repo.remotes.is_empty() {
+                                        ui.label(typography::weak("•"));
+                                        let remotes_str = repo.remotes.join(", ");
+                                        ui.label(typography::weak(remotes_str));
+                                    }
+                                });
                             });
 
+                            // 3. Actions Column (Right Aligned)
                             ui.with_layout(
                                 egui::Layout::right_to_left(egui::Align::Center),
                                 |ui| {
-                                    if ui.button("✖ Unlink").clicked() {
+                                    let unlink_label = typography::body(format!(
+                                        "{} Unlink Repository",
+                                        icons::ACTION_TRASH
+                                    ))
+                                    .color(theme.destructive);
+                                    if ui.button(unlink_label).clicked() {
                                         self.dispatch(Action::Settings(
                                             SettingsAction::UnlinkRepository(repo.id.clone()),
                                         ));
@@ -73,16 +102,6 @@ impl LaReviewApp {
                                 },
                             );
                         });
-
-                        if !repo.remotes.is_empty() {
-                            ui.add_space(spacing::SPACING_XS);
-                            ui.horizontal(|ui| {
-                                ui.label(typography::weak("Remotes: "));
-                                for remote in &repo.remotes {
-                                    ui.label(typography::small(remote).color(theme.text_disabled));
-                                }
-                            });
-                        }
                     });
 
                 if index + 1 < total_repos {
