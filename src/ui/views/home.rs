@@ -197,111 +197,121 @@ impl LaReviewApp {
                 spacing::SPACING_LG as i8,
             ))
             .show(ui, |ui| {
-                ui.vertical(|ui| {
-                    ui.horizontal(|ui| {
-                        // Icon
-                        let icon = match review.source {
-                            ReviewSource::GitHubPr { .. } => icons::ICON_GITHUB,
-                            ReviewSource::DiffPaste { .. } => icons::ICON_FILES,
+                ui.horizontal(|ui| {
+                    // 1. Icon (Far Left)
+                    let icon = match review.source {
+                        ReviewSource::GitHubPr { .. } => icons::ICON_GITHUB,
+                        ReviewSource::DiffPaste { .. } => icons::ICON_FILES,
+                    };
+                    ui.label(typography::body(icon).size(16.0).color(theme.text_primary));
+                    ui.add_space(8.0);
+
+                    // 2. Content Column (Title, Subtitle, Risk)
+                    ui.vertical(|ui| {
+                        ui.spacing_mut().item_spacing.y = 4.0; // Consistent vertical gap
+
+                        // Title
+                        ui.label(typography::bold(&review.title).color(theme.text_primary));
+
+                        // Subtitle
+                        let time_str = if let Ok(dt) =
+                            chrono::DateTime::parse_from_rfc3339(&review.updated_at)
+                        {
+                            dt.format("%Y-%m-%d %H:%M").to_string()
+                        } else {
+                            review.updated_at.clone()
                         };
-                        ui.label(typography::body(icon).size(16.0).color(theme.text_primary));
-                        ui.add_space(8.0);
 
-                        // Content
-                        ui.vertical(|ui| {
-                            ui.label(typography::bold(&review.title));
-
-                            let time_str = if let Ok(dt) =
-                                chrono::DateTime::parse_from_rfc3339(&review.updated_at)
-                            {
-                                dt.format("%Y-%m-%d %H:%M").to_string()
-                            } else {
-                                review.updated_at.clone()
+                        ui.horizontal(|ui| {
+                            let source_meta = match &review.source {
+                                ReviewSource::GitHubPr {
+                                    owner,
+                                    repo,
+                                    number,
+                                    ..
+                                } => format!("{owner}/{repo}#{number}"),
+                                ReviewSource::DiffPaste { .. } => "Pasted Diff".to_string(),
                             };
+                            ui.label(typography::weak(source_meta));
+                            ui.label(typography::weak("•"));
+                            ui.label(typography::weak(format!("Updated {time_str}")));
+                        });
 
+                        // Tasks Summary (Risk)
+                        if total_tasks > 0 {
                             ui.horizontal(|ui| {
-                                let source_meta = match &review.source {
-                                    ReviewSource::GitHubPr {
-                                        owner,
-                                        repo,
-                                        number,
-                                        ..
-                                    } => format!("{owner}/{repo}#{number}"),
-                                    ReviewSource::DiffPaste { .. } => "Pasted Diff".to_string(),
-                                };
-                                ui.label(typography::weak(source_meta));
-                                ui.label(typography::weak("•"));
-                                ui.label(typography::weak(format!("Updated {time_str}")));
+                                ui.label(typography::tiny("Tasks:").color(theme.text_disabled));
+                                ui.add_space(4.0);
+
+                                if high_risk > 0 {
+                                    ui.label(
+                                        typography::tiny(icons::RISK_HIGH).color(theme.destructive),
+                                    );
+                                    ui.add_space(2.0); // Reduced gap
+                                    ui.label(
+                                        typography::tiny(format!("{high_risk} High"))
+                                            .color(theme.text_muted),
+                                    );
+                                    ui.add_space(8.0);
+                                }
+                                if med_risk > 0 {
+                                    ui.label(
+                                        typography::tiny(icons::RISK_MEDIUM).color(theme.warning),
+                                    );
+                                    ui.add_space(2.0); // Reduced gap
+                                    ui.label(
+                                        typography::tiny(format!("{med_risk} Medium"))
+                                            .color(theme.text_muted),
+                                    );
+                                    ui.add_space(8.0);
+                                }
+                                if low_risk > 0 {
+                                    ui.label(typography::tiny(icons::RISK_LOW).color(theme.accent));
+                                    ui.add_space(2.0); // Reduced gap
+                                    ui.label(
+                                        typography::tiny(format!("{low_risk} Low"))
+                                            .color(theme.text_muted),
+                                    );
+                                }
                             });
-                        });
-
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            // Open Button (Primary Action)
-                            if ui.button("Open").clicked() {
-                                self.dispatch(Action::Review(ReviewAction::SelectReview {
-                                    review_id: review.id.clone(),
-                                }));
-                                self.dispatch(Action::Navigation(NavigationAction::SwitchTo(
-                                    AppView::Review,
-                                )));
-                            }
-
-                            // Delete Button
-                            if ui.button("✖").on_hover_text("Delete Review").clicked() {
-                                self.dispatch(Action::Review(ReviewAction::DeleteReview(
-                                    review.id.clone(),
-                                )));
-                            }
-
-                            if total_tasks > 0 {
-                                ui.add_space(spacing::SPACING_MD);
-                                ui.label(
-                                    typography::small(format!("{done_tasks}/{total_tasks} Tasks"))
-                                        .color(if done_tasks == total_tasks {
-                                            theme.success
-                                        } else {
-                                            theme.text_muted
-                                        }),
-                                );
-                            }
-                        });
+                        }
                     });
 
-                    if total_tasks > 0 {
-                        ui.add_space(spacing::SPACING_SM);
-                        ui.horizontal(|ui| {
-                            ui.add_space(24.0); // Offset for icon
+                    // 3. Actions Column (Right Aligned)
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        // Open Button
+                        if ui.button("Open").clicked() {
+                            self.dispatch(Action::Review(ReviewAction::SelectReview {
+                                review_id: review.id.clone(),
+                            }));
+                            self.dispatch(Action::Navigation(NavigationAction::SwitchTo(
+                                AppView::Review,
+                            )));
+                        }
 
-                            ui.label(typography::tiny("Risk Summary:").color(theme.text_disabled));
-                            ui.add_space(4.0);
+                        // Delete Button
+                        let delete_label =
+                            typography::body(format!("{} Delete", icons::ACTION_TRASH))
+                                .color(theme.destructive);
+                        if ui.button(delete_label).clicked() {
+                            self.dispatch(Action::Review(ReviewAction::DeleteReview(
+                                review.id.clone(),
+                            )));
+                        }
 
-                            if high_risk > 0 {
-                                ui.label(
-                                    typography::tiny(icons::RISK_HIGH).color(theme.destructive),
-                                );
-                                ui.label(
-                                    typography::tiny(format!("{high_risk} High"))
-                                        .color(theme.text_muted),
-                                );
-                                ui.add_space(8.0);
-                            }
-                            if med_risk > 0 {
-                                ui.label(typography::tiny(icons::RISK_MEDIUM).color(theme.warning));
-                                ui.label(
-                                    typography::tiny(format!("{med_risk} Medium"))
-                                        .color(theme.text_muted),
-                                );
-                                ui.add_space(8.0);
-                            }
-                            if low_risk > 0 {
-                                ui.label(typography::tiny(icons::RISK_LOW).color(theme.accent));
-                                ui.label(
-                                    typography::tiny(format!("{low_risk} Low"))
-                                        .color(theme.text_muted),
-                                );
-                            }
-                        });
-                    }
+                        // Progress Stats
+                        if total_tasks > 0 {
+                            ui.add_space(spacing::SPACING_MD);
+                            ui.label(
+                                typography::small(format!("{done_tasks}/{total_tasks} Tasks"))
+                                    .color(if done_tasks == total_tasks {
+                                        theme.success
+                                    } else {
+                                        theme.text_muted
+                                    }),
+                            );
+                        }
+                    });
                 });
             });
     }
