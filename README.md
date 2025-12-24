@@ -272,4 +272,9 @@ See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+Licensed under either of:
+- Apache License, Version 2.0 (LICENSE-APACHE)
+- MIT license (LICENSE-MIT)
+
+At your option.
+

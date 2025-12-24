@@ -2,7 +2,7 @@
 name = "lareview"
 version = "0.0.11"
 edition = "2024"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 description = "LaReview is a desktop code review companion that generates intent-driven review plans with AI."
 repository = "https://github.com/puemos/lareview"
 homepage = "https://github.com/puemos/lareview"

@@ -29,6 +29,11 @@ Thanks for your interest in improving LaReview! This document outlines the basic
 - ACP agent invocations and D2 installation are user-triggered; avoid adding implicit network calls.
 - Prefer pinned versions for external tools; if you must use `@latest`, document why and how to override.
 
+## License of contributions
+
+By submitting a contribution (code, docs, or tests), you agree that your contribution is licensed under the project’s license:
+MIT OR Apache-2.0.
+
 ## Reporting issues
 - Use GitHub issues with clear repro steps, expected/actual behavior, logs, and platform info.
 - Security issues: please follow `SECURITY.md`.
