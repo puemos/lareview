@@ -173,8 +173,7 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                 .show_header(ui, |ui| {
                     ui.horizontal(|ui| {
                         ui.label(
-                            typography::body(icons::ICON_PLAN)
-                                .color(current_theme().text_accent),
+                            typography::body(icons::ICON_PLAN).color(current_theme().text_accent),
                         );
                         ui.label(
                             typography::bold_label(format!(
@@ -232,9 +231,7 @@ fn render_content_chunk(
 ) {
     match &chunk.content {
         ContentBlock::Text(text) => {
-            let mut rt = typography::mono(&text.text)
-                .color(color)
-                .size(13.0); // Slightly larger
+            let mut rt = typography::mono(&text.text).color(color).size(13.0); // Slightly larger
             if italics {
                 rt = rt.italics();
             }
@@ -383,10 +380,7 @@ fn render_kv_json(ui: &mut egui::Ui, label: &str, value: &serde_json::Value) {
             .max_col_width(ui.available_width() - 80.0) // Leave room for key column
             .show(ui, |ui| {
                 for (k, v) in map {
-                    ui.label(
-                        typography::small_mono(k)
-                            .color(current_theme().accent),
-                    );
+                    ui.label(typography::small_mono(k).color(current_theme().accent));
 
                     let v_str = if v.is_string() {
                         v.as_str().unwrap().to_string()
@@ -402,8 +396,7 @@ fn render_kv_json(ui: &mut egui::Ui, label: &str, value: &serde_json::Value) {
 
                     ui.add(
                         egui::Label::new(
-                            typography::small_mono(shown_v)
-                                .color(current_theme().text_muted),
+                            typography::small_mono(shown_v).color(current_theme().text_muted),
                         )
                         .wrap(),
                     );

@@ -1,5 +1,5 @@
-use crate::ui::{icons, typography};
 use crate::ui::theme::current_theme;
+use crate::ui::{icons, typography};
 use egui::{Id, Image, Rect, TextureOptions, Ui, load::SizedTexture};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};

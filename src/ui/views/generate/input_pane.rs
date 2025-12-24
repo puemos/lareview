@@ -1,6 +1,6 @@
 use crate::ui::app::{GenerateAction, GeneratePreview};
-use crate::ui::{spacing, typography};
 use crate::ui::theme::Theme;
+use crate::ui::{spacing, typography};
 use eframe::egui;
 use std::sync::Arc;
 
@@ -82,8 +82,7 @@ pub(crate) fn render_input_pane(
                                         );
                                     });
                                     ui.label(
-                                        typography::bold(&gh.meta.title)
-                                            .color(theme.text_primary),
+                                        typography::bold(&gh.meta.title).color(theme.text_primary),
                                     );
                                 });
                             });

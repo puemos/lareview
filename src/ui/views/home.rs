@@ -197,10 +197,7 @@ impl LaReviewApp {
                         };
 
                         ui.horizontal(|ui| {
-                            ui.label(
-                                typography::small_mono(&review.id)
-                                    .color(theme.text_disabled),
-                            );
+                            ui.label(typography::small_mono(&review.id).color(theme.text_disabled));
                             ui.label(
                                 typography::small(format!("• Updated {}", time_str))
                                     .color(theme.text_muted),
@@ -266,10 +263,7 @@ impl LaReviewApp {
                 if agent.available {
                     ui.label(typography::small("Ready").color(theme.success).strong());
                 } else {
-                    ui.label(
-                        typography::small("Unavailable")
-                            .color(theme.text_disabled),
-                    );
+                    ui.label(typography::small("Unavailable").color(theme.text_disabled));
                 }
             });
         });

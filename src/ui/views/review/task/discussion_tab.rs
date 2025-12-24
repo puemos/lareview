@@ -49,11 +49,9 @@ impl LaReviewApp {
                         );
                         ui.add_space(spacing::SPACING_MD);
                         ui.label(typography::h1("No discussions yet"));
-                        ui.label(
-                            typography::weak(
-                                "Add comments in the 'Changes' tab or start a general thread.",
-                            ),
-                        );
+                        ui.label(typography::weak(
+                            "Add comments in the 'Changes' tab or start a general thread.",
+                        ));
                     });
                 });
             return;
@@ -104,17 +102,13 @@ impl LaReviewApp {
                 .show(ui, |ui| {
                     ui.vertical(|ui| {
                         ui.horizontal(|ui| {
-                            ui.label(
-                                typography::bold(&title)
-                                    .color(theme.text_primary),
-                            );
+                            ui.label(typography::bold(&title).color(theme.text_primary));
 
                             ui.with_layout(
                                 egui::Layout::right_to_left(egui::Align::Center),
                                 |ui| {
                                     ui.label(
-                                        typography::tiny(updated_label)
-                                            .color(theme.text_muted),
+                                        typography::tiny(updated_label).color(theme.text_muted),
                                     );
                                 },
                             );

@@ -93,8 +93,7 @@ impl LaReviewApp {
                 {
                     ui.add_space(spacing::SPACING_LG);
                     egui::CollapsingHeader::new(
-                        typography::bold("Setup Instructions")
-                            .color(theme.text_secondary),
+                        typography::bold("Setup Instructions").color(theme.text_secondary),
                     )
                     .default_open(true)
                     .show(ui, |ui| {

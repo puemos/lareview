@@ -1,8 +1,8 @@
 use crate::domain::{ReviewStatus, Thread, ThreadImpact};
 use crate::ui::app::ReviewAction;
 use crate::ui::components::{PopupOption, popup_selector};
-use crate::ui::{spacing, typography};
 use crate::ui::theme::Theme;
+use crate::ui::{spacing, typography};
 use eframe::egui;
 use egui::Color32;
 

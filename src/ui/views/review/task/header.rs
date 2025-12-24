@@ -1,7 +1,7 @@
 use crate::domain::ReviewTask;
 use crate::ui::app::ReviewAction;
-use crate::ui::{icons, spacing, typography};
 use crate::ui::theme::Theme;
+use crate::ui::{icons, spacing, typography};
 use eframe::egui;
 
 pub(crate) fn render_task_header(
@@ -129,11 +129,7 @@ pub(crate) fn render_task_header(
                     .size(12.0),
             );
 
-            ui.label(
-                typography::body("|")
-                    .color(theme.text_disabled)
-                    .size(12.0),
-            );
+            ui.label(typography::body("|").color(theme.text_disabled).size(12.0));
 
             ui.label(
                 typography::body(format!("+{}", task.stats.additions))
@@ -147,11 +143,7 @@ pub(crate) fn render_task_header(
                     .size(12.0),
             );
 
-            ui.label(
-                typography::body("lines")
-                    .color(theme.text_muted)
-                    .size(12.0),
-            );
+            ui.label(typography::body("lines").color(theme.text_muted).size(12.0));
         });
 
         ui.spacing_mut().interact_size = old_interact_size;

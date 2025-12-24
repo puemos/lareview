@@ -1,6 +1,6 @@
 use crate::domain::{Plan, PlanStatus};
-use crate::ui::{icons, typography};
 use crate::ui::theme::current_theme;
+use crate::ui::{icons, typography};
 use eframe::egui;
 
 use crate::ui::spacing;

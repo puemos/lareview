@@ -65,9 +65,10 @@ impl LaReviewApp {
             .or_default()
             .insert(0, "Geist".to_owned());
 
-        fonts
-            .families
-            .insert(FontFamily::Name("Geist".into()), vec!["Geist".to_owned(), phosphor_font.clone()]);
+        fonts.families.insert(
+            FontFamily::Name("Geist".into()),
+            vec!["Geist".to_owned(), phosphor_font.clone()],
+        );
         fonts.families.insert(
             FontFamily::Name("GeistBold".into()),
             vec!["GeistBold".to_owned(), phosphor_font.clone()],

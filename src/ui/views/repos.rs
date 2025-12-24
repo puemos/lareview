@@ -79,10 +79,7 @@ impl LaReviewApp {
                             ui.horizontal(|ui| {
                                 ui.label(typography::weak("Remotes: "));
                                 for remote in &repo.remotes {
-                                    ui.label(
-                                        typography::small(remote)
-                                            .color(theme.text_disabled),
-                                    );
+                                    ui.label(typography::small(remote).color(theme.text_disabled));
                                 }
                             });
                         }

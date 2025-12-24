@@ -77,9 +77,7 @@ impl LaReviewApp {
                 // Custom Title Bar
                 ui.horizontal(|ui| {
                     ui.add_space(spacing::SPACING_MD);
-                    ui.label(
-                        typography::h1("Export Review Preview"),
-                    );
+                    ui.label(typography::h1("Export Review Preview"));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.add_space(spacing::SPACING_MD);
                         if ui

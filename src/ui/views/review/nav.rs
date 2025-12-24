@@ -4,8 +4,8 @@ use crate::application::review::ordering::{
 use crate::domain::ReviewTask;
 use crate::ui::app::ReviewAction;
 use crate::ui::components::list_item::ListItem;
-use crate::ui::{icons, spacing, typography};
 use crate::ui::theme::Theme;
+use crate::ui::{icons, spacing, typography};
 use eframe::egui;
 
 /// Renders the logic for the Left Panel (Navigation)
@@ -23,11 +23,7 @@ pub(crate) fn render_navigation_tree(
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.add(
-                    egui::Label::new(
-                        typography::bold("Tasks")
-                            .color(theme.text_primary),
-                    )
-                    .wrap(),
+                    egui::Label::new(typography::bold("Tasks").color(theme.text_primary)).wrap(),
                 );
 
                 if is_generating {
@@ -145,8 +141,6 @@ pub(crate) fn render_nav_item(
 
     if task.status.is_closed() {
         title_text = title_text.strikethrough().color(theme.text_muted);
-    } else if is_selected {
-        title_text = typography::bold(&task.title).size(13.0).color(theme.text_primary);
     }
 
     // -- Risk / Subtitle --

@@ -1,8 +1,8 @@
 use crate::domain::{ReviewStatus, Thread};
 use crate::ui::app::ReviewAction;
 use crate::ui::components::list_item::ListItem;
-use crate::ui::{icons, spacing, typography};
 use crate::ui::theme::Theme;
+use crate::ui::{icons, spacing, typography};
 use eframe::egui;
 
 pub fn render_thread_list(
@@ -59,8 +59,7 @@ pub fn render_thread_list(
                 };
 
                 // -- Title --
-                let title_text = typography::bold(&thread.title)
-                    .color(theme.text_primary);
+                let title_text = typography::bold(&thread.title).color(theme.text_primary);
 
                 // -- Metadata (Impact + Time) --
                 let (impact_icon, impact_label, impact_color) = match thread.impact {

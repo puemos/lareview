@@ -2,8 +2,8 @@ use crate::domain::ReviewTask;
 use crate::ui::app::{Action, LaReviewApp, ReviewAction};
 use crate::ui::components::action_button::action_button;
 use crate::ui::components::pills::pill_action_button;
-use crate::ui::{icons, spacing, typography};
 use crate::ui::theme::Theme;
+use crate::ui::{icons, spacing, typography};
 use eframe::egui;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -147,10 +147,7 @@ pub(crate) fn render_ready_state(
 
                 // Hint for keyboard shortcut
                 ui.add_space(8.0);
-                ui.label(
-                    typography::tiny("Press [Enter] to start")
-                        .color(theme.text_disabled),
-                );
+                ui.label(typography::tiny("Press [Enter] to start").color(theme.text_disabled));
 
                 if (resp.clicked() || trigger_primary)
                     && btn_enabled
@@ -185,9 +182,9 @@ pub(crate) fn render_empty_state(
                     ui.add_space(spacing::SPACING_MD);
                     ui.label(typography::h1("Analyzing your code..."));
                     ui.add_space(8.0);
-                    ui.label(
-                        typography::weak("The agent is currently generating review tasks."),
-                    );
+                    ui.label(typography::weak(
+                        "The agent is currently generating review tasks.",
+                    ));
                 } else {
                     // Hero Icon
                     ui.label(
@@ -198,9 +195,9 @@ pub(crate) fn render_empty_state(
                     ui.add_space(spacing::SPACING_MD);
                     ui.label(typography::h1("No review tasks yet"));
                     ui.add_space(8.0);
-                    ui.label(
-                        typography::weak("Generate tasks from your diff to start reviewing."),
-                    );
+                    ui.label(typography::weak(
+                        "Generate tasks from your diff to start reviewing.",
+                    ));
                     ui.add_space(24.0);
 
                     if action_button(ui, "Generate tasks", true, theme.brand).clicked() {

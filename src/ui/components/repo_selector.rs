@@ -143,8 +143,7 @@ pub fn repo_selector(
                             ui.style_mut().interaction.selectable_labels = false;
                             ui.horizontal_centered(|ui| {
                                 let label = if none_selected {
-                                    typography::bold("No Repository Context")
-                                        .color(none_text)
+                                    typography::bold("No Repository Context").color(none_text)
                                 } else {
                                     typography::body("No Repository Context").color(none_text)
                                 };

@@ -23,10 +23,7 @@ fn render_comment_bubble(ui: &mut egui::Ui, comment: &Comment, theme: &Theme) {
                     .size(13.0)
                     .color(theme.text_primary),
             );
-            ui.label(
-                typography::tiny(format!("• {}", timestamp))
-                    .color(theme.text_muted),
-            );
+            ui.label(typography::tiny(format!("• {}", timestamp)).color(theme.text_muted));
         });
 
         ui.label(

@@ -1,6 +1,6 @@
 use crate::ui::app::{GenerateAction, TimelineItem};
-use crate::ui::{icons, spacing, typography};
 use crate::ui::theme::Theme;
+use crate::ui::{icons, spacing, typography};
 use eframe::egui;
 
 pub(crate) fn render_timeline_pane(

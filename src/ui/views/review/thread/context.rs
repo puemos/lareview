@@ -1,8 +1,8 @@
 use crate::domain::Thread;
 use crate::ui::components::render_diff_editor_full_view;
-use crate::ui::{spacing, typography};
 use crate::ui::theme::Theme;
 use crate::ui::views::review::format_timestamp;
+use crate::ui::{spacing, typography};
 use eframe::egui;
 
 pub(crate) fn render_thread_context(

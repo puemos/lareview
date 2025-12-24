@@ -73,17 +73,11 @@ pub fn popup_selector<T: Copy + PartialEq>(
         ui.horizontal_centered(|ui| {
             ui.add_space(2.0);
             let icon = selected_option.icon.unwrap_or(icons::DOT_OUTLINE);
-            ui.label(
-                typography::body(icon)
-                    .size(12.0)
-                    .color(selected_option.fg),
-            );
+            ui.label(typography::body(icon).size(12.0).color(selected_option.fg));
             ui.add_space(6.0);
             ui.add(
-                egui::Label::new(
-                    typography::body(selected_option.label).color(theme.text_primary),
-                )
-                .selectable(false),
+                egui::Label::new(typography::body(selected_option.label).color(theme.text_primary))
+                    .selectable(false),
             );
             ui.allocate_ui_with_layout(
                 ui.available_size(),
