@@ -44,3 +44,23 @@ pub(super) fn log_raw_line(line: &str) {
         .open(path)
         .and_then(|mut f| writeln!(f, "{line}"));
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_log_to_file() {
+        let tmp = NamedTempFile::new().unwrap();
+        let config = ServerConfig {
+            log_file: Some(tmp.path().to_path_buf()),
+            ..Default::default()
+        };
+
+        log_to_file(&config, "test message");
+
+        let contents = fs::read_to_string(tmp.path()).unwrap();
+        assert!(contents.contains("test message"));
+    }
+}

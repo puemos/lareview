@@ -449,6 +449,8 @@ fn parse_markdown(text: &str, theme: Theme) -> Vec<MarkdownItem> {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
     options.insert(Options::ENABLE_FOOTNOTES);
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+    options.insert(Options::ENABLE_TASKLISTS);
 
     let parser = Parser::new_ext(text, options);
 
@@ -547,16 +549,16 @@ impl MarkdownState {
             self.theme.text_secondary
         };
 
-        let font_name = if self.is_bold {
-            "GeistBold"
+        let family = if self.is_bold {
+            crate::ui::typography::geist_bold()
         } else if self.is_italic {
-            "GeistItalic"
+            crate::ui::typography::geist_italic()
         } else {
-            "Geist"
+            egui::FontFamily::Proportional
         };
 
         egui::TextFormat {
-            font_id: egui::FontId::new(size, egui::FontFamily::Name(font_name.into())),
+            font_id: egui::FontId::new(size, family),
             color,
             italics: self.is_italic,
             strikethrough: if self.is_strikethrough {
@@ -621,7 +623,7 @@ impl MarkdownState {
                 self.in_table = true;
                 self.table_rows.clear();
             }
-            Tag::TableRow => {
+            Tag::TableHead | Tag::TableRow => {
                 self.current_table_row.clear();
             }
             Tag::TableCell => {
@@ -680,7 +682,7 @@ impl MarkdownState {
                     rows: std::mem::take(&mut self.table_rows),
                 });
             }
-            TagEnd::TableRow => {
+            TagEnd::TableHead | TagEnd::TableRow => {
                 self.table_rows
                     .push(std::mem::take(&mut self.current_table_row));
             }
@@ -784,5 +786,62 @@ impl MarkdownState {
             link,
             decoration,
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egui_kittest::Harness;
+    use egui_kittest::kittest::Queryable;
+
+    #[test]
+    fn test_markdown_parsing_basics() {
+        let theme = current_theme();
+        let items = parse_markdown("# Heading\n\n**Bold** and *italic* and `code`.", theme);
+
+        // Space, Text(Heading), Space, Text(Paragraph)
+        assert!(items.len() >= 4);
+    }
+
+    #[test]
+    fn test_markdown_rendering() {
+        let mut harness = Harness::new(|ctx| {
+            crate::ui::app::LaReviewApp::setup_fonts(ctx);
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.style_mut().override_font_id = Some(egui::FontId::proportional(12.0));
+                render_markdown(ui, "# Title\n\n**Bold** and *italic* and ~~strikethrough~~ and [link](https://example.com).\n\n> Blockquote\n\n- Bullet 1\n- [ ] Task 1\n\n```rust\nfn main() {}\n```");
+            });
+        });
+        harness.run_steps(5);
+
+        harness.get_by_label("Title");
+        harness
+            .get_all_by_role(egui::accesskit::Role::Label)
+            .into_iter()
+            .find(|n| format!("{:?}", n).contains("Bold and italic"))
+            .expect("Paragraph not found");
+        harness.get_by_label("Blockquote");
+        assert!(harness.get_all_by_label("•").count() >= 1);
+        harness.get_by_label("Task 1");
+        harness
+            .get_all_by_role(egui::accesskit::Role::Label)
+            .into_iter()
+            .find(|n| format!("{:?}", n).contains("fn main() {}"))
+            .expect("Code block not found");
+    }
+
+    #[test]
+    fn test_markdown_table_rendering() {
+        let mut harness = Harness::new(|ctx| {
+            crate::ui::app::LaReviewApp::setup_fonts(ctx);
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.style_mut().override_font_id = Some(egui::FontId::proportional(12.0));
+                render_markdown(ui, "| A | B |\n|---|---|\n| 1 | 2 |");
+            });
+        });
+        harness.run_steps(5);
+        harness.get_by_label("A");
+        harness.get_by_label("1");
     }
 }

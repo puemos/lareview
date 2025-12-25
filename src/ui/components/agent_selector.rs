@@ -51,6 +51,8 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
         let (rect, response) =
             ui.allocate_exact_size(egui::vec2(width, button_height), egui::Sense::click());
 
+        response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &selected_label));
+
         if response.clicked() {
             egui::Popup::toggle_id(ui.ctx(), id);
         }
@@ -159,6 +161,8 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
                                 ui.make_persistent_id(format!("agent_item_{}", agent.id));
                             let mut item_response =
                                 ui.interact(item_rect, item_id, egui::Sense::click());
+
+                            item_response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, is_available, &agent.label));
 
                             if is_available {
                                 item_response =

@@ -40,4 +40,6 @@ pub struct LaReviewApp {
 
     pub agent_task: Option<tokio::task::JoinHandle<()>>,
     pub agent_cancel_token: Option<tokio_util::sync::CancellationToken>,
+
+    pub skip_runtime: bool,
 }

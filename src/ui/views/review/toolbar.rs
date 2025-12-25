@@ -55,6 +55,10 @@ pub(crate) fn render_header_selectors(
         let (rect, response) = ui.allocate_exact_size(galley.size(), egui::Sense::click());
         let response = response.on_hover_cursor(egui::CursorIcon::PointingHand);
 
+        response.widget_info(|| {
+            egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &current_label)
+        });
+
         // 3. Determine color
         let text_color = if response.hovered() || is_open {
             theme.brand
@@ -150,4 +154,114 @@ pub(crate) fn render_header_selectors(
     });
 
     action_out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::ReviewSource;
+    use egui_kittest::Harness;
+    use egui_kittest::kittest::Queryable;
+
+    #[test]
+    fn test_render_header_selectors_empty() {
+        let reviews = vec![];
+        let mut harness = Harness::new_ui(|ui| {
+            render_header_selectors(ui, &reviews, None, &crate::ui::theme::current_theme());
+        });
+        harness.run();
+    }
+
+    #[test]
+    fn test_render_header_selectors_no_selection() {
+        let reviews = vec![Review {
+            id: "rev1".into(),
+            title: "Test Review".into(),
+            summary: None,
+            source: ReviewSource::DiffPaste {
+                diff_hash: "h".into(),
+            },
+            active_run_id: None,
+            created_at: "now".into(),
+            updated_at: "now".into(),
+        }];
+        let mut harness = Harness::new_ui(|ui| {
+            crate::ui::app::LaReviewApp::setup_fonts(ui.ctx());
+            render_header_selectors(ui, &reviews, None, &crate::ui::theme::current_theme());
+        });
+        harness.run_steps(5);
+        harness
+            .get_all_by_role(egui::accesskit::Role::Button)
+            .into_iter()
+            .find(|n| format!("{:?}", n).contains("Select review"))
+            .expect("Selector not found");
+    }
+
+    #[test]
+    fn test_render_header_selectors_with_selection() {
+        let reviews = vec![Review {
+            id: "rev1".into(),
+            title: "Selected Review".into(),
+            summary: None,
+            source: ReviewSource::DiffPaste {
+                diff_hash: "h".into(),
+            },
+            active_run_id: None,
+            created_at: "now".into(),
+            updated_at: "now".into(),
+        }];
+        let mut harness = Harness::new_ui(|ui| {
+            crate::ui::app::LaReviewApp::setup_fonts(ui.ctx());
+            render_header_selectors(
+                ui,
+                &reviews,
+                Some(&"rev1".to_string()),
+                &crate::ui::theme::current_theme(),
+            );
+        });
+        harness.run_steps(5);
+        harness
+            .get_all_by_role(egui::accesskit::Role::Button)
+            .into_iter()
+            .find(|n| format!("{:?}", n).contains("Selected Review"))
+            .expect("Review label not found");
+    }
+
+    #[test]
+    fn test_render_header_selectors_multiple() {
+        let reviews = vec![
+            Review {
+                id: "rev1".into(),
+                title: "Review 1".into(),
+                summary: None,
+                source: ReviewSource::DiffPaste {
+                    diff_hash: "h1".into(),
+                },
+                active_run_id: None,
+                created_at: "2024-01-01T00:00:00Z".into(),
+                updated_at: "2024-01-01T00:00:00Z".into(),
+            },
+            Review {
+                id: "rev2".into(),
+                title: "Review 2".into(),
+                summary: None,
+                source: ReviewSource::DiffPaste {
+                    diff_hash: "h2".into(),
+                },
+                active_run_id: None,
+                created_at: "2024-01-02T00:00:00Z".into(),
+                updated_at: "2024-01-02T00:00:00Z".into(),
+            },
+        ];
+        let mut harness = Harness::new_ui(|ui| {
+            crate::ui::app::LaReviewApp::setup_fonts(ui.ctx());
+            render_header_selectors(
+                ui,
+                &reviews,
+                Some(&"rev1".to_string()),
+                &crate::ui::theme::current_theme(),
+            );
+        });
+        harness.run_steps(5);
+    }
 }

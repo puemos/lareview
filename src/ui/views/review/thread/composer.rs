@@ -66,3 +66,24 @@ pub(crate) fn render_reply_composer(
 
     action_out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egui_kittest::Harness;
+    use egui_kittest::kittest::Queryable;
+
+    #[test]
+    fn test_render_reply_composer() {
+        let mut harness = Harness::new_ui(|ui| {
+            render_reply_composer(ui, "draft", "", "task1", None, None, None);
+        });
+        harness.run();
+        harness.get_by_role(egui::accesskit::Role::MultilineTextInput);
+        harness
+            .get_all_by_role(egui::accesskit::Role::Button)
+            .into_iter()
+            .find(|n| format!("{:?}", n).contains("Send Reply"))
+            .expect("Send Reply button not found");
+    }
+}

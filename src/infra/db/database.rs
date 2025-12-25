@@ -18,6 +18,16 @@ impl Database {
         Self::open_at(path)
     }
 
+    /// Create an in-memory database (useful for testing)
+    pub fn open_in_memory() -> Result<Self> {
+        let conn = Connection::open_in_memory()?;
+        let db = Self {
+            conn: Arc::new(Mutex::new(conn)),
+        };
+        db.init()?;
+        Ok(db)
+    }
+
     /// Create or open the database at a specific path
     pub fn open_at(path: PathBuf) -> Result<Self> {
         // Ensure parent directory exists
@@ -113,7 +123,7 @@ impl Database {
     }
 
     /// Get a reference to the connection
-    pub(crate) fn connection(&self) -> Arc<Mutex<Connection>> {
+    pub fn connection(&self) -> Arc<Mutex<Connection>> {
         self.conn.clone()
     }
 
@@ -298,5 +308,25 @@ impl Database {
             .map_err(|e| anyhow::anyhow!("Failed to execute migration {}: {}", version, e))?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_database_default_path() {
+        let path = Database::default_path();
+        assert!(path.to_string_lossy().contains("db.sqlite"));
+    }
+
+    #[test]
+    fn test_database_open_in_memory() {
+        let db = Database::open_in_memory().unwrap();
+        let conn = db.connection();
+        let guard = conn.lock().unwrap();
+        let res: i32 = guard.query_row("SELECT 1", [], |row| row.get(0)).unwrap();
+        assert_eq!(res, 1);
     }
 }

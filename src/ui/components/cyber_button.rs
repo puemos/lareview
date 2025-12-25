@@ -159,5 +159,7 @@ pub fn cyber_button(
     );
     painter.galley(text_pos, galley, Color32::TRANSPARENT);
 
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, text));
+
     response
 }

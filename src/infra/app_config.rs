@@ -68,3 +68,63 @@ fn app_data_dir() -> PathBuf {
         .unwrap_or_else(|_| PathBuf::from("."))
         .join(".lareview")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+    use tempfile::NamedTempFile;
+
+    static ENV_MUTEX: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn test_config_serialization() {
+        let _guard = ENV_MUTEX.lock().unwrap();
+        let config = AppConfig {
+            extra_path: Some("/usr/bin".to_string()),
+            has_seen_requirements: true,
+        };
+
+        let tmp_file = NamedTempFile::new().unwrap();
+        let path = tmp_file.path().to_path_buf();
+
+        // Manual save using our path
+        let contents = toml::to_string_pretty(&config).unwrap();
+        std::fs::write(&path, contents).unwrap();
+
+        // Test loading
+        unsafe {
+            std::env::set_var("LAREVIEW_CONFIG_PATH", &path);
+        }
+        let loaded = load_config();
+        assert_eq!(loaded.extra_path, config.extra_path);
+        assert!(loaded.has_seen_requirements);
+
+        // Test saving
+        let mut config2 = loaded;
+        config2.extra_path = Some("/sbin".to_string());
+        save_config(&config2).unwrap();
+
+        let contents = std::fs::read_to_string(&path).unwrap();
+        assert!(contents.contains("/sbin"));
+
+        unsafe {
+            std::env::remove_var("LAREVIEW_CONFIG_PATH");
+        }
+    }
+
+    #[test]
+    fn test_load_config_missing() {
+        let _guard = ENV_MUTEX.lock().unwrap();
+        let path = PathBuf::from("/non/existent/path/to/config.toml");
+        unsafe {
+            std::env::set_var("LAREVIEW_CONFIG_PATH", &path);
+        }
+        let config = load_config();
+        assert_eq!(config.extra_path, None);
+        assert!(!config.has_seen_requirements);
+        unsafe {
+            std::env::remove_var("LAREVIEW_CONFIG_PATH");
+        }
+    }
+}

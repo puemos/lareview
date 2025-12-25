@@ -181,6 +181,7 @@ impl<'a> ListItem<'a> {
 
         // Placeholder for background
         let bg_shape_idx = ui.painter().add(egui::Shape::Noop);
+        let title_text = self.title.text().to_string();
 
         let frame = egui::Frame::NONE
             .inner_margin(spacing::SPACING_SM)
@@ -223,6 +224,10 @@ impl<'a> ListItem<'a> {
 
         let response = response.interact(egui::Sense::click());
 
+        response.widget_info(|| {
+            egui::WidgetInfo::labeled(egui::WidgetType::Button, is_selected, title_text.clone())
+        });
+
         // Hover logic
         let mut bg_color = if is_selected {
             theme.bg_secondary
@@ -256,5 +261,75 @@ impl<'a> ListItem<'a> {
         }
 
         response
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ui::theme::current_theme;
+    use egui_kittest::Harness;
+    use egui_kittest::kittest::Queryable;
+
+    #[test]
+
+    fn test_list_item_rendering() {
+        let mut harness = Harness::new(|ctx| {
+            crate::ui::app::LaReviewApp::setup_fonts(ctx);
+
+            egui::CentralPanel::default().show(ctx, |ui| {
+                let theme = current_theme();
+
+                let item = ListItem::new(egui::RichText::new("Test Item"))
+                    .subtitle(egui::RichText::new("Subtitle"))
+                    .metadata("Meta");
+
+                item.show_with_bg(ui, &theme);
+            });
+        });
+
+        harness.run_steps(2);
+
+        harness.get_by_role(egui::accesskit::Role::Button);
+
+        harness.get_by_label("Subtitle");
+
+        harness.get_by_label("Meta");
+    }
+
+    #[test]
+
+    fn test_list_item_click() {
+        use std::sync::{Arc, Mutex};
+
+        let clicked = Arc::new(Mutex::new(false));
+
+        let clicked_clone = clicked.clone();
+
+        let mut harness = Harness::new(move |ctx| {
+            crate::ui::app::LaReviewApp::setup_fonts(ctx);
+
+            egui::CentralPanel::default().show(ctx, |ui| {
+                let theme = current_theme();
+
+                let clicked_clone = clicked_clone.clone();
+
+                let item = ListItem::new(egui::RichText::new("Click Me")).action(move || {
+                    let mut guard = clicked_clone.lock().unwrap();
+
+                    *guard = true;
+                });
+
+                item.show_with_bg(ui, &theme);
+            });
+        });
+
+        harness.run_steps(1);
+
+        harness.get_by_role(egui::accesskit::Role::Button).click();
+
+        harness.run_steps(1);
+
+        assert!(*clicked.lock().unwrap());
     }
 }

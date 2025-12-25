@@ -416,3 +416,124 @@ fn render_kv_json(ui: &mut egui::Ui, label: &str, value: &serde_json::Value) {
         );
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egui_kittest::Harness;
+    use egui_kittest::kittest::Queryable;
+
+    #[test]
+    fn test_render_timeline_local_log() {
+        let item = TimelineItem {
+            seq: 1,
+            stream_key: None,
+            content: TimelineContent::LocalLog("System starting".to_string()),
+        };
+        let mut harness = Harness::new_ui(|ui| {
+            render_timeline_item(ui, &item);
+        });
+        harness.run();
+        harness.get_by_label("System starting");
+    }
+
+    #[test]
+    fn test_render_timeline_agent_chunk() {
+        let chunk_json = serde_json::json!({
+            "content": { "type": "text", "text": "Thinking..." }
+        });
+        let chunk: agent_client_protocol::ContentChunk =
+            serde_json::from_value(chunk_json).unwrap();
+        let item = TimelineItem {
+            seq: 1,
+            stream_key: None,
+            content: TimelineContent::Update(Box::new(SessionUpdate::AgentMessageChunk(chunk))),
+        };
+        let mut harness = Harness::new(|ctx| {
+            crate::ui::app::LaReviewApp::setup_fonts(ctx);
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.style_mut().override_font_id = Some(egui::FontId::proportional(12.0));
+                render_timeline_item(ui, &item);
+            });
+        });
+        harness.run_steps(5);
+        harness.get_by_label("Thinking...");
+    }
+
+    #[test]
+    fn test_render_timeline_tool_call() {
+        let call_json = serde_json::json!({
+            "toolCallId": "tc1",
+            "title": "search",
+            "kind": "other",
+            "status": "in_progress",
+            "content": [],
+            "locations": []
+        });
+        let call: agent_client_protocol::ToolCall = serde_json::from_value(call_json).unwrap();
+        let item = TimelineItem {
+            seq: 1,
+            stream_key: None,
+            content: TimelineContent::Update(Box::new(SessionUpdate::ToolCall(call))),
+        };
+        let mut harness = Harness::new(|ctx| {
+            crate::ui::app::LaReviewApp::setup_fonts(ctx);
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.style_mut().override_font_id = Some(egui::FontId::proportional(12.0));
+                render_timeline_item(ui, &item);
+            });
+        });
+        harness.run_steps(5);
+        harness
+            .get_all_by_role(egui::accesskit::Role::Label)
+            .into_iter()
+            .find(|n| format!("{:?}", n).contains("search"))
+            .expect("Tool title not found");
+        harness
+            .get_all_by_role(egui::accesskit::Role::Label)
+            .into_iter()
+            .find(|n| format!("{:?}", n).contains("Running"))
+            .expect("Status not found");
+    }
+
+    #[test]
+    fn test_tool_label_parsing() {
+        // Case 1: Simple tool
+        let label1 = tool_label_from_parts(Some("return_task"), None);
+        assert_eq!(label1.server, "lareview-tasks");
+        assert_eq!(label1.tool, "return_task");
+
+        // Case 2: Tool with server in title
+        let label2 = tool_label_from_parts(Some("my-server/my-tool"), None);
+        assert_eq!(label2.server, "my-server");
+        assert_eq!(label2.tool, "my-tool");
+
+        // Case 3: Complex title
+        let label3 = tool_label_from_parts(
+            Some("return_task (lareview-tasks MCP Server): { ... }"),
+            None,
+        );
+        assert_eq!(label3.server, "lareview-tasks");
+        assert_eq!(label3.tool, "return_task");
+    }
+
+    #[test]
+    fn test_render_timeline_plan() {
+        let plan_json = serde_json::json!({
+            "entries": [
+                { "content": "Step 1", "status": "pending", "priority": "medium" }
+            ]
+        });
+        let plan: agent_client_protocol::Plan = serde_json::from_value(plan_json).unwrap();
+        let item = TimelineItem {
+            seq: 1,
+            stream_key: None,
+            content: TimelineContent::Update(Box::new(SessionUpdate::Plan(plan))),
+        };
+        let mut harness = Harness::new_ui(|ui| {
+            render_timeline_item(ui, &item);
+        });
+        harness.run();
+        harness.get_by_label("Review Plan (1 steps)");
+    }
+}

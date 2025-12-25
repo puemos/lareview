@@ -113,6 +113,8 @@ impl LaReviewApp {
         let (rect, response) =
             ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::click());
 
+        response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, label));
+
         if response.clicked() {
             match view {
                 AppView::Home => self.switch_to_home(),

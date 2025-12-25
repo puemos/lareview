@@ -123,3 +123,25 @@ impl LaReviewApp {
             });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egui_kittest::Harness;
+
+    #[test]
+    fn test_render_changes_tab_empty() {
+        let mut app = LaReviewApp::new_for_test();
+        let task = crate::domain::ReviewTask {
+            id: "task1".into(),
+            ..Default::default()
+        };
+        let mut harness = Harness::new(|ctx| {
+            crate::ui::app::LaReviewApp::setup_fonts(ctx);
+            egui::CentralPanel::default().show(ctx, |ui| {
+                app.render_changes_tab(ui, &task);
+            });
+        });
+        harness.run();
+    }
+}

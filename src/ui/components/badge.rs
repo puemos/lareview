@@ -29,3 +29,19 @@ pub fn badge(
         })
         .response
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egui_kittest::Harness;
+    use egui_kittest::kittest::Queryable;
+
+    #[test]
+    fn test_badge() {
+        let mut harness = Harness::new_ui(|ui| {
+            badge(ui, "Beta", egui::Color32::RED, egui::Color32::WHITE);
+        });
+        harness.run();
+        harness.get_by_label("Beta");
+    }
+}

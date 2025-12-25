@@ -6,6 +6,12 @@ use super::state::AppView;
 impl eframe::App for LaReviewApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         crate::ui::window::apply_rounded_corners(_frame);
+        self.render(ctx);
+    }
+}
+
+impl LaReviewApp {
+    pub fn render(&mut self, ctx: &egui::Context) {
         // Set the base Catppuccin theme for overall UI appearance
         catppuccin_egui::set_theme(ctx, catppuccin_egui::MOCHA);
 

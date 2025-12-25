@@ -25,6 +25,11 @@ Thanks for your interest in improving LaReview! This document outlines the basic
 - Avoid `unwrap/expect` outside tests unless failure is impossible; prefer explicit errors surfaced to the UI.
 - Keep modules small and cohesive. If a file grows beyond ~400 lines, consider splitting before adding more.
 
+## Test organization
+- Unit tests: Located alongside the module they test in `src/` directory (e.g., `src/application/review/tests.rs`).
+- Integration tests: Located in the root `tests/` directory (e.g., `tests/database_workflow_integration.rs`).
+- End-to-end tests: (Planned) Will be located in `tests/e2e/` for full application workflows.
+
 ## Security & networked behavior
 - ACP agent invocations and D2 installation are user-triggered; avoid adding implicit network calls.
 - Prefer pinned versions for external tools; if you must use `@latest`, document why and how to override.

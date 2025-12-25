@@ -45,3 +45,21 @@ macro_rules! define_standard_acp_agent {
         }
     };
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::infra::acp::agent_trait::AcpAgent;
+
+    define_standard_acp_agent!(MockAgent, "mock", "Mock Agent", "logo.png", "ls", &["-la"]);
+
+    #[test]
+    fn test_mock_agent() {
+        let agent = MockAgent;
+        assert_eq!(agent.id(), "mock");
+        assert_eq!(agent.display_name(), "Mock Agent");
+        // "ls" is usually available on all systems we test on
+        let _ = agent.is_available();
+        let candidate = agent.candidate();
+        assert_eq!(candidate.id, "mock");
+    }
+}

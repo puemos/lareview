@@ -23,7 +23,7 @@ impl LaReviewApp {
                     egui::Layout::left_to_right(egui::Align::Center),
                     |ui| {
                         // A. Left Side: Context Selectors
-                        ui.horizontal(|ui| ui.label(typography::h2("Recent Reviews")));
+                        ui.horizontal(|ui| ui.label(typography::h2("Linked Repositories")));
 
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             // C. Right Side: Actions

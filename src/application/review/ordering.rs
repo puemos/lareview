@@ -35,3 +35,30 @@ pub fn tasks_in_display_order(
     }
     out
 }
+
+#[cfg(test)]
+mod tests_internal {
+    use super::*;
+    use crate::domain::{ReviewStatus, ReviewTask, RiskLevel, TaskStats};
+
+    #[test]
+    fn test_compare_tasks() {
+        let t1 = ReviewTask {
+            status: ReviewStatus::Todo,
+            stats: TaskStats {
+                risk: RiskLevel::High,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let t2 = ReviewTask {
+            status: ReviewStatus::Done,
+            ..Default::default()
+        };
+
+        // compare_tasks is private but we can test it via tasks_in_sub_flow_display_order
+        let tasks = vec![t2.clone(), t1.clone()];
+        let sorted = tasks_in_sub_flow_display_order(&tasks);
+        assert_eq!(sorted[0].status, ReviewStatus::Todo);
+    }
+}

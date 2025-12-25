@@ -1,4 +1,3 @@
-use rusqlite::Connection;
 use std::fs;
 
 // Simple structs matching the database schema
@@ -41,6 +40,10 @@ struct ReviewTask {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    run()
+}
+
+pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Determine database path
     let db_path = if let Ok(path) = std::env::var("LAREVIEW_DB_PATH") {
         std::path::PathBuf::from(path)
@@ -56,7 +59,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Connecting to database at: {}", db_path.display());
 
-    let conn = Connection::open(&db_path)?;
+    let db = lareview::infra::db::Database::open_at(db_path.clone())?;
+    let conn = db.connection();
+    let conn = conn.lock().unwrap();
 
     let review_id = "review-calcom-9821".to_string();
     let run_id = "run-1".to_string();
@@ -1057,4 +1062,34 @@ Container -> ViewerMod: "bind viewer deps:\naudit repo, user repo,\nbooking repo
     );
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_seed_db_run() {
+        let tmp = NamedTempFile::new().unwrap();
+        let path = tmp.path().to_path_buf();
+        unsafe {
+            std::env::set_var("LAREVIEW_DB_PATH", &path);
+        }
+
+        run().unwrap();
+
+        let conn = Connection::open(&path).unwrap();
+        let count: i32 = conn
+            .query_row("SELECT COUNT(*) FROM reviews", [], |row| {
+                row.get::<_, i32>(0)
+            })
+            .unwrap();
+        assert!(count > 0);
+
+        unsafe {
+            std::env::remove_var("LAREVIEW_DB_PATH");
+        }
+    }
 }

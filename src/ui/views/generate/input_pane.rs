@@ -120,3 +120,29 @@ pub(crate) fn render_input_pane(
 
     action_out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egui_kittest::Harness;
+    use egui_kittest::kittest::Queryable;
+
+    #[test]
+    fn test_render_input_pane_empty() {
+        let mut harness = Harness::new_ui(|ui| {
+            render_input_pane(ui, "", None, false, &Theme::mocha());
+        });
+        harness.run();
+        harness.get_by_role(egui::accesskit::Role::MultilineTextInput);
+    }
+
+    #[test]
+    fn test_render_input_pane_diff() {
+        let diff = "--- a/file.rs\n+++ b/file.rs";
+        let mut harness = Harness::new_ui(|ui| {
+            render_input_pane(ui, diff, None, false, &Theme::mocha());
+        });
+        harness.run();
+        // Should show diff viewer, not text edit
+    }
+}

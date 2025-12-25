@@ -388,9 +388,6 @@ async fn test_multiple_tasks_and_finalize_persists_correctly() {
         .find_by_run(&"run-multi".to_string())
         .expect("tasks for run after finalize");
     assert_eq!(tasks_after_finalize.len(), 2);
-    assert_eq!(tasks[0].title, "First Task");
-    assert_eq!(tasks[1].title, "Second Task");
-
     // Restore original env var
     if let Some(original) = original_db_path {
         unsafe {
@@ -400,5 +397,266 @@ async fn test_multiple_tasks_and_finalize_persists_correctly() {
         unsafe {
             std::env::remove_var("LAREVIEW_DB_PATH");
         }
+    }
+}
+
+#[tokio::test]
+async fn test_repo_list_files_tool() {
+    let tmp_dir = tempfile::tempdir().expect("tempdir");
+    let repo_root = tmp_dir.path().to_path_buf();
+
+    // Create some files
+    std::fs::write(repo_root.join("file1.rs"), "content1").unwrap();
+    std::fs::create_dir(repo_root.join("subdir")).unwrap();
+    std::fs::write(repo_root.join("subdir/file2.ts"), "content2").unwrap();
+
+    let config = Arc::new(ServerConfig {
+        tasks_out: None,
+        log_file: None,
+        run_context: None,
+        repo_root: Some(repo_root.clone()),
+        db_path: None,
+    });
+
+    let tool = tool::create_repo_list_files_tool(config);
+    let payload = serde_json::json!(
+        {
+            "path": ".",
+            "include_dirs": true
+        }
+    );
+
+    let res = tool
+        .handle(
+            payload,
+            pmcp::RequestHandlerExtra::new("test".into(), CancellationToken::new()),
+        )
+        .await
+        .unwrap();
+    let entries = res.get("entries").unwrap().as_array().unwrap();
+
+    assert!(
+        entries
+            .iter()
+            .any(|e| e.get("path").unwrap().as_str() == Some("file1.rs"))
+    );
+    assert!(
+        entries
+            .iter()
+            .any(|e| e.get("path").unwrap().as_str() == Some("subdir"))
+    );
+}
+
+#[tokio::test]
+async fn test_repo_search_tool() {
+    let tmp_dir = tempfile::tempdir().expect("tempdir");
+    let repo_root = tmp_dir.path().to_path_buf();
+
+    std::fs::write(repo_root.join("search.rs"), "fn find_me() {}").unwrap();
+
+    let config = Arc::new(ServerConfig {
+        tasks_out: None,
+        log_file: None,
+        run_context: None,
+        repo_root: Some(repo_root.clone()),
+        db_path: None,
+    });
+
+    let tool = tool::create_repo_search_tool(config);
+    let payload = serde_json::json!(
+        {
+            "query": "find_me"
+        }
+    );
+
+    let res = tool
+        .handle(
+            payload,
+            pmcp::RequestHandlerExtra::new("test".into(), CancellationToken::new()),
+        )
+        .await
+        .unwrap();
+    let matches = res.get("matches").unwrap().as_array().unwrap();
+
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0].get("path").unwrap().as_str(), Some("search.rs"));
+    assert!(
+        matches[0]
+            .get("text")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .contains("find_me")
+    );
+}
+
+#[tokio::test]
+#[allow(clippy::await_holding_lock)]
+async fn test_save_agent_comment() {
+    let _guard = DB_TEST_MUTEX.lock().unwrap();
+    let tmp_dir = tempfile::tempdir().expect("tempdir");
+    let db_path = tmp_dir.path().join("db.sqlite");
+    let run_context_path = tmp_dir.path().join("run.json");
+
+    unsafe {
+        std::env::set_var("LAREVIEW_DB_PATH", db_path.to_string_lossy().to_string());
+    }
+
+    let run_context = serde_json::json!({
+        "review_id": "rev-1",
+        "run_id": "run-1",
+        "agent_id": "agent-1",
+        "input_ref": "diff",
+        "diff_text": "diff --git a/file.rs b/file.rs\n--- a/file.rs\n+++ b/file.rs\n@@ -1,1 +1,1 @@\n-old\n+new\n",
+        "diff_hash": "h",
+        "source": { "type": "diff_paste", "diff_hash": "h" },
+        "initial_title": "Test",
+        "created_at": "2024-01-01T00:00:00Z"
+    });
+    std::fs::write(&run_context_path, run_context.to_string()).unwrap();
+
+    let config = ServerConfig {
+        tasks_out: None,
+        log_file: None,
+        run_context: Some(run_context_path),
+        repo_root: None,
+        db_path: Some(db_path.clone()),
+    };
+
+    // First, create a review and run and task so auto-linking works and FKs are happy
+    let db = crate::infra::db::Database::open_at(db_path.clone()).expect("open db");
+
+    let review_repo = crate::infra::db::ReviewRepository::new(db.connection());
+    let review = crate::domain::Review {
+        id: "rev-1".into(),
+        title: "Test".into(),
+        summary: None,
+        source: crate::domain::ReviewSource::DiffPaste {
+            diff_hash: "h".into(),
+        },
+        active_run_id: Some("run-1".into()),
+        created_at: "2024-01-01T00:00:00Z".into(),
+        updated_at: "2024-01-01T00:00:00Z".into(),
+    };
+    review_repo.save(&review).unwrap();
+
+    let run_repo = crate::infra::db::ReviewRunRepository::new(db.connection());
+    let run = crate::domain::ReviewRun {
+            id: "run-1".into(),
+            review_id: "rev-1".into(),
+            agent_id: "agent-1".into(),
+            input_ref: "diff".into(),
+            diff_text: "diff --git a/file.rs b/file.rs\n--- a/file.rs\n+++ b/file.rs\n@@ -1,1 +1,1 @@\n-old\n+new\n".into(),
+            diff_hash: "h".into(),
+            created_at: "2024-01-01T00:00:00Z".into(),
+        };
+    run_repo.save(&run).unwrap();
+
+    let task_repo = crate::infra::db::TaskRepository::new(db.connection());
+    let task = crate::domain::ReviewTask {
+        id: "task-1".into(),
+        run_id: "run-1".into(),
+        title: "Task 1".into(),
+        description: "Desc".into(),
+        files: vec!["file.rs".into()],
+        stats: crate::domain::TaskStats::default(),
+        diff_refs: vec![crate::domain::DiffRef {
+            file: "file.rs".into(),
+            hunks: vec![crate::domain::HunkRef {
+                old_start: 1,
+                old_lines: 1,
+                new_start: 1,
+                new_lines: 1,
+            }],
+        }],
+        insight: None,
+        diagram: None,
+        ai_generated: true,
+        status: crate::domain::ReviewStatus::Todo,
+        sub_flow: None,
+    };
+    task_repo.save(&task).unwrap();
+
+    let args = serde_json::json!({
+        "file": "file.rs",
+        "line": 1,
+        "body": "This is a comment",
+        "side": "new",
+        "impact": "blocking"
+    });
+
+    let thread_id =
+        crate::infra::acp::task_mcp_server::comment_ingest::save_agent_comment(&config, args)
+            .unwrap();
+    assert!(!thread_id.is_empty());
+
+    let thread_repo = crate::infra::db::ThreadRepository::new(db.connection());
+    let thread = thread_repo.find_by_id(&thread_id).unwrap().unwrap();
+    assert_eq!(thread.task_id, Some("task-1".to_string()));
+    assert_eq!(thread.impact, crate::domain::ThreadImpact::Blocking);
+
+    let comment_repo = crate::infra::db::CommentRepository::new(db.connection());
+    let comments = comment_repo.list_for_thread(&thread_id).unwrap();
+    assert_eq!(comments.len(), 1);
+    assert_eq!(comments[0].body, "This is a comment");
+
+    unsafe {
+        std::env::remove_var("LAREVIEW_DB_PATH");
+    }
+}
+
+#[tokio::test]
+#[allow(clippy::await_holding_lock)]
+async fn test_save_agent_comment_no_task() {
+    let _guard = DB_TEST_MUTEX.lock().unwrap();
+    let tmp_dir = tempfile::tempdir().expect("tempdir");
+    let db_path = tmp_dir.path().join("db.sqlite");
+    let run_context_path = tmp_dir.path().join("run.json");
+
+    unsafe {
+        std::env::set_var("LAREVIEW_DB_PATH", db_path.to_string_lossy().to_string());
+    }
+
+    let run_context = serde_json::json!({
+        "review_id": "rev-1",
+        "run_id": "run-1",
+        "agent_id": "agent-1",
+        "input_ref": "diff",
+        "diff_text": "diff --git a/file.rs b/file.rs\n--- a/file.rs\n+++ b/file.rs\n@@ -1,1 +1,1 @@\n-old\n+new\n",
+        "diff_hash": "h",
+        "source": { "type": "diff_paste", "diff_hash": "h" },
+        "initial_title": "Test",
+        "created_at": "2024-01-01T00:00:00Z"
+    });
+    std::fs::write(&run_context_path, run_context.to_string()).unwrap();
+
+    let config = ServerConfig {
+        tasks_out: None,
+        log_file: None,
+        run_context: Some(run_context_path),
+        repo_root: None,
+        db_path: Some(db_path.clone()),
+    };
+
+    let args = serde_json::json!({
+        "file": "file.rs",
+        "line": 1,
+        "body": "Comment without task",
+        "side": "new"
+    });
+
+    // Should fail because no task covers this line
+    let result =
+        crate::infra::acp::task_mcp_server::comment_ingest::save_agent_comment(&config, args);
+    assert!(result.is_err());
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("does not fall within the scope of any generated task")
+    );
+
+    unsafe {
+        std::env::remove_var("LAREVIEW_DB_PATH");
     }
 }

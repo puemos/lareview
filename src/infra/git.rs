@@ -25,3 +25,48 @@ pub fn extract_git_remotes(repo_path: &Path) -> Vec<String> {
     }
     remotes
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_extract_git_remotes_empty() {
+        let dir = tempdir().unwrap();
+        // Not a git repo, or at least no remotes
+        let remotes = extract_git_remotes(dir.path());
+        assert!(remotes.is_empty());
+    }
+
+    #[test]
+    fn test_extract_git_remotes_mock() {
+        let dir = tempdir().unwrap();
+        let repo_path = dir.path();
+
+        // Initialize a git repo and add a remote
+        let status = std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(repo_path)
+            .status()
+            .unwrap();
+        if !status.success() {
+            return; // Skip if git is not installed or failed
+        }
+
+        std::process::Command::new("git")
+            .args([
+                "remote",
+                "add",
+                "origin",
+                "https://github.com/example/repo.git",
+            ])
+            .current_dir(repo_path)
+            .status()
+            .unwrap();
+
+        let remotes = extract_git_remotes(repo_path);
+        assert_eq!(remotes.len(), 1);
+        assert_eq!(remotes[0], "https://github.com/example/repo.git");
+    }
+}

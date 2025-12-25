@@ -819,3 +819,114 @@ fn add_comment_schema() -> Value {
         "required": ["file", "line", "body"]
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn test_normalize_extensions() {
+        let exts = Some(vec![
+            ".rs".to_string(),
+            "TS".to_string(),
+            "  .js  ".to_string(),
+        ]);
+        let norm = normalize_extensions(&exts).unwrap();
+        assert!(norm.contains("rs"));
+        assert!(norm.contains("ts"));
+        assert!(norm.contains("js"));
+        assert_eq!(norm.len(), 3);
+
+        assert_eq!(
+            normalize_extensions(&Some(vec!["...rs".into()]))
+                .unwrap()
+                .iter()
+                .next()
+                .unwrap(),
+            "rs"
+        );
+
+        assert!(normalize_extensions(&None).is_none());
+        assert!(normalize_extensions(&Some(vec![])).is_none());
+        assert!(normalize_extensions(&Some(vec![" ".into()])).is_none());
+    }
+
+    #[test]
+    fn test_normalize_path_tool() {
+        assert_eq!(normalize_path(Path::new("a/b/../c")), PathBuf::from("a/c"));
+    }
+
+    #[test]
+    fn test_matches_extension() {
+        let mut exts = HashSet::new();
+        exts.insert("rs".to_string());
+        assert!(matches_extension(Path::new("main.rs"), &exts));
+        assert!(!matches_extension(Path::new("main.ts"), &exts));
+    }
+
+    #[test]
+    fn test_build_matcher() {
+        assert!(build_matcher("query", false, false).is_ok());
+        assert!(build_matcher("query", true, true).is_ok());
+    }
+
+    #[test]
+    fn test_resolve_repo_subpath() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().canonicalize().unwrap();
+
+        assert_eq!(resolve_repo_subpath(&root, None, "test").unwrap(), root);
+        assert_eq!(
+            resolve_repo_subpath(&root, Some("."), "test").unwrap(),
+            root
+        );
+    }
+
+    #[test]
+    fn test_resolve_repo_subpath_error() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+
+        // Path outside root
+        assert!(resolve_repo_subpath(root, Some("/etc/passwd"), "test").is_err());
+        // Missing path
+        assert!(resolve_repo_subpath(root, Some("missing"), "test").is_err());
+    }
+
+    #[test]
+    fn test_search_repo_truncation() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let file = root.join("test.rs");
+        std::fs::write(&file, "line1\nline2\nline3").unwrap();
+
+        let matcher = build_matcher("line", false, false).unwrap();
+        let (matches, truncated) = search_repo(root, root, &matcher, None, false, 2).unwrap();
+
+        assert_eq!(matches.len(), 2);
+        assert!(truncated);
+    }
+
+    #[test]
+    fn test_list_repo_files_dirs() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().canonicalize().unwrap();
+        fs::create_dir(root.join("subdir")).unwrap();
+        fs::write(root.join("subdir/file.rs"), "test").unwrap();
+
+        let (entries, truncated) =
+            list_repo_files(&root, &root, None, true, false, None, 10).unwrap();
+        assert!(
+            entries
+                .iter()
+                .any(|e| e.kind == "dir" && e.path == "subdir")
+        );
+        assert!(
+            entries
+                .iter()
+                .any(|e| e.kind == "file" && e.path == "subdir/file.rs")
+        );
+        assert!(!truncated);
+    }
+}

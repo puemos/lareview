@@ -63,4 +63,25 @@ cocoa = "0.26"
 objc = "0.2"
 
 [target.'cfg(target_os = "windows")'.dependencies]
+
 windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_UI_WindowsAndMessaging"] }
+
+
+
+[dev-dependencies]
+
+
+
+egui_kittest = "0.33.2"
+
+
+
+accesskit = "0.21.1"
+
+
+
+
+
+
+
+

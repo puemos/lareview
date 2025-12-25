@@ -89,6 +89,26 @@ impl ThreadRepository {
         Ok(updated)
     }
 
+    pub fn find_by_id(&self, id: &str) -> Result<Option<Thread>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            r#"
+            SELECT id, review_id, task_id, title, status, impact,
+                   anchor_file_path, anchor_line, anchor_side, anchor_hunk_ref, anchor_head_sha,
+                   author, created_at, updated_at
+            FROM threads
+            WHERE id = ?1
+            "#,
+        )?;
+
+        let mut rows = stmt.query_map([id], Self::row_to_thread)?;
+        if let Some(row) = rows.next() {
+            Ok(Some(row?))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn find_by_review(&self, review_id: &str) -> Result<Vec<Thread>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(

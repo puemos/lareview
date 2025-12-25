@@ -11,7 +11,7 @@ use super::LaReviewApp;
 use super::state::{AppState, AppView, SelectedAgent};
 
 impl LaReviewApp {
-    pub fn new_egui(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn setup_fonts(ctx: &egui::Context) {
         let mut fonts = FontDefinitions::default();
         egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
 
@@ -71,6 +71,20 @@ impl LaReviewApp {
             .or_default()
             .insert(0, "GeistMono".to_owned());
 
+        // Pre-bind custom names to standard families to avoid panics if they are not yet fully loaded
+        fonts.families.insert(
+            FontFamily::Name("GeistBold".into()),
+            vec![FontFamily::Proportional.to_string(), phosphor_font.clone()],
+        );
+        fonts.families.insert(
+            FontFamily::Name("GeistItalic".into()),
+            vec![FontFamily::Proportional.to_string(), phosphor_font.clone()],
+        );
+        fonts.families.insert(
+            FontFamily::Name("Geist".into()),
+            vec![FontFamily::Proportional.to_string(), phosphor_font.clone()],
+        );
+
         fonts.families.insert(
             FontFamily::Name("Geist".into()),
             vec!["Geist".to_owned(), phosphor_font.clone()],
@@ -88,7 +102,11 @@ impl LaReviewApp {
             vec!["GeistMono".to_owned(), phosphor_font.clone()],
         );
 
-        cc.egui_ctx.set_fonts(fonts);
+        ctx.set_fonts(fonts);
+    }
+
+    pub fn new_egui(cc: &eframe::CreationContext<'_>) -> Self {
+        Self::setup_fonts(&cc.egui_ctx);
         egui_extras::install_image_loaders(&cc.egui_ctx);
 
         let db = Database::open().expect("db open");
@@ -163,6 +181,7 @@ impl LaReviewApp {
             action_rx,
             agent_task: None,
             agent_cancel_token: None,
+            skip_runtime: false,
         };
 
         if let Some(image_bytes) = crate::assets::get_content("assets/icons/icon-512.png")
@@ -181,5 +200,66 @@ impl LaReviewApp {
 
         app.sync_review_from_db();
         app
+    }
+
+    pub fn new_for_test() -> Self {
+        let db = Database::open_in_memory().expect("db open");
+
+        let task_repo = Arc::new(db.task_repo());
+        let thread_repo = Arc::new(db.thread_repo());
+        let comment_repo = Arc::new(db.comment_repo());
+        let review_repo = Arc::new(db.review_repo());
+        let run_repo = Arc::new(db.run_repo());
+        let repo_repo = Arc::new(db.repo_repo());
+
+        let state = AppState {
+            session: crate::ui::app::state::SessionState {
+                selected_agent: SelectedAgent::new("codex"),
+                ..Default::default()
+            },
+            ui: crate::ui::app::state::UiState {
+                current_view: AppView::Home,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let (gen_tx, gen_rx) = mpsc::channel(32);
+        let (gh_tx, gh_rx) = mpsc::channel(8);
+        let (d2_install_tx, d2_install_rx) = mpsc::channel(32);
+        let (action_tx, action_rx) = mpsc::channel(32);
+
+        Self {
+            state,
+            task_repo,
+            thread_repo,
+            comment_repo,
+            review_repo,
+            run_repo,
+            repo_repo,
+            _db: db,
+            gen_tx,
+            gen_rx,
+            gh_tx,
+            gh_rx,
+            d2_install_tx,
+            d2_install_rx,
+            action_tx,
+            action_rx,
+            agent_task: None,
+            agent_cancel_token: None,
+            skip_runtime: true,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_setup_fonts() {
+        let ctx = egui::Context::default();
+        LaReviewApp::setup_fonts(&ctx);
     }
 }

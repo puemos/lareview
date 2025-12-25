@@ -60,3 +60,28 @@ pub(crate) fn render_thread_context(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egui_kittest::Harness;
+    use egui_kittest::kittest::Queryable;
+
+    #[test]
+    fn test_render_thread_context() {
+        let file_path = "src/main.rs".to_string();
+        let mut harness = Harness::new_ui(|ui| {
+            render_thread_context(
+                ui,
+                None,
+                Some(&file_path),
+                Some(10),
+                Some("diff snippet".into()),
+                &Theme::mocha(),
+            );
+        });
+        harness.run();
+        harness.get_by_label("main.rs:10");
+        harness.get_by_label("Diff context");
+    }
+}

@@ -63,3 +63,30 @@ impl super::super::agent_trait::AcpAgent for CodexAgent {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::infra::acp::agent_trait::AcpAgent;
+
+    #[test]
+    fn test_codex_agent_basics() {
+        let agent = CodexAgent;
+        assert_eq!(agent.id(), "codex");
+        assert_eq!(agent.display_name(), "Codex");
+        let _ = agent.candidate();
+        let _ = agent.is_available();
+    }
+
+    #[test]
+    fn test_codex_agent_available_override() {
+        unsafe {
+            std::env::set_var("CODEX_ACP_BIN", "ls");
+        }
+        let agent = CodexAgent;
+        assert!(agent.is_available());
+        unsafe {
+            std::env::remove_var("CODEX_ACP_BIN");
+        }
+    }
+}

@@ -115,3 +115,76 @@ pub async fn fetch_pr_diff(pr: &GitHubPrRef) -> Result<String> {
 
     String::from_utf8(output.stdout).context("decode `gh pr diff` stdout")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_pr_ref_valid_url() {
+        let input = "https://github.com/puemos/lareview/pull/123";
+        let res = parse_pr_ref(input).expect("should parse");
+        assert_eq!(res.owner, "puemos");
+        assert_eq!(res.repo, "lareview");
+        assert_eq!(res.number, 123);
+    }
+
+    #[test]
+    fn test_parse_pr_ref_valid_short_ref() {
+        let input = "puemos/lareview#123";
+        let res = parse_pr_ref(input).expect("should parse");
+        assert_eq!(res.owner, "puemos");
+        assert_eq!(res.repo, "lareview");
+        assert_eq!(res.number, 123);
+    }
+
+    #[test]
+    fn test_parse_pr_ref_invalid() {
+        assert!(parse_pr_ref("invalid").is_none());
+        assert!(parse_pr_ref("https://google.com").is_none());
+        assert!(parse_pr_ref("owner/repo").is_none());
+    }
+
+    #[tokio::test]
+    async fn test_fetch_pr_metadata_mock() {
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let gh_mock = tmp_dir.path().join("gh");
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mock_script = r#"#!/bin/sh
+echo '{"title":"Mock PR","url":"https://github.com/mock/pr/1","headRefOid":"head123","baseRefOid":"base456"}'
+"#;
+            std::fs::write(&gh_mock, mock_script).unwrap();
+            std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+
+        #[cfg(windows)]
+        {
+            let mock_script = r#"@echo off
+echo {"title":"Mock PR","url":"https://github.com/mock/pr/1","headRefOid":"head123","baseRefOid":"base456"}
+"#;
+            std::fs::write(gh_mock.with_extension("bat"), mock_script).unwrap();
+        }
+
+        unsafe {
+            std::env::set_var("LAREVIEW_EXTRA_PATH", tmp_dir.path());
+        }
+
+        let pr = GitHubPrRef {
+            owner: "mock".into(),
+            repo: "pr".into(),
+            number: 1,
+            url: "https://github.com/mock/pr/1".into(),
+        };
+
+        let meta = fetch_pr_metadata(&pr).await.unwrap();
+        assert_eq!(meta.title, "Mock PR");
+        assert_eq!(meta.head_sha, Some("head123".into()));
+
+        unsafe {
+            std::env::remove_var("LAREVIEW_EXTRA_PATH");
+        }
+    }
+}

@@ -282,3 +282,54 @@ impl LaReviewApp {
         });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egui_kittest::Harness;
+    use egui_kittest::kittest::Queryable;
+
+    #[test]
+    fn test_ui_copyable_command() {
+        let app = LaReviewApp::new_for_test();
+        let mut harness = Harness::new_ui(|ui| {
+            app.ui_copyable_command(ui, "Label", "ls -la");
+        });
+        harness.run();
+        harness.get_by_label("Label");
+        harness.get_by_label("ls -la");
+        harness.get_by_label("📋 Copy").click();
+    }
+
+    #[test]
+    fn test_ui_settings_rendering() {
+        let mut app = LaReviewApp::new_for_test();
+        let mut harness = Harness::new(|ctx| {
+            crate::ui::app::LaReviewApp::setup_fonts(ctx);
+            egui::CentralPanel::default().show(ctx, |ui| {
+                app.ui_settings(ui);
+            });
+        });
+        harness.run();
+        harness.get_by_label("Settings");
+        harness.get_by_label("GitHub CLI Integration");
+        harness.get_by_label("D2 Diagram Engine");
+    }
+
+    #[test]
+    fn test_ui_settings_gh_troubleshoot() {
+        let mut app = LaReviewApp::new_for_test();
+        app.state.session.gh_status = None;
+        app.state.session.gh_status_error = Some("Mock Error".into());
+
+        let mut harness = Harness::new(|ctx| {
+            crate::ui::app::LaReviewApp::setup_fonts(ctx);
+            egui::CentralPanel::default().show(ctx, |ui| {
+                app.ui_settings(ui);
+            });
+        });
+        harness.run();
+        harness.get_by_label("Setup Instructions");
+        harness.get_by_label("brew install gh");
+    }
+}

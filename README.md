@@ -253,6 +253,11 @@ Generate a Markdown summary of your review, including stats, metadata, task deta
   - `cargo clippy --all-targets --all-features -- -D warnings`
   - `cargo test`
 
+- Tests:
+  - Unit tests: Located alongside modules in `src/` (usually as `tests.rs`)
+  - Integration tests: Located in the root `tests/` directory
+  - Run all tests: `cargo test`
+
 - Supply chain:
   - `cargo deny check` (used in scheduled CI)
 

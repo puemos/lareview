@@ -62,13 +62,21 @@ pub fn run_d2_command(app: &mut LaReviewApp, command: D2Command) {
     let d2_install_tx = app.d2_install_tx.clone();
 
     crate::RUNTIME.get().unwrap().spawn(async move {
-        let mut child = tokio::process::Command::new("sh")
+        let mut child = match tokio::process::Command::new("sh")
             .arg("-c")
             .arg(command_str)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .spawn()
-            .expect("Failed to spawn D2 process");
+        {
+            Ok(child) => child,
+            Err(e) => {
+                let _ = d2_install_tx
+                    .send(format!("Failed to spawn D2 process: {e}"))
+                    .await;
+                return;
+            }
+        };
 
         let stdout = child.stdout.take().unwrap();
         let stderr = child.stderr.take().unwrap();

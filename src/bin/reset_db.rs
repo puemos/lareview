@@ -1,6 +1,10 @@
 use rusqlite::Connection;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    run()
+}
+
+pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Determine database path
     let db_path = if let Ok(path) = std::env::var("LAREVIEW_DB_PATH") {
         std::path::PathBuf::from(path)
@@ -21,6 +25,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let conn = Connection::open(&db_path)?;
 
     // Store initial counts
+    // We use try_query because tables might not exist if it's not initialized
+    let tables_exist: i32 = conn.query_row(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='reviews'",
+        [],
+        |row| row.get(0),
+    )?;
+
+    if tables_exist == 0 {
+        println!("Tables do not exist. No reset needed.");
+        return Ok(());
+    }
+
     let review_count: i64 = conn.query_row("SELECT COUNT(*) FROM reviews", [], |row| row.get(0))?;
     let run_count: i64 =
         conn.query_row("SELECT COUNT(*) FROM review_runs", [], |row| row.get(0))?;
@@ -85,4 +101,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Database location: {}", db_path.display());
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_reset_db_run() {
+        let tmp = NamedTempFile::new().unwrap();
+        let path = tmp.path().to_path_buf();
+        unsafe {
+            std::env::set_var("LAREVIEW_DB_PATH", &path);
+        }
+
+        // Use a real database init to create tables first
+        {
+            let conn = Connection::open(&path).unwrap();
+            conn.execute_batch("CREATE TABLE reviews (id TEXT PRIMARY KEY); CREATE TABLE review_runs (id TEXT PRIMARY KEY); CREATE TABLE tasks (id TEXT PRIMARY KEY); CREATE TABLE threads (id TEXT PRIMARY KEY); CREATE TABLE comments (id TEXT PRIMARY KEY);").unwrap();
+            conn.execute("INSERT INTO reviews (id) VALUES ('r1')", [])
+                .unwrap();
+        }
+
+        run().unwrap();
+
+        let conn = Connection::open(&path).unwrap();
+        let count: i32 = conn
+            .query_row("SELECT COUNT(*) FROM reviews", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 0);
+
+        unsafe {
+            std::env::remove_var("LAREVIEW_DB_PATH");
+        }
+    }
 }

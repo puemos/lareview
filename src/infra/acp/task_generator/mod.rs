@@ -13,13 +13,4 @@ pub use types::{GenerateTasksInput, GenerateTasksResult, ProgressEvent};
 pub use worker::generate_tasks_with_acp;
 
 #[cfg(test)]
-mod mcp_config_tests;
-
-#[cfg(test)]
-mod persistence_tests;
-
-#[cfg(test)]
-mod policy_tests;
-
-#[cfg(test)]
-mod real_acp_tests;
+mod tests;

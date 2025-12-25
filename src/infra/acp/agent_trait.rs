@@ -68,3 +68,27 @@ impl Default for AgentRegistry {
         registry
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_agent_registry_default() {
+        let registry = AgentRegistry::default();
+        let agents = registry.get_agents();
+        assert!(!agents.is_empty());
+
+        let codex = registry.get_agent_by_id("codex");
+        assert!(codex.is_some());
+        assert_eq!(codex.unwrap().id(), "codex");
+    }
+
+    #[test]
+    fn test_agent_registry_candidate() {
+        let registry = AgentRegistry::default();
+        let candidate = registry.get_agent_candidate("codex");
+        assert!(candidate.is_some());
+        assert_eq!(candidate.unwrap().id, "codex");
+    }
+}

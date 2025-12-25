@@ -426,3 +426,141 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
         logs: final_logs,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_task_mcp_server_path() {
+        let current = PathBuf::from("/bin/lareview");
+        let override_p = PathBuf::from("/custom/path");
+
+        assert_eq!(
+            resolve_task_mcp_server_path(Some(&override_p), &current),
+            override_p
+        );
+        // We can't easily test option_env without changing build environment,
+        // but we can test the fallback to current_exe.
+        assert_eq!(resolve_task_mcp_server_path(None, &current), current);
+    }
+
+    #[test]
+    fn test_push_log() {
+        let logs = Arc::new(Mutex::new(Vec::new()));
+        push_log(&logs, "test log", false);
+        assert_eq!(logs.lock().unwrap().len(), 1);
+        assert_eq!(logs.lock().unwrap()[0], "test log");
+    }
+
+    #[tokio::test]
+    async fn test_generate_tasks_with_acp_invalid_command() {
+        use crate::infra::acp::RunContext;
+        let input = GenerateTasksInput {
+            run_context: RunContext {
+                review_id: "r".into(),
+                run_id: "run".into(),
+                agent_id: "a".into(),
+                input_ref: "ref".into(),
+                diff_text: "diff".into(),
+                diff_hash: "h".into(),
+                source: crate::domain::ReviewSource::DiffPaste {
+                    diff_hash: "h".into(),
+                },
+                initial_title: None,
+                created_at: None,
+            },
+            repo_root: None,
+            agent_command: "non_existent_binary".into(),
+            agent_args: vec![],
+            progress_tx: None,
+            mcp_server_binary: None,
+            timeout_secs: Some(1),
+            cancel_token: None,
+            debug: false,
+        };
+
+        let result = generate_tasks_with_acp(input).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_generate_tasks_with_acp_timeout() {
+        use crate::infra::acp::RunContext;
+        let input = GenerateTasksInput {
+            run_context: RunContext {
+                review_id: "r".into(),
+                run_id: "run".into(),
+                agent_id: "a".into(),
+                input_ref: "ref".into(),
+                diff_text: "diff".into(),
+                diff_hash: "h".into(),
+                source: crate::domain::ReviewSource::DiffPaste {
+                    diff_hash: "h".into(),
+                },
+                initial_title: None,
+                created_at: None,
+            },
+            repo_root: None,
+            agent_command: "sleep".into(),
+            agent_args: vec!["10".into()],
+            progress_tx: None,
+            mcp_server_binary: None,
+            timeout_secs: Some(1),
+            cancel_token: None,
+            debug: false,
+        };
+
+        let result = generate_tasks_with_acp(input).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("timed out"));
+    }
+
+    #[tokio::test]
+    async fn test_generate_tasks_with_acp_cancellation() {
+        use crate::infra::acp::RunContext;
+        use tokio_util::sync::CancellationToken;
+
+        let token = CancellationToken::new();
+        let token_clone = token.clone();
+
+        let input = GenerateTasksInput {
+            run_context: RunContext {
+                review_id: "r".into(),
+                run_id: "run".into(),
+                agent_id: "a".into(),
+                input_ref: "ref".into(),
+                diff_text: "diff".into(),
+                diff_hash: "h".into(),
+                source: crate::domain::ReviewSource::DiffPaste {
+                    diff_hash: "h".into(),
+                },
+                initial_title: None,
+                created_at: None,
+            },
+            repo_root: None,
+            agent_command: "sleep".into(),
+            agent_args: vec!["10".into()],
+            progress_tx: None,
+            mcp_server_binary: None,
+            timeout_secs: Some(10),
+            cancel_token: Some(token_clone),
+            debug: false,
+        };
+
+        // Cancel the token after a short delay
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            token.cancel();
+        });
+
+        let result = generate_tasks_with_acp(input).await;
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("cancelled by user")
+        );
+    }
+}

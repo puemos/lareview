@@ -122,7 +122,8 @@ pub fn reduce(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
         AsyncAction::RepoDeleted(result) => {
             if let Err(err) = result {
                 state.ui.review_error = Some(err);
-            } else {
+            } else if let Ok(repo_id) = result {
+                state.domain.linked_repos.retain(|r| r.id != repo_id);
                 return vec![Command::RefreshReviewData {
                     reason: ReviewDataRefreshReason::Manual,
                 }];

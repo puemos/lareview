@@ -249,6 +249,7 @@ fn clean_d2_code(code: String) -> Option<Arc<str>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn test_clean_d2_code() {
@@ -279,5 +280,94 @@ mod tests {
 
         // Case 6: Whitespace only
         assert_eq!(clean_d2_code("   ".to_string()), None);
+    }
+
+    #[test]
+    fn test_extract_files_from_diffs_legacy() {
+        let diffs = vec![
+            "diff --git a/src/main.rs b/src/main.rs\nindex ...".to_string(),
+            "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs".to_string(),
+        ];
+        let files = extract_files_from_diffs_legacy(&diffs);
+        assert_eq!(files, vec!["src/main.rs", "src/lib.rs"]);
+    }
+
+    #[test]
+    fn test_extract_files_legacy_deletion() {
+        let diffs =
+            vec!["diff --git a/deleted b/dev/null\n--- a/deleted\n+++ /dev/null".to_string()];
+        let files = extract_files_from_diffs_legacy(&diffs);
+        assert_eq!(files, vec!["deleted"]);
+    }
+
+    #[test]
+    fn test_parse_task_basic() {
+        let payload = json!({
+            "id": "T1",
+            "title": "Title",
+            "description": "Desc",
+            "diagram": "x -> y",
+            "stats": { "risk": "HIGH", "tags": ["tag1"] },
+            "diff_refs": [
+                { "file": "test.rs", "hunks": [] }
+            ]
+        });
+        let task = parse_task(payload).unwrap();
+        assert_eq!(task.id, "T1");
+        assert_eq!(task.stats.risk, RiskLevel::High);
+        assert_eq!(task.files, vec!["test.rs"]);
+    }
+
+    #[test]
+    fn test_normalize_single_task_payload() {
+        let raw = json!({
+            "params": {
+                "id": "T1",
+                "title": "Title"
+            }
+        });
+        let norm = normalize_single_task_payload(raw).unwrap();
+        assert_eq!(norm.get("id").unwrap().as_str(), Some("T1"));
+    }
+
+    #[test]
+    fn test_normalize_single_task_payload_string() {
+        let raw = json!("{\"id\": \"T2\", \"title\": \"Title2\"}");
+        let norm = normalize_single_task_payload(raw).unwrap();
+        assert_eq!(norm.get("id").unwrap().as_str(), Some("T2"));
+    }
+
+    #[test]
+    fn test_normalize_single_task_payload_nested_string() {
+        let raw =
+            json!("Here is your task: {\"id\": \"T3\", \"title\": \"Title3\"} hope you like it");
+        let norm = normalize_single_task_payload(raw).unwrap();
+        assert_eq!(norm.get("id").unwrap().as_str(), Some("T3"));
+    }
+
+    #[test]
+    fn test_normalize_single_task_payload_arguments() {
+        let raw = json!({
+            "arguments": {
+                "id": "T4",
+                "title": "Title4"
+            }
+        });
+        let norm = normalize_single_task_payload(raw).unwrap();
+        assert_eq!(norm.get("id").unwrap().as_str(), Some("T4"));
+    }
+
+    #[test]
+    fn test_normalize_single_task_payload_invalid() {
+        let raw = json!({ "foo": "bar" });
+        assert!(normalize_single_task_payload(raw).is_err());
+    }
+
+    #[test]
+    fn test_count_line_changes_legacy() {
+        let diffs = vec!["--- a/f\n+++ b/f\n+added\n-removed\n+added2".to_string()];
+        let (add, del) = count_line_changes_legacy(&diffs);
+        assert_eq!(add, 2);
+        assert_eq!(del, 1);
     }
 }

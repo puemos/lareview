@@ -15,6 +15,9 @@ use super::LaReviewApp;
 impl LaReviewApp {
     pub fn dispatch(&mut self, action: Action) {
         let commands = reducer::reduce(&mut self.state, action);
+        if self.skip_runtime {
+            return;
+        }
         for command in commands {
             runtime::run(self, command);
         }

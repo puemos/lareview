@@ -321,4 +321,16 @@ diff --git a/src/App.tsx b/src/App.tsx
         let body = &lines[hunk_idx + 1..];
         assert_eq!(body.len(), 7);
     }
+
+    #[test]
+    fn test_diff_snippet_path_matching() {
+        let diff = "diff --git a/libs/ui/src/button.rs b/libs/ui/src/button.rs\n--- a/libs/ui/src/button.rs\n+++ b/libs/ui/src/button.rs\n@@ -1,1 +1,1 @@\n-old\n+new";
+
+        // Exact match
+        assert!(diff_snippet_for_anchor(diff, "libs/ui/src/button.rs", 1).is_some());
+        // Suffix match
+        assert!(diff_snippet_for_anchor(diff, "button.rs", 1).is_some());
+        // Basename match
+        assert!(diff_snippet_for_anchor(diff, "button", 1).is_none()); // Basename match only works for full component
+    }
 }

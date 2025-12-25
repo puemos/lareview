@@ -33,3 +33,29 @@ fn render_comment_bubble(ui: &mut egui::Ui, comment: &Comment, theme: &Theme) {
         );
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egui_kittest::Harness;
+    use egui_kittest::kittest::Queryable;
+
+    #[test]
+    fn test_render_comment_list() {
+        let comments = vec![Comment {
+            id: "c1".into(),
+            thread_id: "t1".into(),
+            author: "User A".into(),
+            body: "Hello world".into(),
+            parent_id: None,
+            created_at: "2024-01-01T00:00:00Z".into(),
+            updated_at: "2024-01-01T00:00:00Z".into(),
+        }];
+        let mut harness = Harness::new_ui(|ui| {
+            render_comment_list(ui, &comments, &Theme::mocha());
+        });
+        harness.run();
+        harness.get_by_label("User A");
+        harness.get_by_label("Hello world");
+    }
+}

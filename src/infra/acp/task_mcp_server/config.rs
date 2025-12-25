@@ -18,6 +18,15 @@ pub struct ServerConfig {
 impl ServerConfig {
     /// Parse server configuration from command-line arguments.
     pub fn from_args() -> Self {
+        let args: Vec<String> = std::env::args().collect();
+        Self::from_iter(args)
+    }
+
+    /// Parse server configuration from an iterator of strings.
+    pub fn from_iter<I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = String>,
+    {
         let mut config = ServerConfig::default();
 
         if let Ok(path) = std::env::var("TASK_MCP_OUT") {
@@ -35,7 +44,7 @@ impl ServerConfig {
             config.db_path = Some(PathBuf::from(path));
         }
 
-        let args: Vec<String> = std::env::args().collect();
+        let args: Vec<String> = iter.into_iter().collect();
         let mut i = 0;
 
         while i < args.len() {
@@ -85,5 +94,42 @@ impl ServerConfig {
         }
 
         config
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_server_config_from_iter() {
+        let args = vec![
+            "program_name".to_string(),
+            "--tasks-out".to_string(),
+            "/tmp/tasks.json".to_string(),
+            "--log-file".to_string(),
+            "/tmp/debug.log".to_string(),
+            "--pr-context".to_string(),
+            "/tmp/context.json".to_string(),
+            "--repo-root".to_string(),
+            "/tmp/repo".to_string(),
+            "--db-path".to_string(),
+            "/tmp/test.db".to_string(),
+        ];
+
+        let config = ServerConfig::from_iter(args);
+
+        assert_eq!(config.tasks_out, Some(PathBuf::from("/tmp/tasks.json")));
+        assert_eq!(config.log_file, Some(PathBuf::from("/tmp/debug.log")));
+        assert_eq!(config.run_context, Some(PathBuf::from("/tmp/context.json")));
+        assert_eq!(config.repo_root, Some(PathBuf::from("/tmp/repo")));
+        assert_eq!(config.db_path, Some(PathBuf::from("/tmp/test.db")));
+    }
+
+    #[test]
+    fn test_server_config_incomplete_args() {
+        let args = vec!["program_name".to_string(), "--tasks-out".to_string()];
+        let config = ServerConfig::from_iter(args);
+        assert_eq!(config.tasks_out, None);
     }
 }

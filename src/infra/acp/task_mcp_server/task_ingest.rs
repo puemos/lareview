@@ -287,3 +287,46 @@ pub(super) fn load_run_context(config: &ServerConfig) -> RunContext {
         created_at: Some(Utc::now().to_rfc3339()),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_validate_raw_task_hunks_invalid() {
+        let raw = json!({
+            "diff_refs": [
+                { "file": "a.rs", "hunks": [ { "old_start": 1 } ] }
+            ]
+        });
+        assert!(validate_raw_task_hunks(&raw).is_err());
+    }
+
+    #[test]
+    fn test_validate_task_diff_refs_prefixes() {
+        let diff_index = DiffIndex::new("").unwrap();
+        let mut task = ReviewTask {
+            id: "t1".into(),
+            run_id: "r1".into(),
+            title: "T".into(),
+            description: "D".into(),
+            files: vec![],
+            stats: Default::default(),
+            diff_refs: vec![crate::domain::DiffRef {
+                file: "a/b.rs".into(),
+                hunks: vec![],
+            }],
+            insight: None,
+            diagram: None,
+            ai_generated: true,
+            status: crate::domain::ReviewStatus::Todo,
+            sub_flow: None,
+        };
+        // Should bail because of a/ prefix
+        assert!(validate_task_diff_refs(&task, &diff_index).is_err());
+
+        task.diff_refs[0].file = "b/b.rs".into();
+        assert!(validate_task_diff_refs(&task, &diff_index).is_err());
+    }
+}

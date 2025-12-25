@@ -124,3 +124,50 @@ fn plan_entry_style(status: PlanStatus) -> (&'static str, egui::Color32, &'stati
         PlanStatus::Pending => (icons::STATUS_PENDING, current_theme().text_muted, "todo"),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::PlanEntry;
+    use egui_kittest::Harness;
+    use egui_kittest::kittest::Queryable;
+
+    #[test]
+    fn test_render_plan_panel() {
+        let plan = Plan {
+            entries: vec![
+                PlanEntry {
+                    content: "Step 1".to_string(),
+                    status: PlanStatus::Completed,
+                    priority: crate::domain::PlanPriority::Medium,
+                    meta: None,
+                },
+                PlanEntry {
+                    content: "Step 2".to_string(),
+                    status: PlanStatus::InProgress,
+                    priority: crate::domain::PlanPriority::Medium,
+                    meta: None,
+                },
+            ],
+            meta: None,
+        };
+
+        let mut harness = Harness::new_ui(|ui| {
+            render_plan_panel(ui, &plan);
+        });
+        harness.run();
+
+        harness
+            .get_all_by_role(egui::accesskit::Role::Label)
+            .into_iter()
+            .find(|n| format!("{:?}", n).contains("PLAN"))
+            .expect("PLAN label not found");
+        harness.get_by_label("Step 1");
+        harness.get_by_label("Step 2");
+        harness
+            .get_all_by_role(egui::accesskit::Role::Label)
+            .into_iter()
+            .find(|n| format!("{:?}", n).contains("1/2"))
+            .expect("Counter label not found");
+    }
+}

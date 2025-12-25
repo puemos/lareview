@@ -16,6 +16,9 @@ mod store;
 mod timeline;
 mod update;
 
+#[cfg(test)]
+pub mod tests;
+
 pub use messages::{GenMsg, GenResultPayload, GhMsg, GhStatusPayload};
 pub use root::LaReviewApp;
 pub use state::{

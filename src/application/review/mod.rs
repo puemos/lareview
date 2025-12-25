@@ -2,3 +2,6 @@
 
 pub mod export;
 pub mod ordering;
+
+#[cfg(test)]
+mod tests;

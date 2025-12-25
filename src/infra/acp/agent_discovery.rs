@@ -67,3 +67,34 @@ pub fn list_agent_candidates() -> Vec<AgentCandidate> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_agent_candidate_resolution() {
+        let mut candidate = AgentCandidate {
+            id: "test".into(),
+            label: "Test".into(),
+            logo: None,
+            command: Some("ls".into()),
+            args: vec![],
+            available: false,
+        };
+
+        // Should resolve to full path if available
+        let path = crate::infra::brew::find_bin("ls").map(|p| p.to_string_lossy().to_string());
+        if let Some(p) = path {
+            candidate.command = Some(p.clone());
+            candidate.available = true;
+            assert!(candidate.available);
+        }
+    }
+
+    #[test]
+    fn test_list_agent_candidates() {
+        let candidates = list_agent_candidates();
+        assert!(!candidates.is_empty());
+    }
+}

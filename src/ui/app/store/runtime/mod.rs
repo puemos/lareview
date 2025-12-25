@@ -2,6 +2,9 @@ pub mod generate;
 pub mod review;
 pub mod settings;
 
+#[cfg(test)]
+mod tests;
+
 use super::super::LaReviewApp;
 use super::command::Command;
 

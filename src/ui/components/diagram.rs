@@ -432,3 +432,94 @@ fn render_error(ui: &mut Ui, error: &str, trimmed_code: &str, go_to_settings: &m
 fn normalize_d2_code(code: &str) -> String {
     code.replace("\\n", "\n").trim().to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egui_kittest::Harness;
+    use egui_kittest::kittest::Queryable;
+
+    #[test]
+    fn test_diagram_view_no_code() {
+        let mut harness = Harness::new(|ctx| {
+            crate::ui::app::LaReviewApp::setup_fonts(ctx);
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.style_mut().override_font_id = Some(egui::FontId::proportional(12.0));
+                diagram_view(ui, &None, true);
+            });
+        });
+        harness.run_steps(5);
+        harness.get_by_label("No diagram code provided");
+    }
+
+    #[test]
+    fn test_diagram_view_empty_code() {
+        let mut harness = Harness::new(|ctx| {
+            crate::ui::app::LaReviewApp::setup_fonts(ctx);
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.style_mut().override_font_id = Some(egui::FontId::proportional(12.0));
+                diagram_view(ui, &Some(Arc::from("  ")), true);
+            });
+        });
+        harness.run_steps(5);
+        harness.get_by_label("Enter D2 code to render a diagram");
+    }
+
+    #[test]
+    fn test_diagram_view_error_state() {
+        // Manually inject error state into memory
+        let mut harness = Harness::new(|ctx| {
+            crate::ui::app::LaReviewApp::setup_fonts(ctx);
+
+            let code = "x -> y";
+            let key = diagram_key(code, true);
+            let memory_id = Id::new("d2_diagram_memory");
+            ctx.memory_mut(|mem| {
+                let memory = mem.data.get_temp_mut_or_default::<DiagramMemory>(memory_id);
+                memory
+                    .cache
+                    .insert(key, DiagramState::Error("D2 executable not found".into()));
+                memory.last_key = Some(key);
+            });
+
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.style_mut().override_font_id = Some(egui::FontId::proportional(12.0));
+                diagram_view(ui, &Some(Arc::from(code)), true);
+            });
+        });
+        harness.run_steps(5);
+        harness.get_by_label("Failed to load diagram.");
+        harness.get_by_label("D2 executable not found");
+        harness.get_by_label("Install D2");
+    }
+
+    #[test]
+    fn test_normalize_d2_code() {
+        assert_eq!(normalize_d2_code("  x -> y  "), "x -> y");
+        assert_eq!(normalize_d2_code("x\\ny"), "x\ny");
+    }
+
+    #[test]
+    fn test_diagram_key() {
+        let k1 = diagram_key("a", true);
+        let k2 = diagram_key("a", false);
+        let k3 = diagram_key("b", true);
+        assert_ne!(k1, k2);
+        assert_ne!(k1, k3);
+    }
+
+    #[test]
+    fn test_render_error() {
+        use std::sync::{Arc, Mutex};
+        let go_to_settings = Arc::new(Mutex::new(false));
+        let go_to_settings_clone = go_to_settings.clone();
+        let mut harness = Harness::new_ui(move |ui| {
+            let mut guard = go_to_settings_clone.lock().unwrap();
+            render_error(ui, "D2 executable not found", "x -> y", &mut guard);
+        });
+        harness.run();
+        harness.get_by_label("Install D2").click();
+        harness.run();
+        assert!(*go_to_settings.lock().unwrap());
+    }
+}

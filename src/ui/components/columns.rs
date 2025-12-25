@@ -77,3 +77,54 @@ impl<'a> TwoColumnLayout<'a> {
         });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egui_kittest::Harness;
+    use egui_kittest::kittest::Queryable;
+
+    #[test]
+    fn test_two_column_layout() {
+        let mut harness = Harness::builder()
+            .with_size(egui::vec2(1000.0, 500.0))
+            .build_ui(|ui| {
+                TwoColumnLayout::new(
+                    |ui| {
+                        ui.label("Left");
+                    },
+                    |ui| {
+                        ui.label("Right");
+                    },
+                )
+                .show(ui);
+            });
+        harness.run();
+        harness.get_by_label("Left");
+        harness.get_by_label("Right");
+    }
+
+    #[test]
+    fn test_three_column_layout() {
+        let mut harness = Harness::builder()
+            .with_size(egui::vec2(1000.0, 500.0))
+            .build_ui(|ui| {
+                ThreeColumnLayout::new(
+                    |ui| {
+                        ui.label("Left");
+                    },
+                    |ui| {
+                        ui.label("Center");
+                    },
+                    |ui| {
+                        ui.label("Right");
+                    },
+                )
+                .show(ui);
+            });
+        harness.run();
+        harness.get_by_label("Left");
+        harness.get_by_label("Center");
+        harness.get_by_label("Right");
+    }
+}

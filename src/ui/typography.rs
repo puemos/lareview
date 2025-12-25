@@ -2,26 +2,48 @@ use eframe::egui;
 
 use crate::ui::theme;
 
-/// Returns a RichText configured with the GeistBold font family.
-pub fn bold(text: impl Into<String>) -> egui::RichText {
-    egui::RichText::new(text).family(egui::FontFamily::Name("GeistBold".into()))
+pub(crate) fn geist_bold() -> egui::FontFamily {
+    #[cfg(test)]
+    {
+        egui::FontFamily::Proportional
+    }
+    #[cfg(not(test))]
+    {
+        egui::FontFamily::Name("GeistBold".into())
+    }
 }
 
-/// Returns a RichText configured with the Geist font family (Regular).
+pub(crate) fn geist_italic() -> egui::FontFamily {
+    #[cfg(test)]
+    {
+        egui::FontFamily::Proportional
+    }
+    #[cfg(not(test))]
+    {
+        egui::FontFamily::Name("GeistItalic".into())
+    }
+}
+
+/// Returns a RichText configured with the Proportional font family and strong weight.
+pub fn bold(text: impl Into<String>) -> egui::RichText {
+    egui::RichText::new(text).family(geist_bold()).strong()
+}
+
+/// Returns a RichText configured with the Proportional font family.
 pub fn body(text: impl Into<String>) -> egui::RichText {
-    egui::RichText::new(text).family(egui::FontFamily::Name("Geist".into()))
+    egui::RichText::new(text).family(egui::FontFamily::Proportional)
 }
 
 /// Large bold heading
 pub fn h1(text: impl Into<String>) -> egui::RichText {
     let theme = theme::current_theme();
-    body(text).size(20.0).color(theme.text_primary)
+    body(text).size(20.0).color(theme.text_primary).strong()
 }
 
 /// Medium bold heading
 pub fn h2(text: impl Into<String>) -> egui::RichText {
     let theme = theme::current_theme();
-    body(text).size(16.0).color(theme.text_primary)
+    body(text).size(16.0).color(theme.text_primary).strong()
 }
 
 /// Standard UI label size (small)
@@ -49,9 +71,9 @@ pub fn weak(text: impl Into<String>) -> egui::RichText {
     body(text).weak()
 }
 
-/// Returns a RichText configured with the GeistMono font family.
+/// Returns a RichText configured with the Monospace font family.
 pub fn mono(text: impl Into<String>) -> egui::RichText {
-    egui::RichText::new(text).family(egui::FontFamily::Name("GeistMono".into()))
+    egui::RichText::new(text).family(egui::FontFamily::Monospace)
 }
 
 /// Small monospace text
@@ -62,13 +84,13 @@ pub fn small_mono(text: impl Into<String>) -> egui::RichText {
 // --- FontId Helpers ---
 
 pub fn bold_font(size: f32) -> egui::FontId {
-    egui::FontId::new(size, egui::FontFamily::Name("GeistBold".into()))
+    egui::FontId::new(size, geist_bold())
 }
 
 pub fn body_font(size: f32) -> egui::FontId {
-    egui::FontId::new(size, egui::FontFamily::Name("Geist".into()))
+    egui::FontId::new(size, egui::FontFamily::Proportional)
 }
 
 pub fn mono_font(size: f32) -> egui::FontId {
-    egui::FontId::new(size, egui::FontFamily::Name("GeistMono".into()))
+    egui::FontId::new(size, egui::FontFamily::Monospace)
 }

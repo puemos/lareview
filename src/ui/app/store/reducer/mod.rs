@@ -381,4 +381,558 @@ mod tests {
             Some(1)
         );
     }
+
+    #[test]
+    fn test_dismiss_requirements_emits_save_config() {
+        let mut state = AppState::default();
+        state.ui.show_requirements_modal = true;
+        state.ui.extra_path = "/test".to_string();
+
+        let commands = reduce(
+            &mut state,
+            Action::Settings(SettingsAction::DismissRequirements),
+        );
+
+        assert!(!state.ui.show_requirements_modal);
+        assert!(state.ui.has_seen_requirements);
+        assert!(matches!(
+            commands.as_slice(),
+            [Command::SaveAppConfig { extra_path, has_seen_requirements: true }]
+            if extra_path == "/test"
+        ));
+    }
+
+    #[test]
+    fn test_navigation_to_generate_resets_session() {
+        let mut state = AppState {
+            session: SessionState {
+                is_generating: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let _ = reduce(
+            &mut state,
+            Action::Navigation(NavigationAction::SwitchTo(AppView::Generate)),
+        );
+
+        assert_eq!(state.ui.current_view, AppView::Generate);
+    }
+
+    #[test]
+    fn test_review_action_select_review() {
+        let mut state = AppState::default();
+        let review = crate::domain::Review {
+            id: "rev1".into(),
+            title: "Review".into(),
+            summary: None,
+            source: crate::domain::ReviewSource::DiffPaste {
+                diff_hash: "h".into(),
+            },
+            active_run_id: Some("run1".into()),
+            created_at: "now".into(),
+            updated_at: "now".into(),
+        };
+        state.domain.reviews.push(review);
+
+        let commands = reduce(
+            &mut state,
+            Action::Review(ReviewAction::SelectReview {
+                review_id: "rev1".into(),
+            }),
+        );
+
+        assert_eq!(state.ui.selected_review_id.as_deref(), Some("rev1"));
+        assert_eq!(state.ui.selected_run_id.as_deref(), Some("run1"));
+        assert!(
+            commands
+                .iter()
+                .any(|c| matches!(c, Command::LoadReviewThreads { .. }))
+        );
+    }
+
+    #[test]
+    fn test_review_action_delete_review() {
+        let mut state = AppState::default();
+        state.ui.selected_review_id = Some("rev1".into());
+
+        let commands = reduce(
+            &mut state,
+            Action::Review(ReviewAction::DeleteReview("rev1".into())),
+        );
+
+        assert!(state.ui.selected_review_id.is_none());
+        assert!(matches!(
+            commands.as_slice(),
+            [Command::DeleteReview { .. }]
+        ));
+    }
+
+    #[test]
+    fn test_navigate_to_thread() {
+        let mut state = AppState::default();
+        let thread = Thread {
+            id: "t1".into(),
+            review_id: "r1".into(),
+            task_id: Some("task1".into()),
+            title: "Title".into(),
+            status: ReviewStatus::Todo,
+            impact: ThreadImpact::Nitpick,
+            anchor: None,
+            author: "User".into(),
+            created_at: "now".into(),
+            updated_at: "now".into(),
+        };
+
+        reduce(
+            &mut state,
+            Action::Review(ReviewAction::NavigateToThread(thread)),
+        );
+
+        assert_eq!(state.ui.selected_task_id.as_deref(), Some("task1"));
+        assert_eq!(state.ui.current_view, AppView::Review);
+        assert!(state.ui.active_thread.is_some());
+    }
+
+    #[test]
+    fn test_gen_msg_input_resolved() {
+        let mut state = AppState::default();
+        let payload = crate::ui::app::messages::GenerateResolvedPayload {
+            run_context: crate::infra::acp::RunContext {
+                review_id: "rev1".into(),
+                run_id: "run1".into(),
+                agent_id: "agent1".into(),
+                input_ref: "ref1".into(),
+                diff_text: "diff".into(),
+                diff_hash: "hash".into(),
+                source: crate::domain::ReviewSource::DiffPaste {
+                    diff_hash: "hash".into(),
+                },
+                initial_title: None,
+                created_at: None,
+            },
+            preview: crate::ui::app::state::GeneratePreview {
+                diff_text: "diff".into(),
+                github: None,
+            },
+        };
+
+        let commands = reduce(
+            &mut state,
+            Action::Async(AsyncAction::GenerationMessage(Box::new(
+                GenMsg::InputResolved(Box::new(Ok(payload))),
+            ))),
+        );
+
+        assert_eq!(state.ui.selected_review_id.as_deref(), Some("rev1"));
+        assert!(
+            commands
+                .iter()
+                .any(|c| matches!(c, Command::StartGeneration { .. }))
+        );
+    }
+
+    #[test]
+    fn test_gen_msg_progress() {
+        let mut state = AppState::default();
+        let evt = crate::infra::acp::ProgressEvent::TaskStarted("t1".into());
+
+        let commands = reduce(
+            &mut state,
+            Action::Async(AsyncAction::GenerationMessage(Box::new(GenMsg::Progress(
+                Box::new(evt),
+            )))),
+        );
+
+        assert!(commands.iter().any(|c| matches!(
+            c,
+            Command::RefreshReviewData {
+                reason: ReviewDataRefreshReason::Incremental
+            }
+        )));
+        assert_eq!(state.session.agent_timeline.len(), 1);
+    }
+
+    #[test]
+    fn test_navigation_same_view() {
+        let mut state = AppState {
+            ui: UiState {
+                current_view: AppView::Home,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let commands = reduce(
+            &mut state,
+            Action::Navigation(NavigationAction::SwitchTo(AppView::Home)),
+        );
+        assert!(commands.is_empty());
+    }
+
+    #[test]
+    fn test_generate_action_reset() {
+        let mut state = AppState {
+            ui: UiState {
+                current_view: AppView::Review,
+                ..Default::default()
+            },
+            session: SessionState {
+                diff_text: "some diff".into(),
+                is_generating: true,
+                generation_error: Some("Error".into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let commands = reduce(&mut state, Action::Generate(GenerateAction::Reset));
+
+        assert!(state.session.diff_text.is_empty());
+        assert!(!state.session.is_generating);
+        assert!(state.session.generation_error.is_none());
+        assert_eq!(state.ui.current_view, AppView::Generate);
+        assert!(matches!(commands.as_slice(), [Command::AbortGeneration]));
+    }
+
+    #[test]
+    fn test_generate_action_update_diff_text() {
+        let mut state = AppState::default();
+        reduce(
+            &mut state,
+            Action::Generate(GenerateAction::UpdateDiffText("new diff".into())),
+        );
+        assert_eq!(state.session.diff_text, "new diff");
+    }
+
+    #[test]
+    fn test_generate_action_select_repo() {
+        let mut state = AppState::default();
+        reduce(
+            &mut state,
+            Action::Generate(GenerateAction::SelectRepo(Some("repo1".into()))),
+        );
+        assert_eq!(state.ui.selected_repo_id.as_deref(), Some("repo1"));
+    }
+
+    #[test]
+    fn test_generate_action_clear_timeline() {
+        let mut state = AppState::default();
+        state
+            .session
+            .agent_timeline
+            .push(crate::ui::app::TimelineItem {
+                seq: 1,
+                stream_key: None,
+                content: crate::ui::app::TimelineContent::LocalLog("log".into()),
+            });
+        reduce(&mut state, Action::Generate(GenerateAction::ClearTimeline));
+        assert!(state.session.agent_timeline.is_empty());
+    }
+
+    #[test]
+    fn test_generate_action_toggles() {
+        let mut state = AppState::default();
+
+        state.ui.agent_panel_collapsed = false;
+        reduce(
+            &mut state,
+            Action::Generate(GenerateAction::ToggleAgentPanel),
+        );
+        assert!(state.ui.agent_panel_collapsed);
+
+        state.ui.plan_panel_collapsed = false;
+        reduce(
+            &mut state,
+            Action::Generate(GenerateAction::TogglePlanPanel),
+        );
+        assert!(state.ui.plan_panel_collapsed);
+    }
+
+    #[test]
+    fn test_review_action_clear_selection() {
+        let mut state = AppState {
+            ui: UiState {
+                selected_task_id: Some("t1".into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        reduce(&mut state, Action::Review(ReviewAction::ClearSelection));
+        assert!(state.ui.selected_task_id.is_none());
+    }
+
+    #[test]
+    fn test_review_action_close_thread() {
+        let mut state = AppState {
+            ui: UiState {
+                active_thread: Some(crate::ui::app::ThreadContext {
+                    thread_id: None,
+                    task_id: "t1".into(),
+                    file_path: None,
+                    line_number: None,
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        reduce(&mut state, Action::Review(ReviewAction::CloseThread));
+        assert!(state.ui.active_thread.is_none());
+    }
+
+    #[test]
+    fn test_settings_action_update_extra_path() {
+        let mut state = AppState::default();
+        reduce(
+            &mut state,
+            Action::Settings(SettingsAction::UpdateExtraPath("/new".into())),
+        );
+        assert_eq!(state.ui.extra_path, "/new");
+    }
+
+    #[test]
+    fn test_generate_action_update_diff_text_triggers_preview() {
+        let mut state = AppState::default();
+        let pr_url = "https://github.com/owner/repo/pull/123";
+        let commands = reduce(
+            &mut state,
+            Action::Generate(GenerateAction::UpdateDiffText(pr_url.into())),
+        );
+
+        assert_eq!(state.session.diff_text, pr_url);
+        assert!(state.session.is_preview_fetching);
+        assert_eq!(
+            state.session.last_preview_input_ref.as_deref(),
+            Some(pr_url)
+        );
+        assert!(
+            matches!(
+                commands.as_slice(),
+                [Command::FetchPrContextPreview { input_ref }]
+                if input_ref == pr_url
+            ),
+            "expected fetch context command"
+        );
+    }
+
+    #[test]
+    fn test_generate_action_fetch_pr_context_valid() {
+        let mut state = AppState::default();
+        let ref_str = "owner/repo#123";
+        let commands = reduce(
+            &mut state,
+            Action::Generate(GenerateAction::FetchPrContext(ref_str.into())),
+        );
+
+        assert!(state.session.is_preview_fetching);
+        assert_eq!(
+            state.session.last_preview_input_ref.as_deref(),
+            Some(ref_str)
+        );
+        assert!(matches!(
+            commands.as_slice(),
+            [Command::FetchPrContextPreview { input_ref }]
+            if input_ref == ref_str
+        ));
+    }
+
+    #[test]
+    fn test_generate_action_fetch_pr_context_ignored() {
+        let mut state = AppState {
+            session: SessionState {
+                last_preview_input_ref: Some("owner/repo#123".into()),
+                generate_preview: Some(crate::ui::app::state::GeneratePreview {
+                    diff_text: "".into(),
+                    github: None,
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let commands = reduce(
+            &mut state,
+            Action::Generate(GenerateAction::FetchPrContext("owner/repo#123".into())),
+        );
+        assert!(commands.is_empty());
+    }
+
+    #[test]
+    fn test_gen_msg_preview_resolved_success_auto_repo_select() {
+        let mut state = AppState::default();
+        state.session.diff_text = "owner/repo#123".into();
+        state.session.is_preview_fetching = true;
+
+        let linked_repo = crate::domain::LinkedRepo {
+            id: "repo-1".into(),
+            name: "repo".into(),
+            path: "/path".into(),
+            remotes: vec!["https://github.com/owner/repo.git".into()],
+            created_at: "now".into(),
+        };
+        state.domain.linked_repos.push(linked_repo);
+
+        let pr_ref = crate::infra::github::GitHubPrRef {
+            owner: "owner".into(),
+            repo: "repo".into(),
+            number: 123,
+            url: "url".into(),
+        };
+        let meta = crate::infra::github::GitHubPrMetadata {
+            title: "Title".into(),
+            url: "url".into(),
+            head_sha: None,
+            base_sha: None,
+        };
+        let preview = crate::ui::app::state::GeneratePreview {
+            diff_text: "diff".into(),
+            github: Some(crate::ui::app::state::GitHubPreview { pr: pr_ref, meta }),
+        };
+
+        let commands = reduce(
+            &mut state,
+            Action::Async(AsyncAction::GenerationMessage(Box::new(
+                GenMsg::PreviewResolved {
+                    input_ref: "owner/repo#123".into(),
+                    result: Ok(preview),
+                },
+            ))),
+        );
+
+        assert!(!state.session.is_preview_fetching);
+        assert!(state.session.generate_preview.is_some());
+        assert_eq!(state.ui.selected_repo_id.as_deref(), Some("repo-1"));
+        assert!(commands.is_empty());
+    }
+
+    #[test]
+    fn test_gen_msg_preview_resolved_error() {
+        let mut state = AppState::default();
+        state.session.diff_text = "ref".into();
+        state.session.is_preview_fetching = true;
+
+        let _commands = reduce(
+            &mut state,
+            Action::Async(AsyncAction::GenerationMessage(Box::new(
+                GenMsg::PreviewResolved {
+                    input_ref: "ref".into(),
+                    result: Err("Failed".to_string()),
+                },
+            ))),
+        );
+
+        assert!(!state.session.is_preview_fetching);
+        assert!(state.session.generate_preview.is_none());
+        assert_eq!(state.session.generation_error.as_deref(), Some("Failed"));
+    }
+
+    #[test]
+    fn test_async_action_gh_status_loaded() {
+        let mut state = AppState::default();
+        state.session.is_gh_status_checking = true;
+
+        reduce(
+            &mut state,
+            Action::Async(AsyncAction::GhStatusLoaded(Ok(
+                crate::ui::app::GhStatusPayload {
+                    gh_path: "/bin/gh".into(),
+                    login: Some("user".into()),
+                },
+            ))),
+        );
+
+        assert!(!state.session.is_gh_status_checking);
+        assert!(state.session.gh_status.is_some());
+        assert!(state.session.gh_status_error.is_none());
+
+        reduce(
+            &mut state,
+            Action::Async(AsyncAction::GhStatusLoaded(Err("Error".to_string()))),
+        );
+        assert!(state.session.gh_status.is_none());
+        assert_eq!(state.session.gh_status_error.as_deref(), Some("Error"));
+    }
+
+    #[test]
+    fn test_async_action_export_preview_generated() {
+        let mut state = AppState::default();
+        state.ui.is_exporting = true;
+
+        reduce(
+            &mut state,
+            Action::Async(AsyncAction::ExportPreviewGenerated(Ok(
+                crate::application::review::export::ExportResult {
+                    markdown: "MD".into(),
+                    assets: std::collections::HashMap::new(),
+                },
+            ))),
+        );
+
+        assert!(!state.ui.is_exporting);
+        assert_eq!(state.ui.export_preview.as_deref(), Some("MD"));
+        assert!(state.ui.review_error.is_none());
+
+        reduce(
+            &mut state,
+            Action::Async(AsyncAction::ExportPreviewGenerated(
+                Err("Error".to_string()),
+            )),
+        );
+        assert!(state.ui.export_preview.is_none());
+        assert_eq!(state.ui.review_error.as_deref(), Some("Error"));
+    }
+
+    #[test]
+    fn test_async_action_task_status_saved() {
+        let mut state = AppState::default();
+
+        let commands = reduce(
+            &mut state,
+            Action::Async(AsyncAction::TaskStatusSaved(Ok(()))),
+        );
+        assert!(matches!(
+            commands.as_slice(),
+            [Command::RefreshReviewData {
+                reason: ReviewDataRefreshReason::AfterStatusChange
+            }]
+        ));
+
+        reduce(
+            &mut state,
+            Action::Async(AsyncAction::TaskStatusSaved(Err("Error".to_string()))),
+        );
+        assert_eq!(state.ui.review_error.as_deref(), Some("Error"));
+    }
+
+    #[test]
+    fn test_async_action_repo_deleted() {
+        let mut state = AppState::default();
+        let repo = crate::domain::LinkedRepo {
+            id: "r1".into(),
+            name: "n".into(),
+            path: "p".into(),
+            remotes: vec![],
+            created_at: "t".into(),
+        };
+        state.domain.linked_repos.push(repo);
+
+        let commands = reduce(
+            &mut state,
+            Action::Async(AsyncAction::RepoDeleted(Ok("r1".into()))),
+        );
+
+        assert!(state.domain.linked_repos.is_empty());
+        assert!(matches!(
+            commands.as_slice(),
+            [Command::RefreshReviewData {
+                reason: ReviewDataRefreshReason::Manual
+            }]
+        ));
+
+        reduce(
+            &mut state,
+            Action::Async(AsyncAction::RepoDeleted(Err("Error".to_string()))),
+        );
+        assert_eq!(state.ui.review_error.as_deref(), Some("Error"));
+    }
 }

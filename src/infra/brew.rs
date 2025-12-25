@@ -71,3 +71,34 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_find_bin_missing() {
+        assert!(find_bin("non_existent_binary_12345").is_none());
+    }
+
+    #[test]
+    fn test_find_brew() {
+        // Brew may or may not be installed on test machine
+        let _ = find_brew();
+    }
+
+    #[test]
+    fn test_candidate_names() {
+        let names = candidate_names("test");
+        assert!(names.contains(&std::ffi::OsString::from("test")));
+    }
+
+    #[test]
+    fn test_push_unique_paths() {
+        let mut dest = vec![PathBuf::from("/a")];
+        let paths = vec![PathBuf::from("/a"), PathBuf::from("/b")];
+        push_unique_paths(&mut dest, paths);
+        assert_eq!(dest.len(), 2);
+        assert_eq!(dest[1], PathBuf::from("/b"));
+    }
+}

@@ -208,3 +208,66 @@ pub fn repo_selector(
             });
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::LinkedRepo;
+    use egui_kittest::Harness;
+    use egui_kittest::kittest::Queryable;
+    use std::path::PathBuf;
+    use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn test_repo_selector_rendering() {
+        let selected = Arc::new(Mutex::new(None));
+        let selected_clone = selected.clone();
+        let repos = vec![LinkedRepo {
+            id: "repo-1".into(),
+            name: "Repo 1".into(),
+            path: PathBuf::from("/path/1"),
+            remotes: vec![],
+            created_at: "".into(),
+        }];
+
+        let mut harness = Harness::new(move |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                let mut selected_guard = selected_clone.lock().unwrap();
+                repo_selector(ui, &mut selected_guard, &repos);
+            });
+        });
+
+        harness.run_steps(1);
+        harness.get_by_label("No Repo Context");
+    }
+
+    #[test]
+    fn test_repo_selector_selection() {
+        let selected = Arc::new(Mutex::new(None));
+        let selected_clone = selected.clone();
+        let repos = vec![LinkedRepo {
+            id: "repo-1".into(),
+            name: "Repo 1".into(),
+            path: PathBuf::from("/path/1"),
+            remotes: vec![],
+            created_at: "".into(),
+        }];
+
+        let mut harness = Harness::new(move |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                let mut selected_guard = selected_clone.lock().unwrap();
+                repo_selector(ui, &mut selected_guard, &repos);
+            });
+        });
+
+        harness.run_steps(1);
+        harness.get_by_label("No Repo Context").click();
+        harness.run_steps(1);
+
+        // Popup is open, should see "Repo 1"
+        harness.get_by_label("Repo 1").click();
+        harness.run_steps(1);
+
+        assert_eq!(*selected.lock().unwrap(), Some("repo-1".to_string()));
+    }
+}

@@ -139,3 +139,20 @@ pub fn supports_native_rounded_corners() -> bool {
         false
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_supports_native_rounded_corners() {
+        // Just verify it doesn't crash and returns a consistent value for the platform
+        let _ = supports_native_rounded_corners();
+    }
+
+    #[test]
+    fn test_apply_native_rounded_corners_null() {
+        let res = apply_native_rounded_corners(std::ptr::null_mut());
+        assert!(res.is_err());
+    }
+}

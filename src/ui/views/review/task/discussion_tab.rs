@@ -1,4 +1,5 @@
 use crate::ui::app::{Action, LaReviewApp, ReviewAction};
+use crate::ui::components::list_item::ListItem;
 use crate::ui::theme::current_theme;
 use crate::ui::views::review::format_timestamp;
 use crate::ui::{spacing, typography};
@@ -90,120 +91,134 @@ impl LaReviewApp {
             let reply_count = comments
                 .map(|items: &Vec<crate::domain::Comment>| items.len())
                 .unwrap_or(0);
-            let updated_label = format_timestamp(&thread.updated_at);
+            let _updated_label = format_timestamp(&thread.updated_at);
 
-            let bg_shape_idx = ui.painter().add(egui::Shape::Noop);
+            // Metadata: status icon/label + impact icon/label + comments count
+            let mut metadata_job = egui::text::LayoutJob::default();
 
-            let inner_response = egui::Frame::NONE
-                .inner_margin(egui::Margin::symmetric(
-                    spacing::SPACING_XL as i8,
-                    spacing::SPACING_MD as i8,
-                ))
-                .show(ui, |ui| {
-                    ui.vertical(|ui| {
-                        ui.horizontal(|ui| {
-                            ui.label(typography::bold(&title).color(theme.text_primary));
-
-                            ui.with_layout(
-                                egui::Layout::right_to_left(egui::Align::Center),
-                                |ui| {
-                                    ui.label(
-                                        typography::tiny(updated_label).color(theme.text_muted),
-                                    );
-                                },
-                            );
-                        });
-
-                        ui.add_space(spacing::SPACING_XS);
-
-                        ui.horizontal(|ui| {
-                            ui.spacing_mut().item_spacing.x = spacing::SPACING_SM;
-
-                            ui.horizontal(|ui| {
-                                ui.spacing_mut().item_spacing.x = 4.0;
-                                ui.label(
-                                    typography::body(status_v.icon)
-                                        .color(status_v.color)
-                                        .size(12.0),
-                                );
-                                ui.label(
-                                    typography::body(status_v.label)
-                                        .color(theme.text_secondary)
-                                        .size(12.0),
-                                );
-                            });
-
-                            ui.label(typography::body("·").color(theme.text_muted).size(12.0));
-
-                            ui.horizontal(|ui| {
-                                ui.spacing_mut().item_spacing.x = 4.0;
-                                ui.label(
-                                    typography::body(impact_v.icon)
-                                        .color(impact_v.color)
-                                        .size(12.0),
-                                );
-                                ui.label(
-                                    typography::body(impact_v.label)
-                                        .color(theme.text_secondary)
-                                        .size(12.0),
-                                );
-                            });
-
-                            ui.label(typography::body("·").color(theme.text_muted).size(12.0));
-
-                            let metadata: String = if path.is_empty() {
-                                format!("{} comments", reply_count)
-                            } else {
-                                format!("{} comments • {}", reply_count, path)
-                            };
-
-                            ui.label(
-                                typography::body(metadata)
-                                    .color(theme.text_secondary)
-                                    .size(12.0),
-                            );
-                        });
-                    })
-                });
-
-            let row_rect = inner_response.response.rect;
-            let row_id = ui.id().with(("thread_row", &thread.id));
-            let response = ui.interact(row_rect, row_id, egui::Sense::click());
-
-            if response.hovered() {
-                ui.painter().set(
-                    bg_shape_idx,
-                    egui::Shape::rect_filled(
-                        row_rect,
-                        crate::ui::spacing::RADIUS_MD,
-                        theme.bg_secondary,
-                    ),
-                );
-            }
-
-            let row_response = ui.interact(
-                response.rect,
-                ui.id().with(("thread_row", &thread.id)),
-                egui::Sense::click(),
+            // Status
+            metadata_job.append(
+                status_v.icon,
+                0.0,
+                egui::TextFormat {
+                    font_id: egui::FontId::proportional(12.0),
+                    color: status_v.color,
+                    ..Default::default()
+                },
             );
-            let row_response = row_response.on_hover_cursor(egui::CursorIcon::PointingHand);
+            metadata_job.append(
+                &format!(" {} · ", status_v.label),
+                0.0,
+                egui::TextFormat {
+                    font_id: egui::FontId::proportional(12.0),
+                    color: theme.text_secondary,
+                    ..Default::default()
+                },
+            );
 
-            if row_response.clicked() {
-                self.dispatch(Action::Review(ReviewAction::OpenThread {
-                    task_id: task.id.clone(),
-                    thread_id: Some(thread.id.clone()),
-                    file_path: if path.is_empty() {
-                        None
-                    } else {
-                        Some(path.clone())
-                    },
-                    line_number: if line == 0 { None } else { Some(line) },
-                }));
+            // Impact
+            metadata_job.append(
+                impact_v.icon,
+                0.0,
+                egui::TextFormat {
+                    font_id: egui::FontId::proportional(12.0),
+                    color: impact_v.color,
+                    ..Default::default()
+                },
+            );
+            metadata_job.append(
+                &format!(" {} · ", impact_v.label),
+                0.0,
+                egui::TextFormat {
+                    font_id: egui::FontId::proportional(12.0),
+                    color: theme.text_secondary,
+                    ..Default::default()
+                },
+            );
+
+            // Count + Path
+            let count_label = if path.is_empty() {
+                format!("{} comments", reply_count)
+            } else {
+                format!("{} comments • {}", reply_count, path)
+            };
+            metadata_job.append(
+                &count_label,
+                0.0,
+                egui::TextFormat {
+                    font_id: egui::FontId::proportional(12.0),
+                    color: theme.text_secondary,
+                    ..Default::default()
+                },
+            );
+
+            let mut action_out = None;
+            ListItem::new(typography::bold(&title).color(theme.text_primary))
+                .metadata(egui::WidgetText::from(metadata_job))
+                .action(|| {
+                    action_out = Some(ReviewAction::OpenThread {
+                        task_id: task.id.clone(),
+                        thread_id: Some(thread.id.clone()),
+                        file_path: if path.is_empty() {
+                            None
+                        } else {
+                            Some(path.clone())
+                        },
+                        line_number: if line == 0 { None } else { Some(line) },
+                    });
+                })
+                .show_with_bg(ui, &theme);
+
+            if let Some(action) = action_out {
+                self.dispatch(Action::Review(action));
             }
 
             if index + 1 < task_threads.len() {
                 ui.separator();
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egui_kittest::Harness;
+    use egui_kittest::kittest::Queryable;
+
+    #[test]
+    fn test_render_discussion_tab_with_threads() {
+        let mut app = LaReviewApp::new_for_test();
+        let task = crate::domain::ReviewTask {
+            id: "task1".into(),
+            ..Default::default()
+        };
+        let thread = crate::domain::Thread {
+            id: "thread1".into(),
+            review_id: "rev1".into(),
+            task_id: Some("task1".into()),
+            title: "Discussion Title".into(),
+            status: crate::domain::ReviewStatus::Todo,
+            impact: crate::domain::ThreadImpact::Nitpick,
+            anchor: None,
+            author: "User".into(),
+            created_at: "now".into(),
+            updated_at: "now".into(),
+        };
+        app.state.domain.threads.push(thread);
+
+        let mut harness = Harness::new(|ctx| {
+            crate::ui::app::LaReviewApp::setup_fonts(ctx);
+            egui::CentralPanel::default().show(ctx, |ui| {
+                app.render_discussion_tab(ui, &task);
+            });
+        });
+        harness.run();
+        harness.get_by_role(egui::accesskit::Role::Button);
+        harness
+            .get_all_by_role(egui::accesskit::Role::Label)
+            .into_iter()
+            .find(|n| n.value().as_deref() == Some("Discussion Title"))
+            .expect("Discussion Title label not found");
     }
 }

@@ -213,3 +213,86 @@ pub(crate) fn render_empty_state(
     );
     action_out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egui_kittest::Harness;
+    use egui_kittest::kittest::Queryable;
+
+    #[test]
+    fn test_render_all_done_state() {
+        let mut harness = Harness::new(|ctx| {
+            crate::ui::app::LaReviewApp::setup_fonts(ctx);
+            egui::CentralPanel::default().show(ctx, |ui| {
+                render_all_done_state(ui, &Theme::mocha());
+            });
+        });
+        harness.run();
+        harness.get_by_label("All tasks completed!");
+    }
+
+    #[test]
+    fn test_render_ready_state() {
+        let mut harness = Harness::new(|ctx| {
+            crate::ui::app::LaReviewApp::setup_fonts(ctx);
+            egui::CentralPanel::default().show(ctx, |ui| {
+                render_ready_state(ui, Some("t1".into()), &Theme::mocha());
+            });
+        });
+        harness.run();
+        harness.get_by_label("Ready to Review");
+        harness
+            .get_all_by_role(egui::accesskit::Role::Button)
+            .into_iter()
+            .find(|n| format!("{:?}", n).contains("Start Reviewing"))
+            .expect("Start Reviewing button not found");
+    }
+
+    #[test]
+    fn test_render_empty_state_generating() {
+        let mut harness = Harness::new(|ctx| {
+            crate::ui::app::LaReviewApp::setup_fonts(ctx);
+            egui::CentralPanel::default().show(ctx, |ui| {
+                render_empty_state(ui, &Theme::mocha(), true);
+            });
+        });
+        harness.run_steps(5);
+        harness.get_by_label("Analyzing your code...");
+    }
+
+    #[test]
+    fn test_render_center_pane_ready() {
+        let mut app = LaReviewApp::new_for_test();
+        app.state.ui.selected_task_id = None;
+        let mut harness = Harness::new(|ctx| {
+            crate::ui::app::LaReviewApp::setup_fonts(ctx);
+            egui::CentralPanel::default().show(ctx, |ui| {
+                app.render_center_pane(ui, &[], 1, 1, Some("t1".into()));
+            });
+        });
+        harness.run();
+        harness.get_by_label("Ready to Review");
+    }
+
+    #[test]
+    fn test_render_ready_state_enter() {
+        let mut harness = Harness::new(|ctx| {
+            crate::ui::app::LaReviewApp::setup_fonts(ctx);
+            egui::CentralPanel::default().show(ctx, |ui| {
+                // Simulate Enter key
+                ctx.input_mut(|i| {
+                    i.events.push(egui::Event::Key {
+                        key: egui::Key::Enter,
+                        physical_key: None,
+                        pressed: true,
+                        repeat: false,
+                        modifiers: egui::Modifiers::default(),
+                    });
+                });
+                render_ready_state(ui, Some("t1".into()), &Theme::mocha());
+            });
+        });
+        harness.run();
+    }
+}

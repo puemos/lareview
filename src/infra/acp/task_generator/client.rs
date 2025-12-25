@@ -769,3 +769,186 @@ impl agent_client_protocol::Client for LaReviewClient {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_slice_lines() {
+        let content = "line1\nline2\nline3\nline4\nline5";
+        assert_eq!(LaReviewClient::slice_lines(content, None, None), content);
+        assert_eq!(
+            LaReviewClient::slice_lines(content, Some(2), Some(2)),
+            "line2\nline3"
+        );
+        assert_eq!(
+            LaReviewClient::slice_lines(content, Some(4), Some(10)),
+            "line4\nline5"
+        );
+    }
+
+    #[test]
+    fn test_parse_return_payload_from_str() {
+        let payload = json!({
+            "id": "T1",
+            "diff_refs": []
+        })
+        .to_string();
+        let res = LaReviewClient::parse_return_payload_from_str(&payload).unwrap();
+        assert_eq!(res.get("id").unwrap().as_str(), Some("T1"));
+
+        let finalize = json!({
+            "title": "Final Title"
+        })
+        .to_string();
+        let res = LaReviewClient::parse_return_payload_from_str(&finalize).unwrap();
+        assert_eq!(res.get("title").unwrap().as_str(), Some("Final Title"));
+    }
+
+    #[test]
+    fn test_extract_chunk_id() {
+        let meta = json!({ "message_id": "m1" });
+        let meta_obj: Meta = serde_json::from_value(meta).unwrap();
+        assert_eq!(
+            LaReviewClient::extract_chunk_id(Some(&meta_obj)),
+            Some("m1".to_string())
+        );
+    }
+
+    #[test]
+    fn test_tool_name_detection() {
+        let client = LaReviewClient::new(None, "run1", None);
+        assert!(client.looks_like_return_tool("return_task"));
+        assert!(client.looks_like_return_tool("finalize_review"));
+        assert!(!client.looks_like_return_tool("read_file"));
+
+        assert_eq!(
+            LaReviewClient::tool_name_from_title("return_task"),
+            Some("return_task")
+        );
+        assert_eq!(LaReviewClient::tool_name_from_title("something_else"), None);
+    }
+
+    #[test]
+    fn test_payload_candidates() {
+        let val = json!({ "id": "T1", "arguments": { "foo": "bar" } });
+        let candidates = LaReviewClient::payload_candidates(&val);
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(candidates[0], val);
+        assert_eq!(candidates[1], json!({ "foo": "bar" }));
+    }
+
+    #[test]
+    fn test_append_streamed_content() {
+        let client = LaReviewClient::new(None, "run1", None);
+        let store = Arc::new(Mutex::new(Vec::new()));
+        let last_id = Arc::new(Mutex::new(None));
+
+        let (combined, is_new) = client.append_streamed_content(&store, &last_id, None, "Hello");
+        assert_eq!(combined, "Hello");
+        assert!(is_new);
+
+        let (combined, is_new) = client.append_streamed_content(&store, &last_id, None, " World");
+        assert_eq!(combined, "Hello World");
+        assert!(!is_new);
+    }
+
+    #[test]
+    fn test_normalize_path() {
+        assert_eq!(
+            LaReviewClient::normalize_path(Path::new("a/b/../c")),
+            PathBuf::from("a/c")
+        );
+        assert_eq!(
+            LaReviewClient::normalize_path(Path::new("./a/./b")),
+            PathBuf::from("a/b")
+        );
+    }
+
+    #[test]
+    fn test_append_single_task_from_value() {
+        let client = LaReviewClient::new(None, "run1", None);
+        let task_json = json!({
+            "id": "T1",
+            "title": "Title",
+            "description": "Desc",
+            "diagram": "x -> y",
+            "stats": { "risk": "LOW", "tags": [] },
+            "diff_refs": []
+        });
+
+        assert!(client.append_single_task_from_value(task_json));
+        assert_eq!(client.tasks.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_tool_call_tracking() {
+        use agent_client_protocol::ToolCallId;
+        let client = LaReviewClient::new(None, "run1", None);
+        let id = ToolCallId::new("tc1");
+
+        client.record_tool_call_name(&id, "search");
+        assert_eq!(client.lookup_tool_call_name(&id), Some("search".into()));
+
+        client.clear_tool_call_name(&id);
+        assert_eq!(client.lookup_tool_call_name(&id), None);
+    }
+
+    #[tokio::test]
+    async fn test_request_permission() {
+        use agent_client_protocol::{Client, RequestPermissionRequest};
+        let client = LaReviewClient::new(None, "run1", None);
+
+        let req_json = json!({
+            "sessionId": "s1",
+            "toolCall": {
+                "toolCallId": "tc1",
+                "title": "return_task",
+                "kind": "other",
+                "status": "pending",
+                "content": [],
+                "locations": []
+            },
+            "options": [
+                {
+                    "optionId": "allow",
+                    "kind": "allow_once",
+                    "name": "Allow"
+                }
+            ]
+        });
+        let req: RequestPermissionRequest = serde_json::from_value(req_json).unwrap();
+
+        let resp = client.request_permission(req).await.unwrap();
+        assert!(matches!(
+            resp.outcome,
+            agent_client_protocol::RequestPermissionOutcome::Selected(_)
+        ));
+    }
+
+    #[test]
+    fn test_client_finalization() {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let client = LaReviewClient::new(Some(tx), "run1", None);
+
+        client.mark_finalization_received();
+        assert!(*client.finalization_received.lock().unwrap());
+        let event = rx.try_recv().unwrap();
+        assert!(matches!(event, ProgressEvent::Finalized));
+    }
+
+    #[test]
+    fn test_client_emit_log() {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let client = LaReviewClient::new(Some(tx), "run1", None);
+
+        client.emit_log("test log");
+        let event = rx.try_recv().unwrap();
+        if let ProgressEvent::LocalLog(msg) = event {
+            assert_eq!(msg, "test log");
+        } else {
+            panic!("wrong event type");
+        }
+    }
+}

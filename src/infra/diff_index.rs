@@ -553,4 +553,21 @@ index 0000000..abcdefg
         assert!(diff_text.contains("@@ -10,3 +10,3 @@"));
         assert!(!diff_text.contains("@@ -1,3 +1,3 @@"));
     }
+
+    #[test]
+    fn test_generate_hunk_manifest() {
+        let index = DiffIndex::new(TEST_DIFF).unwrap();
+        let manifest = index.generate_hunk_manifest();
+        assert!(manifest.contains("src/main.rs:"));
+        assert!(manifest.contains("H1:"));
+    }
+
+    #[test]
+    fn test_diff_index_error_display() {
+        let err = DiffIndexError::FileNotFound {
+            file: "missing.rs".into(),
+        };
+        assert!(err.to_string().contains("missing.rs"));
+        assert!(err.to_json().contains("FileNotFound"));
+    }
 }
