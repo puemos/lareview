@@ -410,89 +410,76 @@ impl LaReviewApp {
                             
                             let key_width = 140.0;
                             let val_width = 200.0;
-                            let btn_width = 40.0;
+                            let btn_width = 32.0;
+                            let row_height = 24.0;
+                            let spacing_x = spacing::SPACING_LG;
 
                             // Header
-                            egui::Grid::new("agent_modal_envs_header")
-                                .num_columns(3)
-                                .spacing([spacing::SPACING_LG, spacing::SPACING_MD])
-                                .min_col_width(key_width)
-                                .show(ui, |ui| {
-                                    ui.label(typography::weak("Variable Name"));
-                                    ui.set_min_width(val_width);
-                                    ui.label(typography::weak("Value"));
-                                    ui.set_min_width(btn_width);
-                                    ui.label("");
-                                    ui.end_row();
-                                });
+                            ui.horizontal(|ui| {
+                                ui.spacing_mut().item_spacing.x = spacing_x;
+                                ui.add_sized([key_width, row_height], egui::Label::new(typography::weak("Variable Name")));
+                                ui.add_sized([val_width, row_height], egui::Label::new(typography::weak("Value")));
+                                ui.add_sized([btn_width, row_height], egui::Label::new(""));
+                            });
                             ui.add_space(spacing::SPACING_XS);
 
                             egui::ScrollArea::vertical()
                                 .max_height(200.0)
                                 .auto_shrink([false, true])
                                 .show(ui, |ui| {
-                                    egui::Grid::new("agent_modal_envs_grid")
-                                        .num_columns(3)
-                                        .spacing([spacing::SPACING_LG, spacing::SPACING_MD])
-                                        .min_col_width(key_width)
-                                        .show(ui, |ui| {
-                                            let mut to_remove = None;
-                                            if let Some(envs) = self.state.ui.agent_envs.get(&agent_id) {
-                                                for (key, value) in envs {
-                                                    ui.add(egui::Label::new(typography::mono(key)).truncate());
+                                    ui.vertical(|ui| {
+                                        ui.spacing_mut().item_spacing.y = spacing::SPACING_MD;
+                                        let mut to_remove = None;
+                                        if let Some(envs) = self.state.ui.agent_envs.get(&agent_id) {
+                                            for (key, value) in envs {
+                                                ui.horizontal(|ui| {
+                                                    ui.spacing_mut().item_spacing.x = spacing_x;
                                                     
-                                                    ui.scope(|ui| {
-                                                        ui.set_min_width(val_width);
-                                                        ui.label(if value.len() > 10 { "*******" } else { value });
-                                                    });
+                                                    ui.add_sized([key_width, row_height], egui::Label::new(typography::mono(key)).truncate());
+                                                    
+                                                    let display_val = if value.len() > 10 { "*******" } else { value };
+                                                    ui.add_sized([val_width, row_height], egui::Label::new(display_val));
 
-                                                    ui.scope(|ui| {
-                                                        ui.set_min_width(btn_width);
-                                                        if ui.button("🗑").clicked() {
-                                                            to_remove = Some(key.clone());
-                                                        }
-                                                    });
-                                                    ui.end_row();
-                                                }
+                                                    if ui.add_sized([btn_width, row_height], egui::Button::new("🗑")).clicked() {
+                                                        to_remove = Some(key.clone());
+                                                    }
+                                                });
                                             }
-                                            
-                                            if let Some(key) = to_remove {
-                                                self.dispatch(Action::Settings(SettingsAction::RemoveAgentEnv(agent_id.clone(), key)));
-                                            }
-                                        });
+                                        }
+                                        
+                                        if let Some(key) = to_remove {
+                                            self.dispatch(Action::Settings(SettingsAction::RemoveAgentEnv(agent_id.clone(), key)));
+                                        }
+                                    });
                                 });
                             
                             ui.add_space(spacing::SPACING_MD);
                             
                             // Add New row
-                            egui::Grid::new("agent_modal_envs_footer")
-                                .num_columns(3)
-                                .spacing([spacing::SPACING_LG, spacing::SPACING_MD])
-                                .min_col_width(key_width)
-                                .show(ui, |ui| {
-                                    ui.add(egui::TextEdit::singleline(&mut self.state.ui.agent_env_draft_key)
-                                        .hint_text("KEY")
-                                        .desired_width(key_width));
-                                    
-                                    ui.add(egui::TextEdit::singleline(&mut self.state.ui.agent_env_draft_value)
+                            ui.horizontal(|ui| {
+                                ui.spacing_mut().item_spacing.x = spacing_x;
+                                
+                                ui.add_sized([key_width, row_height], 
+                                    egui::TextEdit::singleline(&mut self.state.ui.agent_env_draft_key)
+                                        .hint_text("KEY"));
+                                
+                                ui.add_sized([val_width, row_height], 
+                                    egui::TextEdit::singleline(&mut self.state.ui.agent_env_draft_value)
                                         .hint_text("VALUE")
-                                        .password(true)
-                                        .desired_width(val_width));
-                                    
-                                    ui.scope(|ui| {
-                                        ui.set_min_width(btn_width);
-                                        if ui.button("➕").clicked() && !self.state.ui.agent_env_draft_key.is_empty() {
-                                            self.dispatch(Action::Settings(SettingsAction::UpdateAgentEnv(
-                                                agent_id.clone(),
-                                                self.state.ui.agent_env_draft_key.clone(),
-                                                self.state.ui.agent_env_draft_value.clone(),
-                                            )));
-                                            self.state.ui.agent_env_draft_key.clear();
-                                            self.state.ui.agent_env_draft_value.clear();
-                                        }
-                                    });
-                                    ui.end_row();
-                                });
+                                        .password(true));
+                                
+                                if ui.add_sized([btn_width, row_height], egui::Button::new("➕")).clicked() 
+                                    && !self.state.ui.agent_env_draft_key.is_empty() 
+                                {
+                                    self.dispatch(Action::Settings(SettingsAction::UpdateAgentEnv(
+                                        agent_id.clone(),
+                                        self.state.ui.agent_env_draft_key.clone(),
+                                        self.state.ui.agent_env_draft_value.clone(),
+                                    )));
+                                    self.state.ui.agent_env_draft_key.clear();
+                                    self.state.ui.agent_env_draft_value.clear();
+                                }
+                            });
                             
                             ui.add_space(spacing::SPACING_XL);
                             ui.horizontal(|ui| {
