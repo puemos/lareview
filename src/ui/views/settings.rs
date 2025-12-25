@@ -293,14 +293,11 @@ impl LaReviewApp {
                 ui.vertical(|ui| {
                     ui.set_max_width(ui.available_width());
                     
-                    egui::Frame::NONE.show(ui, |ui| {
-                        ui.spacing_mut().item_spacing = egui::vec2(spacing::SPACING_MD, spacing::SPACING_MD);
-                        
-                        ui.horizontal_wrapped(|ui| {
-                            for candidate in &candidates {
-                                self.ui_agent_card(ui, candidate);
-                            }
-                        });
+                    ui.spacing_mut().item_spacing = egui::vec2(spacing::SPACING_MD, spacing::SPACING_MD);
+                    ui.horizontal_wrapped(|ui| {
+                        for candidate in &candidates {
+                            self.ui_agent_card(ui, candidate);
+                        }
                     });
                 });
             });
@@ -323,7 +320,6 @@ impl LaReviewApp {
             .corner_radius(spacing::RADIUS_MD)
             .show(ui, |ui| {
                 ui.set_min_size(egui::vec2(card_width, card_height));
-                ui.set_max_size(egui::vec2(card_width, card_height));
                 
                 ui.vertical(|ui| {
                     ui.horizontal(|ui| {
@@ -359,9 +355,10 @@ impl LaReviewApp {
                     
                     // Path/Command info
                     let cmd = candidate.command.as_deref().unwrap_or("Not found");
-                    ui.label(typography::weak(cmd).size(10.0));
+                    ui.add(egui::Label::new(typography::weak(cmd).size(10.0)).truncate());
                     
                     ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
+                        ui.add_space(spacing::SPACING_XS);
                         if ui.button("⚙ Settings").clicked() {
                             self.dispatch(Action::Settings(SettingsAction::OpenAgentSettings(candidate.id.clone())));
                         }
@@ -380,69 +377,82 @@ impl LaReviewApp {
             .collapsible(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
             .show(ctx, |ui| {
-                ui.set_width(450.0);
+                ui.set_width(500.0);
                 
-                ui.add_space(spacing::SPACING_SM);
-                ui.label(typography::bold("Executable Path Override"));
-                
-                let mut path = self.state.ui.agent_path_overrides.get(&agent_id).cloned().unwrap_or_default();
-                if ui.add(egui::TextEdit::singleline(&mut path).desired_width(f32::INFINITY)).changed() {
-                    self.dispatch(Action::Settings(SettingsAction::UpdateAgentPath(agent_id.clone(), path)));
-                }
-                ui.label(typography::weak("Leave empty to use default auto-discovery."));
-                
-                ui.add_space(spacing::SPACING_LG);
-                ui.separator();
-                ui.add_space(spacing::SPACING_MD);
-                
-                ui.label(typography::bold("Environment Variables"));
-                
-                egui::ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
-                    egui::Grid::new("agent_modal_envs_grid")
-                        .num_columns(3)
-                        .spacing([spacing::SPACING_MD, spacing::SPACING_SM])
-                        .show(ui, |ui| {
-                            let mut to_remove = None;
-                            if let Some(envs) = self.state.ui.agent_envs.get(&agent_id) {
-                                for (key, value) in envs {
-                                    ui.label(typography::mono(key));
-                                    ui.label(if value.len() > 10 { "*******" } else { value });
-                                    if ui.button("🗑").clicked() {
-                                        to_remove = Some(key.clone());
-                                    }
-                                    ui.end_row();
-                                }
-                            }
+                egui::Frame::NONE
+                    .inner_margin(spacing::SPACING_LG)
+                    .show(ui, |ui| {
+                        ui.vertical(|ui| {
+                            ui.label(typography::bold("Executable Path Override"));
+                            ui.add_space(spacing::SPACING_XS);
                             
-                            if let Some(key) = to_remove {
-                                self.dispatch(Action::Settings(SettingsAction::RemoveAgentEnv(agent_id.clone(), key)));
+                            let mut path = self.state.ui.agent_path_overrides.get(&agent_id).cloned().unwrap_or_default();
+                            if ui.add(egui::TextEdit::singleline(&mut path).desired_width(f32::INFINITY)).changed() {
+                                self.dispatch(Action::Settings(SettingsAction::UpdateAgentPath(agent_id.clone(), path)));
                             }
+                            ui.label(typography::weak("Leave empty to use default auto-discovery."));
+                            
+                            ui.add_space(spacing::SPACING_XL);
+                            ui.separator();
+                            ui.add_space(spacing::SPACING_LG);
+                            
+                            ui.label(typography::bold("Environment Variables"));
+                            ui.add_space(spacing::SPACING_MD);
+                            
+                            egui::ScrollArea::vertical()
+                                .max_height(250.0)
+                                .auto_shrink([false, true])
+                                .show(ui, |ui| {
+                                    egui::Grid::new("agent_modal_envs_grid")
+                                        .num_columns(3)
+                                        .spacing([spacing::SPACING_LG, spacing::SPACING_MD])
+                                        .show(ui, |ui| {
+                                            let mut to_remove = None;
+                                            if let Some(envs) = self.state.ui.agent_envs.get(&agent_id) {
+                                                for (key, value) in envs {
+                                                    ui.label(typography::mono(key));
+                                                    ui.label(if value.len() > 10 { "*******" } else { value });
+                                                    if ui.button("🗑").clicked() {
+                                                        to_remove = Some(key.clone());
+                                                    }
+                                                    ui.end_row();
+                                                }
+                                            }
+                                            
+                                            if let Some(key) = to_remove {
+                                                self.dispatch(Action::Settings(SettingsAction::RemoveAgentEnv(agent_id.clone(), key)));
+                                            }
+                                        });
+                                });
+                            
+                            ui.add_space(spacing::SPACING_LG);
+                            ui.horizontal(|ui| {
+                                ui.add(egui::TextEdit::singleline(&mut self.state.ui.agent_env_draft_key).hint_text("KEY").desired_width(120.0));
+                                ui.add(egui::TextEdit::singleline(&mut self.state.ui.agent_env_draft_value).hint_text("VALUE").password(true).desired_width(180.0));
+                                
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    if ui.button("➕ Add").clicked() && !self.state.ui.agent_env_draft_key.is_empty() {
+                                        self.dispatch(Action::Settings(SettingsAction::UpdateAgentEnv(
+                                            agent_id.clone(),
+                                            self.state.ui.agent_env_draft_key.clone(),
+                                            self.state.ui.agent_env_draft_value.clone(),
+                                        )));
+                                        self.state.ui.agent_env_draft_key.clear();
+                                        self.state.ui.agent_env_draft_value.clear();
+                                    }
+                                });
+                            });
+                            
+                            ui.add_space(spacing::SPACING_XL);
+                            ui.horizontal(|ui| {
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    if ui.button("Done").clicked() {
+                                        self.dispatch(Action::Settings(SettingsAction::CloseAgentSettings));
+                                    }
+                                });
+                            });
                         });
-                });
-                
-                ui.add_space(spacing::SPACING_MD);
-                ui.horizontal(|ui| {
-                    ui.add(egui::TextEdit::singleline(&mut self.state.ui.agent_env_draft_key).hint_text("KEY"));
-                    ui.add(egui::TextEdit::singleline(&mut self.state.ui.agent_env_draft_value).hint_text("VALUE").password(true));
-                    if ui.button("➕ Add").clicked() && !self.state.ui.agent_env_draft_key.is_empty() {
-                        self.dispatch(Action::Settings(SettingsAction::UpdateAgentEnv(
-                            agent_id.clone(),
-                            self.state.ui.agent_env_draft_key.clone(),
-                            self.state.ui.agent_env_draft_value.clone(),
-                        )));
-                        self.state.ui.agent_env_draft_key.clear();
-                        self.state.ui.agent_env_draft_value.clear();
-                    }
-                });
-                
-                ui.add_space(spacing::SPACING_LG);
-                ui.horizontal(|ui| {
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button("Close").clicked() {
-                            self.dispatch(Action::Settings(SettingsAction::CloseAgentSettings));
-                        }
                     });
-                });
             });
             
         if !open {
@@ -460,38 +470,46 @@ impl LaReviewApp {
             .collapsible(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
             .show(ctx, |ui| {
-                ui.set_width(400.0);
+                ui.set_width(450.0);
                 
-                egui::Grid::new("add_custom_agent_grid")
-                    .num_columns(2)
-                    .spacing([spacing::SPACING_MD, spacing::SPACING_MD])
+                egui::Frame::NONE
+                    .inner_margin(spacing::SPACING_LG)
                     .show(ui, |ui| {
-                        ui.label("Unique ID:");
-                        ui.text_edit_singleline(&mut self.state.ui.custom_agent_draft.id);
-                        ui.end_row();
-                        
-                        ui.label("Display Label:");
-                        ui.text_edit_singleline(&mut self.state.ui.custom_agent_draft.label);
-                        ui.end_row();
-                        
-                        ui.label("Command/Binary:");
-                        ui.text_edit_singleline(&mut self.state.ui.custom_agent_draft.command);
-                        ui.end_row();
+                        ui.vertical(|ui| {
+                            egui::Grid::new("add_custom_agent_grid")
+                                .num_columns(2)
+                                .spacing([spacing::SPACING_LG, spacing::SPACING_LG])
+                                .show(ui, |ui| {
+                                    ui.label(typography::bold("Unique ID:"));
+                                    ui.text_edit_singleline(&mut self.state.ui.custom_agent_draft.id);
+                                    ui.end_row();
+                                    
+                                    ui.label(typography::bold("Display Label:"));
+                                    ui.text_edit_singleline(&mut self.state.ui.custom_agent_draft.label);
+                                    ui.end_row();
+                                    
+                                    ui.label(typography::bold("Command/Binary:"));
+                                    ui.text_edit_singleline(&mut self.state.ui.custom_agent_draft.command);
+                                    ui.end_row();
+                                });
+                            
+                            ui.add_space(spacing::SPACING_XL);
+                            ui.horizontal(|ui| {
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    if ui.button("Add Agent").clicked() && !self.state.ui.custom_agent_draft.id.is_empty() {
+                                        self.dispatch(Action::Settings(SettingsAction::AddCustomAgent(self.state.ui.custom_agent_draft.clone())));
+                                        self.dispatch(Action::Settings(SettingsAction::CloseAddCustomAgent));
+                                    }
+                                    
+                                    ui.add_space(spacing::SPACING_MD);
+                                    
+                                    if ui.button("Cancel").clicked() {
+                                        self.dispatch(Action::Settings(SettingsAction::CloseAddCustomAgent));
+                                    }
+                                });
+                            });
+                        });
                     });
-                
-                ui.add_space(spacing::SPACING_LG);
-                ui.horizontal(|ui| {
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button("Add Agent").clicked() && !self.state.ui.custom_agent_draft.id.is_empty() {
-                            self.dispatch(Action::Settings(SettingsAction::AddCustomAgent(self.state.ui.custom_agent_draft.clone())));
-                            self.dispatch(Action::Settings(SettingsAction::CloseAddCustomAgent));
-                        }
-                        
-                        if ui.button("Cancel").clicked() {
-                            self.dispatch(Action::Settings(SettingsAction::CloseAddCustomAgent));
-                        }
-                    });
-                });
             });
             
         if !open {
