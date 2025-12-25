@@ -259,6 +259,244 @@ impl LaReviewApp {
                         });
                 }
             });
+
+        ui.separator();
+
+        // --- Agents Section ---
+        egui::Frame::NONE
+            .inner_margin(egui::Margin::symmetric(
+                spacing::SPACING_XL as i8,
+                spacing::SPACING_MD as i8,
+            ))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(typography::label("ACP Agents").color(theme.text_primary));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if self.state.ui.is_agent_settings_modified
+                            && ui
+                                .button(typography::bold("💾 Save Changes").color(theme.brand))
+                                .clicked()
+                        {
+                            self.dispatch(Action::Settings(SettingsAction::SaveAgentSettings));
+                        }
+
+                        if ui.button("➕ Add Custom Agent").clicked() {
+                            self.dispatch(Action::Settings(SettingsAction::OpenAddCustomAgent));
+                        }
+                    });
+                });
+
+                ui.add_space(spacing::SPACING_MD);
+
+                let candidates = crate::infra::acp::list_agent_candidates();
+
+                ui.vertical(|ui| {
+                    ui.set_max_width(ui.available_width());
+                    
+                    egui::Frame::NONE.show(ui, |ui| {
+                        ui.spacing_mut().item_spacing = egui::vec2(spacing::SPACING_MD, spacing::SPACING_MD);
+                        
+                        ui.horizontal_wrapped(|ui| {
+                            for candidate in &candidates {
+                                self.ui_agent_card(ui, candidate);
+                            }
+                        });
+                    });
+                });
+            });
+
+        // --- Modals ---
+        self.ui_agent_settings_modal(ui.ctx());
+        self.ui_add_custom_agent_modal(ui.ctx());
+    }
+
+    fn ui_agent_card(&mut self, ui: &mut egui::Ui, candidate: &crate::infra::acp::AgentCandidate) {
+        let theme = theme::current_theme();
+        
+        let card_width = 240.0;
+        let card_height = 120.0;
+        
+        egui::Frame::NONE
+            .fill(theme.bg_card)
+            .stroke(egui::Stroke::new(1.0, theme.border))
+            .inner_margin(spacing::SPACING_MD)
+            .corner_radius(spacing::RADIUS_MD)
+            .show(ui, |ui| {
+                ui.set_min_size(egui::vec2(card_width, card_height));
+                ui.set_max_size(egui::vec2(card_width, card_height));
+                
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui| {
+                        // Logo
+                        if let Some(logo_path) = &candidate.logo {
+                            ui.add(
+                                egui::Image::new(format!("bytes://{}", logo_path))
+                                    .max_width(24.0)
+                                    .corner_radius(2.0),
+                            );
+                        } else {
+                            // Placeholder icon
+                            ui.label(typography::body("🤖").size(20.0));
+                        }
+                        
+                        ui.add_space(spacing::SPACING_XS);
+                        
+                        ui.vertical(|ui| {
+                            ui.label(typography::bold(&candidate.label));
+                            ui.label(typography::weak(&candidate.id).size(11.0));
+                        });
+                        
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                            if candidate.available {
+                                ui.colored_label(theme.success, "✔");
+                            } else {
+                                ui.colored_label(theme.destructive, "✖");
+                            }
+                        });
+                    });
+                    
+                    ui.add_space(spacing::SPACING_SM);
+                    
+                    // Path/Command info
+                    let cmd = candidate.command.as_deref().unwrap_or("Not found");
+                    ui.label(typography::weak(cmd).size(10.0));
+                    
+                    ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
+                        if ui.button("⚙ Settings").clicked() {
+                            self.dispatch(Action::Settings(SettingsAction::OpenAgentSettings(candidate.id.clone())));
+                        }
+                    });
+                });
+            });
+    }
+
+    fn ui_agent_settings_modal(&mut self, ctx: &egui::Context) {
+        let Some(agent_id) = self.state.ui.editing_agent_id.clone() else { return; };
+        
+        let mut open = true;
+        egui::Window::new(format!("Agent Settings: {}", agent_id))
+            .open(&mut open)
+            .resizable(false)
+            .collapsible(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+            .show(ctx, |ui| {
+                ui.set_width(450.0);
+                
+                ui.add_space(spacing::SPACING_SM);
+                ui.label(typography::bold("Executable Path Override"));
+                
+                let mut path = self.state.ui.agent_path_overrides.get(&agent_id).cloned().unwrap_or_default();
+                if ui.add(egui::TextEdit::singleline(&mut path).desired_width(f32::INFINITY)).changed() {
+                    self.dispatch(Action::Settings(SettingsAction::UpdateAgentPath(agent_id.clone(), path)));
+                }
+                ui.label(typography::weak("Leave empty to use default auto-discovery."));
+                
+                ui.add_space(spacing::SPACING_LG);
+                ui.separator();
+                ui.add_space(spacing::SPACING_MD);
+                
+                ui.label(typography::bold("Environment Variables"));
+                
+                egui::ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
+                    egui::Grid::new("agent_modal_envs_grid")
+                        .num_columns(3)
+                        .spacing([spacing::SPACING_MD, spacing::SPACING_SM])
+                        .show(ui, |ui| {
+                            let mut to_remove = None;
+                            if let Some(envs) = self.state.ui.agent_envs.get(&agent_id) {
+                                for (key, value) in envs {
+                                    ui.label(typography::mono(key));
+                                    ui.label(if value.len() > 10 { "*******" } else { value });
+                                    if ui.button("🗑").clicked() {
+                                        to_remove = Some(key.clone());
+                                    }
+                                    ui.end_row();
+                                }
+                            }
+                            
+                            if let Some(key) = to_remove {
+                                self.dispatch(Action::Settings(SettingsAction::RemoveAgentEnv(agent_id.clone(), key)));
+                            }
+                        });
+                });
+                
+                ui.add_space(spacing::SPACING_MD);
+                ui.horizontal(|ui| {
+                    ui.add(egui::TextEdit::singleline(&mut self.state.ui.agent_env_draft_key).hint_text("KEY"));
+                    ui.add(egui::TextEdit::singleline(&mut self.state.ui.agent_env_draft_value).hint_text("VALUE").password(true));
+                    if ui.button("➕ Add").clicked() && !self.state.ui.agent_env_draft_key.is_empty() {
+                        self.dispatch(Action::Settings(SettingsAction::UpdateAgentEnv(
+                            agent_id.clone(),
+                            self.state.ui.agent_env_draft_key.clone(),
+                            self.state.ui.agent_env_draft_value.clone(),
+                        )));
+                        self.state.ui.agent_env_draft_key.clear();
+                        self.state.ui.agent_env_draft_value.clear();
+                    }
+                });
+                
+                ui.add_space(spacing::SPACING_LG);
+                ui.horizontal(|ui| {
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.button("Close").clicked() {
+                            self.dispatch(Action::Settings(SettingsAction::CloseAgentSettings));
+                        }
+                    });
+                });
+            });
+            
+        if !open {
+            self.dispatch(Action::Settings(SettingsAction::CloseAgentSettings));
+        }
+    }
+
+    fn ui_add_custom_agent_modal(&mut self, ctx: &egui::Context) {
+        if !self.state.ui.show_add_custom_agent_modal { return; }
+        
+        let mut open = true;
+        egui::Window::new("Add Custom ACP Agent")
+            .open(&mut open)
+            .resizable(false)
+            .collapsible(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+            .show(ctx, |ui| {
+                ui.set_width(400.0);
+                
+                egui::Grid::new("add_custom_agent_grid")
+                    .num_columns(2)
+                    .spacing([spacing::SPACING_MD, spacing::SPACING_MD])
+                    .show(ui, |ui| {
+                        ui.label("Unique ID:");
+                        ui.text_edit_singleline(&mut self.state.ui.custom_agent_draft.id);
+                        ui.end_row();
+                        
+                        ui.label("Display Label:");
+                        ui.text_edit_singleline(&mut self.state.ui.custom_agent_draft.label);
+                        ui.end_row();
+                        
+                        ui.label("Command/Binary:");
+                        ui.text_edit_singleline(&mut self.state.ui.custom_agent_draft.command);
+                        ui.end_row();
+                    });
+                
+                ui.add_space(spacing::SPACING_LG);
+                ui.horizontal(|ui| {
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.button("Add Agent").clicked() && !self.state.ui.custom_agent_draft.id.is_empty() {
+                            self.dispatch(Action::Settings(SettingsAction::AddCustomAgent(self.state.ui.custom_agent_draft.clone())));
+                            self.dispatch(Action::Settings(SettingsAction::CloseAddCustomAgent));
+                        }
+                        
+                        if ui.button("Cancel").clicked() {
+                            self.dispatch(Action::Settings(SettingsAction::CloseAddCustomAgent));
+                        }
+                    });
+                });
+            });
+            
+        if !open {
+            self.dispatch(Action::Settings(SettingsAction::CloseAddCustomAgent));
+        }
     }
 
     /// Helper UI component for commands

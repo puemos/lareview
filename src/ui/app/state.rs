@@ -212,6 +212,17 @@ pub struct UiState {
     pub plan_panel_collapsed: bool,
     pub thread_title_draft: String,
     pub thread_reply_draft: String,
+    // Agent settings
+    pub agent_path_overrides: std::collections::HashMap<String, String>,
+    pub custom_agents: Vec<crate::infra::app_config::CustomAgentConfig>,
+    pub agent_envs: std::collections::HashMap<String, std::collections::HashMap<String, String>>,
+    pub is_agent_settings_modified: bool,
+    pub agent_env_draft_id: String,
+    pub agent_env_draft_key: String,
+    pub agent_env_draft_value: String,
+    pub custom_agent_draft: crate::infra::app_config::CustomAgentConfig,
+    pub editing_agent_id: Option<String>,
+    pub show_add_custom_agent_modal: bool,
 }
 
 /// All app state in one struct.
