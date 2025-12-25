@@ -291,8 +291,6 @@ impl LaReviewApp {
                 let candidates = crate::infra::acp::list_agent_candidates();
 
                 ui.vertical(|ui| {
-                    ui.set_max_width(ui.available_width());
-                    
                     ui.spacing_mut().item_spacing = egui::vec2(spacing::SPACING_MD, spacing::SPACING_MD);
                     ui.horizontal_wrapped(|ui| {
                         for candidate in &candidates {
@@ -313,58 +311,62 @@ impl LaReviewApp {
         let card_width = 240.0;
         let card_height = 120.0;
         
-        egui::Frame::NONE
-            .fill(theme.bg_card)
-            .stroke(egui::Stroke::new(1.0, theme.border))
-            .inner_margin(spacing::SPACING_MD)
-            .corner_radius(spacing::RADIUS_MD)
-            .show(ui, |ui| {
-                ui.set_min_size(egui::vec2(card_width, card_height));
-                
-                ui.vertical(|ui| {
-                    ui.horizontal(|ui| {
-                        // Logo
-                        if let Some(logo_path) = &candidate.logo {
-                            ui.add(
-                                egui::Image::new(format!("bytes://{}", logo_path))
-                                    .max_width(24.0)
-                                    .corner_radius(2.0),
-                            );
-                        } else {
-                            // Placeholder icon
-                            ui.label(typography::body("🤖").size(20.0));
-                        }
-                        
-                        ui.add_space(spacing::SPACING_XS);
-                        
-                        ui.vertical(|ui| {
-                            ui.label(typography::bold(&candidate.label));
-                            ui.label(typography::weak(&candidate.id).size(11.0));
+        // Use allocate_ui to force the card width in horizontal_wrapped
+        ui.allocate_ui(egui::vec2(card_width, card_height), |ui| {
+            egui::Frame::NONE
+                .fill(theme.bg_card)
+                .stroke(egui::Stroke::new(1.0, theme.border))
+                .inner_margin(spacing::SPACING_MD)
+                .corner_radius(spacing::RADIUS_MD)
+                .show(ui, |ui| {
+                    ui.set_min_size(egui::vec2(card_width, card_height));
+                    ui.set_max_size(egui::vec2(card_width, card_height));
+                    
+                    ui.vertical(|ui| {
+                        ui.horizontal(|ui| {
+                            // Logo
+                            if let Some(logo_path) = &candidate.logo {
+                                ui.add(
+                                    egui::Image::new(format!("bytes://{}", logo_path))
+                                        .max_width(24.0)
+                                        .corner_radius(2.0),
+                                );
+                            } else {
+                                // Placeholder icon
+                                ui.label(typography::body("🤖").size(20.0));
+                            }
+                            
+                            ui.add_space(spacing::SPACING_XS);
+                            
+                            ui.vertical(|ui| {
+                                ui.label(typography::bold(&candidate.label));
+                                ui.label(typography::weak(&candidate.id).size(11.0));
+                            });
+                            
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                                if candidate.available {
+                                    ui.colored_label(theme.success, "✔");
+                                } else {
+                                    ui.colored_label(theme.destructive, "✖");
+                                }
+                            });
                         });
                         
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                            if candidate.available {
-                                ui.colored_label(theme.success, "✔");
-                            } else {
-                                ui.colored_label(theme.destructive, "✖");
+                        ui.add_space(spacing::SPACING_SM);
+                        
+                        // Path/Command info
+                        let cmd = candidate.command.as_deref().unwrap_or("Not found");
+                        ui.add(egui::Label::new(typography::weak(cmd).size(10.0)).truncate());
+                        
+                        ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
+                            ui.add_space(spacing::SPACING_XS);
+                            if ui.button("⚙ Settings").clicked() {
+                                self.dispatch(Action::Settings(SettingsAction::OpenAgentSettings(candidate.id.clone())));
                             }
                         });
                     });
-                    
-                    ui.add_space(spacing::SPACING_SM);
-                    
-                    // Path/Command info
-                    let cmd = candidate.command.as_deref().unwrap_or("Not found");
-                    ui.add(egui::Label::new(typography::weak(cmd).size(10.0)).truncate());
-                    
-                    ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
-                        ui.add_space(spacing::SPACING_XS);
-                        if ui.button("⚙ Settings").clicked() {
-                            self.dispatch(Action::Settings(SettingsAction::OpenAgentSettings(candidate.id.clone())));
-                        }
-                    });
                 });
-            });
+        });
     }
 
     fn ui_agent_settings_modal(&mut self, ctx: &egui::Context) {
