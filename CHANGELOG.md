@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.13] - 2025-12-26
+
+### Added
+- **Generate Input**: Added GitHub PR URL/owner#num parsing with `gh` metadata/diff fetch and preview.
+- **Agent Settings**: Added per-agent executable overrides, environment variables, and custom ACP agents in Settings.
+- **ACP Task Flow**: Added streaming `return_task`/`finalize_review` handling, diff ref validation, and task stats via diff index.
+- **Testing**: Added UI harness tests, expanded unit coverage, and new integration tests for review ordering and DB workflows.
+- **Tooling**: Added login-shell PATH hydration and git remote discovery helpers.
+
+### Changed
+- **Navigation**: Removed the Home view; Generate remains the default entry point.
+- **Tool Discovery**: Standardized on login-shell PATH plus per-agent overrides for external tools.
+- **macOS App Bundle**: Simplified app packaging to use a single binary name; updated codesign target.
+- **Settings UI**: Reworked agent settings layout with cards, modals, and aligned grids.
+- **Docs**: Updated architecture/dev guidance and test organization notes.
+
+### Fixed
+- **Shell PATH**: Resolved PATH edge cases for CLI tool discovery.
+- **UI Details**: Improved pill hover tint and layout alignment.
+
 ## [0.0.12] - 2025-12-24
 
 ### Added

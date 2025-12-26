@@ -2972,7 +2972,7 @@ dependencies = [
 
 [[package]]
 name = "lareview"
-version = "0.0.12"
+version = "0.0.13"
 dependencies = [
  "accesskit",
  "agent-client-protocol",
