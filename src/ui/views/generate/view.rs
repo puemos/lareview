@@ -64,18 +64,20 @@ impl LaReviewApp {
                                     }
 
                                     // 2. Stop/Clear Button (Simple Pill)
-                                    let (label, icon, color) = if is_generating {
-                                        ("Stop", icons::ACTION_STOP, theme.destructive)
+                                    let (label, icon) = if is_generating {
+                                        ("Stop", icons::ACTION_STOP)
                                     } else {
-                                        (
-                                            "Clear",
-                                            egui_phosphor::regular::ARROWS_COUNTER_CLOCKWISE,
-                                            theme.border,
-                                        )
+                                        ("Clear", egui_phosphor::regular::ARROWS_COUNTER_CLOCKWISE)
                                     };
 
-                                    if pill_action_button(ui, icon, label, has_content, color)
-                                        .clicked()
+                                    if pill_action_button(
+                                        ui,
+                                        icon,
+                                        label,
+                                        has_content,
+                                        theme.destructive,
+                                    )
+                                    .clicked()
                                     {
                                         self.dispatch(Action::Generate(GenerateAction::Reset));
                                     }

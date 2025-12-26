@@ -1,23 +1,4 @@
-use crate::ui::spacing;
-use crate::ui::theme;
-use eframe::egui;
-
-pub fn pill_divider(ui: &mut egui::Ui) {
-    let theme = theme::current_theme();
-
-    // Small, subtle divider to separate inline "pill" elements without adding visual weight.
-    let size = egui::vec2(spacing::SPACING_SM, 18.0);
-    let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
-
-    let x = rect.center().x;
-    let top = rect.top() + 2.0;
-    let bottom = rect.bottom() - 2.0;
-
-    ui.painter().line_segment(
-        [egui::pos2(x, top), egui::pos2(x, bottom)],
-        egui::Stroke::new(1.0, theme.border_secondary.gamma_multiply(0.8)),
-    );
-}
+use crate::ui::{spacing, theme};
 
 pub fn pill_action_button(
     ui: &mut egui::Ui,
@@ -27,37 +8,41 @@ pub fn pill_action_button(
     tint: egui::Color32,
 ) -> egui::Response {
     let theme = theme::current_theme();
-    let text = egui::RichText::new(format!("{icon} {label}"))
-        .size(12.0)
-        .color(if enabled {
-            theme.text_primary
-        } else {
-            theme.text_disabled
-        });
-
-    let fill = if enabled {
-        theme.bg_secondary
-    } else {
-        theme.bg_surface
-    };
-
-    let stroke = if enabled { tint } else { theme.border };
-
     let old_padding = ui.spacing().button_padding;
-    ui.spacing_mut().button_padding =
-        egui::vec2(spacing::BUTTON_PADDING.0, spacing::BUTTON_PADDING.1);
 
-    let resp = ui.add_enabled(
-        enabled,
-        egui::Button::new(text)
+    ui.scope(|ui| {
+        ui.spacing_mut().button_padding =
+            egui::vec2(spacing::BUTTON_PADDING.0, spacing::BUTTON_PADDING.1);
+
+        // Set text colors by modifying fg_stroke.color for different states
+        if enabled {
+            ui.style_mut().visuals.widgets.inactive.fg_stroke.color = theme.text_primary;
+            ui.style_mut().visuals.widgets.hovered.fg_stroke.color = tint;
+            ui.style_mut().visuals.widgets.hovered.bg_stroke = egui::Stroke::new(1.0, tint);
+        } else {
+            ui.style_mut().visuals.widgets.inactive.fg_stroke.color = theme.text_disabled;
+        }
+
+        let fill = if enabled {
+            theme.bg_secondary
+        } else {
+            theme.bg_surface
+        };
+
+        // Don't set explicit color - let widget visuals handle it
+        let text = egui::RichText::new(format!("{icon} {label}")).size(12.0);
+
+        let button = egui::Button::new(text)
             .fill(fill)
-            .stroke(egui::Stroke::new(1.0, stroke))
             .corner_radius(egui::CornerRadius::same(5))
-            .min_size(egui::vec2(0.0, 28.0)),
-    );
+            .min_size(egui::vec2(0.0, 28.0));
 
-    let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
+        let resp = ui
+            .add_enabled(enabled, button)
+            .on_hover_cursor(egui::CursorIcon::PointingHand);
 
-    ui.spacing_mut().button_padding = old_padding;
-    resp
+        ui.spacing_mut().button_padding = old_padding;
+        resp
+    })
+    .inner
 }
