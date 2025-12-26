@@ -35,7 +35,7 @@ LaReview turns a PR or unified diff into a task tree so you can review changes i
 
 ## Demo
 
-https://github.com/user-attachments/assets/25ca9d3c-33e8-45f8-9ec7-c8aa670488e5
+https://github.com/user-attachments/assets/609bce15-f6df-4033-b84d-9cc7fc05cbb3
 
 ## Key Features
 
@@ -45,10 +45,10 @@ LaReview is designed for a local-first, secure, and focused review experience.
 | :----------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | <img src="assets/screenshots/generate.webp" width="400" alt="Plan Generation View">        | **AI-Powered Plan Generation**<br>Input a GitHub PR reference (e.g., `owner/repo#123`) or paste a raw diff. LaReview uses your local ACP agent to analyze the changes and generate a structured review plan based on the author's intent.                                    |
 | <img src="assets/screenshots/review.webp" width="400" alt="Structured Review Tree">        | **Structured Task Tree & Notes**<br>Navigate the review as a hierarchical tree. Mark tasks as **To Do**, **In Progress**, or **Done**. Attach contextual notes to specific tasks or lines of code to keep track of your thoughts.                                            |
-| <img src="assets/screenshots/generate-changes.webp" width="400" alt="Task-focused Diff">   | **Task-Focused Diffs**<br>Stop context switching. When you select a task, the diff viewer only shows the specific hunks relevant to completing that task, isolating the noise.                                                                                               |
-| <img src="assets/screenshots/generate-discussion.webp" width="400" alt="Feedback Threads"> | **Agent-Generated Feedback Threads**<br>The AI agent doesn't just plan; it actively identifies issues. It can autonomously create feedback threads (nitpicks, blocking issues, or suggestions) anchored to specific lines of code, helping you catch bugs before they merge. |
+| <img src="assets/screenshots/review-changes.webp" width="400" alt="Task-focused Diff">   | **Task-Focused Diffs**<br>Stop context switching. When you select a task, the diff viewer only shows the specific hunks relevant to completing that task, isolating the noise.                                                                                               |
+| <img src="assets/screenshots/review-discussion-item.webp" width="400" alt="Feedback Threads"> | **Agent-Generated Feedback Threads**<br>The AI agent doesn't just plan; it actively identifies issues. It can autonomously create feedback threads (nitpicks, blocking issues, or suggestions) anchored to specific lines of code, helping you catch bugs before they merge. |
 | <img src="assets/screenshots/repos.webp" width="400" alt="Linked Repositories">            | **Local Repository Context**<br>Link your local Git repositories to LaReview. This gives the AI agent full access to search your codebase and list files, providing maximum context for more accurate and insightful reviews.                                                |
-| <img src="assets/screenshots/generate-diagram.webp" width="400" alt="Diagram Viewer">      | **Visual Diagram View**<br>Visualize the structure and flow of changes with automatically generated diagrams, helping you understand complex refactors faster. (Requires D2).                                                                                                |
+| <img src="assets/screenshots/review-diagram.webp" width="400" alt="Diagram Viewer">      | **Visual Diagram View**<br>Visualize the structure and flow of changes with automatically generated diagrams, helping you understand complex refactors faster. (Requires D2).                                                                                                |
 | <img src="assets/screenshots/settings.webp" width="400" alt="Settings View">               | **Export & Local-First**<br>No third-party servers. Review state is stored in a local SQLite DB. Export your summary as Markdown. PR data is fetched securely via your own GitHub CLI (`gh`), and planning is handled by your local ACP agent.                               |
 
 ## How it works
