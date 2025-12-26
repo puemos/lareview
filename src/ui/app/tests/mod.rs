@@ -4,8 +4,6 @@ pub mod harness;
 #[cfg(test)]
 mod generate;
 #[cfg(test)]
-mod home;
-#[cfg(test)]
 mod navigation;
 #[cfg(test)]
 mod overlay;

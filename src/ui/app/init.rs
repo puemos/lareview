@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use eframe::egui;
 use eframe::egui::FontDefinitions;
+
+use crate::ui::app::{Action, SettingsAction};
 use egui::{FontData, FontFamily};
 use tokio::sync::mpsc;
 
@@ -126,7 +128,7 @@ impl LaReviewApp {
                 ..Default::default()
             },
             ui: crate::ui::app::state::UiState {
-                current_view: AppView::Home,
+                current_view: AppView::Generate,
                 ..Default::default()
             },
             ..Default::default()
@@ -201,6 +203,13 @@ impl LaReviewApp {
             );
         }
 
+        if app.state.session.gh_status.is_none()
+            && app.state.session.gh_status_error.is_none()
+            && !app.state.session.is_gh_status_checking
+        {
+            app.dispatch(Action::Settings(SettingsAction::CheckGitHubStatus));
+        }
+
         app.sync_review_from_db();
         app
     }
@@ -221,7 +230,7 @@ impl LaReviewApp {
                 ..Default::default()
             },
             ui: crate::ui::app::state::UiState {
-                current_view: AppView::Home,
+                current_view: AppView::Generate,
                 ..Default::default()
             },
             ..Default::default()

@@ -117,9 +117,9 @@ pub enum SettingsAction {
     // Agent settings
     UpdateAgentPath(String, String), // agent_id, path
     AddCustomAgent(crate::infra::app_config::CustomAgentConfig),
-    RemoveCustomAgent(String), // agent_id
+    RemoveCustomAgent(String),              // agent_id
     UpdateAgentEnv(String, String, String), // agent_id, key, value
-    RemoveAgentEnv(String, String), // agent_id, key
+    RemoveAgentEnv(String, String),         // agent_id, key
     SaveAgentSettings,
     LoadAgentSettings,
     OpenAgentSettings(String), // agent_id

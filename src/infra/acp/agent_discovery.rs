@@ -1,8 +1,8 @@
 //! Agent discovery module for LaReview
 //! Detects and manages available ACP (Agent Client Protocol) agents such as Codex, Qwen, Gemini, and Mistral ACP-Vibe.
 
+use crate::infra::app_config::{AppConfig, load_config};
 use std::sync::Mutex;
-use crate::infra::app_config::{load_config, AppConfig};
 
 /// Information about a discoverable ACP agent
 #[derive(Debug, Clone, PartialEq)]
@@ -55,7 +55,7 @@ pub fn list_agent_candidates() -> Vec<AgentCandidate> {
     }
 
     // Cache is expired or doesn't exist, rebuild it
-    
+
     // 1. Apply environment variables from config before discovery
     // Note: This modifies the process environment, which built-in agents read.
     for envs in config.agent_envs.values() {
@@ -159,7 +159,7 @@ mod tests {
         let custom = candidates.iter().find(|c| c.id == "custom-test");
         assert!(custom.is_some());
         assert_eq!(custom.unwrap().label, "Custom Test");
-        
+
         // Cleanup
         config.custom_agents.retain(|c| c.id != "custom-test");
         crate::infra::app_config::save_config(&config).unwrap();

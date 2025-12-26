@@ -37,7 +37,6 @@ impl LaReviewApp {
 
                 // --- 2. CENTER: Navigation Tabs ---
                 let tabs_data = [
-                    (AppView::Home, "Home", icons::VIEW_HOME),
                     (AppView::Generate, "Generate", icons::VIEW_GENERATE),
                     (AppView::Review, "Review", icons::VIEW_REVIEW),
                     (AppView::Repos, "Repos", icons::VIEW_REPOS),
@@ -117,7 +116,6 @@ impl LaReviewApp {
 
         if response.clicked() {
             match view {
-                AppView::Home => self.switch_to_home(),
                 AppView::Generate => self.switch_to_generate(),
                 AppView::Review => self.switch_to_review(),
                 AppView::Repos => self.switch_to_repos(),

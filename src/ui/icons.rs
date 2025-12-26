@@ -20,7 +20,6 @@ pub const RISK_MEDIUM: &str = icons::CARET_CIRCLE_UP;
 pub const RISK_HIGH: &str = icons::CARET_CIRCLE_DOUBLE_UP;
 
 // --- Navigation & Views ---
-pub const VIEW_HOME: &str = icons::HOUSE;
 pub const VIEW_GENERATE: &str = icons::ASTERISK;
 pub const VIEW_REVIEW: &str = icons::EYES;
 pub const VIEW_REPOS: &str = icons::FOLDER;
@@ -45,6 +44,8 @@ pub const ACTION_OPEN_WINDOW: &str = icons::ARROW_SQUARE_OUT;
 pub const ACTION_EXPAND: &str = icons::ARROWS_OUT_SIMPLE;
 pub const ACTION_COLLAPSE: &str = icons::ARROWS_IN_SIMPLE;
 pub const ACTION_BACK: &str = icons::ARROW_SQUARE_IN;
+pub const ACTION_COPY: &str = icons::COPY;
+pub const ACTION_SAVE: &str = icons::FLOPPY_DISK;
 
 // --- Symbols ---
 pub const ICON_PLAN: &str = icons::LIST_CHECKS;

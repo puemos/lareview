@@ -1,6 +1,27 @@
-use super::super::super::state::{SessionState, UiState};
+use super::super::super::state::{AgentSettingsSnapshot, SessionState, UiState};
 use super::super::action::SettingsAction;
 use super::super::command::{Command, D2Command};
+
+fn snapshot_for_agent(ui: &UiState, agent_id: &str) -> AgentSettingsSnapshot {
+    let path_override = ui.agent_path_overrides.get(agent_id).and_then(|path| {
+        if path.is_empty() {
+            None
+        } else {
+            Some(path.clone())
+        }
+    });
+    AgentSettingsSnapshot {
+        agent_id: agent_id.to_string(),
+        path_override,
+        envs: ui.agent_envs.get(agent_id).and_then(|envs| {
+            if envs.is_empty() {
+                None
+            } else {
+                Some(envs.clone())
+            }
+        }),
+    }
+}
 
 pub fn reduce(
     ui: &mut UiState,
@@ -63,7 +84,11 @@ pub fn reduce(
             }]
         }
         SettingsAction::UpdateAgentPath(agent_id, path) => {
-            ui.agent_path_overrides.insert(agent_id, path);
+            if path.trim().is_empty() {
+                ui.agent_path_overrides.remove(&agent_id);
+            } else {
+                ui.agent_path_overrides.insert(agent_id, path);
+            }
             ui.is_agent_settings_modified = true;
             Vec::new()
         }
@@ -78,19 +103,28 @@ pub fn reduce(
             Vec::new()
         }
         SettingsAction::UpdateAgentEnv(agent_id, key, value) => {
-            ui.agent_envs.entry(agent_id).or_default().insert(key, value);
+            ui.agent_envs
+                .entry(agent_id)
+                .or_default()
+                .insert(key, value);
             ui.is_agent_settings_modified = true;
             Vec::new()
         }
         SettingsAction::RemoveAgentEnv(agent_id, key) => {
             if let Some(envs) = ui.agent_envs.get_mut(&agent_id) {
                 envs.remove(&key);
+                if envs.is_empty() {
+                    ui.agent_envs.remove(&agent_id);
+                }
             }
             ui.is_agent_settings_modified = true;
             Vec::new()
         }
         SettingsAction::SaveAgentSettings => {
             ui.is_agent_settings_modified = false;
+            if let Some(agent_id) = ui.editing_agent_id.clone() {
+                ui.agent_settings_snapshot = Some(snapshot_for_agent(ui, &agent_id));
+            }
             vec![Command::SaveAppConfigFull {
                 extra_path: ui.extra_path.clone(),
                 has_seen_requirements: ui.has_seen_requirements,
@@ -105,14 +139,37 @@ pub fn reduce(
             ui.custom_agents = config.custom_agents;
             ui.agent_envs = config.agent_envs;
             ui.is_agent_settings_modified = false;
+            ui.agent_settings_snapshot = None;
             Vec::new()
         }
         SettingsAction::OpenAgentSettings(agent_id) => {
-            ui.editing_agent_id = Some(agent_id);
+            ui.editing_agent_id = Some(agent_id.clone());
+            ui.agent_settings_snapshot = Some(snapshot_for_agent(ui, &agent_id));
             Vec::new()
         }
         SettingsAction::CloseAgentSettings => {
-            ui.editing_agent_id = None;
+            let editing_agent_id = ui.editing_agent_id.take();
+            if let (Some(agent_id), Some(snapshot)) =
+                (editing_agent_id, ui.agent_settings_snapshot.take())
+                && snapshot.agent_id == agent_id
+            {
+                match snapshot.path_override {
+                    Some(path) => {
+                        ui.agent_path_overrides.insert(agent_id.clone(), path);
+                    }
+                    None => {
+                        ui.agent_path_overrides.remove(&agent_id);
+                    }
+                }
+                match snapshot.envs {
+                    Some(envs) => {
+                        ui.agent_envs.insert(agent_id, envs);
+                    }
+                    None => {
+                        ui.agent_envs.remove(&agent_id);
+                    }
+                }
+            }
             Vec::new()
         }
         SettingsAction::OpenAddCustomAgent => {

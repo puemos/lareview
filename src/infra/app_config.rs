@@ -131,8 +131,19 @@ mod tests {
         assert!(loaded.has_seen_requirements);
         assert_eq!(loaded.custom_agents.len(), 1);
         assert_eq!(loaded.custom_agents[0].id, "my-agent");
-        assert_eq!(loaded.agent_path_overrides.get("gemini").unwrap(), "/custom/gemini");
-        assert_eq!(loaded.agent_envs.get("codex").unwrap().get("API_KEY").unwrap(), "secret");
+        assert_eq!(
+            loaded.agent_path_overrides.get("gemini").unwrap(),
+            "/custom/gemini"
+        );
+        assert_eq!(
+            loaded
+                .agent_envs
+                .get("codex")
+                .unwrap()
+                .get("API_KEY")
+                .unwrap(),
+            "secret"
+        );
 
         // Test saving
         let mut config2 = loaded;
