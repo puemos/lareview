@@ -1,10 +1,23 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct CustomAgentConfig {
+    pub id: String,
+    pub label: String,
+    pub logo: Option<String>,
+    pub command: String,
+    pub args: Vec<String>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
     pub extra_path: Option<String>,
     pub has_seen_requirements: bool,
+    pub custom_agents: Vec<CustomAgentConfig>,
+    pub agent_path_overrides: HashMap<String, String>,
+    pub agent_envs: HashMap<String, HashMap<String, String>>,
 }
 
 pub fn load_config() -> AppConfig {
@@ -80,9 +93,26 @@ mod tests {
     #[test]
     fn test_config_serialization() {
         let _guard = ENV_MUTEX.lock().unwrap();
+        let mut agent_envs = HashMap::new();
+        let mut codex_envs = HashMap::new();
+        codex_envs.insert("API_KEY".to_string(), "secret".to_string());
+        agent_envs.insert("codex".to_string(), codex_envs);
+
+        let mut path_overrides = HashMap::new();
+        path_overrides.insert("gemini".to_string(), "/custom/gemini".to_string());
+
         let config = AppConfig {
             extra_path: Some("/usr/bin".to_string()),
             has_seen_requirements: true,
+            custom_agents: vec![CustomAgentConfig {
+                id: "my-agent".into(),
+                label: "My Agent".into(),
+                logo: None,
+                command: "my-command".into(),
+                args: vec!["--flag".into()],
+            }],
+            agent_path_overrides: path_overrides,
+            agent_envs,
         };
 
         let tmp_file = NamedTempFile::new().unwrap();
@@ -99,6 +129,21 @@ mod tests {
         let loaded = load_config();
         assert_eq!(loaded.extra_path, config.extra_path);
         assert!(loaded.has_seen_requirements);
+        assert_eq!(loaded.custom_agents.len(), 1);
+        assert_eq!(loaded.custom_agents[0].id, "my-agent");
+        assert_eq!(
+            loaded.agent_path_overrides.get("gemini").unwrap(),
+            "/custom/gemini"
+        );
+        assert_eq!(
+            loaded
+                .agent_envs
+                .get("codex")
+                .unwrap()
+                .get("API_KEY")
+                .unwrap(),
+            "secret"
+        );
 
         // Test saving
         let mut config2 = loaded;
@@ -107,6 +152,8 @@ mod tests {
 
         let contents = std::fs::read_to_string(&path).unwrap();
         assert!(contents.contains("/sbin"));
+        assert!(contents.contains("my-agent"));
+        assert!(contents.contains("API_KEY"));
 
         unsafe {
             std::env::remove_var("LAREVIEW_CONFIG_PATH");

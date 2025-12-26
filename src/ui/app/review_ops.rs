@@ -5,12 +5,6 @@ use super::{Action, LaReviewApp, NavigationAction, ReviewAction};
 use crate::ui::app::store::ReviewDataRefreshReason;
 
 impl LaReviewApp {
-    pub fn switch_to_home(&mut self) {
-        self.dispatch(Action::Navigation(NavigationAction::SwitchTo(
-            AppView::Home,
-        )));
-    }
-
     pub fn switch_to_review(&mut self) {
         self.dispatch(Action::Navigation(NavigationAction::SwitchTo(
             AppView::Review,

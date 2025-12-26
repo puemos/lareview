@@ -401,12 +401,6 @@ fn test_review_ops_navigation() {
         crate::ui::app::state::AppView::Settings
     );
 
-    app.switch_to_home();
-    assert_eq!(
-        app.state.ui.current_view,
-        crate::ui::app::state::AppView::Home
-    );
-
     app.switch_to_review();
     assert_eq!(
         app.state.ui.current_view,

@@ -179,10 +179,22 @@ async fn test_update_thread_title_runtime() {
 #[test]
 fn test_save_app_config_runtime() {
     // This one doesn't use app, it uses global env and file system
-    settings::save_app_config("test_path".to_string(), true);
+    settings::save_app_config_full(
+        "test_path".to_string(),
+        true,
+        Vec::new(),
+        std::collections::HashMap::new(),
+        std::collections::HashMap::new(),
+    );
     assert_eq!(std::env::var("LAREVIEW_EXTRA_PATH").unwrap(), "test_path");
 
-    settings::save_app_config("".to_string(), false);
+    settings::save_app_config_full(
+        "".to_string(),
+        false,
+        Vec::new(),
+        std::collections::HashMap::new(),
+        std::collections::HashMap::new(),
+    );
     assert!(std::env::var("LAREVIEW_EXTRA_PATH").is_err());
 }
 

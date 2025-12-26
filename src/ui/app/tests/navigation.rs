@@ -10,7 +10,7 @@ async fn test_navigation_flow() {
     let mut harness = setup_harness(app.clone());
 
     harness.run_steps(2);
-    assert_eq!(app.lock().unwrap().state.ui.current_view, AppView::Home);
+    assert_eq!(app.lock().unwrap().state.ui.current_view, AppView::Generate);
 
     app.lock().unwrap().state.ui.current_view = AppView::Generate;
     harness.run();
@@ -27,7 +27,7 @@ async fn test_click_navigation() {
     let mut harness = setup_harness(app.clone());
 
     harness.run_steps(2);
-    assert_eq!(app.lock().unwrap().state.ui.current_view, AppView::Home);
+    assert_eq!(app.lock().unwrap().state.ui.current_view, AppView::Generate);
 
     harness.get_by_label("Settings").click();
     harness.run();

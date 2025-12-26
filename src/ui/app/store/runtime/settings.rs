@@ -165,7 +165,13 @@ pub fn pick_folder_for_link(app: &mut LaReviewApp) {
     });
 }
 
-pub fn save_app_config(extra_path: String, has_seen_requirements: bool) {
+pub fn save_app_config_full(
+    extra_path: String,
+    has_seen_requirements: bool,
+    custom_agents: Vec<crate::infra::app_config::CustomAgentConfig>,
+    agent_path_overrides: std::collections::HashMap<String, String>,
+    agent_envs: std::collections::HashMap<String, std::collections::HashMap<String, String>>,
+) {
     let extra_path = extra_path.trim().to_string();
     let config = crate::infra::app_config::AppConfig {
         extra_path: if extra_path.is_empty() {
@@ -174,6 +180,9 @@ pub fn save_app_config(extra_path: String, has_seen_requirements: bool) {
             Some(extra_path.clone())
         },
         has_seen_requirements,
+        custom_agents,
+        agent_path_overrides,
+        agent_envs,
     };
 
     if !extra_path.is_empty() {

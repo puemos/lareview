@@ -1,6 +1,7 @@
 use crate::ui::app::LaReviewApp;
 use crate::ui::app::state::AppView;
 use crate::ui::app::tests::harness::setup_harness;
+use crate::ui::icons;
 use egui_kittest::kittest::Queryable;
 use std::sync::{Arc, Mutex};
 
@@ -62,7 +63,7 @@ async fn test_settings_d2_toggle() {
         harness.run();
         assert!(app.lock().unwrap().state.ui.allow_d2_install);
     } else {
-        harness.get_by_label("✔ Installed");
+        harness.get_by_label(&format!("{} Installed", icons::ICON_CHECK));
     }
 }
 #[tokio::test]

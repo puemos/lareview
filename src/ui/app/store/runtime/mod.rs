@@ -76,6 +76,25 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
         Command::SaveAppConfig {
             extra_path,
             has_seen_requirements,
-        } => settings::save_app_config(extra_path, has_seen_requirements),
+        } => settings::save_app_config_full(
+            extra_path,
+            has_seen_requirements,
+            Vec::new(),
+            std::collections::HashMap::new(),
+            std::collections::HashMap::new(),
+        ),
+        Command::SaveAppConfigFull {
+            extra_path,
+            has_seen_requirements,
+            custom_agents,
+            agent_path_overrides,
+            agent_envs,
+        } => settings::save_app_config_full(
+            extra_path,
+            has_seen_requirements,
+            custom_agents,
+            agent_path_overrides,
+            agent_envs,
+        ),
     }
 }

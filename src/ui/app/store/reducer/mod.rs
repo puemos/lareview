@@ -558,14 +558,14 @@ mod tests {
     fn test_navigation_same_view() {
         let mut state = AppState {
             ui: UiState {
-                current_view: AppView::Home,
+                current_view: AppView::Generate,
                 ..Default::default()
             },
             ..Default::default()
         };
         let commands = reduce(
             &mut state,
-            Action::Navigation(NavigationAction::SwitchTo(AppView::Home)),
+            Action::Navigation(NavigationAction::SwitchTo(AppView::Generate)),
         );
         assert!(commands.is_empty());
     }

@@ -11,7 +11,6 @@ use super::timeline::{TimelineContent, TimelineItem};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum AppView {
     #[default]
-    Home,
     Generate,
     Review,
     Repos,
@@ -212,6 +211,25 @@ pub struct UiState {
     pub plan_panel_collapsed: bool,
     pub thread_title_draft: String,
     pub thread_reply_draft: String,
+    // Agent settings
+    pub agent_path_overrides: std::collections::HashMap<String, String>,
+    pub custom_agents: Vec<crate::infra::app_config::CustomAgentConfig>,
+    pub agent_envs: std::collections::HashMap<String, std::collections::HashMap<String, String>>,
+    pub is_agent_settings_modified: bool,
+    pub agent_settings_snapshot: Option<AgentSettingsSnapshot>,
+    pub agent_env_draft_id: String,
+    pub agent_env_draft_key: String,
+    pub agent_env_draft_value: String,
+    pub custom_agent_draft: crate::infra::app_config::CustomAgentConfig,
+    pub editing_agent_id: Option<String>,
+    pub show_add_custom_agent_modal: bool,
+}
+
+#[derive(Clone, Default)]
+pub struct AgentSettingsSnapshot {
+    pub agent_id: String,
+    pub path_override: Option<String>,
+    pub envs: Option<std::collections::HashMap<String, String>>,
 }
 
 /// All app state in one struct.
