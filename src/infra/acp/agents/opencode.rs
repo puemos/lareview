@@ -6,5 +6,5 @@ crate::define_standard_acp_agent!(
     "OpenCode",
     "assets/icons/opencode.svg",
     "opencode",
-    ["--experimental-acp"]
+    ["acp"]
 );
