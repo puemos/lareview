@@ -4,7 +4,6 @@
 
 pub mod acp;
 pub mod app_config;
-pub mod brew;
 pub mod d2;
 pub mod db;
 pub mod diff;
@@ -12,6 +11,7 @@ pub mod diff_index;
 pub mod git;
 pub mod github;
 pub mod hash;
+pub mod shell;
 
 /// Normalizes escaped or literal newlines to standard \n.
 pub fn normalize_newlines(s: &str) -> String {

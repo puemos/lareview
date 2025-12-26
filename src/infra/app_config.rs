@@ -13,7 +13,6 @@ pub struct CustomAgentConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
-    pub extra_path: Option<String>,
     pub has_seen_requirements: bool,
     pub custom_agents: Vec<CustomAgentConfig>,
     pub agent_path_overrides: HashMap<String, String>,
@@ -102,7 +101,6 @@ mod tests {
         path_overrides.insert("gemini".to_string(), "/custom/gemini".to_string());
 
         let config = AppConfig {
-            extra_path: Some("/usr/bin".to_string()),
             has_seen_requirements: true,
             custom_agents: vec![CustomAgentConfig {
                 id: "my-agent".into(),
@@ -127,7 +125,6 @@ mod tests {
             std::env::set_var("LAREVIEW_CONFIG_PATH", &path);
         }
         let loaded = load_config();
-        assert_eq!(loaded.extra_path, config.extra_path);
         assert!(loaded.has_seen_requirements);
         assert_eq!(loaded.custom_agents.len(), 1);
         assert_eq!(loaded.custom_agents[0].id, "my-agent");
@@ -146,12 +143,9 @@ mod tests {
         );
 
         // Test saving
-        let mut config2 = loaded;
-        config2.extra_path = Some("/sbin".to_string());
-        save_config(&config2).unwrap();
+        save_config(&loaded).unwrap();
 
         let contents = std::fs::read_to_string(&path).unwrap();
-        assert!(contents.contains("/sbin"));
         assert!(contents.contains("my-agent"));
         assert!(contents.contains("API_KEY"));
 
@@ -168,7 +162,6 @@ mod tests {
             std::env::set_var("LAREVIEW_CONFIG_PATH", &path);
         }
         let config = load_config();
-        assert_eq!(config.extra_path, None);
         assert!(!config.has_seen_requirements);
         unsafe {
             std::env::remove_var("LAREVIEW_CONFIG_PATH");

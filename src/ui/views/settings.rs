@@ -180,7 +180,7 @@ impl LaReviewApp {
                 spacing::SPACING_MD as i8,
             ))
             .show(ui, |ui| {
-                let d2_installed = crate::infra::brew::find_bin("d2").is_some();
+                let d2_installed = crate::infra::shell::find_bin("d2").is_some();
 
                 ui.horizontal(|ui| {
                     ui.label(typography::label("D2 Diagram Engine").color(theme.text_primary));

@@ -8,7 +8,7 @@ pub fn check_github_status(app: &mut LaReviewApp) {
 
     tokio::spawn(async move {
         let result: Result<GhStatusPayload, String> = async {
-            let gh_path = crate::infra::brew::find_bin("gh")
+            let gh_path = crate::infra::shell::find_bin("gh")
                 .ok_or_else(|| "gh is not installed".to_string())?;
 
             let auth = tokio::process::Command::new(&gh_path)
@@ -166,35 +166,17 @@ pub fn pick_folder_for_link(app: &mut LaReviewApp) {
 }
 
 pub fn save_app_config_full(
-    extra_path: String,
     has_seen_requirements: bool,
     custom_agents: Vec<crate::infra::app_config::CustomAgentConfig>,
     agent_path_overrides: std::collections::HashMap<String, String>,
     agent_envs: std::collections::HashMap<String, std::collections::HashMap<String, String>>,
 ) {
-    let extra_path = extra_path.trim().to_string();
     let config = crate::infra::app_config::AppConfig {
-        extra_path: if extra_path.is_empty() {
-            None
-        } else {
-            Some(extra_path.clone())
-        },
         has_seen_requirements,
         custom_agents,
         agent_path_overrides,
         agent_envs,
     };
-
-    if !extra_path.is_empty() {
-        // set_var is currently unsafe on nightly; this is limited to process-local config.
-        unsafe {
-            std::env::set_var("LAREVIEW_EXTRA_PATH", extra_path);
-        }
-    } else {
-        unsafe {
-            std::env::remove_var("LAREVIEW_EXTRA_PATH");
-        }
-    }
 
     if let Err(err) = crate::infra::app_config::save_config(&config) {
         eprintln!("[config] Failed to save config: {err}");

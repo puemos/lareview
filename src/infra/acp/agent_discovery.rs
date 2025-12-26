@@ -25,7 +25,6 @@ pub struct AgentCandidate {
 struct AgentCache {
     candidates: Vec<AgentCandidate>,
     last_updated: std::time::Instant,
-    extra_path_snapshot: Option<String>,
     config_snapshot: AppConfig,
 }
 
@@ -39,13 +38,11 @@ const CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(30); // 30
 /// Uses a cached AgentRegistry to avoid recreating it on each call, with TTL
 pub fn list_agent_candidates() -> Vec<AgentCandidate> {
     let mut cache_guard = AGENT_CACHE.lock().unwrap();
-    let extra_path_snapshot = std::env::var("LAREVIEW_EXTRA_PATH").ok();
     let config = load_config();
 
     // Check if cache is valid (not expired and config hasn't changed)
     if let Some(cache) = cache_guard.as_ref()
         && cache.last_updated.elapsed() < CACHE_TTL
-        && cache.extra_path_snapshot == extra_path_snapshot
         // Simple heuristic: check if custom agents count or overrides count changed
         && cache.config_snapshot.custom_agents.len() == config.custom_agents.len()
         && cache.config_snapshot.agent_path_overrides.len() == config.agent_path_overrides.len()
@@ -99,7 +96,6 @@ pub fn list_agent_candidates() -> Vec<AgentCandidate> {
     *cache_guard = Some(AgentCache {
         candidates: candidates.clone(),
         last_updated: std::time::Instant::now(),
-        extra_path_snapshot,
         config_snapshot: config,
     });
 
@@ -123,7 +119,7 @@ mod tests {
         };
 
         // Should resolve to full path if available
-        let path = crate::infra::brew::find_bin("ls").map(|p| p.to_string_lossy().to_string());
+        let path = crate::infra::shell::find_bin("ls").map(|p| p.to_string_lossy().to_string());
         if let Some(p) = path {
             candidate.command = Some(p.clone());
             candidate.available = true;

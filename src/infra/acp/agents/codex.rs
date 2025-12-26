@@ -4,15 +4,15 @@ use super::super::agent_discovery::AgentCandidate;
 
 // Check if a command is available in PATH
 fn is_command_available(command: &str) -> bool {
-    crate::infra::brew::find_bin(command).is_some()
+    crate::infra::shell::find_bin(command).is_some()
 }
 
 /// Build the Codex candidate, allowing overrides for binary/package.
 pub fn codex_candidate() -> AgentCandidate {
     let bin_override = std::env::var("CODEX_ACP_BIN").ok();
     let command = match bin_override.as_deref() {
-        Some(bin) => crate::infra::brew::find_bin(bin),
-        None => crate::infra::brew::find_bin("npx"),
+        Some(bin) => crate::infra::shell::find_bin(bin),
+        None => crate::infra::shell::find_bin("npx"),
     };
     let available = command.is_some();
     let args = if bin_override.is_some() {

@@ -2,6 +2,7 @@ use crate::domain::{ReviewStatus, ThreadImpact};
 use crate::ui::app::LaReviewApp;
 use crate::ui::app::store::runtime::{review, settings};
 use std::path::PathBuf;
+use tempfile::NamedTempFile;
 
 #[tokio::test]
 async fn test_update_task_status_runtime() {
@@ -178,24 +179,31 @@ async fn test_update_thread_title_runtime() {
 
 #[test]
 fn test_save_app_config_runtime() {
-    // This one doesn't use app, it uses global env and file system
+    let tmp_file = NamedTempFile::new().unwrap();
+    let path = tmp_file.path().to_path_buf();
+    let prev = std::env::var_os("LAREVIEW_CONFIG_PATH");
+    unsafe {
+        std::env::set_var("LAREVIEW_CONFIG_PATH", &path);
+    }
+
     settings::save_app_config_full(
-        "test_path".to_string(),
         true,
         Vec::new(),
         std::collections::HashMap::new(),
         std::collections::HashMap::new(),
     );
-    assert_eq!(std::env::var("LAREVIEW_EXTRA_PATH").unwrap(), "test_path");
 
-    settings::save_app_config_full(
-        "".to_string(),
-        false,
-        Vec::new(),
-        std::collections::HashMap::new(),
-        std::collections::HashMap::new(),
-    );
-    assert!(std::env::var("LAREVIEW_EXTRA_PATH").is_err());
+    let contents = std::fs::read_to_string(&path).unwrap();
+    assert!(contents.contains("has_seen_requirements = true"));
+
+    match prev {
+        Some(value) => unsafe {
+            std::env::set_var("LAREVIEW_CONFIG_PATH", value);
+        },
+        None => unsafe {
+            std::env::remove_var("LAREVIEW_CONFIG_PATH");
+        },
+    }
 }
 
 #[tokio::test]

@@ -1,4 +1,4 @@
-use crate::infra::brew;
+use crate::infra::shell;
 use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -71,7 +71,7 @@ struct GhPrViewJson {
 }
 
 pub async fn fetch_pr_metadata(pr: &GitHubPrRef) -> Result<GitHubPrMetadata> {
-    let gh_path = brew::find_bin("gh").context("resolve `gh` path")?;
+    let gh_path = shell::find_bin("gh").context("resolve `gh` path")?;
     let output = Command::new(&gh_path)
         .args([
             "pr",
@@ -101,7 +101,7 @@ pub async fn fetch_pr_metadata(pr: &GitHubPrRef) -> Result<GitHubPrMetadata> {
 }
 
 pub async fn fetch_pr_diff(pr: &GitHubPrRef) -> Result<String> {
-    let gh_path = brew::find_bin("gh").context("resolve `gh` path")?;
+    let gh_path = shell::find_bin("gh").context("resolve `gh` path")?;
     let output = Command::new(&gh_path)
         .args(["pr", "diff", pr.url.as_str()])
         .output()
@@ -168,8 +168,16 @@ echo {"title":"Mock PR","url":"https://github.com/mock/pr/1","headRefOid":"head1
             std::fs::write(gh_mock.with_extension("bat"), mock_script).unwrap();
         }
 
-        unsafe {
-            std::env::set_var("LAREVIEW_EXTRA_PATH", tmp_dir.path());
+        let prev_path = std::env::var_os("PATH");
+        let mut paths = Vec::new();
+        paths.push(tmp_dir.path().to_path_buf());
+        if let Some(existing) = prev_path.as_ref() {
+            paths.extend(std::env::split_paths(existing));
+        }
+        if let Ok(joined) = std::env::join_paths(paths) {
+            unsafe {
+                std::env::set_var("PATH", joined);
+            }
         }
 
         let pr = GitHubPrRef {
@@ -183,8 +191,13 @@ echo {"title":"Mock PR","url":"https://github.com/mock/pr/1","headRefOid":"head1
         assert_eq!(meta.title, "Mock PR");
         assert_eq!(meta.head_sha, Some("head123".into()));
 
-        unsafe {
-            std::env::remove_var("LAREVIEW_EXTRA_PATH");
+        match prev_path {
+            Some(value) => unsafe {
+                std::env::set_var("PATH", value);
+            },
+            None => unsafe {
+                std::env::remove_var("PATH");
+            },
         }
     }
 }

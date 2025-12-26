@@ -188,8 +188,8 @@ LaReview stores review state locally.
 
 Executable discovery (GUI apps can start with a minimal PATH):
 
-- Add custom paths in **Settings → Executable Search Paths**, or
-- Use `LAREVIEW_EXTRA_PATH=/custom/bin:/other/bin`
+- LaReview hydrates PATH from your login shell when launched outside a terminal (macOS/Linux). Restart after shell PATH changes.
+- You can override individual agent executables in **Settings → Agent Settings**.
 
 Wipe local state:
 
@@ -282,4 +282,3 @@ Licensed under either of:
 - MIT license (LICENSE-MIT)
 
 At your option.
-

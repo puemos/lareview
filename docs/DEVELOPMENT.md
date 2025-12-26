@@ -15,7 +15,6 @@
 ## Useful environment variables
 - `LAREVIEW_DB_PATH`: override SQLite path (helpful for tests/dev sandboxes)
 - `ACP_DEBUG`: enable ACP debug logging (prints ACP session updates/tool calls)
-- `LAREVIEW_EXTRA_PATH`: additional directories to add to the `PATH` for tool discovery (e.g., if `d2` is installed in a non-standard location).
 - `LAREVIEW_CONFIG_PATH`: override the default configuration file path.
 - `LAREVIEW_DATA_HOME`: override the default data directory.
 
@@ -27,5 +26,5 @@
 
 ## Tool Discovery and Requirements
 - LaReview depends on external tools like `d2` for diagram generation and `gh` for GitHub integration.
-- Tool discovery can be managed via the Settings view or by setting `LAREVIEW_EXTRA_PATH`.
+- Tool discovery uses the process PATH (hydrated from the login shell when running outside a terminal on macOS/Linux) and per-agent overrides in the Settings view.
 - Requirements can be checked and optionally installed (for `d2`) directly from the app.

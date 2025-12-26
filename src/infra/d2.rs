@@ -1,9 +1,9 @@
-use crate::infra::brew;
+use crate::infra::shell;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
 pub fn d2_to_svg(d2_code: &str, is_dark_mode: bool) -> Result<String, String> {
-    let d2_path = brew::find_bin("d2").ok_or_else(|| {
+    let d2_path = shell::find_bin("d2").ok_or_else(|| {
         "D2 executable not found. Please install D2 and ensure it is in your PATH.".to_string()
     })?;
 
@@ -44,7 +44,7 @@ pub fn d2_to_svg(d2_code: &str, is_dark_mode: bool) -> Result<String, String> {
 }
 
 pub async fn d2_to_svg_async(d2_code: &str, is_dark_mode: bool) -> Result<String, String> {
-    let d2_path = brew::find_bin("d2").ok_or_else(|| {
+    let d2_path = shell::find_bin("d2").ok_or_else(|| {
         "D2 executable not found. Please install D2 and ensure it is in your PATH.".to_string()
     })?;
 
@@ -88,7 +88,7 @@ pub async fn d2_to_svg_async(d2_code: &str, is_dark_mode: bool) -> Result<String
 }
 
 pub fn d2_to_ascii(d2_code: &str) -> Result<String, String> {
-    let d2_path = brew::find_bin("d2").ok_or_else(|| {
+    let d2_path = shell::find_bin("d2").ok_or_else(|| {
         "D2 executable not found. Please install D2 and ensure it is in your PATH.".to_string()
     })?;
 
@@ -128,7 +128,7 @@ pub fn d2_to_ascii(d2_code: &str) -> Result<String, String> {
 /// Returns Ok(()) if valid or if d2 is not installed (skip validation).
 /// Returns Err(msg) if d2 is installed and validation fails.
 pub fn validate_d2(d2_code: &str) -> Result<(), String> {
-    let Some(d2_path) = brew::find_bin("d2") else {
+    let Some(d2_path) = shell::find_bin("d2") else {
         return Ok(()); // Skip validation if d2 is not installed
     };
 
@@ -173,7 +173,7 @@ mod tests {
 
     #[test]
     fn test_validate_d2_success() {
-        if brew::find_bin("d2").is_some() {
+        if shell::find_bin("d2").is_some() {
             let valid_code = "x -> y";
             let result = validate_d2(valid_code);
             assert!(result.is_ok(), "Validation failed: {:?}", result.err());
@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn test_validate_d2_failure() {
-        if brew::find_bin("d2").is_some() {
+        if shell::find_bin("d2").is_some() {
             let invalid_code = "x -> {"; // Unclosed brace
             let result = validate_d2(invalid_code);
             assert!(result.is_err());
@@ -192,7 +192,7 @@ mod tests {
 
     #[test]
     fn test_validate_d2_ok_if_missing() {
-        if brew::find_bin("d2").is_none() {
+        if shell::find_bin("d2").is_none() {
             assert!(validate_d2("bad code").is_ok());
         }
     }

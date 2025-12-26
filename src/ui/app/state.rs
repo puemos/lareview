@@ -204,7 +204,6 @@ pub struct UiState {
     pub d2_install_output: String,
     pub is_d2_installing: bool,
     pub allow_d2_install: bool,
-    pub extra_path: String,
     pub show_requirements_modal: bool,
     pub has_seen_requirements: bool,
     pub agent_panel_collapsed: bool,

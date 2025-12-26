@@ -90,12 +90,7 @@ pub enum Command {
         repo_id: String,
     },
     PickFolderForLink,
-    SaveAppConfig {
-        extra_path: String,
-        has_seen_requirements: bool,
-    },
     SaveAppConfigFull {
-        extra_path: String,
         has_seen_requirements: bool,
         custom_agents: Vec<crate::infra::app_config::CustomAgentConfig>,
         agent_path_overrides: std::collections::HashMap<String, String>,

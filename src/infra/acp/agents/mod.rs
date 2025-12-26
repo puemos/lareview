@@ -25,7 +25,7 @@ macro_rules! define_standard_acp_agent {
             }
 
             fn candidate(&self) -> $crate::infra::acp::agent_discovery::AgentCandidate {
-                let command_path = $crate::infra::brew::find_bin($command)
+                let command_path = $crate::infra::shell::find_bin($command)
                     .map(|path| path.to_string_lossy().to_string());
                 let available = command_path.is_some();
 
@@ -40,7 +40,7 @@ macro_rules! define_standard_acp_agent {
             }
 
             fn is_available(&self) -> bool {
-                $crate::infra::brew::find_bin($command).is_some()
+                $crate::infra::shell::find_bin($command).is_some()
             }
         }
     };

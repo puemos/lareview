@@ -386,7 +386,6 @@ mod tests {
     fn test_dismiss_requirements_emits_save_config() {
         let mut state = AppState::default();
         state.ui.show_requirements_modal = true;
-        state.ui.extra_path = "/test".to_string();
 
         let commands = reduce(
             &mut state,
@@ -397,8 +396,10 @@ mod tests {
         assert!(state.ui.has_seen_requirements);
         assert!(matches!(
             commands.as_slice(),
-            [Command::SaveAppConfig { extra_path, has_seen_requirements: true }]
-            if extra_path == "/test"
+            [Command::SaveAppConfigFull {
+                has_seen_requirements: true,
+                ..
+            }]
         ));
     }
 
@@ -678,16 +679,6 @@ mod tests {
         };
         reduce(&mut state, Action::Review(ReviewAction::CloseThread));
         assert!(state.ui.active_thread.is_none());
-    }
-
-    #[test]
-    fn test_settings_action_update_extra_path() {
-        let mut state = AppState::default();
-        reduce(
-            &mut state,
-            Action::Settings(SettingsAction::UpdateExtraPath("/new".into())),
-        );
-        assert_eq!(state.ui.extra_path, "/new");
     }
 
     #[test]

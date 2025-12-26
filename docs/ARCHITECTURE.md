@@ -44,7 +44,7 @@ UI logic goes through a reducer-style store in `src/ui/app/store/` so state is d
 Flow highlights:
 - Generate: `RunRequested` validates diff input, flips `is_generating`, clears the timeline, and emits `StartGeneration`. Supports both manual diffs and GitHub PRs.
 - Review: Centralized selection of reviews, runs, and tasks. Manages feedback threads and comments.
-- Settings: Manages tool requirements (like D2), GitHub authentication status, and extra paths for tool discovery.
+- Settings: Manages tool requirements (like D2), GitHub authentication status, and agent/path overrides.
 
 Add new UI behaviors by introducing an `Action` variant, handling it in `reducer.rs` (with tests there), and emitting a `Command` that the runtime can execute.
 

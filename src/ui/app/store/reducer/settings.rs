@@ -67,20 +67,14 @@ pub fn reduce(
         SettingsAction::UnlinkRepository(repo_id) => {
             vec![Command::DeleteRepo { repo_id }]
         }
-        SettingsAction::UpdateExtraPath(extra_path) => {
-            ui.extra_path = extra_path;
-            Vec::new()
-        }
-        SettingsAction::SaveExtraPath => vec![Command::SaveAppConfig {
-            extra_path: ui.extra_path.clone(),
-            has_seen_requirements: ui.has_seen_requirements,
-        }],
         SettingsAction::DismissRequirements => {
             ui.show_requirements_modal = false;
             ui.has_seen_requirements = true;
-            vec![Command::SaveAppConfig {
-                extra_path: ui.extra_path.clone(),
+            vec![Command::SaveAppConfigFull {
                 has_seen_requirements: ui.has_seen_requirements,
+                custom_agents: ui.custom_agents.clone(),
+                agent_path_overrides: ui.agent_path_overrides.clone(),
+                agent_envs: ui.agent_envs.clone(),
             }]
         }
         SettingsAction::UpdateAgentPath(agent_id, path) => {
@@ -126,7 +120,6 @@ pub fn reduce(
                 ui.agent_settings_snapshot = Some(snapshot_for_agent(ui, &agent_id));
             }
             vec![Command::SaveAppConfigFull {
-                extra_path: ui.extra_path.clone(),
                 has_seen_requirements: ui.has_seen_requirements,
                 custom_agents: ui.custom_agents.clone(),
                 agent_path_overrides: ui.agent_path_overrides.clone(),

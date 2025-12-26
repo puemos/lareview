@@ -191,8 +191,8 @@ impl LaReviewApp {
         let theme = crate::ui::theme::current_theme();
         let mut open = true;
 
-        let gh_path = crate::infra::brew::find_bin("gh");
-        let d2_path = crate::infra::brew::find_bin("d2");
+        let gh_path = crate::infra::shell::find_bin("gh");
+        let d2_path = crate::infra::shell::find_bin("d2");
         let agents = crate::infra::acp::list_agent_candidates();
 
         egui::Window::new("Setup Checklist")

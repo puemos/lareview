@@ -6,5 +6,5 @@ crate::define_standard_acp_agent!(
     "Claude",
     "assets/icons/claude.svg",
     "npx",
-    ["@zed-industries/claude-code-acp"]
+    ["-y", "@zed-industries/claude-code-acp"]
 );

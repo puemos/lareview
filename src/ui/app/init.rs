@@ -134,19 +134,11 @@ impl LaReviewApp {
             ..Default::default()
         };
 
-        state.ui.extra_path = config.extra_path.clone().unwrap_or_default();
         state.ui.has_seen_requirements = config.has_seen_requirements;
         state.ui.show_requirements_modal = !config.has_seen_requirements;
         state.ui.agent_path_overrides = config.agent_path_overrides;
         state.ui.custom_agents = config.custom_agents;
         state.ui.agent_envs = config.agent_envs;
-
-        if !state.ui.extra_path.trim().is_empty() {
-            // set_var is currently unsafe on nightly; this is limited to process-local config.
-            unsafe {
-                std::env::set_var("LAREVIEW_EXTRA_PATH", state.ui.extra_path.clone());
-            }
-        }
 
         if let Ok(repos) = repo_repo.find_all() {
             state.domain.linked_repos = repos;

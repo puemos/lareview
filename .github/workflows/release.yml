@@ -86,8 +86,7 @@ jobs:
 
           BIN_SRC="target/${{ matrix.target }}/release/lareview"
           APP_DIR="target/${{ matrix.target }}/release/${APP_BUNDLE}"
-          BIN_DST="${APP_DIR}/Contents/MacOS/${APP_NAME}-bin"
-          WRAPPER_DST="${APP_DIR}/Contents/MacOS/${APP_NAME}"
+          BIN_DST="${APP_DIR}/Contents/MacOS/${APP_NAME}"
           RES_DIR="${APP_DIR}/Contents/Resources"
 
           rm -rf "${APP_DIR}"
@@ -95,21 +94,6 @@ jobs:
 
           cp "${BIN_SRC}" "${BIN_DST}"
           chmod +x "${BIN_DST}"
-
-          cat > "${WRAPPER_DST}" << 'EOF_WRAPPER'
-          #!/bin/sh
-          DIR="$(cd "$(dirname "$0")" && pwd)"
-          PATH="$(/usr/libexec/path_helper -s | awk -F'"' '/PATH=/{print $2}')"
-          if [ -z "$PATH" ]; then
-            PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-          fi
-          if [ -n "${LAREVIEW_EXTRA_PATH:-}" ]; then
-            PATH="${LAREVIEW_EXTRA_PATH}:$PATH"
-          fi
-          export PATH
-          exec "$DIR/LaReview-bin" "$@"
-          EOF_WRAPPER
-          chmod +x "${WRAPPER_DST}"
 
           VERSION="${GITHUB_REF#refs/tags/v}"
 
@@ -185,7 +169,7 @@ jobs:
 
           codesign --force --options runtime --timestamp \
             --sign "$MACOS_IDENTITY" \
-            "$APP_BUNDLE/Contents/MacOS/$APP_NAME-bin"
+            "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 
           codesign --force --options runtime --timestamp \
             --sign "$MACOS_IDENTITY" \

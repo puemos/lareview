@@ -9,6 +9,12 @@ use lareview::{RUNTIME, assets, infra, ui};
 /// Sets up the Tokio runtime and initializes the egui UI framework
 fn main() -> Result<(), eframe::Error> {
     let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|arg| arg == "--printenv") {
+        infra::shell::print_env_for_capture();
+        return Ok(());
+    }
+
+    infra::shell::init_process_path();
 
     // Check if we're running as an MCP server
     // Also check for MCP-related environment variables that may indicate MCP mode
