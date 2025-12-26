@@ -5,6 +5,6 @@ crate::define_standard_acp_agent!(
     "claude",
     "Claude",
     "assets/icons/claude.svg",
-    "claude",
-    ["--experimental-acp"]
+    "npx",
+    ["@zed-industries/claude-code-acp"]
 );

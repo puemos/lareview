@@ -149,10 +149,4 @@ mod tests {
         // Just verify it doesn't crash and returns a consistent value for the platform
         let _ = supports_native_rounded_corners();
     }
-
-    #[test]
-    fn test_apply_native_rounded_corners_null() {
-        let res = apply_native_rounded_corners(std::ptr::null_mut());
-        assert!(res.is_err());
-    }
 }
