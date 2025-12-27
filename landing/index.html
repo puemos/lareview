@@ -1,21 +1,14 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>LaReview — It's good for your code reviews</title>
         <link
             rel="icon"
-            type="image/png"
+            type="image/svg+xml"
             sizes="512x512"
-            href="./assets/logo/512.png"
-        />
-        <link
-            rel="icon"
-            type="image/png"
-            sizes="512x512"
-            href="./assets/logo/512-light.png"
-            media="(prefers-color-scheme: light)"
+            href="./assets/logo/favicon.svg"
         />
 
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -38,18 +31,28 @@
                 <img
                     src="./assets/logo/512.png"
                     alt="LaReview logo"
-                    class="h-8 w-8"
+                    class="h-5 w-5"
                 />
                 <span class="font-display font-bold text-lg tracking-tight"
                     >LaReview</span
                 >
             </div>
             <div class="hidden md:flex gap-8 text-sm font-medium tracking-wide">
-                <a href="#features" class="hover:opacity-60">FEATURES</a>
-                <a href="#how-it-works" class="hover:opacity-60"
+                <a
+                    href="#features"
+                    class="hover:underline underline-offset-2 decoration-2"
+                    >FEATURES</a
+                >
+                <a
+                    href="#how-it-works"
+                    class="hover:underline underline-offset-2 decoration-2"
                     >HOW IT WORKS</a
                 >
-                <a href="#download" class="hover:opacity-60">DOWNLOAD</a>
+                <a
+                    href="#download"
+                    class="hover:underline underline-offset-2 decoration-2"
+                    >DOWNLOAD</a
+                >
             </div>
             <a
                 href="https://github.com/puemos/lareview"
@@ -61,7 +64,7 @@
         </nav>
 
         <header class="w-full">
-            <div class="border-b border-theme pt-12 pb-2 px-4 md:px-8">
+            <div class="border-b border-theme pt-12 pb-2 px-8 md:px-5">
                 <h1
                     class="font-display text-[14vw] md:text-[13vw] leading-[0.85] tracking-tighter text-velura-dark"
                 >
@@ -93,14 +96,14 @@
                         <div class="flex flex-wrap gap-4">
                             <a
                                 href="#download"
-                                class="flex items-center gap-2 bg-velura-dark text-velura-bg px-8 py-4 text-sm font-bold uppercase tracking-widest hover:bg-transparent hover:text-velura-dark border border-transparent hover:border-velura-dark"
+                                class="flex items-center hover:-translate-y-1 transition-transform gap-2 bg-velura-dark text-velura-bg px-8 py-4 text-sm font-bold uppercase tracking-widest border border-transparent"
                             >
                                 <i class="ph-bold ph-download-simple"></i>
                                 Download <i>(It's Free)</i>
                             </a>
                             <a
                                 href="https://github.com/puemos/lareview"
-                                class="flex items-center gap-2 bg-transparent text-velura-dark px-8 py-4 text-sm font-bold uppercase tracking-widest border border-theme hover:bg-velura-dark hover:text-velura-bg"
+                                class="flex items-center hover:-translate-y-1 transition-transform gap-2 bg-transparent text-velura-dark px-8 py-4 text-sm font-bold uppercase tracking-widest border border-theme"
                             >
                                 <i class="ph-bold ph-github-logo"></i> Source
                             </a>
@@ -480,13 +483,13 @@
                 <div class="flex flex-col md:flex-row justify-center gap-4">
                     <a
                         href="https://github.com/puemos/lareview/releases"
-                        class="flex items-center justify-center gap-2 bg-velura-dark text-velura-bg px-10 py-5 text-sm font-bold uppercase tracking-widest hover:bg-transparent hover:text-velura-dark border border-transparent hover:border-velura-dark"
+                        class="flex items-center hover:-translate-y-1 transition-transform justify-center gap-2 bg-velura-dark text-velura-bg px-10 py-5 text-sm font-bold uppercase tracking-widest border border-transparent"
                     >
                         <i class="ph-bold ph-apple-logo text-lg"></i> macOS App
                     </a>
                     <a
                         href="https://github.com/puemos/lareview/releases"
-                        class="flex items-center justify-center gap-2 bg-transparent text-velura-dark px-10 py-5 text-sm font-bold uppercase tracking-widest border border-theme hover:bg-velura-dark hover:text-velura-bg"
+                        class="flex items-center hover:-translate-y-1 transition-transform justify-center gap-2 bg-transparent text-velura-dark px-10 py-5 text-sm font-bold uppercase tracking-widest border border-theme"
                     >
                         <i class="ph-bold ph-linux-logo text-lg"></i>
                         <i class="ph-bold ph-windows-logo text-lg"></i> Linux /
