@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.14] - 2025-12-27
+
+### Added
+- **Open in Editor**: Added editor picker and diff integration for open-in-editor flow.
+- **Landing**: Added a new landing page with build config and GitHub Pages deploy workflow.
+
+### Changed
+- **Branding**: Refreshed logo assets and screenshots; updated README logo.
+- **Release**: Minor tweaks to the release workflow.
+
+### Fixed
+- **ACP**: Fixed opencode ACP agent handling.
+
 ## [0.0.13] - 2025-12-26
 
 ### Added
