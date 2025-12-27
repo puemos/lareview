@@ -67,7 +67,7 @@ cat > "${APP_DIR}/Contents/Info.plist" << EOF_PLIST
 </plist>
 EOF_PLIST
 
-ICON_PNG="assets/icons/icon-512.png"
+ICON_PNG="assets/logo/512-mac.png"
 ICONSET="$(mktemp -d)/${APP_NAME}.iconset"
 mkdir -p "${ICONSET}"
 

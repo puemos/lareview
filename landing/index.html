@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>LaReview — It's good for your code reviews</title>
+        <link
+            rel="icon"
+            type="image/png"
+            sizes="512x512"
+            href="./assets/logo/512.png"
+        />
+        <link
+            rel="icon"
+            type="image/png"
+            sizes="512x512"
+            href="./assets/logo/512-light.png"
+            media="(prefers-color-scheme: light)"
+        />
+
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;700&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="./styles/landing.css" />
+        <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    </head>
+
+    <body
+        class="bg-velura-bg text-velura-dark font-sans selection:bg-velura-dark selection:text-velura-bg overflow-x-hidden"
+    >
+        <nav
+            class="flex justify-between items-center px-6 py-4 border-b border-theme sticky top-0 bg-velura-bg z-50"
+        >
+            <div class="flex items-center gap-2">
+                <img
+                    src="./assets/logo/512.png"
+                    alt="LaReview logo"
+                    class="h-8 w-8"
+                />
+                <span class="font-display font-bold text-lg tracking-tight"
+                    >LaReview</span
+                >
+            </div>
+            <div class="hidden md:flex gap-8 text-sm font-medium tracking-wide">
+                <a href="#features" class="hover:opacity-60">FEATURES</a>
+                <a href="#how-it-works" class="hover:opacity-60"
+                    >HOW IT WORKS</a
+                >
+                <a href="#download" class="hover:opacity-60">DOWNLOAD</a>
+            </div>
+            <a
+                href="https://github.com/puemos/lareview"
+                target="_blank"
+                class="flex items-center gap-1 text-sm font-bold hover:underline underline-offset-4"
+            >
+                GITHUB <i class="ph-bold ph-arrow-up-right"></i>
+            </a>
+        </nav>
+
+        <header class="w-full">
+            <div class="border-b border-theme pt-12 pb-2 px-4 md:px-8">
+                <h1
+                    class="font-display text-[14vw] md:text-[13vw] leading-[0.85] tracking-tighter text-velura-dark"
+                >
+                    LaReview
+                </h1>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 border-b border-theme">
+                <div
+                    class="lg:col-span-5 border-r-0 lg:border-r border-theme p-8 flex flex-col justify-between relative"
+                >
+                    <div>
+                        <h2
+                            class="font-display text-4xl md:text-5xl leading-tight mb-6 font-light"
+                        >
+                            Turn a diff into a <br />
+                            <span class="font-medium italic"
+                                >review checklist.</span
+                            >
+                        </h2>
+                        <p
+                            class="text-velura-gray max-w-md text-lg leading-relaxed mb-8"
+                        >
+                            Stop doom-scrolling through diffs. LaReview uses
+                            your local ACP agent to generate a structured plan,
+                            identify issues, and help you review deliberately.
+                        </p>
+
+                        <div class="flex flex-wrap gap-4">
+                            <a
+                                href="#download"
+                                class="flex items-center gap-2 bg-velura-dark text-velura-bg px-8 py-4 text-sm font-bold uppercase tracking-widest hover:bg-transparent hover:text-velura-dark border border-transparent hover:border-velura-dark"
+                            >
+                                <i class="ph-bold ph-download-simple"></i>
+                                Download <i>(It's Free)</i>
+                            </a>
+                            <a
+                                href="https://github.com/puemos/lareview"
+                                class="flex items-center gap-2 bg-transparent text-velura-dark px-8 py-4 text-sm font-bold uppercase tracking-widest border border-theme hover:bg-velura-dark hover:text-velura-bg"
+                            >
+                                <i class="ph-bold ph-github-logo"></i> Source
+                            </a>
+                        </div>
+                    </div>
+
+                    <div
+                        class="mt-12 lg:mt-1 text-xs font-mono text-velura-gray flex flex-col gap-2"
+                    >
+                        <p class="flex items-center gap-2">STATUS: ALPHA</p>
+                        <p>LICENSE: MIT / APACHE 2.0</p>
+                        <p>BUILT WITH RUST</p>
+                    </div>
+                </div>
+
+                <div
+                    class="lg:col-span-7 relative bg-neutral-200 overflow-hidden"
+                >
+                    <video
+                        autoplay
+                        loop
+                        muted
+                        playsinline
+                        controls
+                        preload="metadata"
+                        poster="./assets/screenshots/review.webp"
+                        class="w-full object-cover"
+                    >
+                        <source
+                            src="./assets/video/demo.mp4"
+                            type="video/mp4"
+                        />
+                        Your browser does not support the video tag.
+                    </video>
+
+                    <div
+                        class="absolute bottom-4 right-4 text-xs font-mono bg-velura-bg px-2 py-1 border border-theme flex items-center gap-2 z-10"
+                    >
+                        <i class="ph-fill ph-play-circle"></i> DEMO PREVIEW
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="border-b border-theme bg-velura-dark text-velura-bg">
+            <div
+                class="border-b border-theme py-4 bg-velura-dark text-velura-bg"
+            >
+                <div
+                    class="container justify-center mx-auto px-6 flex flex-col md:flex-row items-start md:items-center gap-10"
+                >
+                    <span
+                        class="text-xs font-mono tracking-widest uppercase opacity-70 whitespace-nowrap pt-1"
+                        >Supported Agents</span
+                    >
+
+                    <div
+                        class="flex flex-wrap justify-center md:justify-start gap-8 items-center"
+                    >
+                        <div class="flex flex-row items-center gap-2 group">
+                            <div class="">
+                                <img
+                                    src="./assets/icons/claude.svg"
+                                    alt="Claude"
+                                    class="h-5 w-auto"
+                                    loading="lazy"
+                                    decoding="async"
+                                />
+                            </div>
+                            <span
+                                class="text-[10px] font-mono uppercase tracking-tighter opacity-50 group-hover:opacity-100 transition-opacity"
+                                >Claude</span
+                            >
+                        </div>
+
+                        <div class="flex flex-row items-center gap-2 group">
+                            <div class="">
+                                <img
+                                    src="./assets/icons/codex.svg"
+                                    alt="Codex"
+                                    class="h-5 w-auto"
+                                    loading="lazy"
+                                    decoding="async"
+                                />
+                            </div>
+                            <span
+                                class="text-[10px] font-mono uppercase tracking-tighter opacity-50 group-hover:opacity-100 transition-opacity"
+                                >Codex</span
+                            >
+                        </div>
+
+                        <div class="flex flex-row items-center gap-2 group">
+                            <div class="">
+                                <img
+                                    src="./assets/icons/gemini.svg"
+                                    alt="Gemini"
+                                    class="h-5 w-auto"
+                                    loading="lazy"
+                                    decoding="async"
+                                />
+                            </div>
+                            <span
+                                class="text-[10px] font-mono uppercase tracking-tighter opacity-50 group-hover:opacity-100 transition-opacity"
+                                >Gemini</span
+                            >
+                        </div>
+
+                        <div class="flex flex-row items-center gap-2 group">
+                            <div class="">
+                                <img
+                                    src="./assets/icons/kimi.svg"
+                                    alt="Kimi"
+                                    class="h-5 w-auto"
+                                    loading="lazy"
+                                    decoding="async"
+                                />
+                            </div>
+                            <span
+                                class="text-[10px] font-mono uppercase tracking-tighter opacity-50 group-hover:opacity-100 transition-opacity"
+                                >Kimi</span
+                            >
+                        </div>
+
+                        <div class="flex flex-row items-center gap-2 group">
+                            <div class="">
+                                <img
+                                    src="./assets/icons/mistral.svg"
+                                    alt="Mistral"
+                                    class="h-5 w-auto"
+                                    loading="lazy"
+                                    decoding="async"
+                                />
+                            </div>
+                            <span
+                                class="text-[10px] font-mono uppercase tracking-tighter opacity-50 group-hover:opacity-100 transition-opacity"
+                                >Mistral</span
+                            >
+                        </div>
+
+                        <div class="flex flex-row items-center gap-2 group">
+                            <div class="">
+                                <img
+                                    src="./assets/icons/opencode.svg"
+                                    alt="OpenCode"
+                                    class="h-5 w-auto"
+                                    loading="lazy"
+                                    decoding="async"
+                                />
+                            </div>
+                            <span
+                                class="text-[10px] font-mono uppercase tracking-tighter opacity-50 group-hover:opacity-100 transition-opacity"
+                                >OpenCode</span
+                            >
+                        </div>
+
+                        <div class="flex flex-row items-center gap-2 group">
+                            <div class="">
+                                <img
+                                    src="./assets/icons/qwen.svg"
+                                    alt="Qwen"
+                                    class="h-5 w-auto"
+                                    loading="lazy"
+                                    decoding="async"
+                                />
+                            </div>
+                            <span
+                                class="text-[10px] font-mono uppercase tracking-tighter opacity-50 group-hover:opacity-100 transition-opacity"
+                                >Qwen</span
+                            >
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <section id="features" class="w-full">
+            <div class="grid grid-cols-1 md:grid-cols-2">
+                <div
+                    class="border-b border-r-0 md:border-r border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                >
+                    <div class="mb-auto">
+                        <span
+                            class="block text-5xl font-display font-light mb-4"
+                            >01</span
+                        >
+                        <h3 class="text-2xl font-bold uppercase mb-2">
+                            AI-Powered Planning
+                        </h3>
+                        <p class="text-velura-gray">
+                            Input a PR reference or paste a raw diff. LaReview
+                            uses your local ACP agent to analyze intent and
+                            generate a structured review plan.
+                        </p>
+                    </div>
+                    <div class="mt-8 border border-theme p-2 bg-stone-200">
+                        <img
+                            src="./assets/screenshots/generate.webp"
+                            alt="Plan Generation"
+                            class="w-full"
+                            loading="lazy"
+                            decoding="async"
+                        />
+                    </div>
+                </div>
+
+                <div
+                    class="border-b border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                >
+                    <div class="mb-auto">
+                        <span
+                            class="block text-5xl font-display font-light mb-4"
+                            >02</span
+                        >
+                        <h3 class="text-2xl font-bold uppercase mb-2">
+                            Task-Focused Diffs
+                        </h3>
+                        <p class="text-velura-gray">
+                            Stop context switching. Select a task, and the
+                            viewer isolates only the relevant hunks of code.
+                            Review step-by-step.
+                        </p>
+                    </div>
+                    <div class="mt-8 border border-theme p-2 bg-stone-200">
+                        <img
+                            src="./assets/screenshots/review-changes.webp"
+                            alt="Diff View"
+                            class="w-full"
+                            loading="lazy"
+                            decoding="async"
+                        />
+                    </div>
+                </div>
+
+                <div
+                    class="border-b border-r-0 md:border-r border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                >
+                    <div class="mb-auto">
+                        <span
+                            class="block text-5xl font-display font-light mb-4"
+                            >03</span
+                        >
+                        <h3 class="text-2xl font-bold uppercase mb-2">
+                            Agent Feedback
+                        </h3>
+                        <p class="text-velura-gray">
+                            The AI proactively identifies bugs and style issues,
+                            creating feedback threads anchored to specific lines
+                            of code automatically.
+                        </p>
+                    </div>
+                    <div class="mt-8 border border-theme p-2 bg-stone-200">
+                        <img
+                            src="./assets/screenshots/review-discussion-item.webp"
+                            alt="Feedback"
+                            class="w-full"
+                            loading="lazy"
+                            decoding="async"
+                        />
+                    </div>
+                </div>
+
+                <div
+                    class="border-b border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                >
+                    <div class="mb-auto">
+                        <span
+                            class="block text-5xl font-display font-light mb-4"
+                            >04</span
+                        >
+                        <h3 class="text-2xl font-bold uppercase mb-2">
+                            Local Context
+                        </h3>
+                        <p class="text-velura-gray">
+                            Link local Git repos to give the agent full access
+                            to search your codebase, providing deeper insights
+                            than a simple diff review.
+                        </p>
+                    </div>
+                    <div class="mt-8 border border-theme p-2 bg-stone-200">
+                        <img
+                            src="./assets/screenshots/repos.webp"
+                            alt="Repos"
+                            class="w-full"
+                            loading="lazy"
+                            decoding="async"
+                        />
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section
+            id="how-it-works"
+            class="py-20 px-4 md:px-8 border-b border-theme"
+        >
+            <div class="max-w-4xl mx-auto">
+                <h2
+                    class="font-display text-5xl md:text-7xl mb-16 text-center tracking-tighter"
+                >
+                    Workflow
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                    <div class="flex flex-col gap-4 group">
+                        <div class="h-px w-full bg-velura-dark"></div>
+                        <span
+                            class="font-mono text-sm text-velura-gray flex items-center gap-2"
+                        >
+                            <i class="ph-bold ph-number-one"></i> INPUT
+                        </span>
+                        <h4 class="text-xl font-bold">Input</h4>
+                        <p class="text-sm text-velura-gray">
+                            Paste a unified diff or a GitHub PR URL (e.g.,
+                            owner/repo#123).
+                        </p>
+                    </div>
+
+                    <div class="flex flex-col gap-4 group">
+                        <div class="h-px w-full bg-velura-dark"></div>
+                        <span
+                            class="font-mono text-sm text-velura-gray flex items-center gap-2"
+                        >
+                            <i class="ph-bold ph-number-two"></i> FETCH
+                        </span>
+                        <h4 class="text-xl font-bold">Fetch</h4>
+                        <p class="text-sm text-velura-gray">
+                            LaReview fetches data locally via the GitHub CLI
+                            (`gh`). No intermediate servers.
+                        </p>
+                    </div>
+
+                    <div class="flex flex-col gap-4 group">
+                        <div class="h-px w-full bg-velura-dark"></div>
+                        <span
+                            class="font-mono text-sm text-velura-gray flex items-center gap-2"
+                        >
+                            <i class="ph-bold ph-number-three"></i> GENERATE
+                        </span>
+                        <h4 class="text-xl font-bold">Generate</h4>
+                        <p class="text-sm text-velura-gray">
+                            Your chosen ACP agent analyzes intent and builds a
+                            task tree.
+                        </p>
+                    </div>
+
+                    <div class="flex flex-col gap-4 group">
+                        <div class="h-px w-full bg-velura-dark"></div>
+                        <span
+                            class="font-mono text-sm text-velura-gray flex items-center gap-2"
+                        >
+                            <i class="ph-bold ph-number-four"></i> REVIEW
+                        </span>
+                        <h4 class="text-xl font-bold">Review</h4>
+                        <p class="text-sm text-velura-gray">
+                            Execute the plan. Add notes, track status, and
+                            export to Markdown.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section
+            id="download"
+            class="relative py-32 px-4 text-center border-b border-theme bg-[#E5E0D8]"
+        >
+            <div>
+                <h2
+                    class="font-display text-6xl md:text-8xl mb-6 tracking-tighter"
+                >
+                    Start Reviewing
+                </h2>
+                <p class="text-xl font-light mb-10 max-w-2xl mx-auto">
+                    Local-first. Free. Open Source.
+                </p>
+
+                <div class="flex flex-col md:flex-row justify-center gap-4">
+                    <a
+                        href="https://github.com/puemos/lareview/releases"
+                        class="flex items-center justify-center gap-2 bg-velura-dark text-velura-bg px-10 py-5 text-sm font-bold uppercase tracking-widest hover:bg-transparent hover:text-velura-dark border border-transparent hover:border-velura-dark"
+                    >
+                        <i class="ph-bold ph-apple-logo text-lg"></i> macOS App
+                    </a>
+                    <a
+                        href="https://github.com/puemos/lareview/releases"
+                        class="flex items-center justify-center gap-2 bg-transparent text-velura-dark px-10 py-5 text-sm font-bold uppercase tracking-widest border border-theme hover:bg-velura-dark hover:text-velura-bg"
+                    >
+                        <i class="ph-bold ph-linux-logo text-lg"></i>
+                        <i class="ph-bold ph-windows-logo text-lg"></i> Linux /
+                        Windows
+                    </a>
+                </div>
+
+                <div class="mt-8 font-mono text-xs text-velura-gray">
+                    Requires GitHub CLI &amp; ACP Agent
+                </div>
+            </div>
+        </section>
+
+        <footer
+            class="py-12 px-8 flex flex-col md:flex-row justify-between items-end gap-8"
+        >
+            <div>
+                <div class="flex items-center gap-2 mb-4">
+                    <img
+                        src="./assets/logo/512.png"
+                        alt="LaReview logo"
+                        class="h-7 w-7"
+                    />
+                    <h3 class="font-display text-2xl font-bold">LaReview</h3>
+                </div>
+                <div class="flex flex-col gap-2 text-sm text-velura-gray">
+                    <a
+                        href="https://github.com/puemos/lareview/blob/main/docs/README.md"
+                        class="hover:text-velura-dark flex items-center gap-2"
+                        >Documentation</a
+                    >
+                    <a
+                        href="https://github.com/puemos/lareview/releases"
+                        class="hover:text-velura-dark flex items-center gap-2"
+                        >Releases</a
+                    >
+                    <a
+                        href="https://github.com/puemos/lareview/blob/main/SECURITY.md"
+                        class="hover:text-velura-dark flex items-center gap-2"
+                        >Security</a
+                    >
+                </div>
+            </div>
+
+            <div class="text-right">
+                <p class="text-xs font-mono text-velura-gray uppercase">
+                    &copy; 2025 LaReview. Open Source.<br />
+                    Designed with local-first principles.
+                </p>
+            </div>
+        </footer>
+    </body>
+</html>

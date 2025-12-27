@@ -14,7 +14,10 @@ pub fn get_content(path: &str) -> Option<&'static [u8]> {
         "assets/icons/mistral.svg" => Some(include_bytes!("../assets/icons/mistral.svg")),
         "assets/icons/opencode.svg" => Some(include_bytes!("../assets/icons/opencode.svg")),
         "assets/icons/qwen.svg" => Some(include_bytes!("../assets/icons/qwen.svg")),
-        "assets/icons/icon-512.png" => Some(include_bytes!("../assets/icons/icon-512.png")),
+        "assets/logo/512-light.svg" => Some(include_bytes!("../assets/logo/512-light.svg")),
+        "assets/logo/512.png" => Some(include_bytes!("../assets/logo/512.png")),
+        "assets/logo/512-light.png" => Some(include_bytes!("../assets/logo/512-light.png")),
+        "assets/logo/512-mac.png" => Some(include_bytes!("../assets/logo/512-mac.png")),
 
         // Fonts
         "assets/fonts/Geist.ttf" => Some(include_bytes!("../assets/fonts/Geist.ttf")),

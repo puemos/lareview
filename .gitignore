@@ -18,4 +18,8 @@ target
 .gemini-clipboard/
 .qwen
 
+node_modules/
+landing/styles/
+landing/dist/
+
 .DS_Store

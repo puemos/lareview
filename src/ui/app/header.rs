@@ -4,6 +4,24 @@ use crate::ui::icons;
 use crate::ui::spacing;
 use crate::ui::{theme, typography};
 use eframe::egui;
+use once_cell::sync::Lazy;
+use std::sync::Arc;
+
+#[derive(Clone)]
+struct HeaderLogo {
+    uri: &'static str,
+    bytes: Arc<[u8]>,
+}
+
+fn header_logo() -> Option<HeaderLogo> {
+    static LOGO: Lazy<Option<HeaderLogo>> = Lazy::new(|| {
+        crate::assets::get_content("assets/logo/512-light.svg").map(|bytes| HeaderLogo {
+            uri: "bytes://header_logo.svg",
+            bytes: bytes.into(),
+        })
+    });
+    LOGO.clone()
+}
 
 impl LaReviewApp {
     pub(super) fn render_header(&mut self, ctx: &egui::Context) {
@@ -21,11 +39,18 @@ impl LaReviewApp {
                 ui.scope_builder(egui::UiBuilder::new().max_rect(left_rect), |ui| {
                     ui.horizontal_centered(|ui| {
                         ui.add_space(spacing::SPACING_SM);
-                        ui.label(
-                            egui::RichText::new(icons::STATUS_IN_PROGRESS)
-                                .size(22.0)
-                                .color(theme.brand),
-                        );
+                        if let Some(logo) = header_logo() {
+                            let image = egui::Image::from_bytes(logo.uri, logo.bytes)
+                                .fit_to_exact_size(egui::vec2(16.0, 16.0))
+                                .corner_radius(4.0);
+                            ui.add(image);
+                        } else {
+                            ui.label(
+                                egui::RichText::new(icons::STATUS_IN_PROGRESS)
+                                    .size(22.0)
+                                    .color(theme.brand),
+                            );
+                        }
                         ui.add_space(2.0);
                         ui.label(
                             typography::bold("LaReview")

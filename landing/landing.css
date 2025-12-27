@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: #ebe6de;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: #1a1a1a;
+    }
+}
+
+@layer utilities {
+    .border-theme {
+        border-color: #1a1a1a;
+    }
+}

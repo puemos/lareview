@@ -1,9 +1,9 @@
 <p align="center">
   <a href="https://github.com/puemos/lareview">
     <picture>
-      <source srcset="assets/icons/icon-512.png" media="(prefers-color-scheme: dark)">
-      <source srcset="assets/icons/icon-512.png" media="(prefers-color-scheme: light)">
-      <img src="assets/icons/icon-512.png" alt="LaReview logo" width="160">
+      <source srcset="assets/logo/512.png" media="(prefers-color-scheme: dark)">
+      <source srcset="assets/logo/512.png" media="(prefers-color-scheme: light)">
+      <img src="assets/logo/512.png" alt="LaReview logo" width="160">
     </picture>
   </a>
 </p>
