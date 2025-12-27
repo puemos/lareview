@@ -1,9 +1,7 @@
 <p align="center">
   <a href="https://github.com/puemos/lareview">
     <picture>
-      <source srcset="assets/logo/512.png" media="(prefers-color-scheme: dark)">
-      <source srcset="assets/logo/512.png" media="(prefers-color-scheme: light)">
-      <img src="assets/logo/512.png" alt="LaReview logo" width="160">
+      <img src="assets/logo/512-mac.png" alt="LaReview logo" width="90">
     </picture>
   </a>
 </p>
@@ -13,18 +11,10 @@
 <p align="center"><b>Turn a diff into a review checklist.</b></p>
 
 <p align="center">
-  <a href="https://github.com/puemos/lareview/actions/workflows/ci.yml">
-    <img alt="Build" src="https://img.shields.io/github/actions/workflow/status/puemos/lareview/ci.yml?style=flat-square" />
-  </a>
-  <a href="https://github.com/puemos/lareview/releases">
-    <img alt="Release" src="https://img.shields.io/github/v/release/puemos/lareview?style=flat-square" />
-  </a>
-  <a href="LICENSE">
-    <img alt="License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" />
-  </a>
-  <a href="https://www.rust-lang.org">
-    <img alt="Rust" src="https://img.shields.io/badge/rust-nightly-orange?style=flat-square" />
-  </a>
+  <a href="https://github.com/puemos/lareview/actions/workflows/ci.yml"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/puemos/lareview/ci.yml?style=flat-square" /></a>
+  <a href="https://github.com/puemos/lareview/releases"><img alt="Release" src="https://img.shields.io/github/v/release/puemos/lareview?style=flat-square" /></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" /></a>
+  <a href="https://www.rust-lang.org"><img alt="Rust" src="https://img.shields.io/badge/rust-nightly-orange?style=flat-square" /></a>
 </p>
 
 [![LaReview hero screenshot](assets/screenshots/review.webp)](assets/screenshots/review.webp)
@@ -41,15 +31,15 @@ https://github.com/user-attachments/assets/609bce15-f6df-4033-b84d-9cc7fc05cbb3
 
 LaReview is designed for a local-first, secure, and focused review experience.
 
-|                                                                                            | Feature                                                                                                                                                                                                                                                                      |
-| :----------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <img src="assets/screenshots/generate.webp" width="400" alt="Plan Generation View">        | **AI-Powered Plan Generation**<br>Input a GitHub PR reference (e.g., `owner/repo#123`) or paste a raw diff. LaReview uses your local ACP agent to analyze the changes and generate a structured review plan based on the author's intent.                                    |
-| <img src="assets/screenshots/review.webp" width="400" alt="Structured Review Tree">        | **Structured Task Tree & Notes**<br>Navigate the review as a hierarchical tree. Mark tasks as **To Do**, **In Progress**, or **Done**. Attach contextual notes to specific tasks or lines of code to keep track of your thoughts.                                            |
-| <img src="assets/screenshots/review-changes.webp" width="400" alt="Task-focused Diff">   | **Task-Focused Diffs**<br>Stop context switching. When you select a task, the diff viewer only shows the specific hunks relevant to completing that task, isolating the noise.                                                                                               |
+|                                                                                               | Feature                                                                                                                                                                                                                                                                      |
+| :-------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <img src="assets/screenshots/generate.webp" width="400" alt="Plan Generation View">           | **AI-Powered Plan Generation**<br>Input a GitHub PR reference (e.g., `owner/repo#123`) or paste a raw diff. LaReview uses your local ACP agent to analyze the changes and generate a structured review plan based on the author's intent.                                    |
+| <img src="assets/screenshots/review.webp" width="400" alt="Structured Review Tree">           | **Structured Task Tree & Notes**<br>Navigate the review as a hierarchical tree. Mark tasks as **To Do**, **In Progress**, or **Done**. Attach contextual notes to specific tasks or lines of code to keep track of your thoughts.                                            |
+| <img src="assets/screenshots/review-changes.webp" width="400" alt="Task-focused Diff">        | **Task-Focused Diffs**<br>Stop context switching. When you select a task, the diff viewer only shows the specific hunks relevant to completing that task, isolating the noise.                                                                                               |
 | <img src="assets/screenshots/review-discussion-item.webp" width="400" alt="Feedback Threads"> | **Agent-Generated Feedback Threads**<br>The AI agent doesn't just plan; it actively identifies issues. It can autonomously create feedback threads (nitpicks, blocking issues, or suggestions) anchored to specific lines of code, helping you catch bugs before they merge. |
-| <img src="assets/screenshots/repos.webp" width="400" alt="Linked Repositories">            | **Local Repository Context**<br>Link your local Git repositories to LaReview. This gives the AI agent full access to search your codebase and list files, providing maximum context for more accurate and insightful reviews.                                                |
-| <img src="assets/screenshots/review-diagram.webp" width="400" alt="Diagram Viewer">      | **Visual Diagram View**<br>Visualize the structure and flow of changes with automatically generated diagrams, helping you understand complex refactors faster. (Requires D2).                                                                                                |
-| <img src="assets/screenshots/settings.webp" width="400" alt="Settings View">               | **Export & Local-First**<br>No third-party servers. Review state is stored in a local SQLite DB. Export your summary as Markdown. PR data is fetched securely via your own GitHub CLI (`gh`), and planning is handled by your local ACP agent.                               |
+| <img src="assets/screenshots/repos.webp" width="400" alt="Linked Repositories">               | **Local Repository Context**<br>Link your local Git repositories to LaReview. This gives the AI agent full access to search your codebase and list files, providing maximum context for more accurate and insightful reviews.                                                |
+| <img src="assets/screenshots/review-diagram.webp" width="400" alt="Diagram Viewer">           | **Visual Diagram View**<br>Visualize the structure and flow of changes with automatically generated diagrams, helping you understand complex refactors faster. (Requires D2).                                                                                                |
+| <img src="assets/screenshots/settings.webp" width="400" alt="Settings View">                  | **Export & Local-First**<br>No third-party servers. Review state is stored in a local SQLite DB. Export your summary as Markdown. PR data is fetched securely via your own GitHub CLI (`gh`), and planning is handled by your local ACP agent.                               |
 
 ## How it works
 
@@ -278,6 +268,7 @@ See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
 ## License
 
 Licensed under either of:
+
 - Apache License, Version 2.0 (LICENSE-APACHE)
 - MIT license (LICENSE-MIT)
 
