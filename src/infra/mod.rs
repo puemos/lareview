@@ -8,6 +8,7 @@ pub mod d2;
 pub mod db;
 pub mod diff;
 pub mod diff_index;
+pub mod editor;
 pub mod git;
 pub mod github;
 pub mod hash;

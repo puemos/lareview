@@ -17,6 +17,7 @@ pub struct AppConfig {
     pub custom_agents: Vec<CustomAgentConfig>,
     pub agent_path_overrides: HashMap<String, String>,
     pub agent_envs: HashMap<String, HashMap<String, String>>,
+    pub preferred_editor_id: Option<String>,
 }
 
 pub fn load_config() -> AppConfig {
@@ -111,6 +112,7 @@ mod tests {
             }],
             agent_path_overrides: path_overrides,
             agent_envs,
+            preferred_editor_id: Some("vscode".into()),
         };
 
         let tmp_file = NamedTempFile::new().unwrap();
@@ -141,6 +143,7 @@ mod tests {
                 .unwrap(),
             "secret"
         );
+        assert_eq!(loaded.preferred_editor_id.as_deref(), Some("vscode"));
 
         // Test saving
         save_config(&loaded).unwrap();

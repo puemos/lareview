@@ -170,12 +170,14 @@ pub fn save_app_config_full(
     custom_agents: Vec<crate::infra::app_config::CustomAgentConfig>,
     agent_path_overrides: std::collections::HashMap<String, String>,
     agent_envs: std::collections::HashMap<String, std::collections::HashMap<String, String>>,
+    preferred_editor_id: Option<String>,
 ) {
     let config = crate::infra::app_config::AppConfig {
         has_seen_requirements,
         custom_agents,
         agent_path_overrides,
         agent_envs,
+        preferred_editor_id,
     };
 
     if let Err(err) = crate::infra::app_config::save_config(&config) {

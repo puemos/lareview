@@ -95,5 +95,11 @@ pub enum Command {
         custom_agents: Vec<crate::infra::app_config::CustomAgentConfig>,
         agent_path_overrides: std::collections::HashMap<String, String>,
         agent_envs: std::collections::HashMap<String, std::collections::HashMap<String, String>>,
+        preferred_editor_id: Option<String>,
+    },
+    OpenInEditor {
+        editor_id: String,
+        file_path: std::path::PathBuf,
+        line_number: usize,
     },
 }

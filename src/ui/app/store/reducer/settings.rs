@@ -75,7 +75,53 @@ pub fn reduce(
                 custom_agents: ui.custom_agents.clone(),
                 agent_path_overrides: ui.agent_path_overrides.clone(),
                 agent_envs: ui.agent_envs.clone(),
+                preferred_editor_id: ui.preferred_editor_id.clone(),
             }]
+        }
+        SettingsAction::SetPreferredEditor(editor_id) => {
+            ui.preferred_editor_id = Some(editor_id.clone());
+            ui.show_editor_picker = false;
+            ui.editor_picker_error = None;
+
+            let mut commands = vec![Command::SaveAppConfigFull {
+                has_seen_requirements: ui.has_seen_requirements,
+                custom_agents: ui.custom_agents.clone(),
+                agent_path_overrides: ui.agent_path_overrides.clone(),
+                agent_envs: ui.agent_envs.clone(),
+                preferred_editor_id: ui.preferred_editor_id.clone(),
+            }];
+
+            if let Some(request) = ui.pending_editor_open.take() {
+                commands.push(Command::OpenInEditor {
+                    editor_id,
+                    file_path: request.file_path,
+                    line_number: request.line_number,
+                });
+            }
+
+            commands
+        }
+        SettingsAction::OpenEditorPicker => {
+            ui.show_editor_picker = true;
+            ui.editor_picker_error = None;
+            Vec::new()
+        }
+        SettingsAction::ClearPreferredEditor => {
+            ui.preferred_editor_id = None;
+            ui.editor_picker_error = None;
+            vec![Command::SaveAppConfigFull {
+                has_seen_requirements: ui.has_seen_requirements,
+                custom_agents: ui.custom_agents.clone(),
+                agent_path_overrides: ui.agent_path_overrides.clone(),
+                agent_envs: ui.agent_envs.clone(),
+                preferred_editor_id: ui.preferred_editor_id.clone(),
+            }]
+        }
+        SettingsAction::CloseEditorPicker => {
+            ui.show_editor_picker = false;
+            ui.pending_editor_open = None;
+            ui.editor_picker_error = None;
+            Vec::new()
         }
         SettingsAction::UpdateAgentPath(agent_id, path) => {
             if path.trim().is_empty() {
@@ -124,6 +170,7 @@ pub fn reduce(
                 custom_agents: ui.custom_agents.clone(),
                 agent_path_overrides: ui.agent_path_overrides.clone(),
                 agent_envs: ui.agent_envs.clone(),
+                preferred_editor_id: ui.preferred_editor_id.clone(),
             }]
         }
         SettingsAction::LoadAgentSettings => {
@@ -131,6 +178,7 @@ pub fn reduce(
             ui.agent_path_overrides = config.agent_path_overrides;
             ui.custom_agents = config.custom_agents;
             ui.agent_envs = config.agent_envs;
+            ui.preferred_editor_id = config.preferred_editor_id;
             ui.is_agent_settings_modified = false;
             ui.agent_settings_snapshot = None;
             Vec::new()

@@ -191,6 +191,7 @@ fn test_save_app_config_runtime() {
         Vec::new(),
         std::collections::HashMap::new(),
         std::collections::HashMap::new(),
+        None,
     );
 
     let contents = std::fs::read_to_string(&path).unwrap();

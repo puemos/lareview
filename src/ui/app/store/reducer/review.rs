@@ -3,6 +3,7 @@ use super::super::action::{ReviewAction, ReviewDataPayload};
 use super::super::command::Command;
 use crate::domain::{ReviewStatus, TaskId};
 use chrono::Utc;
+use std::path::Path;
 
 pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
     match action {
@@ -245,6 +246,40 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
                 Vec::new()
             }
         }
+        ReviewAction::OpenInEditor {
+            file_path,
+            line_number,
+        } => {
+            state.ui.review_error = None;
+
+            let Some(request) = resolve_editor_open_request(state, &file_path, line_number) else {
+                state.ui.review_error =
+                    Some("Link a repository to open files in an editor.".to_string());
+                return Vec::new();
+            };
+
+            if let Some(editor_id) = state.ui.preferred_editor_id.clone() {
+                if crate::infra::editor::is_editor_available(&editor_id) {
+                    state.ui.pending_editor_open = None;
+                    state.ui.show_editor_picker = false;
+                    state.ui.editor_picker_error = None;
+                    return vec![Command::OpenInEditor {
+                        editor_id,
+                        file_path: request.file_path,
+                        line_number: request.line_number,
+                    }];
+                }
+
+                state.ui.editor_picker_error =
+                    Some("Preferred editor is not available on this system.".to_string());
+            } else {
+                state.ui.editor_picker_error = None;
+            }
+
+            state.ui.pending_editor_open = Some(request);
+            state.ui.show_editor_picker = true;
+            Vec::new()
+        }
     }
 }
 
@@ -343,4 +378,61 @@ pub fn apply_review_data(state: &mut AppState, payload: ReviewDataPayload) -> Ve
     } else {
         Vec::new()
     }
+}
+
+fn resolve_editor_open_request(
+    state: &AppState,
+    file_path: &str,
+    line_number: usize,
+) -> Option<crate::ui::app::state::EditorOpenRequest> {
+    if state.domain.linked_repos.is_empty() {
+        return None;
+    }
+
+    let rel_path = Path::new(file_path);
+    if rel_path.is_absolute() {
+        return None;
+    }
+
+    let selected_repo = state.ui.selected_repo_id.as_ref().and_then(|selected_id| {
+        state
+            .domain
+            .linked_repos
+            .iter()
+            .find(|repo| &repo.id == selected_id)
+    });
+
+    let mut repos = Vec::new();
+    if let Some(selected) = selected_repo {
+        repos.push(selected);
+    }
+
+    for repo in &state.domain.linked_repos {
+        if !repos.iter().any(|existing| existing.id == repo.id) {
+            repos.push(repo);
+        }
+    }
+
+    for repo in &repos {
+        let candidate = repo.path.join(rel_path);
+        if candidate.exists() {
+            return Some(crate::ui::app::state::EditorOpenRequest {
+                file_path: candidate,
+                line_number,
+            });
+        }
+    }
+
+    let fallback_repo = if let Some(selected) = selected_repo {
+        Some(selected)
+    } else if state.domain.linked_repos.len() == 1 {
+        state.domain.linked_repos.first()
+    } else {
+        None
+    };
+
+    fallback_repo.map(|repo| crate::ui::app::state::EditorOpenRequest {
+        file_path: repo.path.join(rel_path),
+        line_number,
+    })
 }

@@ -6,7 +6,7 @@ use super::types::DiffLineInfo;
 use super::utils::{DIFF_FONT_SIZE, paint_inline_text_job};
 use crate::ui::{spacing, theme};
 use eframe::egui::{self, FontId, TextFormat, text::LayoutJob};
-use egui_phosphor::regular::PLUS;
+use egui_phosphor::regular::{ARROW_SQUARE_OUT, PENCIL};
 
 pub fn render_unified_row(
     ui: &mut egui::Ui,
@@ -54,6 +54,13 @@ pub fn render_unified_row(
         line_num_bg = active_color;
     }
 
+    struct TextOverlay {
+        pos: egui::Pos2,
+        width: f32,
+        job: LayoutJob,
+    }
+
+    let mut text_overlay: Option<TextOverlay> = None;
     let main_response = egui::Frame::NONE
         .fill(bg_color)
         .show(ui, |ui| {
@@ -148,32 +155,40 @@ pub fn render_unified_row(
                             );
                         }
 
-                        ui.label(job);
+                        let label =
+                            egui::Label::new(job.clone()).wrap_mode(egui::TextWrapMode::Wrap);
+                        let response = ui.add(label);
+                        text_overlay = Some(TextOverlay {
+                            pos: response.rect.min,
+                            width: response.rect.width(),
+                            job,
+                        });
                     });
             });
         })
         .response;
 
-    if main_response.hovered() && line_number.is_some() {
-        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-    }
-
     let line_number_for_action = line_number;
     let mut comment_button_rect: Option<egui::Rect> = None;
+    let mut open_button_rect: Option<egui::Rect> = None;
 
     let pointer_pos = ui.ctx().input(|i| i.pointer.hover_pos());
     let is_line_hovered = pointer_pos.is_some_and(|p| main_response.rect.contains(p));
+    let is_modifier_pressed = ui.ctx().input(|i| i.modifiers.ctrl || i.modifiers.command);
 
     let show_comment_button = line_number.is_some() && !is_comment_active && is_line_hovered;
+    let show_open_button = line_number.is_some() && is_line_hovered;
 
     if show_comment_button {
         let row_rect = main_response.rect;
         let size: f32 = 18.0;
+        let gap: f32 = 4.0;
+        let right_offset: f32 = 4.0;
         let button_size = egui::vec2(size, size);
-        let offset_x: f32 = -4.0;
         let top_y = row_rect.center().y - size * 0.5 - 1.0;
-        let button_rect =
-            egui::Rect::from_min_size(egui::pos2(row_rect.left() + offset_x, top_y), button_size);
+        let open_x = row_rect.right() - size - right_offset;
+        let comment_x = open_x - gap - size;
+        let button_rect = egui::Rect::from_min_size(egui::pos2(comment_x, top_y), button_size);
         comment_button_rect = Some(button_rect);
 
         let painter = ui.painter();
@@ -181,7 +196,7 @@ pub fn render_unified_row(
         painter.text(
             button_rect.center(),
             egui::Align2::CENTER_CENTER,
-            PLUS.to_string(),
+            PENCIL.to_string(),
             FontId::proportional(size - 2.0),
             theme.bg_primary,
         );
@@ -211,72 +226,108 @@ pub fn render_unified_row(
         }
     }
 
-    if let Some(pos) = pointer_pos {
-        if let Some(btn_rect) = comment_button_rect {
-            if btn_rect.contains(pos) {
-                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-            } else if main_response.rect.contains(pos) {
-                ui.ctx().set_cursor_icon(egui::CursorIcon::Text);
+    if show_open_button {
+        let row_rect = main_response.rect;
+        let size: f32 = 18.0;
+        let right_offset: f32 = 4.0;
+        let button_size = egui::vec2(size, size);
+        let top_y = row_rect.center().y - size * 0.5 - 1.0;
+        let button_rect = egui::Rect::from_min_size(
+            egui::pos2(row_rect.right() - size - right_offset, top_y),
+            button_size,
+        );
+        open_button_rect = Some(button_rect);
+
+        let painter = ui.painter();
+        painter.rect_filled(button_rect, size * 0.5, theme.brand);
+        painter.text(
+            button_rect.center(),
+            egui::Align2::CENTER_CENTER,
+            ARROW_SQUARE_OUT.to_string(),
+            FontId::proportional(size - 4.0),
+            theme.bg_primary,
+        );
+
+        let hovered_button = pointer_pos.is_some_and(|p| button_rect.contains(p));
+        let clicked = ui
+            .ctx()
+            .input(|i| hovered_button && i.pointer.button_clicked(egui::PointerButton::Primary));
+
+        if clicked
+            && matches!(action, DiffAction::None)
+            && let Some(num) = line_number_for_action
+        {
+            action = DiffAction::OpenInEditor {
+                file_path: ctx.file_path.clone(),
+                line_number: num,
+            };
+        }
+    }
+
+    let show_jump_hint = is_line_hovered && is_modifier_pressed && line_number_for_action.is_some();
+    if show_jump_hint {
+        let tint_color = match line.change_type {
+            ChangeType::Equal => theme.brand,
+            ChangeType::Delete | ChangeType::Insert => theme.text_primary,
+        };
+        if let Some(overlay) = &text_overlay {
+            let mut job = overlay.job.clone();
+            job.wrap.max_width = overlay.width;
+            for (idx, section) in job.sections.iter_mut().enumerate() {
+                if idx >= 2 {
+                    section.format.color = tint_color;
+                }
             }
-        } else if main_response.rect.contains(pos) {
+            let galley = ui.painter().layout_job(job);
+            ui.painter().add(egui::Shape::Text(egui::epaint::TextShape {
+                pos: overlay.pos,
+                galley,
+                underline: egui::Stroke::NONE,
+                override_text_color: Some(tint_color),
+                angle: 0.0,
+                fallback_color: tint_color,
+                opacity_factor: 1.0,
+            }));
+        }
+    }
+
+    if let Some(pos) = pointer_pos {
+        let hover_comment = comment_button_rect.is_some_and(|rect| rect.contains(pos));
+        let hover_open = open_button_rect.is_some_and(|rect| rect.contains(pos));
+        let hover_row = main_response.rect.contains(pos);
+
+        if hover_comment || hover_open || (hover_row && is_modifier_pressed) {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        } else if hover_row {
             ui.ctx().set_cursor_icon(egui::CursorIcon::Text);
         }
     }
 
-    if is_comment_active {
-        ui.add_space(4.0);
-        let text_edit_id = ui.id().with(("comment_text", ctx.file_idx, ctx.line_idx));
-        let mut comment_text = ui.memory(|mem| {
-            mem.data
-                .get_temp::<String>(text_edit_id)
-                .unwrap_or_default()
-        });
+    let is_primary_clicked = ui
+        .ctx()
+        .input(|i| i.pointer.button_clicked(egui::PointerButton::Primary));
+    let clicked_in_row = pointer_pos.is_some_and(|p| main_response.rect.contains(p));
+    let clicked_comment_button = comment_button_rect
+        .zip(pointer_pos)
+        .is_some_and(|(rect, pos)| rect.contains(pos));
+    let clicked_open_button = open_button_rect
+        .zip(pointer_pos)
+        .is_some_and(|(rect, pos)| rect.contains(pos));
 
-        let text_response = ui.add(
-            egui::TextEdit::multiline(&mut comment_text)
-                .id_salt(text_edit_id)
-                .hint_text("Enter your comment...")
-                .font(egui::TextStyle::Monospace)
-                .frame(false)
-                .desired_rows(3)
-                .desired_width(ui.available_width())
-                .lock_focus(true),
-        );
-
-        ui.memory_mut(|mem| mem.data.insert_temp(text_edit_id, comment_text.clone()));
-
-        ui.horizontal(|ui| {
-            if ui.button("Save Comment").clicked() {
-                if let Some(line_num) = line_number {
-                    action = DiffAction::SaveNote {
-                        file_idx: ctx.file_idx,
-                        line_idx: ctx.line_idx,
-                        line_number: line_num,
-                        note_text: comment_text.clone(),
-                    };
-                }
-
-                ui.memory_mut(|mem| {
-                    mem.data.remove::<String>(text_edit_id);
-                    mem.data.insert_temp(comment_open_id, false);
-                });
-                is_comment_active = false;
-            }
-
-            if ui.button("Cancel").clicked() {
-                ui.memory_mut(|mem| {
-                    mem.data.remove::<String>(text_edit_id);
-                    mem.data.insert_temp(comment_open_id, false);
-                });
-                is_comment_active = false;
-            }
-        });
-
-        if text_response.gained_focus() {
-            ui.ctx().memory_mut(|mem| {
-                mem.request_focus(text_response.id);
-            });
-        }
+    if matches!(action, DiffAction::None)
+        && !is_comment_active
+        && is_modifier_pressed
+        && is_primary_clicked
+        && clicked_in_row
+        && !clicked_comment_button
+        && !clicked_open_button
+        && line_number_for_action.is_some()
+        && let Some(num) = line_number_for_action
+    {
+        action = DiffAction::OpenInEditor {
+            file_path: ctx.file_path.clone(),
+            line_number: num,
+        };
     }
 
     action

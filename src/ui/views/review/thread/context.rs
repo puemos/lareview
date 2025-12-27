@@ -1,5 +1,5 @@
 use crate::domain::Thread;
-use crate::ui::components::render_diff_editor_full_view;
+use crate::ui::components::{DiffAction, render_diff_editor_full_view};
 use crate::ui::theme::Theme;
 use crate::ui::views::review::format_timestamp;
 use crate::ui::{spacing, typography};
@@ -12,7 +12,8 @@ pub(crate) fn render_thread_context(
     line_number: Option<u32>,
     diff_snippet: Option<String>,
     theme: &Theme,
-) {
+) -> DiffAction {
+    let mut action = DiffAction::None;
     if let (Some(file_path), Some(line_number)) = (file_path, line_number)
         && line_number > 0
     {
@@ -54,11 +55,13 @@ pub(crate) fn render_thread_context(
                     egui::ScrollArea::vertical()
                         .max_height(220.0)
                         .show(ui, |ui| {
-                            render_diff_editor_full_view(ui, &diff_snippet, "diff");
+                            action = render_diff_editor_full_view(ui, &diff_snippet, "diff");
                         });
                 });
         }
     }
+
+    action
 }
 
 #[cfg(test)]

@@ -1,4 +1,5 @@
-use crate::ui::app::{Action, LaReviewApp};
+use crate::ui::app::{Action, LaReviewApp, ReviewAction};
+use crate::ui::components::DiffAction;
 use crate::ui::spacing;
 use crate::ui::theme::current_theme;
 use eframe::egui;
@@ -80,7 +81,7 @@ impl LaReviewApp {
                         None
                     };
 
-                render_thread_context(
+                let action = render_thread_context(
                     ui,
                     thread.as_ref(),
                     view.file_path.as_ref(),
@@ -88,6 +89,16 @@ impl LaReviewApp {
                     diff_snippet,
                     &theme,
                 );
+                if let DiffAction::OpenInEditor {
+                    file_path,
+                    line_number,
+                } = action
+                {
+                    self.dispatch(Action::Review(ReviewAction::OpenInEditor {
+                        file_path,
+                        line_number,
+                    }));
+                }
             });
 
         ui.add_space(spacing::SPACING_MD);

@@ -139,6 +139,7 @@ impl LaReviewApp {
         state.ui.agent_path_overrides = config.agent_path_overrides;
         state.ui.custom_agents = config.custom_agents;
         state.ui.agent_envs = config.agent_envs;
+        state.ui.preferred_editor_id = config.preferred_editor_id;
 
         if let Ok(repos) = repo_repo.find_all() {
             state.domain.linked_repos = repos;
@@ -181,7 +182,7 @@ impl LaReviewApp {
             skip_runtime: false,
         };
 
-        if let Some(image_bytes) = crate::assets::get_content("assets/icons/icon-512.png")
+        if let Some(image_bytes) = crate::assets::get_content("assets/logo/512-mac.png")
             && let Ok(image) = image::load_from_memory(image_bytes)
         {
             let size = [image.width() as usize, image.height() as usize];

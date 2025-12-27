@@ -51,6 +51,12 @@ pub struct ThreadContext {
     pub line_number: Option<u32>,
 }
 
+#[derive(Debug, Clone)]
+pub struct EditorOpenRequest {
+    pub file_path: std::path::PathBuf,
+    pub line_number: usize,
+}
+
 /// Domain-related persistent state.
 #[derive(Default)]
 pub struct DomainState {
@@ -210,6 +216,10 @@ pub struct UiState {
     pub plan_panel_collapsed: bool,
     pub thread_title_draft: String,
     pub thread_reply_draft: String,
+    pub preferred_editor_id: Option<String>,
+    pub show_editor_picker: bool,
+    pub pending_editor_open: Option<EditorOpenRequest>,
+    pub editor_picker_error: Option<String>,
     // Agent settings
     pub agent_path_overrides: std::collections::HashMap<String, String>,
     pub custom_agents: Vec<crate::infra::app_config::CustomAgentConfig>,

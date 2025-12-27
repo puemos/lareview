@@ -25,6 +25,11 @@ pub enum DiffAction {
         line_number: usize,
         note_text: String,
     },
+    /// Open the file in an external editor at the given line.
+    OpenInEditor {
+        file_path: String,
+        line_number: usize,
+    },
 }
 
 #[derive(Debug, Clone)]

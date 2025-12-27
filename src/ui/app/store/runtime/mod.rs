@@ -1,3 +1,4 @@
+pub mod editor;
 pub mod generate;
 pub mod review;
 pub mod settings;
@@ -78,11 +79,18 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
             custom_agents,
             agent_path_overrides,
             agent_envs,
+            preferred_editor_id,
         } => settings::save_app_config_full(
             has_seen_requirements,
             custom_agents,
             agent_path_overrides,
             agent_envs,
+            preferred_editor_id,
         ),
+        Command::OpenInEditor {
+            editor_id,
+            file_path,
+            line_number,
+        } => editor::open_in_editor(editor_id, file_path, line_number),
     }
 }

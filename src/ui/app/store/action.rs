@@ -101,6 +101,10 @@ pub enum ReviewAction {
     ExportReviewToFile {
         path: std::path::PathBuf,
     },
+    OpenInEditor {
+        file_path: String,
+        line_number: usize,
+    },
 }
 
 #[derive(Debug)]
@@ -112,6 +116,10 @@ pub enum SettingsAction {
     LinkRepository,
     UnlinkRepository(String),
     DismissRequirements,
+    SetPreferredEditor(String),
+    OpenEditorPicker,
+    ClearPreferredEditor,
+    CloseEditorPicker,
     // Agent settings
     UpdateAgentPath(String, String), // agent_id, path
     AddCustomAgent(crate::infra::app_config::CustomAgentConfig),

@@ -1,4 +1,5 @@
 use super::{Action, LaReviewApp, ReviewAction, SettingsAction};
+use crate::ui::components::DiffAction;
 use crate::ui::components::pills::pill_action_button;
 use crate::ui::{icons, spacing, typography};
 use eframe::egui;
@@ -42,7 +43,19 @@ impl LaReviewApp {
 
                 ui.separator();
 
-                crate::ui::components::diff::render_diff_editor_full_view(ui, &full.text, "diff");
+                let action = crate::ui::components::diff::render_diff_editor_full_view(
+                    ui, &full.text, "diff",
+                );
+                if let DiffAction::OpenInEditor {
+                    file_path,
+                    line_number,
+                } = action
+                {
+                    self.dispatch(Action::Review(ReviewAction::OpenInEditor {
+                        file_path,
+                        line_number,
+                    }));
+                }
             });
 
         if !open {
@@ -241,6 +254,68 @@ impl LaReviewApp {
 
         if !open {
             self.dispatch(Action::Settings(SettingsAction::DismissRequirements));
+        }
+    }
+}
+
+impl LaReviewApp {
+    pub(super) fn render_editor_picker_overlay(&mut self, ctx: &egui::Context) {
+        if !self.state.ui.show_editor_picker {
+            return;
+        }
+
+        let theme = crate::ui::theme::current_theme();
+        let mut open = true;
+        let editors = crate::infra::editor::list_available_editors();
+
+        egui::Window::new("Choose Editor")
+            .open(&mut open)
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+            .frame(
+                egui::Frame::window(&ctx.style())
+                    .inner_margin(egui::Margin::same(spacing::SPACING_MD as i8)),
+            )
+            .show(ctx, |ui| {
+                ui.label("Select a text editor to open files:");
+                ui.add_space(spacing::SPACING_SM);
+
+                if let Some(err) = &self.state.ui.editor_picker_error {
+                    ui.label(typography::body(err).color(theme.destructive));
+                    ui.add_space(spacing::SPACING_SM);
+                }
+
+                if editors.is_empty() {
+                    ui.label(typography::body("No supported editors found on PATH."));
+                    ui.label(typography::weak(
+                        "Install one (VS Code, Cursor, Sublime, JetBrains) or add it to PATH.",
+                    ));
+                } else {
+                    for editor in editors {
+                        let label = format!("{} ({})", editor.label, editor.path.display());
+                        if ui
+                            .add_sized(
+                                [ui.available_width(), 28.0],
+                                egui::Button::new(typography::label(label)),
+                            )
+                            .clicked()
+                        {
+                            self.dispatch(Action::Settings(SettingsAction::SetPreferredEditor(
+                                editor.id.to_string(),
+                            )));
+                        }
+                    }
+                }
+
+                ui.add_space(spacing::SPACING_MD);
+                if ui.button("Cancel").clicked() {
+                    self.dispatch(Action::Settings(SettingsAction::CloseEditorPicker));
+                }
+            });
+
+        if !open {
+            self.dispatch(Action::Settings(SettingsAction::CloseEditorPicker));
         }
     }
 }

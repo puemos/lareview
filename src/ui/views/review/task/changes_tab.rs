@@ -116,6 +116,15 @@ impl LaReviewApp {
                                     line_number: Some(line_number),
                                 }));
                             }
+                            DiffAction::OpenInEditor {
+                                file_path,
+                                line_number,
+                            } => {
+                                self.dispatch(Action::Review(ReviewAction::OpenInEditor {
+                                    file_path,
+                                    line_number,
+                                }));
+                            }
                             _ => {}
                         }
                     });
