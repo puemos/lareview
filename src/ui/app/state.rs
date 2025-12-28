@@ -17,6 +17,29 @@ pub enum AppView {
     Settings,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExportOptions {
+    pub include_summary: bool,
+    pub include_stats: bool,
+    pub include_tasks: bool,
+    pub include_threads: bool,
+    pub include_metadata: bool,
+    pub selected_thread_ids: std::collections::HashSet<String>,
+}
+
+impl Default for ExportOptions {
+    fn default() -> Self {
+        Self {
+            include_summary: true,
+            include_stats: true,
+            include_tasks: true,
+            include_threads: true,
+            include_metadata: true,
+            selected_thread_ids: std::collections::HashSet::new(),
+        }
+    }
+}
+
 /// Which agent is selected.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct SelectedAgent {
@@ -232,6 +255,11 @@ pub struct UiState {
     pub custom_agent_draft: crate::infra::app_config::CustomAgentConfig,
     pub editing_agent_id: Option<String>,
     pub show_add_custom_agent_modal: bool,
+    // --- Export UI ---
+    pub export_options: ExportOptions,
+    pub show_export_options_menu: bool,
+    pub export_sidebar_width: f32,
+    pub pending_clipboard_copy: Option<String>,
 }
 
 #[derive(Clone, Default)]

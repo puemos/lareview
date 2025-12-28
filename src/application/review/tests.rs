@@ -6,7 +6,7 @@ use std::sync::Arc;
 #[tokio::test]
 async fn test_export_to_markdown_basics() {
     let data = create_mock_data();
-    let result = ReviewExporter::export_to_markdown(&data, false)
+    let result = ReviewExporter::export_to_markdown(&data, &ExportOptions::default())
         .await
         .unwrap();
 
@@ -17,9 +17,8 @@ async fn test_export_to_markdown_basics() {
     assert!(md.contains("### Flow A"));
     assert!(md.contains("#### [ ] 🟡 First Task"));
     assert!(md.contains("AI Insight"));
-    assert!(md.contains("##### Discussion"));
-    assert!(md.contains("- [todo][nitpick] Thread Title"));
-    assert!(md.contains("Author (2023-01-01T00:00:00Z): Comment body"));
+    assert!(md.contains("### ⚪ [nitpick] Thread Title"));
+    assert!(md.contains("Comment body"));
 }
 
 #[tokio::test]
@@ -99,7 +98,7 @@ async fn test_export_to_markdown_full() {
         }],
     };
 
-    let result = ReviewExporter::export_to_markdown(&data, false)
+    let result = ReviewExporter::export_to_markdown(&data, &ExportOptions::default())
         .await
         .unwrap();
     assert!(result.markdown.contains("Full Review"));

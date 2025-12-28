@@ -75,13 +75,16 @@ pub enum Command {
         command: D2Command,
     },
     GenerateExportPreview {
-        review_id: ReviewId,
-        run_id: crate::domain::ReviewRunId,
+        review_id: String,
+        run_id: String,
+        include_thread_ids: Option<Vec<String>>,
+        options: Box<crate::application::review::export::ExportOptions>,
     },
     ExportReview {
         review_id: ReviewId,
         run_id: crate::domain::ReviewRunId,
         path: std::path::PathBuf,
+        options: Box<crate::application::review::export::ExportOptions>,
     },
     SaveRepo {
         repo: crate::domain::LinkedRepo,
