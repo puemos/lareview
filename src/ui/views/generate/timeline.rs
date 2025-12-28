@@ -411,10 +411,12 @@ mod tests {
             render_timeline_item(ui, &item);
         });
         harness.run();
-        // Technical logs should NOT be found in labels
-        let mut labels = harness.get_all_by_role(egui::accesskit::Role::Label);
-        let found = labels.any(|l| format!("{:?}", l).contains("System starting"));
-        assert!(!found, "Technical log should not be rendered");
+        // Technical logs should NOT be rendered
+        let dump = format!("{:?}", harness);
+        assert!(
+            !dump.contains("System starting"),
+            "Technical log should not be rendered"
+        );
     }
 
     #[test]

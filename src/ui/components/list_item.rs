@@ -210,6 +210,14 @@ impl<'a> ListItem<'a> {
                                     crate::ui::icons::ICON_SQUARE
                                 };
                                 let resp = ui.selectable_label(false, icon);
+                                resp.widget_info(|| {
+                                    egui::WidgetInfo::selected(
+                                        egui::WidgetType::Checkbox,
+                                        true,
+                                        checked,
+                                        "Check Me",
+                                    )
+                                });
                                 if resp.clicked()
                                     && let Some(action) = self.action.take()
                                 {

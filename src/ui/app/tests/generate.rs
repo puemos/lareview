@@ -197,12 +197,20 @@ async fn test_timeline_updates() {
 
     {
         let mut app_lock = app.lock().unwrap();
+        let chunk_json = serde_json::json!({
+            "content": { "type": "text", "text": "Agent working..." },
+            "meta": {}
+        });
+        let chunk: agent_client_protocol::ContentChunk =
+            serde_json::from_value(chunk_json).unwrap();
         app_lock
             .state
-            .ingest_progress(ProgressEvent::LocalLog("Agent starting...".to_string()));
+            .ingest_progress(ProgressEvent::Update(Box::new(
+                agent_client_protocol::SessionUpdate::AgentMessageChunk(chunk),
+            )));
     }
 
     harness.step();
 
-    harness.get_by_label("Agent starting...");
+    harness.get_by_label("Agent working...");
 }

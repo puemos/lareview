@@ -263,7 +263,7 @@ mod tests {
             });
         });
         harness.run_steps(5);
-        harness.get_by_label("Analyzing your code...");
+        harness.get_by_label("Analyzing Codebase");
     }
 
     #[test]
