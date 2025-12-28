@@ -90,5 +90,9 @@ impl LaReviewApp {
         self.render_export_preview_overlay(ctx);
         self.render_requirements_overlay(ctx);
         self.render_editor_picker_overlay(ctx);
+
+        if let Some(text) = self.state.ui.pending_clipboard_copy.take() {
+            ctx.output_mut(|o| o.commands.push(egui::OutputCommand::CopyText(text)));
+        }
     }
 }
