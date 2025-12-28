@@ -9,6 +9,7 @@ pub struct ListItem<'a> {
     subtitle: Option<egui::RichText>,
     metadata: Option<egui::WidgetText>,
     selected: bool,
+    checkbox: Option<bool>,
     action: Option<Box<dyn FnOnce() + 'a>>,
 }
 
@@ -20,6 +21,7 @@ impl<'a> ListItem<'a> {
             subtitle: None,
             metadata: None,
             selected: false,
+            checkbox: None,
             action: None,
         }
     }
@@ -41,6 +43,11 @@ impl<'a> ListItem<'a> {
 
     pub fn selected(mut self, selected: bool) -> Self {
         self.selected = selected;
+        self
+    }
+
+    pub fn checkbox(mut self, checked: &mut bool) -> Self {
+        self.checkbox = Some(*checked);
         self
     }
 
@@ -176,7 +183,7 @@ impl<'a> ListItem<'a> {
 
 // Redefining show with the Shape trick for background
 impl<'a> ListItem<'a> {
-    pub fn show_with_bg(self, ui: &mut egui::Ui, theme: &Theme) -> egui::Response {
+    pub fn show_with_bg(mut self, ui: &mut egui::Ui, theme: &Theme) -> egui::Response {
         let is_selected = self.selected;
 
         // Placeholder for background
@@ -194,6 +201,24 @@ impl<'a> ListItem<'a> {
                 ui.horizontal(|ui| {
                     // Align Top
                     ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
+                        if let Some(checked) = self.checkbox {
+                            ui.vertical(|ui| {
+                                ui.add_space(2.0); // Optical alignment
+                                let icon = if checked {
+                                    crate::ui::icons::ICON_CHECK_SQUARE
+                                } else {
+                                    crate::ui::icons::ICON_SQUARE
+                                };
+                                let resp = ui.selectable_label(false, icon);
+                                if resp.clicked()
+                                    && let Some(action) = self.action.take()
+                                {
+                                    action();
+                                }
+                            });
+                            ui.add_space(spacing::SPACING_SM);
+                        }
+
                         if let Some((icon, color)) = self.status_icon {
                             // Icon Column
                             ui.vertical(|ui| {
@@ -331,5 +356,35 @@ mod tests {
         harness.run_steps(1);
 
         assert!(*clicked.lock().unwrap());
+    }
+
+    #[test]
+    fn test_list_item_checkbox_click() {
+        use std::sync::{Arc, Mutex};
+        let changed = Arc::new(Mutex::new(false));
+        let changed_clone = changed.clone();
+
+        let mut harness = egui_kittest::Harness::new(move |ctx| {
+            crate::ui::app::LaReviewApp::setup_fonts(ctx);
+            egui::CentralPanel::default().show(ctx, |ui| {
+                let theme = crate::ui::theme::current_theme();
+                let changed_clone = changed_clone.clone();
+                let mut checked = false;
+                let item = ListItem::new(egui::RichText::new("Check Me"))
+                    .checkbox(&mut checked)
+                    .action(move || {
+                        let mut guard = changed_clone.lock().unwrap();
+                        *guard = true;
+                    });
+                item.show_with_bg(ui, &theme);
+            });
+        });
+
+        harness.run_steps(1);
+        // Find the checkbox and click it
+        harness.get_by_role(egui::accesskit::Role::CheckBox).click();
+        harness.run_steps(1);
+
+        assert!(*changed.lock().unwrap());
     }
 }
