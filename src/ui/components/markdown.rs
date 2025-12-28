@@ -90,10 +90,9 @@ fn mix_u64(a: u64, b: u64) -> u64 {
     a ^ b.wrapping_mul(0x9E3779B97F4A7C15).rotate_left(7)
 }
 
-fn code_cache_key(content_hash: u64, lang: &str, wrap_px: u32, theme_hash: u64) -> u64 {
+fn code_cache_key(content_hash: u64, lang: &str, theme_hash: u64) -> u64 {
     let mut key = content_hash;
     key = mix_u64(key, egui::util::hash(lang));
-    key = mix_u64(key, wrap_px as u64);
     key = mix_u64(key, theme_hash);
     key
 }
@@ -217,6 +216,11 @@ pub fn render_markdown(ui: &mut egui::Ui, text: &str) {
     });
 
     let mut code_block_counter = 0;
+    let mut table_counter = 0;
+
+    // Use the smaller of available width or 900px for better readability
+    let max_width = ui.available_width().min(900.0);
+    ui.set_max_width(max_width);
 
     for item in items.iter() {
         match item {
@@ -236,7 +240,8 @@ pub fn render_markdown(ui: &mut egui::Ui, text: &str) {
                 render_code_block(ui, content, lang, *hash, code_block_counter, theme);
             }
             MarkdownItem::Table { rows } => {
-                render_table(ui, rows, theme);
+                table_counter += 1;
+                render_table(ui, rows, table_counter, theme);
             }
             MarkdownItem::Space(height) => {
                 ui.add_space(*height);
@@ -342,11 +347,6 @@ fn render_code_block(
         return;
     }
 
-    // This affects both the highlight cache key and the layout.
-    // Quantize to reduce cache misses during resize.
-    let wrap_px = quantize_width((ui.available_width() - (spacing::SPACING_MD * 2.0)).max(32.0))
-        .round() as u32;
-
     let theme_hash = egui::util::hash((
         theme.bg_tertiary,
         theme.text_primary,
@@ -354,7 +354,7 @@ fn render_code_block(
         theme.brand,
     ));
 
-    let cache_key = code_cache_key(content_hash, lang, wrap_px, theme_hash);
+    let cache_key = code_cache_key(content_hash, lang, theme_hash);
 
     let job: Arc<egui::text::LayoutJob> = ui.ctx().memory_mut(|mem| {
         let cache = mem
@@ -370,7 +370,7 @@ fn render_code_block(
 
             let mono = egui::FontId::monospace(13.0);
             let mut job = egui::text::LayoutJob::default();
-            job.wrap.max_width = wrap_px as f32;
+            job.wrap.max_width = f32::INFINITY;
 
             for line in LinesWithEndings::from(content) {
                 let Ok(ranges) = h.highlight_line(line, &SYNTAX_SET) else {
@@ -400,15 +400,21 @@ fn render_code_block(
         })
     });
 
+    let available_width = ui.available_width();
+
     egui::Frame::NONE
         .fill(theme.bg_tertiary)
         .corner_radius(crate::ui::spacing::RADIUS_MD)
         .inner_margin(egui::Margin::same(spacing::SPACING_MD as i8))
         .show(ui, |ui| {
-            egui::ScrollArea::vertical()
-                .id_salt(ui.id().with("code_scroll").with(counter))
-                .max_height(260.0)
-                .auto_shrink([false, false])
+            // Constraint the frame's inner area to the available width
+            ui.set_max_width(available_width - (spacing::SPACING_MD * 2.0));
+            // But we want the background to be full width if possible
+            ui.set_width(ui.available_width());
+
+            egui::ScrollArea::horizontal()
+                .id_salt(ui.id().with("code_h_scroll").with(counter))
+                .auto_shrink([false, true])
                 .show(ui, |ui| {
                     ui.add(egui::Label::new(job.clone()).wrap_mode(egui::TextWrapMode::Wrap));
                 });
@@ -417,7 +423,12 @@ fn render_code_block(
     ui.add_space(spacing::SPACING_SM);
 }
 
-fn render_table(ui: &mut egui::Ui, rows: &[Vec<Arc<egui::text::LayoutJob>>], theme: Theme) {
+fn render_table(
+    ui: &mut egui::Ui,
+    rows: &[Vec<Arc<egui::text::LayoutJob>>],
+    counter: usize,
+    theme: Theme,
+) {
     if rows.is_empty() {
         return;
     }
@@ -429,7 +440,7 @@ fn render_table(ui: &mut egui::Ui, rows: &[Vec<Arc<egui::text::LayoutJob>>], the
         .inner_margin(egui::Margin::same(spacing::SPACING_SM as i8))
         .show(ui, |ui| {
             let num_cols = rows[0].len();
-            egui::Grid::new(ui.id().with("table_grid"))
+            egui::Grid::new(ui.id().with("table_grid").with(counter))
                 .num_columns(num_cols)
                 .spacing([12.0, 8.0])
                 .striped(true)

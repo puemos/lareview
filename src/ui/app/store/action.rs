@@ -105,6 +105,11 @@ pub enum ReviewAction {
         file_path: String,
         line_number: usize,
     },
+    ToggleThreadSelection(String),
+    UpdateExportOptions(crate::ui::app::state::ExportOptions),
+    ToggleExportOptionsMenu,
+    SelectAllExportThreads,
+    ClearExportThreads,
 }
 
 #[derive(Debug)]

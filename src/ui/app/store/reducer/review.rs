@@ -3,7 +3,10 @@ use super::super::action::{ReviewAction, ReviewDataPayload};
 use super::super::command::Command;
 use crate::domain::{ReviewStatus, TaskId};
 use chrono::Utc;
-use std::path::Path;
+use std::path::Path; // Keep Path as it's used
+// The user's diff suggested adding HashMap and removing Path, but Path is used.
+// The instruction was "remove unused HashSet import" which is not present.
+// I will keep Path and not add HashMap as it's not used.
 
 pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
     match action {
@@ -221,7 +224,26 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
             {
                 state.ui.is_exporting = true;
                 state.ui.review_error = None;
-                vec![Command::GenerateExportPreview { review_id, run_id }]
+                // Default to selecting all threads if none are selected yet
+                if state.ui.export_options.selected_thread_ids.is_empty() {
+                    state.ui.export_options.selected_thread_ids =
+                        state.domain.threads.iter().map(|t| t.id.clone()).collect();
+                }
+
+                vec![Command::GenerateExportPreview {
+                    review_id,
+                    run_id,
+                    include_thread_ids: Some(
+                        state
+                            .ui
+                            .export_options
+                            .selected_thread_ids
+                            .iter()
+                            .cloned()
+                            .collect(),
+                    ),
+                    options: Box::new(map_export_options(&state.ui.export_options)),
+                }]
             } else {
                 state.ui.review_error = Some("No review or run selected for export".into());
                 vec![]
@@ -241,6 +263,7 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
                     review_id: review_id.clone(),
                     run_id: run_id.clone(),
                     path,
+                    options: Box::new(map_export_options(&state.ui.export_options)),
                 }]
             } else {
                 Vec::new()
@@ -279,6 +302,132 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
             state.ui.pending_editor_open = Some(request);
             state.ui.show_editor_picker = true;
             Vec::new()
+        }
+        ReviewAction::ToggleExportOptionsMenu => {
+            state.ui.show_export_options_menu = !state.ui.show_export_options_menu;
+            Vec::new()
+        }
+        ReviewAction::SelectAllExportThreads => {
+            state.ui.export_options.selected_thread_ids =
+                state.domain.threads.iter().map(|t| t.id.clone()).collect();
+            let (review_id, run_id) = if let Some(r) = state.domain.reviews.first() {
+                (r.id.clone(), r.active_run_id.clone())
+            } else {
+                return Vec::new();
+            };
+            let Some(run_id) = run_id else {
+                return Vec::new();
+            };
+            vec![Command::GenerateExportPreview {
+                review_id,
+                run_id,
+                include_thread_ids: Some(
+                    state
+                        .ui
+                        .export_options
+                        .selected_thread_ids
+                        .iter()
+                        .cloned()
+                        .collect(),
+                ),
+                options: Box::new(map_export_options(&state.ui.export_options)),
+            }]
+        }
+        ReviewAction::ClearExportThreads => {
+            state.ui.export_options.selected_thread_ids.clear();
+            let (review_id, run_id) = if let Some(r) = state.domain.reviews.first() {
+                (r.id.clone(), r.active_run_id.clone())
+            } else {
+                return Vec::new();
+            };
+            let Some(run_id) = run_id else {
+                return Vec::new();
+            };
+            vec![Command::GenerateExportPreview {
+                review_id,
+                run_id,
+                include_thread_ids: Some(Vec::new()),
+                options: Box::new(map_export_options(&state.ui.export_options)),
+            }]
+        }
+        ReviewAction::ToggleThreadSelection(thread_id) => {
+            if state
+                .ui
+                .export_options
+                .selected_thread_ids
+                .contains(&thread_id)
+            {
+                state
+                    .ui
+                    .export_options
+                    .selected_thread_ids
+                    .remove(&thread_id);
+            } else {
+                state
+                    .ui
+                    .export_options
+                    .selected_thread_ids
+                    .insert(thread_id);
+            }
+            // Trigger regeneration
+            if let Some(review_id) = state.ui.selected_review_id.clone()
+                && let Some(run_id) = state.ui.selected_run_id.clone()
+            {
+                state.ui.is_exporting = true;
+                let include_thread_ids = if state.ui.export_options.selected_thread_ids.is_empty() {
+                    None
+                } else {
+                    Some(
+                        state
+                            .ui
+                            .export_options
+                            .selected_thread_ids
+                            .iter()
+                            .cloned()
+                            .collect(), // This already converts HashSet to Vec
+                    )
+                };
+
+                vec![Command::GenerateExportPreview {
+                    review_id,
+                    run_id,
+                    include_thread_ids,
+                    options: Box::new(map_export_options(&state.ui.export_options)),
+                }]
+            } else {
+                Vec::new()
+            }
+        }
+        ReviewAction::UpdateExportOptions(options) => {
+            state.ui.export_options = options.clone();
+            // Trigger regeneration
+            if let Some(review_id) = state.ui.selected_review_id.clone()
+                && let Some(run_id) = state.ui.selected_run_id.clone()
+            {
+                state.ui.is_exporting = true;
+                let include_thread_ids = if state.ui.export_options.selected_thread_ids.is_empty() {
+                    None
+                } else {
+                    Some(
+                        state
+                            .ui
+                            .export_options
+                            .selected_thread_ids
+                            .iter()
+                            .cloned()
+                            .collect(),
+                    ) // This already converts HashSet to Vec
+                };
+
+                vec![Command::GenerateExportPreview {
+                    review_id,
+                    run_id,
+                    include_thread_ids,
+                    options: Box::new(map_export_options(&state.ui.export_options)),
+                }]
+            } else {
+                Vec::new()
+            }
         }
     }
 }
@@ -435,4 +584,21 @@ fn resolve_editor_open_request(
         file_path: repo.path.join(rel_path),
         line_number,
     })
+}
+
+fn map_export_options(
+    ui_options: &crate::ui::app::state::ExportOptions,
+) -> crate::application::review::export::ExportOptions {
+    crate::application::review::export::ExportOptions {
+        include_summary: ui_options.include_summary,
+        include_stats: ui_options.include_stats,
+        include_metadata: ui_options.include_metadata,
+        include_tasks: ui_options.include_tasks,
+        include_threads: ui_options.include_threads,
+        include_thread_ids: if ui_options.selected_thread_ids.is_empty() {
+            None
+        } else {
+            Some(ui_options.selected_thread_ids.clone())
+        },
+    }
 }

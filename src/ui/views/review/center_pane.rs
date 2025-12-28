@@ -1,6 +1,5 @@
 use crate::domain::ReviewTask;
 use crate::ui::app::{Action, LaReviewApp, ReviewAction};
-use crate::ui::components::action_button::action_button;
 use crate::ui::components::pills::pill_action_button;
 use crate::ui::theme::Theme;
 use crate::ui::{icons, spacing, typography};
@@ -168,6 +167,7 @@ pub(crate) fn render_empty_state(
     is_generating: bool,
 ) -> Option<Action> {
     let mut action_out = None;
+
     ui.allocate_ui_with_layout(
         ui.available_size(),
         egui::Layout::centered_and_justified(egui::Direction::TopDown),
@@ -177,30 +177,35 @@ pub(crate) fn render_empty_state(
                     crate::ui::animations::cyber::cyber_spinner(
                         ui,
                         theme.brand,
-                        Some(crate::ui::animations::cyber::CyberSpinnerSize::Md),
+                        Some(crate::ui::animations::cyber::CyberSpinnerSize::Lg),
                     );
-                    ui.add_space(spacing::SPACING_MD);
-                    ui.label(typography::h1("Analyzing your code..."));
-                    ui.add_space(8.0);
-                    ui.label(typography::weak(
-                        "The agent is currently generating review tasks.",
-                    ));
-                } else {
-                    // Hero Icon
+                    ui.add_space(spacing::SPACING_LG);
+                    ui.label(typography::h2("Analyzing Codebase").color(theme.text_primary));
+                    ui.add_space(spacing::SPACING_SM);
                     ui.label(
-                        typography::body(icons::ICON_EMPTY)
-                            .size(64.0)
-                            .color(theme.border_secondary),
+                        typography::body("The agent is generating a review plan based on your changes.")
+                            .color(theme.text_secondary)
                     );
-                    ui.add_space(spacing::SPACING_MD);
-                    ui.label(typography::h1("No review tasks yet"));
-                    ui.add_space(8.0);
-                    ui.label(typography::weak(
-                        "Generate tasks from your diff to start reviewing.",
-                    ));
-                    ui.add_space(24.0);
+                } else {
+                    // Text Content
+                    ui.label(typography::h2("No Active Review").color(theme.text_primary));
 
-                    if action_button(ui, "Generate tasks", true, theme.brand).clicked() {
+                    ui.add_space(spacing::SPACING_SM);
+                    ui.label(
+                        typography::body("Your review queue is empty. Generate a new review plan from your local changes to get started.")
+                            .color(theme.text_secondary)
+                    );
+
+                    ui.add_space(spacing::SPACING_XL);
+
+                    // Primary CTA
+                    if crate::ui::components::pills::pill_action_button(
+                        ui,
+                        icons::VIEW_GENERATE,
+                        "Generate New Review",
+                        true,
+                        theme.brand
+                    ).clicked() {
                         action_out = Some(Action::Navigation(
                             crate::ui::app::NavigationAction::SwitchTo(
                                 crate::ui::app::AppView::Generate,

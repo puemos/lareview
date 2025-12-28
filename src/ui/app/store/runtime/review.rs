@@ -245,6 +245,8 @@ pub fn generate_export_preview(
     app: &mut LaReviewApp,
     review_id: crate::domain::ReviewId,
     run_id: crate::domain::ReviewRunId,
+    include_thread_ids: Option<Vec<String>>,
+    options: crate::application::review::export::ExportOptions,
 ) {
     let review_repo = app.review_repo.clone();
     let run_repo = app.run_repo.clone();
@@ -267,9 +269,14 @@ pub fn generate_export_preview(
                 .find_by_run(&run_id)
                 .map_err(|e: anyhow::Error| e.to_string())?;
 
-            let threads = thread_repo
+            let mut threads = thread_repo
                 .find_by_review(&review_id)
                 .map_err(|e: anyhow::Error| e.to_string())?;
+
+            if let Some(include_ids) = &include_thread_ids {
+                threads.retain(|t| include_ids.contains(&t.id));
+            }
+
             let mut comments = Vec::new();
             for thread in &threads {
                 let mut thread_comments = comment_repo
@@ -286,7 +293,7 @@ pub fn generate_export_preview(
                 comments,
             };
 
-            crate::application::review::export::ReviewExporter::export_to_markdown(&data, true)
+            crate::application::review::export::ReviewExporter::export_to_markdown(&data, &options)
                 .await
                 .map_err(|e| e.to_string())
         }
@@ -303,6 +310,7 @@ pub fn export_review(
     review_id: crate::domain::ReviewId,
     run_id: crate::domain::ReviewRunId,
     path: std::path::PathBuf,
+    options: crate::application::review::export::ExportOptions,
 ) {
     let review_repo = app.review_repo.clone();
     let run_repo = app.run_repo.clone();
@@ -346,7 +354,7 @@ pub fn export_review(
 
             let export_result =
                 crate::application::review::export::ReviewExporter::export_to_markdown(
-                    &data, false,
+                    &data, &options,
                 )
                 .await
                 .map_err(|e| anyhow::anyhow!("{e}"))?;

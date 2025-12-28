@@ -52,11 +52,16 @@ async fn test_export_preview_overlay_flow() {
     harness
         .get_all_by_role(Role::Window)
         .into_iter()
-        .find(|n| format!("{:?}", n).contains("Export Review Preview"))
+        .find(|n| format!("{:?}", n).contains("Export Review"))
         .expect("Export Preview Window not found");
 
     // Find Cancel button
-    harness.get_by_label("Cancel").click();
+    harness
+        .get_all_by_role(Role::Button)
+        .into_iter()
+        .find(|n| format!("{:?}", n).contains("Cancel"))
+        .expect("Cancel button not found")
+        .click();
 
     {
         let mut app_lock = app.lock().unwrap();

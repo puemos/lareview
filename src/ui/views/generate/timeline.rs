@@ -10,15 +10,8 @@ pub(super) fn render_timeline_item(ui: &mut egui::Ui, item: &TimelineItem) {
     ui.set_max_width(ui.available_width());
 
     match &item.content {
-        TimelineContent::LocalLog(line) => {
-            ui.add(
-                egui::Label::new(
-                    typography::small_mono(line)
-                        .color(current_theme().text_muted)
-                        .size(11.0),
-                )
-                .wrap(),
-            );
+        TimelineContent::LocalLog(_line) => {
+            // Internal technical logs are not rendered in the user-facing activity log
         }
         TimelineContent::Update(update) => {
             render_session_update(ui, update);
@@ -190,26 +183,10 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                 });
         }
         SessionUpdate::AvailableCommandsUpdate(_) => {
-            // Minimal system log
-            ui.label(
-                typography::small_mono("System: Commands updated")
-                    .color(current_theme().text_muted)
-                    .italics(),
-            );
+            // Skip internal system log: "System: Commands updated"
         }
-        SessionUpdate::CurrentModeUpdate(mode) => {
-            ui.horizontal(|ui| {
-                ui.label(
-                    typography::small_mono("Mode switch:")
-                        .color(current_theme().text_muted)
-                        .size(11.0),
-                );
-                ui.label(
-                    typography::small_mono(mode.current_mode_id.to_string())
-                        .color(current_theme().text_muted)
-                        .background_color(current_theme().bg_secondary),
-                );
-            });
+        SessionUpdate::CurrentModeUpdate(_) => {
+            // Skip internal mode switch logs
         }
         _ => {
             ui.add(
@@ -434,7 +411,10 @@ mod tests {
             render_timeline_item(ui, &item);
         });
         harness.run();
-        harness.get_by_label("System starting");
+        // Technical logs should NOT be found in labels
+        let mut labels = harness.get_all_by_role(egui::accesskit::Role::Label);
+        let found = labels.any(|l| format!("{:?}", l).contains("System starting"));
+        assert!(!found, "Technical log should not be rendered");
     }
 
     #[test]

@@ -12,7 +12,6 @@ use egui::Margin;
 use egui::epaint::MarginF32;
 
 use crate::ui::views::review::nav::render_navigation_tree;
-use crate::ui::views::review::thread_list::render_thread_list;
 use crate::ui::views::review::toolbar::render_header_selectors;
 
 impl LaReviewApp {
@@ -128,28 +127,18 @@ impl LaReviewApp {
                                 if pill_action_button(
                                     ui,
                                     icons::ACTION_EXPORT,
-                                    "Export",
+                                    "Export Review...",
                                     review_selected,
                                     theme.border,
                                 )
-                                .on_hover_text("Export as markdown")
+                                .on_hover_text("Export Review...")
                                 .clicked()
                                 {
                                     self.dispatch(Action::Review(
                                         ReviewAction::RequestExportPreview,
                                     ));
                                 }
-
-                                if self.state.ui.is_exporting {
-                                    ui.add_space(spacing::SPACING_XS);
-                                    crate::ui::animations::cyber::cyber_spinner(
-                                        ui,
-                                        theme.brand,
-                                        Some(crate::ui::animations::cyber::CyberSpinnerSize::Sm),
-                                    );
-                                }
                             }
-
                             // Progress Text (Right aligned next to actions)
                             if total_tasks > 0 {
                                 ui.add_space(spacing::SPACING_MD);
@@ -173,8 +162,13 @@ impl LaReviewApp {
                 );
             });
 
-        // Draw Full-Width Separator
-        ui.separator();
+        // Draw Full-Width Separator only if we have tasks or are generating
+        let is_generating_this = self.state.session.is_generating
+            && self.state.ui.selected_review_id == self.state.session.generating_review_id;
+
+        if total_tasks > 0 || is_generating_this {
+            ui.separator();
+        }
 
         // Handle delayed actions
         if trigger_delete_review {
@@ -428,12 +422,18 @@ impl LaReviewApp {
                     egui::Frame::NONE
                         .inner_margin(Margin::symmetric(spacing::SPACING_SM as i8, 0))
                         .show(ui, |ui| {
-                            ui.add(
-                                egui::Label::new(
+                            ui.horizontal(|ui| {
+                                ui.label(
                                     typography::bold_label("All Threads").color(theme.text_primary),
-                                )
-                                .wrap(),
-                            );
+                                );
+
+                                ui.with_layout(
+                                    egui::Layout::right_to_left(egui::Align::Center),
+                                    |_ui| {
+                                        // Removed thread selection toggle button
+                                    },
+                                );
+                            });
                         });
 
                     ui.add_space(spacing::SPACING_SM);
@@ -456,7 +456,15 @@ impl LaReviewApp {
                             .and_then(|t| t.thread_id.as_deref());
 
                         if let Some(action) =
-                            render_thread_list(ui, &review_threads, active_thread_id, &theme)
+                            crate::ui::views::review::thread_list::render_thread_list(
+                                ui,
+                                &review_threads,
+                                active_thread_id,
+                                false,
+                                &std::collections::HashSet::new(),
+                                true,
+                                &theme,
+                            )
                         {
                             self.dispatch(Action::Review(action));
                         }

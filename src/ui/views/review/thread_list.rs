@@ -9,6 +9,9 @@ pub fn render_thread_list(
     ui: &mut egui::Ui,
     threads: &[Thread],
     active_thread_id: Option<&str>,
+    select_mode: bool,
+    selected_ids: &std::collections::HashSet<String>,
+    show_status_icons: bool,
     theme: &Theme,
 ) -> Option<ReviewAction> {
     let mut action = None;
@@ -126,12 +129,26 @@ pub fn render_thread_list(
                 let metadata = egui::WidgetText::from(metadata_job);
 
                 // -- Render Item --
-                let response = ListItem::new(title_text)
-                    .status_icon(icon, color)
+                let mut list_item = ListItem::new(title_text)
                     .metadata(metadata)
-                    .selected(is_active)
+                    .selected(is_active);
+
+                if show_status_icons {
+                    list_item = list_item.status_icon(icon, color);
+                }
+
+                if select_mode {
+                    let mut selected = selected_ids.contains(&thread.id);
+                    list_item = list_item.checkbox(&mut selected);
+                }
+
+                let response = list_item
                     .action(|| {
-                        action = Some(ReviewAction::NavigateToThread(thread.clone()));
+                        if select_mode {
+                            action = Some(ReviewAction::ToggleThreadSelection(thread.id.clone()));
+                        } else {
+                            action = Some(ReviewAction::NavigateToThread(thread.clone()));
+                        }
                     })
                     .show_with_bg(ui, theme);
 

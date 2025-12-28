@@ -348,7 +348,13 @@ async fn test_generate_export_preview_runtime() {
     };
     app.run_repo.save(&run).unwrap();
 
-    review::generate_export_preview(&mut app, "r1".into(), "run1".into());
+    review::generate_export_preview(
+        &mut app,
+        "r1".into(),
+        "run1".into(),
+        None,
+        Default::default(),
+    );
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     app.poll_action_messages();
@@ -387,7 +393,13 @@ async fn test_export_review_runtime() {
     let tmp = tempfile::NamedTempFile::new().unwrap();
     let path = tmp.path().to_path_buf();
 
-    review::export_review(&mut app, "r1".into(), "run1".into(), path);
+    review::export_review(
+        &mut app,
+        "r1".into(),
+        "run1".into(),
+        path,
+        Default::default(),
+    );
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     app.poll_action_messages();

@@ -54,14 +54,18 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
             body,
         ),
         Command::RunD2 { command } => settings::run_d2_command(app, command),
-        Command::GenerateExportPreview { review_id, run_id } => {
-            review::generate_export_preview(app, review_id, run_id)
-        }
+        Command::GenerateExportPreview {
+            review_id,
+            run_id,
+            include_thread_ids,
+            options,
+        } => review::generate_export_preview(app, review_id, run_id, include_thread_ids, *options),
         Command::ExportReview {
             review_id,
             run_id,
             path,
-        } => review::export_review(app, review_id, run_id, path),
+            options,
+        } => review::export_review(app, review_id, run_id, path, *options),
         Command::UpdateThreadStatus { thread_id, status } => {
             review::update_thread_status(app, thread_id, status)
         }
