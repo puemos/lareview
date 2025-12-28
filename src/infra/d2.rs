@@ -124,6 +124,46 @@ pub fn d2_to_ascii(d2_code: &str) -> Result<String, String> {
     }
 }
 
+pub async fn d2_to_ascii_async(d2_code: &str) -> Result<String, String> {
+    let d2_path = shell::find_bin("d2").ok_or_else(|| {
+        "D2 executable not found. Please install D2 and ensure it is in your PATH.".to_string()
+    })?;
+
+    let mut command = tokio::process::Command::new(&d2_path);
+
+    // Input from stdin, output to stdout
+    command.arg("-");
+    command.arg("-");
+
+    command.arg("--stdout-format").arg("ascii");
+    command.arg("--ascii-mode").arg("extended");
+
+    let mut child = command
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    let mut stdin = child.stdin.take().ok_or("Failed to open stdin")?;
+    use tokio::io::AsyncWriteExt;
+    stdin
+        .write_all(d2_code.as_bytes())
+        .await
+        .map_err(|e| e.to_string())?;
+    drop(stdin); // Close stdin to signal EOF
+
+    let output = child.wait_with_output().await.map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        let ascii = String::from_utf8(output.stdout).map_err(|e| e.to_string())?;
+        Ok(ascii)
+    } else {
+        let error_message = String::from_utf8(output.stderr).map_err(|e| e.to_string())?;
+        Err(error_message)
+    }
+}
+
 /// Validate D2 code by compiling it with `d2`.
 /// Returns Ok(()) if valid or if d2 is not installed (skip validation).
 /// Returns Err(msg) if d2 is installed and validation fails.
