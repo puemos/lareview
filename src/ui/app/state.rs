@@ -228,7 +228,6 @@ pub struct UiState {
     pub full_diff: Option<FullDiffView>,
     pub export_preview: Option<String>,
     pub export_assets: HashMap<String, Vec<u8>>,
-    pub cached_unified_diff: Option<(Vec<crate::domain::DiffRef>, Arc<str>)>,
     pub active_feedback: Option<FeedbackContext>,
     pub is_exporting: bool,
     pub d2_install_output: String,
@@ -236,10 +235,6 @@ pub struct UiState {
     pub allow_d2_install: bool,
     pub show_requirements_modal: bool,
     pub has_seen_requirements: bool,
-    pub agent_panel_collapsed: bool,
-    pub plan_panel_collapsed: bool,
-    pub feedback_title_draft: String,
-    pub feedback_reply_draft: String,
     pub preferred_editor_id: Option<String>,
     pub show_editor_picker: bool,
     pub pending_editor_open: Option<EditorOpenRequest>,
@@ -252,14 +247,6 @@ pub struct UiState {
     pub agent_path_overrides: std::collections::HashMap<String, String>,
     pub custom_agents: Vec<crate::infra::app_config::CustomAgentConfig>,
     pub agent_envs: std::collections::HashMap<String, std::collections::HashMap<String, String>>,
-    pub is_agent_settings_modified: bool,
-    pub agent_settings_snapshot: Option<AgentSettingsSnapshot>,
-    pub agent_env_draft_id: String,
-    pub agent_env_draft_key: String,
-    pub agent_env_draft_value: String,
-    pub custom_agent_draft: crate::infra::app_config::CustomAgentConfig,
-    pub editing_agent_id: Option<String>,
-    pub show_add_custom_agent_modal: bool,
     // --- Export UI ---
     pub export_options: ExportOptions,
     pub show_export_options_menu: bool,
@@ -267,7 +254,7 @@ pub struct UiState {
     pub pending_clipboard_copy: Option<String>,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug, PartialEq)]
 pub struct AgentSettingsSnapshot {
     pub agent_id: String,
     pub path_override: Option<String>,

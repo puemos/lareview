@@ -9,10 +9,16 @@ use egui::Color32;
 pub(crate) fn render_feedback_header(
     ui: &mut egui::Ui,
     feedback: Option<&Feedback>,
-    feedback_title_draft: &str,
     theme: &Theme,
     task_id: &str,
+    draft_key: &str,
 ) -> Option<ReviewAction> {
+    let ctx = ui.ctx().clone();
+    let feedback_title_draft = crate::ui::app::ui_memory::get_ui_memory(&ctx)
+        .feedback_drafts
+        .get(draft_key)
+        .map(|d| d.title.clone())
+        .unwrap_or_else(|| feedback.map(|f| f.title.clone()).unwrap_or_default());
     let mut action_out = None;
 
     let feedback_id = feedback.map(|t| t.id.clone());
@@ -23,7 +29,12 @@ pub(crate) fn render_feedback_header(
         let status_width = 120.0;
         let impact_width = 150.0;
         let selector_gap = spacing::SPACING_MD;
-        let selector_total_width = status_width + impact_width + selector_gap;
+        let delete_btn_total = if feedback_id.is_some() {
+            spacing::SPACING_LG + 32.0 // gap + approx button width
+        } else {
+            0.0
+        };
+        let selector_total_width = status_width + impact_width + selector_gap + delete_btn_total;
         let title_width = (ui.available_width() - selector_total_width).max(120.0);
 
         // Edit Title
@@ -45,8 +56,11 @@ pub(crate) fn render_feedback_header(
             .inner;
 
         if response.changed() {
-            action_out = Some(ReviewAction::SetFeedbackTitleDraft {
-                text: edit_text.clone(),
+            crate::ui::app::ui_memory::with_ui_memory_mut(&ctx, |mem| {
+                mem.feedback_drafts
+                    .entry(draft_key.to_string())
+                    .or_default()
+                    .title = edit_text.clone();
             });
         }
 
@@ -106,6 +120,20 @@ pub(crate) fn render_feedback_header(
         }
 
         ui.spacing_mut().item_spacing.x = old_spacing;
+        ui.add_space(spacing::SPACING_LG);
+
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if let Some(feedback_id) = feedback_id.clone()
+                && ui
+                    .button(
+                        typography::label(crate::ui::icons::ACTION_DELETE).color(theme.destructive),
+                    )
+                    .on_hover_text("Delete Feedback")
+                    .clicked()
+            {
+                action_out = Some(ReviewAction::DeleteFeedback(feedback_id));
+            }
+        });
     });
 
     action_out

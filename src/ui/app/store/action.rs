@@ -27,8 +27,6 @@ pub enum GenerateAction {
     SelectAgent(SelectedAgent),
     ClearTimeline,
     SelectRepo(Option<String>),
-    ToggleAgentPanel,
-    TogglePlanPanel,
 }
 
 #[derive(Debug)]
@@ -84,16 +82,6 @@ pub enum ReviewAction {
     },
     NavigateToFeedback(crate::domain::Feedback),
     CloseFeedback,
-    /// User is typing in the feedback title field
-    SetFeedbackTitleDraft {
-        text: String,
-    },
-    /// User is typing in the reply composer
-    SetFeedbackReplyDraft {
-        text: String,
-    },
-    /// Clear the reply draft after sending
-    ClearFeedbackReplyDraft,
     OpenFullDiff(FullDiffView),
     CloseFullDiff,
     RequestExportPreview,
@@ -112,6 +100,11 @@ pub enum ReviewAction {
     ToggleExportOptionsMenu,
     SelectAllExportFeedbacks,
     ClearExportFeedbacks,
+    DeleteFeedback(String),
+    DeleteComment {
+        feedback_id: String,
+        comment_id: String,
+    },
 }
 
 #[derive(Debug)]
@@ -124,21 +117,15 @@ pub enum SettingsAction {
     UnlinkRepository(String),
     DismissRequirements,
     SetPreferredEditor(String),
-    OpenEditorPicker,
     ClearPreferredEditor,
-    CloseEditorPicker,
     // Agent settings
     UpdateAgentPath(String, String), // agent_id, path
     AddCustomAgent(crate::infra::app_config::CustomAgentConfig),
-    RemoveCustomAgent(String),              // agent_id
+    DeleteCustomAgent(String),              // agent_id
     UpdateAgentEnv(String, String, String), // agent_id, key, value
     RemoveAgentEnv(String, String),         // agent_id, key
     SaveAgentSettings,
     LoadAgentSettings,
-    OpenAgentSettings(String), // agent_id
-    CloseAgentSettings,
-    OpenAddCustomAgent,
-    CloseAddCustomAgent,
 }
 
 #[derive(Debug)]

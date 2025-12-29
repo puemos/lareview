@@ -11,9 +11,10 @@ mod overlay;
 mod polling;
 mod review_ops;
 mod root;
-mod state;
+pub(crate) mod state;
 mod store;
 mod timeline;
+pub mod ui_memory;
 mod update;
 
 #[cfg(test)]
@@ -22,7 +23,8 @@ pub mod tests;
 pub use messages::{GenMsg, GenResultPayload, GhMsg, GhStatusPayload};
 pub use root::LaReviewApp;
 pub use state::{
-    AppView, DomainState, FeedbackContext, FullDiffView, GeneratePreview, SelectedAgent, UiState,
+    AgentSettingsSnapshot, AppView, DomainState, FeedbackContext, FullDiffView, GeneratePreview,
+    SelectedAgent, UiState,
 };
 pub use timeline::{TimelineContent, TimelineItem};
 

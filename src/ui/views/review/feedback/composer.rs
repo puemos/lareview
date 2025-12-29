@@ -5,13 +5,18 @@ use eframe::egui;
 
 pub(crate) fn render_reply_composer(
     ui: &mut egui::Ui,
-    reply_draft: &str,
-    title_draft: &str,
     task_id: &str,
     feedback_id: Option<String>,
     file_path: Option<String>,
     line_number: Option<u32>,
+    draft_key: &str,
 ) -> Option<ReviewAction> {
+    let ctx = ui.ctx().clone();
+    let (reply_draft, title_draft) = crate::ui::app::ui_memory::get_ui_memory(&ctx)
+        .feedback_drafts
+        .get(draft_key)
+        .map(|d| (d.reply.clone(), d.title.clone()))
+        .unwrap_or_default();
     let mut action_out = None;
 
     ui.vertical(|ui| {
@@ -29,7 +34,12 @@ pub(crate) fn render_reply_composer(
         );
 
         if response.changed() {
-            action_out = Some(ReviewAction::SetFeedbackReplyDraft { text: text.clone() });
+            crate::ui::app::ui_memory::with_ui_memory_mut(&ctx, |mem| {
+                mem.feedback_drafts
+                    .entry(draft_key.to_string())
+                    .or_default()
+                    .reply = text.clone();
+            });
         }
 
         ui.add_space(spacing::SPACING_SM);
@@ -76,7 +86,7 @@ mod tests {
     #[test]
     fn test_render_reply_composer() {
         let mut harness = Harness::new_ui(|ui| {
-            render_reply_composer(ui, "draft", "", "task1", None, None, None);
+            render_reply_composer(ui, "task1", None, None, None, "test_draft");
         });
         harness.run();
         harness.get_by_role(egui::accesskit::Role::MultilineTextInput);

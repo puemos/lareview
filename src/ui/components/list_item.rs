@@ -11,6 +11,7 @@ pub struct ListItem<'a> {
     selected: bool,
     checkbox: Option<bool>,
     action: Option<Box<dyn FnOnce() + 'a>>,
+    inner_margin: Option<egui::Margin>,
 }
 
 impl<'a> ListItem<'a> {
@@ -23,7 +24,13 @@ impl<'a> ListItem<'a> {
             selected: false,
             checkbox: None,
             action: None,
+            inner_margin: None,
         }
+    }
+
+    pub fn inner_margin(mut self, margin: egui::Margin) -> Self {
+        self.inner_margin = Some(margin);
+        self
     }
 
     pub fn status_icon(mut self, icon: &'static str, color: egui::Color32) -> Self {
@@ -69,8 +76,12 @@ impl<'a> ListItem<'a> {
         // But since we want the background to cover the whole area including padding,
         // we use a Frame.
 
+        let margin = self
+            .inner_margin
+            .unwrap_or(egui::Margin::same(spacing::SPACING_SM as i8));
+
         let frame = egui::Frame::NONE
-            .inner_margin(spacing::SPACING_SM)
+            .inner_margin(margin)
             .fill(bg_color)
             .corner_radius(spacing::RADIUS_MD);
 
@@ -190,8 +201,12 @@ impl<'a> ListItem<'a> {
         let bg_shape_idx = ui.painter().add(egui::Shape::Noop);
         let title_text = self.title.text().to_string();
 
+        let margin = self
+            .inner_margin
+            .unwrap_or(egui::Margin::same(spacing::SPACING_SM as i8));
+
         let frame = egui::Frame::NONE
-            .inner_margin(spacing::SPACING_SM)
+            .inner_margin(margin)
             // We do NOT set fill here, we handle it manually
             .fill(egui::Color32::TRANSPARENT);
 

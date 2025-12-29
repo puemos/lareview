@@ -241,6 +241,32 @@ pub fn update_feedback_title(app: &mut LaReviewApp, feedback_id: String, title: 
     }
 }
 
+pub fn delete_feedback(app: &mut LaReviewApp, feedback_id: String) {
+    let review_id = app.state.ui.selected_review_id.clone();
+    let result = app
+        .feedback_repo
+        .delete(&feedback_id)
+        .map(|_| ())
+        .map_err(|e| format!("Failed to delete feedback: {e}"));
+
+    if let (Ok(_), Some(review_id)) = (&result, review_id) {
+        load_review_feedbacks(app, review_id);
+    }
+}
+
+pub fn delete_comment(app: &mut LaReviewApp, comment_id: String) {
+    let review_id = app.state.ui.selected_review_id.clone();
+    let result = app
+        .comment_repo
+        .delete(&comment_id)
+        .map(|_| ())
+        .map_err(|e| format!("Failed to delete comment: {e}"));
+
+    if let (Ok(_), Some(review_id)) = (&result, review_id) {
+        load_review_feedbacks(app, review_id);
+    }
+}
+
 pub fn generate_export_preview(
     app: &mut LaReviewApp,
     review_id: crate::domain::ReviewId,

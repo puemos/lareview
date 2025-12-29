@@ -1,4 +1,5 @@
 use super::{Action, LaReviewApp, ReviewAction, SettingsAction};
+use crate::ui::app::ui_memory::with_ui_memory_mut;
 use crate::ui::components::DiffAction;
 use crate::ui::components::pills::pill_action_button;
 use crate::ui::theme::{Theme, current_theme};
@@ -142,11 +143,13 @@ impl LaReviewApp {
                         |ui| {
                             ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
 
-                            let mut sidebar_width = if self.state.ui.export_sidebar_width > 50.0 {
-                                self.state.ui.export_sidebar_width
-                            } else {
-                                300.0
-                            };
+                            let mut sidebar_width = with_ui_memory_mut(ui.ctx(), |mem| {
+                                if mem.export.sidebar_width > 50.0 {
+                                    mem.export.sidebar_width
+                                } else {
+                                    300.0
+                                }
+                            });
 
                             // A. Sidebar
                             ui.push_id("export_sidebar", |ui| {
@@ -170,29 +173,29 @@ impl LaReviewApp {
                                                     let mut options = self.state.ui.export_options.clone();
                                                     let mut changed = false;
 
-                                                    fn icon_checkbox(ui: &mut egui::Ui, theme: &Theme, value: &mut bool, label: &str) -> egui::Response {
+                                                    fn icon_checkbox(ui: &mut egui::Ui, theme: &Theme, value: &mut bool, label: &str, changed: &mut bool) {
                                                         ui.horizontal(|ui| {
                                                             let icon = if *value { icons::ICON_CHECK_SQUARE } else { icons::ICON_SQUARE };
                                                             let resp = ui.label(typography::body(format!("{} {}", icon, label)).color(theme.text_primary))
                                                                 .interact(egui::Sense::click());
                                                             if resp.clicked() {
                                                                 *value = !*value;
+                                                                *changed = true;
                                                             }
-                                                            resp
-                                                        }).inner
+                                                        });
                                                     }
 
                                                     ui.add_space(spacing::SPACING_XS);
-                                                    if icon_checkbox(ui, &theme, &mut options.include_summary, "Include Summary").clicked() { changed = true; }
-                                                    if icon_checkbox(ui, &theme, &mut options.include_stats, "Include Stats").clicked() { changed = true; }
-                                                    if icon_checkbox(ui, &theme, &mut options.include_metadata, "Include Metadata").clicked() { changed = true; }
-                                                    if icon_checkbox(ui, &theme, &mut options.include_tasks, "Include Tasks").clicked() { changed = true; }
-                                                    if icon_checkbox(ui, &theme, &mut options.include_feedbacks, "Include Feedbacks").clicked() { changed = true; }
+                                                    icon_checkbox(ui, &theme, &mut options.include_summary, "Include Summary", &mut changed);
+                                                    icon_checkbox(ui, &theme, &mut options.include_stats, "Include Stats", &mut changed);
+                                                    icon_checkbox(ui, &theme, &mut options.include_metadata, "Include Metadata", &mut changed);
+                                                    icon_checkbox(ui, &theme, &mut options.include_tasks, "Include Tasks", &mut changed);
+                                                    icon_checkbox(ui, &theme, &mut options.include_feedbacks, "Include Feedbacks", &mut changed);
+                                                    ui.add_space(spacing::SPACING_SM);
 
                                                     if changed {
                                                         self.dispatch(Action::Review(ReviewAction::UpdateExportOptions(options)));
                                                     }
-                                                    ui.add_space(spacing::SPACING_SM);
                                                 });
 
                                                 ui.separator();
@@ -258,7 +261,7 @@ impl LaReviewApp {
                             if resp.dragged() {
                                 sidebar_width += resp.drag_delta().x;
                                 sidebar_width = sidebar_width.clamp(200.0, 600.0);
-                                self.state.ui.export_sidebar_width = sidebar_width;
+                                with_ui_memory_mut(ui.ctx(), |mem| mem.export.sidebar_width = sidebar_width);
                             }
 
                             if resp.hovered() || resp.dragged() {
@@ -364,7 +367,7 @@ impl LaReviewApp {
         }
     }
 
-    pub(super) fn render_requirements_overlay(&mut self, ctx: &egui::Context) {
+    pub(crate) fn render_requirements_overlay(&mut self, ctx: &egui::Context) {
         if !self.state.ui.show_requirements_modal {
             return;
         }
@@ -426,7 +429,7 @@ impl LaReviewApp {
         }
     }
 
-    pub(super) fn render_editor_picker_overlay(&mut self, ctx: &egui::Context) {
+    pub(crate) fn render_editor_picker_overlay(&mut self, ctx: &egui::Context) {
         if !self.state.ui.show_editor_picker {
             return;
         }
@@ -478,12 +481,12 @@ impl LaReviewApp {
 
                 ui.add_space(spacing::SPACING_MD);
                 if ui.button("Cancel").clicked() {
-                    self.dispatch(Action::Settings(SettingsAction::CloseEditorPicker));
+                    self.dispatch(Action::Settings(SettingsAction::ClearPreferredEditor));
                 }
             });
 
         if !open {
-            self.dispatch(Action::Settings(SettingsAction::CloseEditorPicker));
+            self.dispatch(Action::Settings(SettingsAction::ClearPreferredEditor));
         }
     }
 }

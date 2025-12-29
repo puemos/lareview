@@ -213,8 +213,13 @@ async fn test_feedback_reply_flow() {
     harness.get_by_role(Role::MultilineTextInput);
 
     {
-        let mut app_lock = app.lock().unwrap();
-        app_lock.state.ui.feedback_reply_draft = "My reply".to_string();
+        let ctx = harness.ctx.clone();
+        crate::ui::app::ui_memory::with_ui_memory_mut(&ctx, |mem| {
+            mem.feedback_drafts
+                .entry("thread_1".to_string())
+                .or_default()
+                .reply = "My reply".to_string();
+        });
     }
     harness.run();
 

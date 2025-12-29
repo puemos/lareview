@@ -14,41 +14,34 @@ impl LaReviewApp {
             return;
         }
 
-        let unified_diff: Arc<str> = match &self.state.ui.cached_unified_diff {
-            Some((cached_diff_refs, diff_string)) if cached_diff_refs == &task.diff_refs => {
-                diff_string.clone()
-            }
+        let unified_diff = if let Some(cached) =
+            crate::ui::app::ui_memory::get_ui_memory(ui.ctx()).get_cached_diff(&task.id)
+        {
+            cached
+        } else {
+            let new_diff = if !task.diff_refs.is_empty() {
+                let run = self.state.domain.runs.iter().find(|r| r.id == task.run_id);
 
-            _ => {
-                let new_diff = if !task.diff_refs.is_empty() {
-                    let run = self.state.domain.runs.iter().find(|r| r.id == task.run_id);
-
-                    match run {
-                        Some(run) => match crate::infra::diff_index::DiffIndex::new(&run.diff_text)
-                        {
-                            Ok(diff_index) => match diff_index.render_unified_diff(&task.diff_refs)
-                            {
-                                Ok((diff_text, _ordered_files)) => diff_text,
-
-                                Err(_) => String::new(),
-                            },
-
+                match run {
+                    Some(run) => match crate::infra::diff_index::DiffIndex::new(&run.diff_text) {
+                        Ok(diff_index) => match diff_index.render_unified_diff(&task.diff_refs) {
+                            Ok((diff_text, _ordered_files)) => diff_text,
                             Err(_) => String::new(),
                         },
+                        Err(_) => String::new(),
+                    },
+                    None => String::new(),
+                }
+            } else {
+                String::new()
+            };
 
-                        None => String::new(),
-                    }
-                } else {
-                    String::new()
-                };
-
-                let new_diff_arc: Arc<str> = Arc::from(new_diff);
-
-                self.state.ui.cached_unified_diff =
-                    Some((task.diff_refs.clone(), new_diff_arc.clone()));
-
-                new_diff_arc
-            }
+            let new_diff_arc: Arc<str> = Arc::from(new_diff);
+            let arc_copy = new_diff_arc.clone();
+            crate::ui::app::ui_memory::with_ui_memory_mut(ui.ctx(), |mem| {
+                mem.cache_diff(task.id.clone(), new_diff_arc);
+            });
+            arc_copy
         };
 
         egui::Frame::NONE

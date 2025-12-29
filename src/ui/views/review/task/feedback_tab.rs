@@ -155,22 +155,28 @@ impl LaReviewApp {
             );
 
             let mut action_out = None;
-            ListItem::new(typography::bold(&title).color(theme.text_primary))
-                .metadata(egui::WidgetText::from(metadata_job))
-                .action(|| {
-                    action_out = Some(ReviewAction::OpenFeedback {
-                        task_id: task.id.clone(),
-                        feedback_id: Some(feedback.id.clone()),
-                        file_path: if path.is_empty() {
-                            None
-                        } else {
-                            Some(path.clone())
-                        },
-                        line_number: if line == 0 { None } else { Some(line) },
-                    });
-                })
-                .show_with_bg(ui, &theme);
-
+            egui::Frame::NONE
+                .inner_margin(egui::Margin::symmetric(
+                    spacing::SPACING_XL as i8,
+                    spacing::SPACING_ZERO as i8,
+                ))
+                .show(ui, |ui| {
+                    ListItem::new(typography::bold(&title).color(theme.text_primary))
+                        .metadata(egui::WidgetText::from(metadata_job))
+                        .action(|| {
+                            action_out = Some(ReviewAction::OpenFeedback {
+                                task_id: task.id.clone(),
+                                feedback_id: Some(feedback.id.clone()),
+                                file_path: if path.is_empty() {
+                                    None
+                                } else {
+                                    Some(path.clone())
+                                },
+                                line_number: if line == 0 { None } else { Some(line) },
+                            });
+                        })
+                        .show_with_bg(ui, &theme);
+                });
             if let Some(action) = action_out {
                 self.dispatch(Action::Review(action));
             }

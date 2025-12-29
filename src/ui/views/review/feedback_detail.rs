@@ -1,3 +1,4 @@
+use crate::ui::app::ui_memory::with_ui_memory_mut;
 use crate::ui::app::{Action, LaReviewApp, ReviewAction};
 use crate::ui::components::DiffAction;
 use crate::ui::spacing;
@@ -64,13 +65,17 @@ impl LaReviewApp {
                 bottom: 0.0,
             })
             .show(ui, |ui| {
-                if let Some(action) = render_feedback_header(
-                    ui,
-                    feedback.as_ref(),
-                    &self.state.ui.feedback_title_draft,
-                    &theme,
+                // Get draft key - use feedback_id if exists, otherwise synthesize from context
+                let draft_key = crate::ui::app::ui_memory::UiMemory::feedback_draft_key(
+                    feedback_id.as_deref(),
                     &view.task_id,
-                ) {
+                    view.file_path.as_deref(),
+                    view.line_number,
+                );
+
+                if let Some(action) =
+                    render_feedback_header(ui, feedback.as_ref(), &theme, &view.task_id, &draft_key)
+                {
                     self.dispatch(Action::Review(action));
                 }
 
@@ -114,20 +119,34 @@ impl LaReviewApp {
                 bottom: spacing::SPACING_XL as i8,
             })
             .show(ui, |ui| {
+                let draft_key = crate::ui::app::ui_memory::UiMemory::feedback_draft_key(
+                    feedback_id.as_deref(),
+                    &view.task_id,
+                    view.file_path.as_deref(),
+                    view.line_number,
+                );
+
                 ui.vertical(|ui| {
-                    render_comment_list(ui, &comments, &theme);
+                    if let Some(action) = render_comment_list(ui, &comments, &theme) {
+                        self.dispatch(Action::Review(action));
+                    }
 
                     // 4. Input Area
                     ui.add_space(spacing::SPACING_MD);
                     if let Some(action) = render_reply_composer(
                         ui,
-                        &self.state.ui.feedback_reply_draft,
-                        &self.state.ui.feedback_title_draft,
                         &view.task_id,
-                        feedback_id,
+                        feedback_id.clone(),
                         view.file_path.clone(),
                         view.line_number,
+                        &draft_key,
                     ) {
+                        // Clear drafts after sending
+                        if matches!(action, ReviewAction::CreateFeedbackComment { .. }) {
+                            with_ui_memory_mut(ui.ctx(), |mem| {
+                                mem.feedback_drafts.remove(&draft_key);
+                            });
+                        }
                         self.dispatch(Action::Review(action));
                     }
                 });

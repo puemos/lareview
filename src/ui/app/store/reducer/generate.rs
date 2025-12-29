@@ -84,18 +84,10 @@ pub fn reduce(
         }
         GenerateAction::ClearTimeline => {
             session.reset_agent_timeline();
-            Vec::new()
+            vec![]
         }
         GenerateAction::SelectRepo(repo_id) => {
             ui.selected_repo_id = repo_id;
-            Vec::new()
-        }
-        GenerateAction::ToggleAgentPanel => {
-            ui.agent_panel_collapsed = !ui.agent_panel_collapsed;
-            Vec::new()
-        }
-        GenerateAction::TogglePlanPanel => {
-            ui.plan_panel_collapsed = !ui.plan_panel_collapsed;
             Vec::new()
         }
     }

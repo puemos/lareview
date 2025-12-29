@@ -56,6 +56,14 @@ impl CommentRepository {
         Ok(affected)
     }
 
+    pub fn delete(&self, id: &str) -> Result<usize> {
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        let count = tx.execute("DELETE FROM comments WHERE id = ?", [id])?;
+        tx.commit()?;
+        Ok(count)
+    }
+
     pub fn touch(&self, id: &str) -> Result<usize> {
         let conn = self.conn.lock().unwrap();
         let updated = conn.execute(

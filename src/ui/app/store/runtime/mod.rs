@@ -95,6 +95,8 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
             agent_envs,
             preferred_editor_id,
         ),
+        Command::DeleteFeedback(feedback_id) => review::delete_feedback(app, feedback_id),
+        Command::DeleteComment(comment_id) => review::delete_comment(app, comment_id),
         Command::OpenInEditor {
             editor_id,
             file_path,

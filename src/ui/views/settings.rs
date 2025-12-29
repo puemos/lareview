@@ -400,7 +400,10 @@ impl LaReviewApp {
                             )))
                             .clicked()
                         {
-                            self.dispatch(Action::Settings(SettingsAction::OpenAddCustomAgent));
+                            crate::ui::app::ui_memory::with_ui_memory_mut(ui.ctx(), |mem| {
+                                mem.settings.show_add_custom_agent_modal = true;
+                                mem.settings.custom_agent_draft = Default::default();
+                            });
                         }
                     });
                 });
@@ -434,6 +437,8 @@ impl LaReviewApp {
         // --- Modals ---
         self.ui_agent_settings_modal(ui.ctx());
         self.ui_add_custom_agent_modal(ui.ctx());
+        self.render_requirements_overlay(ui.ctx());
+        self.render_editor_picker_overlay(ui.ctx());
     }
 
     fn ui_agent_card(&mut self, ui: &mut egui::Ui, candidate: &crate::infra::acp::AgentCandidate) {
@@ -475,6 +480,26 @@ impl LaReviewApp {
                         });
 
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                            let is_custom = self
+                                .state
+                                .ui
+                                .custom_agents
+                                .iter()
+                                .any(|a| a.id == candidate.id);
+                            if is_custom
+                                && ui
+                                    .button(
+                                        typography::label(icons::ACTION_DELETE)
+                                            .color(theme.destructive),
+                                    )
+                                    .on_hover_text("Delete custom agent")
+                                    .clicked()
+                            {
+                                self.dispatch(Action::Settings(SettingsAction::DeleteCustomAgent(
+                                    candidate.id.clone(),
+                                )));
+                            }
+
                             if candidate.available {
                                 ui.label(
                                     typography::label(icons::STATUS_DONE).color(theme.success),
@@ -506,9 +531,23 @@ impl LaReviewApp {
                             )
                             .clicked()
                         {
-                            self.dispatch(Action::Settings(SettingsAction::OpenAgentSettings(
-                                candidate.id.clone(),
-                            )));
+                            crate::ui::app::ui_memory::with_ui_memory_mut(ui.ctx(), |mem| {
+                                mem.settings.editing_agent_id = Some(candidate.id.clone());
+                                // Take snapshot for dirty check
+                                let path_override = self
+                                    .state
+                                    .ui
+                                    .agent_path_overrides
+                                    .get(&candidate.id)
+                                    .cloned();
+                                let envs = self.state.ui.agent_envs.get(&candidate.id).cloned();
+                                mem.settings.agent_settings_snapshot =
+                                    Some(crate::ui::app::state::AgentSettingsSnapshot {
+                                        agent_id: candidate.id.clone(),
+                                        path_override,
+                                        envs,
+                                    });
+                            });
                         }
                     });
                 });
@@ -516,7 +555,8 @@ impl LaReviewApp {
     }
 
     fn ui_agent_settings_modal(&mut self, ctx: &egui::Context) {
-        let Some(agent_id) = self.state.ui.editing_agent_id.clone() else {
+        let ui_memory = crate::ui::app::ui_memory::get_ui_memory(ctx);
+        let Some(agent_id) = ui_memory.settings.editing_agent_id.clone() else {
             return;
         };
 
@@ -540,7 +580,7 @@ impl LaReviewApp {
                 Some(envs.clone())
             }
         });
-        let is_agent_dirty = match self.state.ui.agent_settings_snapshot.as_ref() {
+        let is_agent_dirty = match ui_memory.settings.agent_settings_snapshot.as_ref() {
             Some(snapshot) => {
                 snapshot.agent_id == agent_id
                     && (snapshot.path_override != current_path || snapshot.envs != current_envs)
@@ -738,13 +778,21 @@ impl LaReviewApp {
                                                     ui.set_min_size(egui::vec2(
                                                         key_width, row_height,
                                                     ));
-                                                    ui.add(
-                                                        egui::TextEdit::singleline(
-                                                            &mut self.state.ui.agent_env_draft_key,
+                                                    let mut key = crate::ui::app::ui_memory::get_ui_memory(ui.ctx()).settings.agent_env_draft_key;
+                                                    if ui
+                                                        .add(
+                                                            egui::TextEdit::singleline(
+                                                                &mut key,
+                                                            )
+                                                            .hint_text(typography::weak("KEY"))
+                                                            .desired_width(key_width),
                                                         )
-                                                        .hint_text(typography::weak("KEY"))
-                                                        .desired_width(key_width),
-                                                    );
+                                                        .changed()
+                                                    {
+                                                        crate::ui::app::ui_memory::with_ui_memory_mut(ui.ctx(), |mem| {
+                                                            mem.settings.agent_env_draft_key = key;
+                                                        });
+                                                    }
                                                 });
                                             egui::Frame::NONE
                                                 .stroke(cell_stroke)
@@ -753,17 +801,22 @@ impl LaReviewApp {
                                                     ui.set_min_size(egui::vec2(
                                                         val_width, row_height,
                                                     ));
-                                                    ui.add(
-                                                        egui::TextEdit::singleline(
-                                                            &mut self
-                                                                .state
-                                                                .ui
-                                                                .agent_env_draft_value,
+                                                    let mut val = crate::ui::app::ui_memory::get_ui_memory(ui.ctx()).settings.agent_env_draft_value;
+                                                    if ui
+                                                        .add(
+                                                            egui::TextEdit::singleline(
+                                                                &mut val,
+                                                            )
+                                                            .hint_text(typography::weak("VALUE"))
+                                                            .password(true)
+                                                            .desired_width(val_width),
                                                         )
-                                                        .hint_text(typography::weak("VALUE"))
-                                                        .password(true)
-                                                        .desired_width(val_width),
-                                                    );
+                                                        .changed()
+                                                    {
+                                                        crate::ui::app::ui_memory::with_ui_memory_mut(ui.ctx(), |mem| {
+                                                            mem.settings.agent_env_draft_value = val;
+                                                        });
+                                                    }
                                                 });
                                             egui::Frame::NONE
                                                 .stroke(cell_stroke)
@@ -777,38 +830,25 @@ impl LaReviewApp {
                                                             egui::Align::Center,
                                                         ),
                                                         |ui| {
+                                                            let ui_mem = crate::ui::app::ui_memory::get_ui_memory(ui.ctx());
                                                             if ui
                                                                 .button(typography::label(
                                                                     "Add more",
                                                                 ))
                                                                 .clicked()
-                                                                && !self
-                                                                    .state
-                                                                    .ui
-                                                                    .agent_env_draft_key
-                                                                    .is_empty()
+                                                                && !ui_mem.settings.agent_env_draft_key.is_empty()
                                                             {
                                                                 self.dispatch(Action::Settings(
                                                                     SettingsAction::UpdateAgentEnv(
                                                                         agent_id.clone(),
-                                                                        self.state
-                                                                            .ui
-                                                                            .agent_env_draft_key
-                                                                            .clone(),
-                                                                        self.state
-                                                                            .ui
-                                                                            .agent_env_draft_value
-                                                                            .clone(),
+                                                                        ui_mem.settings.agent_env_draft_key.clone(),
+                                                                        ui_mem.settings.agent_env_draft_value.clone(),
                                                                     ),
                                                                 ));
-                                                                self.state
-                                                                    .ui
-                                                                    .agent_env_draft_key
-                                                                    .clear();
-                                                                self.state
-                                                                    .ui
-                                                                    .agent_env_draft_value
-                                                                    .clear();
+                                                                crate::ui::app::ui_memory::with_ui_memory_mut(ui.ctx(), |mem| {
+                                                                    mem.settings.agent_env_draft_key.clear();
+                                                                    mem.settings.agent_env_draft_value.clear();
+                                                                });
                                                             }
                                                         },
                                                     );
@@ -829,9 +869,9 @@ impl LaReviewApp {
                                     egui::Layout::right_to_left(egui::Align::Center),
                                     |ui| {
                                         if ui.button(typography::label("Done")).clicked() {
-                                            self.dispatch(Action::Settings(
-                                                SettingsAction::CloseAgentSettings,
-                                            ));
+                                            crate::ui::app::ui_memory::with_ui_memory_mut(ui.ctx(), |mem| {
+                                                mem.settings.editing_agent_id = None;
+                                            });
                                         }
                                         if is_agent_dirty
                                             && ui
@@ -856,12 +896,17 @@ impl LaReviewApp {
             });
 
         if !open {
-            self.dispatch(Action::Settings(SettingsAction::CloseAgentSettings));
+            crate::ui::app::ui_memory::with_ui_memory_mut(ctx, |mem| {
+                mem.settings.editing_agent_id = None;
+            });
         }
     }
 
     fn ui_add_custom_agent_modal(&mut self, ctx: &egui::Context) {
-        if !self.state.ui.show_add_custom_agent_modal {
+        if !crate::ui::app::ui_memory::get_ui_memory(ctx)
+            .settings
+            .show_add_custom_agent_modal
+        {
             return;
         }
 
@@ -882,22 +927,45 @@ impl LaReviewApp {
                                 .num_columns(2)
                                 .spacing([spacing::SPACING_LG, spacing::SPACING_LG])
                                 .show(ui, |ui| {
+                                    let mut draft =
+                                        crate::ui::app::ui_memory::get_ui_memory(ui.ctx())
+                                            .settings
+                                            .custom_agent_draft;
+
                                     ui.label(typography::bold("Unique ID:"));
-                                    ui.text_edit_singleline(
-                                        &mut self.state.ui.custom_agent_draft.id,
-                                    );
+                                    if ui.text_edit_singleline(&mut draft.id).changed() {
+                                        crate::ui::app::ui_memory::with_ui_memory_mut(
+                                            ui.ctx(),
+                                            |mem| {
+                                                mem.settings.custom_agent_draft.id =
+                                                    draft.id.clone();
+                                            },
+                                        );
+                                    }
                                     ui.end_row();
 
                                     ui.label(typography::bold("Display Label:"));
-                                    ui.text_edit_singleline(
-                                        &mut self.state.ui.custom_agent_draft.label,
-                                    );
+                                    if ui.text_edit_singleline(&mut draft.label).changed() {
+                                        crate::ui::app::ui_memory::with_ui_memory_mut(
+                                            ui.ctx(),
+                                            |mem| {
+                                                mem.settings.custom_agent_draft.label =
+                                                    draft.label.clone();
+                                            },
+                                        );
+                                    }
                                     ui.end_row();
 
                                     ui.label(typography::bold("Command/Binary:"));
-                                    ui.text_edit_singleline(
-                                        &mut self.state.ui.custom_agent_draft.command,
-                                    );
+                                    if ui.text_edit_singleline(&mut draft.command).changed() {
+                                        crate::ui::app::ui_memory::with_ui_memory_mut(
+                                            ui.ctx(),
+                                            |mem| {
+                                                mem.settings.custom_agent_draft.command =
+                                                    draft.command.clone();
+                                            },
+                                        );
+                                    }
                                     ui.end_row();
                                 });
 
@@ -906,25 +974,35 @@ impl LaReviewApp {
                                 ui.with_layout(
                                     egui::Layout::right_to_left(egui::Align::Center),
                                     |ui| {
+                                        let draft =
+                                            crate::ui::app::ui_memory::get_ui_memory(ui.ctx())
+                                                .settings
+                                                .custom_agent_draft;
                                         if ui.button(typography::label("Add Agent")).clicked()
-                                            && !self.state.ui.custom_agent_draft.id.is_empty()
+                                            && !draft.id.is_empty()
                                         {
                                             self.dispatch(Action::Settings(
-                                                SettingsAction::AddCustomAgent(
-                                                    self.state.ui.custom_agent_draft.clone(),
-                                                ),
+                                                SettingsAction::AddCustomAgent(draft.clone()),
                                             ));
-                                            self.dispatch(Action::Settings(
-                                                SettingsAction::CloseAddCustomAgent,
-                                            ));
+                                            crate::ui::app::ui_memory::with_ui_memory_mut(
+                                                ui.ctx(),
+                                                |mem| {
+                                                    mem.settings.show_add_custom_agent_modal =
+                                                        false;
+                                                },
+                                            );
                                         }
 
                                         ui.add_space(spacing::SPACING_MD);
 
                                         if ui.button(typography::label("Cancel")).clicked() {
-                                            self.dispatch(Action::Settings(
-                                                SettingsAction::CloseAddCustomAgent,
-                                            ));
+                                            crate::ui::app::ui_memory::with_ui_memory_mut(
+                                                ui.ctx(),
+                                                |mem| {
+                                                    mem.settings.show_add_custom_agent_modal =
+                                                        false;
+                                                },
+                                            );
                                         }
                                     },
                                 );
@@ -934,7 +1012,9 @@ impl LaReviewApp {
             });
 
         if !open {
-            self.dispatch(Action::Settings(SettingsAction::CloseAddCustomAgent));
+            crate::ui::app::ui_memory::with_ui_memory_mut(ctx, |mem| {
+                mem.settings.show_add_custom_agent_modal = false;
+            });
         }
     }
 

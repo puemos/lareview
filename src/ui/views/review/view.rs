@@ -305,7 +305,7 @@ impl LaReviewApp {
             let mut left_ui = ui.new_child(egui::UiBuilder::new().max_rect(left_rect));
             egui::Frame::NONE
                 .inner_margin(egui::Margin {
-                    left: (spacing::SPACING_SM + 2.0) as i8,
+                    left: spacing::SPACING_MD as i8,
                     right: 0,
                     top: spacing::SPACING_MD as i8,
                     bottom: spacing::SPACING_MD as i8,
@@ -425,7 +425,7 @@ impl LaReviewApp {
                 })
                 .show(&mut right_ui, |ui| {
                     egui::Frame::NONE
-                        .inner_margin(Margin::symmetric(spacing::SPACING_SM as i8, 0))
+                        .inner_margin(Margin::symmetric(spacing::SPACING_MD as i8, 0))
                         .show(ui, |ui| {
                             ui.horizontal(|ui| {
                                 ui.label(

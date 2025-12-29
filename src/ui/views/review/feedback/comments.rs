@@ -4,17 +4,30 @@ use crate::ui::typography;
 use crate::ui::views::review::format_timestamp;
 use eframe::egui;
 
-pub(crate) fn render_comment_list(ui: &mut egui::Ui, comments: &[Comment], theme: &Theme) {
+pub(crate) fn render_comment_list(
+    ui: &mut egui::Ui,
+    comments: &[Comment],
+    theme: &Theme,
+) -> Option<crate::ui::app::ReviewAction> {
+    let mut action_out = None;
     ui.vertical(|ui| {
         for comment in comments {
-            render_comment_bubble(ui, comment, theme);
+            if let Some(action) = render_comment_bubble(ui, comment, theme) {
+                action_out = Some(action);
+            }
             ui.add_space(crate::ui::spacing::SPACING_MD);
         }
     });
+    action_out
 }
 
-fn render_comment_bubble(ui: &mut egui::Ui, comment: &Comment, theme: &Theme) {
+fn render_comment_bubble(
+    ui: &mut egui::Ui,
+    comment: &Comment,
+    theme: &Theme,
+) -> Option<crate::ui::app::ReviewAction> {
     let timestamp = format_timestamp(&comment.created_at);
+    let mut action_out = None;
 
     ui.vertical(|ui| {
         ui.horizontal(|ui| {
@@ -24,6 +37,22 @@ fn render_comment_bubble(ui: &mut egui::Ui, comment: &Comment, theme: &Theme) {
                     .color(theme.text_primary),
             );
             ui.label(typography::tiny(format!("• {}", timestamp)).color(theme.text_muted));
+            ui.add_space(crate::ui::spacing::SPACING_MD);
+
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui
+                    .button(
+                        typography::label(crate::ui::icons::ACTION_DELETE).color(theme.destructive),
+                    )
+                    .on_hover_text("Delete Comment")
+                    .clicked()
+                {
+                    action_out = Some(crate::ui::app::ReviewAction::DeleteComment {
+                        feedback_id: comment.feedback_id.clone(),
+                        comment_id: comment.id.clone(),
+                    });
+                }
+            });
         });
 
         ui.label(
@@ -32,6 +61,8 @@ fn render_comment_bubble(ui: &mut egui::Ui, comment: &Comment, theme: &Theme) {
                 .line_height(Some(26.0)),
         );
     });
+
+    action_out
 }
 
 #[cfg(test)]

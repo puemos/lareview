@@ -131,6 +131,7 @@ pub fn render_feedback_list(
                 // -- Render Item --
                 let mut list_item = ListItem::new(title_text)
                     .metadata(metadata)
+                    .inner_margin(egui::Margin::same(spacing::SPACING_MD as i8))
                     .selected(is_active);
 
                 if show_status_icons {

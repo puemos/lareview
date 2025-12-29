@@ -129,9 +129,19 @@ impl FeedbackRepository {
     }
 
     pub fn delete_by_review(&self, review_id: &str) -> Result<usize> {
-        let conn = self.conn.lock().unwrap();
-        let affected = conn.execute("DELETE FROM feedback WHERE review_id = ?1", [review_id])?;
-        Ok(affected)
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        let count = tx.execute("DELETE FROM feedback WHERE review_id = ?", [review_id])?;
+        tx.commit()?;
+        Ok(count)
+    }
+
+    pub fn delete(&self, id: &str) -> Result<usize> {
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        let count = tx.execute("DELETE FROM feedback WHERE id = ?", [id])?;
+        tx.commit()?;
+        Ok(count)
     }
 
     fn row_to_feedback(row: &Row) -> rusqlite::Result<Feedback> {

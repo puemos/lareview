@@ -634,25 +634,6 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_action_toggles() {
-        let mut state = AppState::default();
-
-        state.ui.agent_panel_collapsed = false;
-        reduce(
-            &mut state,
-            Action::Generate(GenerateAction::ToggleAgentPanel),
-        );
-        assert!(state.ui.agent_panel_collapsed);
-
-        state.ui.plan_panel_collapsed = false;
-        reduce(
-            &mut state,
-            Action::Generate(GenerateAction::TogglePlanPanel),
-        );
-        assert!(state.ui.plan_panel_collapsed);
-    }
-
-    #[test]
     fn test_review_action_clear_selection() {
         let mut state = AppState {
             ui: UiState {

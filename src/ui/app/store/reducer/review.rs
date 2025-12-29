@@ -19,9 +19,6 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
                 let file_path = feedback.anchor.as_ref().and_then(|a| a.file_path.clone());
                 let line_number = feedback.anchor.as_ref().and_then(|a| a.line_number);
 
-                state.ui.feedback_title_draft = feedback.title.clone();
-                state.ui.feedback_reply_draft.clear();
-
                 state.ui.active_feedback = Some(crate::ui::app::FeedbackContext {
                     feedback_id: Some(feedback.id),
                     task_id,
@@ -73,10 +70,7 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
                 .and_then(|r| r.active_run_id.clone());
 
             state.ui.selected_task_id = None;
-            state.ui.cached_unified_diff = None;
             state.ui.active_feedback = None;
-            state.ui.feedback_title_draft.clear();
-            state.ui.feedback_reply_draft.clear();
 
             let mut commands = select_default_task_for_current_run(state);
             commands.push(Command::LoadReviewFeedbacks { review_id });
@@ -85,10 +79,7 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
         ReviewAction::SelectRun { run_id } => {
             state.ui.selected_run_id = Some(run_id);
             state.ui.selected_task_id = None;
-            state.ui.cached_unified_diff = None;
             state.ui.active_feedback = None;
-            state.ui.feedback_title_draft.clear();
-            state.ui.feedback_reply_draft.clear();
             select_default_task_for_current_run(state)
         }
         ReviewAction::SelectTask { task_id } => select_task(state, task_id),
@@ -101,10 +92,7 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
         }
         ReviewAction::ClearSelection => {
             state.ui.selected_task_id = None;
-            state.ui.cached_unified_diff = None;
             state.ui.active_feedback = None;
-            state.ui.feedback_title_draft.clear();
-            state.ui.feedback_reply_draft.clear();
             Vec::new()
         }
         ReviewAction::UpdateTaskStatus { task_id, status } => {
@@ -209,14 +197,6 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
             line_number,
         } => {
             // Initialize title draft from existing thread data
-            let existing_title = feedback_id
-                .as_ref()
-                .and_then(|fid| state.domain.feedbacks.iter().find(|t| &t.id == fid))
-                .map(|t| t.title.clone())
-                .unwrap_or_default();
-            state.ui.feedback_title_draft = existing_title;
-            state.ui.feedback_reply_draft.clear();
-
             state.ui.active_feedback = Some(crate::ui::app::FeedbackContext {
                 feedback_id,
                 task_id,
@@ -226,21 +206,7 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
             Vec::new()
         }
         ReviewAction::CloseFeedback => {
-            state.ui.feedback_title_draft.clear();
-            state.ui.feedback_reply_draft.clear();
             state.ui.active_feedback = None;
-            Vec::new()
-        }
-        ReviewAction::SetFeedbackTitleDraft { text } => {
-            state.ui.feedback_title_draft = text;
-            Vec::new()
-        }
-        ReviewAction::SetFeedbackReplyDraft { text } => {
-            state.ui.feedback_reply_draft = text;
-            Vec::new()
-        }
-        ReviewAction::ClearFeedbackReplyDraft => {
-            state.ui.feedback_reply_draft.clear();
             Vec::new()
         }
         ReviewAction::OpenFullDiff(view) => {
@@ -480,15 +446,30 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
                 Vec::new()
             }
         }
+        ReviewAction::DeleteFeedback(feedback_id) => {
+            if state
+                .ui
+                .active_feedback
+                .as_ref()
+                .map(|f| matches!(f.feedback_id.as_ref(), Some(id) if id == &feedback_id))
+                .unwrap_or(false)
+            {
+                state.ui.active_feedback = None;
+            }
+            vec![Command::DeleteFeedback(feedback_id)]
+        }
+        ReviewAction::DeleteComment {
+            feedback_id: _,
+            comment_id,
+        } => {
+            vec![Command::DeleteComment(comment_id)]
+        }
     }
 }
 
 pub fn select_task(state: &mut AppState, task_id: TaskId) -> Vec<Command> {
     state.ui.selected_task_id = Some(task_id.clone());
-    state.ui.cached_unified_diff = None;
     state.ui.active_feedback = None;
-    state.ui.feedback_title_draft.clear();
-    state.ui.feedback_reply_draft.clear();
     let _ = task_id;
     Vec::new()
 }
@@ -528,7 +509,6 @@ pub fn apply_review_data(state: &mut AppState, payload: ReviewDataPayload) -> Ve
     state.domain.runs = payload.runs;
     state.domain.all_tasks = payload.tasks;
     state.ui.review_error = None;
-    state.ui.cached_unified_diff = None;
 
     if let Some(selected) = &state.ui.selected_review_id
         && !state.domain.reviews.iter().any(|r| &r.id == selected)

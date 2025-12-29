@@ -86,6 +86,8 @@ pub enum Command {
         path: std::path::PathBuf,
         options: Box<crate::application::review::export::ExportOptions>,
     },
+    DeleteFeedback(String),
+    DeleteComment(String),
     SaveRepo {
         repo: crate::domain::LinkedRepo,
     },
