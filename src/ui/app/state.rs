@@ -244,6 +244,10 @@ pub struct UiState {
     pub show_editor_picker: bool,
     pub pending_editor_open: Option<EditorOpenRequest>,
     pub editor_picker_error: Option<String>,
+    pub export_copy_success: bool,
+    pub export_copy_shown_frames: u8,
+    pub export_save_success: bool,
+    pub export_save_shown_frames: u8,
     // Agent settings
     pub agent_path_overrides: std::collections::HashMap<String, String>,
     pub custom_agents: Vec<crate::infra::app_config::CustomAgentConfig>,

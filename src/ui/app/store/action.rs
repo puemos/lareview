@@ -98,6 +98,8 @@ pub enum ReviewAction {
     CloseFullDiff,
     RequestExportPreview,
     CloseExportPreview,
+    ResetExportCopySuccess,
+    ResetExportSaveSuccess,
     ExportReviewToFile {
         path: std::path::PathBuf,
     },

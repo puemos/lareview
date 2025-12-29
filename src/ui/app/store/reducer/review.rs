@@ -288,6 +288,16 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
             state.ui.export_preview = None;
             Vec::new()
         }
+        ReviewAction::ResetExportCopySuccess => {
+            state.ui.export_copy_success = false;
+            state.ui.export_copy_shown_frames = 0;
+            Vec::new()
+        }
+        ReviewAction::ResetExportSaveSuccess => {
+            state.ui.export_save_success = false;
+            state.ui.export_save_shown_frames = 0;
+            Vec::new()
+        }
         ReviewAction::ExportReviewToFile { path } => {
             if let (Some(review_id), Some(run_id)) = (
                 state.ui.selected_review_id.as_ref(),

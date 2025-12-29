@@ -75,6 +75,11 @@ pub fn reduce(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
             state.ui.is_exporting = false;
             if let Err(err) = result {
                 state.ui.review_error = Some(err);
+            } else {
+                state.ui.export_copy_success = true;
+                state.ui.export_save_success = true;
+                state.ui.export_copy_shown_frames = 0;
+                state.ui.export_save_shown_frames = 0;
             }
             Vec::new()
         }

@@ -313,11 +313,6 @@ impl LaReviewApp {
                         })
                         .show(ui, |ui| {
                             ui.horizontal(|ui| {
-                                // Regenerate
-                                if pill_action_button(ui, icons::ACTION_REFRESH, "Regenerate", true, theme.border).clicked() {
-                                    self.dispatch(Action::Review(ReviewAction::RequestExportPreview));
-                                }
-
                                 ui.add_space(spacing::SPACING_XS);
 
                                 // Cancel
@@ -327,16 +322,32 @@ impl LaReviewApp {
 
                                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                     // Save
-                                    if pill_action_button(ui, icons::ACTION_SAVE, "Save Review...", true, theme.brand).clicked() && let Some(path) = rfd::FileDialog::new()
-                                        .add_filter("Markdown", &["md"])
-                                        .set_file_name("review_export.md")
-                                        .save_file()
-                                        {
-                                            self.dispatch(Action::Review(ReviewAction::ExportReviewToFile { path }));
-                                        }
+                                    let save_text = if self.state.ui.export_save_success && self.state.ui.export_save_shown_frames < 180 {
+                                        "Saved!"
+                                    } else {
+                                        "Save Review..."
+                                    };
+
+                                    if pill_action_button(ui, icons::ACTION_SAVE, save_text, true, theme.brand).clicked()
+                                        && let Some(path) = rfd::FileDialog::new()
+                                            .add_filter("Markdown", &["md"])
+                                            .set_file_name("review_export.md")
+                                            .save_file() {
+                                        self.dispatch(Action::Review(ReviewAction::ExportReviewToFile { path }));
+                                        self.dispatch(Action::Review(ReviewAction::ResetExportSaveSuccess));
+                                    }
+
+                                    ui.add_space(spacing::SPACING_XS);
+
+                                    if pill_action_button(ui, icons::ACTION_COPY, "Copy", true, theme.brand).clicked()
+                                        && let Some(preview) = self.state.ui.export_preview.as_ref() {
+                                        ui.ctx().output_mut(|o| o.commands.push(egui::OutputCommand::CopyText(preview.clone())));
+                                        self.dispatch(Action::Review(ReviewAction::ResetExportCopySuccess));
+                                    }
                                 });
                             });
                         });
+
                 });
             });
 
