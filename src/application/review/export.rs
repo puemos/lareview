@@ -112,11 +112,14 @@ impl ReviewExporter {
 
             md.push_str("| Metric | Value |\n| :--- | :--- |\n");
             md.push_str(&format!("| **Total Tasks** | {} |\n", total_tasks));
+            let completion_pct = if total_tasks > 0 {
+                (completed_tasks as f32 / total_tasks as f32) * 100.0
+            } else {
+                0.0
+            };
             md.push_str(&format!(
                 "| **Completion** | {}/{} ({:.0}%) |\n",
-                completed_tasks,
-                total_tasks,
-                (completed_tasks as f32 / total_tasks as f32) * 100.0
+                completed_tasks, total_tasks, completion_pct
             ));
             md.push_str(&format!("| **High Risk** | 🔴 {} |\n", high_risk));
             md.push_str(&format!("| **Medium Risk** | 🟡 {} |\n", medium_risk));
@@ -358,5 +361,48 @@ fn get_risk_icon(risk: RiskLevel) -> &'static str {
         RiskLevel::Low => "🟢",
         RiskLevel::Medium => "🟡",
         RiskLevel::High => "🔴",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::{Review, ReviewRun, ReviewSource};
+
+    #[tokio::test]
+    async fn test_export_with_zero_tasks() {
+        let now = chrono::Utc::now().to_rfc3339();
+        let export_data = ExportData {
+            review: Review {
+                id: "test-review".into(),
+                title: "Test Review".into(),
+                summary: Some("Summary".into()),
+                source: ReviewSource::DiffPaste {
+                    diff_hash: "hash".into(),
+                },
+                active_run_id: Some("run-1".into()),
+                created_at: now.clone(),
+                updated_at: now.clone(),
+            },
+            run: ReviewRun {
+                id: "run-1".into(),
+                review_id: "test-review".into(),
+                agent_id: "agent-1".into(),
+                input_ref: "ref".into(),
+                diff_text: "".into(),
+                diff_hash: "hash".into(),
+                created_at: now,
+            },
+            tasks: vec![],
+            feedbacks: vec![],
+            comments: vec![],
+        };
+
+        let result =
+            ReviewExporter::export_to_markdown(&export_data, &ExportOptions::default()).await;
+        assert!(result.is_ok());
+        let md = result.unwrap().markdown;
+        assert!(md.contains("**Total Tasks** | 0 |"));
+        assert!(md.contains("**Completion** | 0/0 (0%) |"));
     }
 }

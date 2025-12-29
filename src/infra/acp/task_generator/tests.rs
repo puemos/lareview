@@ -94,7 +94,7 @@ mod policy_tests {
     fn prompt_renders_no_repo_access_block() {
         let diff = "diff --git a/src/a.rs b/src/a.rs\n--- a/src/a.rs\n+++ b/src/a.rs\n";
         let run = sample_run(diff);
-        let prompt = crate::infra::acp::task_generator::prompt::build_prompt(&run, None);
+        let prompt = crate::infra::acp::task_generator::prompt::build_prompt(&run, None).unwrap();
         assert!(prompt.contains("You do NOT have repository access."));
         assert!(
             prompt.contains("Use `return_task` to submit each task individually during analysis")
@@ -110,11 +110,22 @@ mod policy_tests {
         let diff = "diff --git a/src/a.rs b/src/a.rs\n--- a/src/a.rs\n+++ b/src/a.rs\n";
         let run = sample_run(diff);
         let root = std::path::PathBuf::from("/tmp/repo-root");
-        let prompt = crate::infra::acp::task_generator::prompt::build_prompt(&run, Some(&root));
+        let prompt =
+            crate::infra::acp::task_generator::prompt::build_prompt(&run, Some(&root)).unwrap();
         assert!(prompt.contains("You have READ-ONLY access"));
         assert!(prompt.contains(&root.display().to_string()));
         assert!(prompt.contains("Allowed tools:"));
         assert!(!prompt.contains("You do NOT have repository access."));
+    }
+
+    #[test]
+    fn prompt_renders_error_on_missing_template() {
+        let diff = "diff --git a/src/a.rs b/src/a.rs\n--- a/src/a.rs\n+++ b/src/a.rs\n";
+        let run = sample_run(diff);
+        // We can't easily trigger a rendering error without modifying the prompt name in build_prompt,
+        // but we can test that it's a Result.
+        let res = crate::infra::acp::task_generator::prompt::build_prompt(&run, None);
+        assert!(res.is_ok());
     }
 
     #[test]

@@ -224,6 +224,7 @@ pub struct UiState {
     pub selected_task_id: Option<String>,
     pub selected_repo_id: Option<String>,
     pub review_error: Option<String>,
+    pub fatal_error: Option<String>,
     pub full_diff: Option<FullDiffView>,
     pub export_preview: Option<String>,
     pub export_assets: HashMap<String, Vec<u8>>,

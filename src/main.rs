@@ -24,12 +24,21 @@ fn main() -> Result<(), eframe::Error> {
 
     if is_mcp_server {
         // Initialize the global Tokio runtime
-        let rt = tokio::runtime::Builder::new_multi_thread()
+        let rt = match tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
-            .expect("Failed to create Tokio runtime");
+        {
+            Ok(rt) => rt,
+            Err(e) => {
+                eprintln!("Failed to create Tokio runtime: {e:?}");
+                std::process::exit(1);
+            }
+        };
 
-        RUNTIME.set(rt).expect("Runtime already initialized");
+        if let Err(e) = RUNTIME.set(rt) {
+            eprintln!("Runtime already initialized: {e:?}");
+            std::process::exit(1);
+        }
 
         // Enter the runtime context and run the MCP server
         let _guard = RUNTIME.get().unwrap().enter();
@@ -47,28 +56,39 @@ fn main() -> Result<(), eframe::Error> {
     }
 
     // Initialize the global Tokio runtime for UI mode
-    let rt = tokio::runtime::Builder::new_multi_thread()
+    let rt = match tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
-        .expect("Failed to create Tokio runtime");
+    {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("Failed to create Tokio runtime: {e:?}");
+            std::process::exit(1);
+        }
+    };
 
-    RUNTIME.set(rt).expect("Runtime already initialized");
+    if let Err(e) = RUNTIME.set(rt) {
+        eprintln!("Runtime already initialized: {e:?}");
+        std::process::exit(1);
+    }
 
     // Enter the runtime context
     let _guard = RUNTIME.get().unwrap().enter();
 
     // Load the app icon
-    let icon = eframe::icon_data::from_png_bytes(
-        crate::assets::get_content("assets/logo/512-mac.png")
-            .expect("Failed to read app icon file"),
-    )
-    .expect("Failed to decode app icon");
+    let icon = crate::assets::get_content("assets/logo/512-mac.png")
+        .and_then(|bytes| eframe::icon_data::from_png_bytes(bytes).ok());
+
+    let mut viewport = egui::ViewportBuilder::default()
+        .with_inner_size([1200.0, 800.0])
+        .with_title("LaReview");
+
+    if let Some(icon) = icon {
+        viewport = viewport.with_icon(icon);
+    }
 
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1200.0, 800.0])
-            .with_title("LaReview")
-            .with_icon(icon),
+        viewport,
         ..Default::default()
     };
 

@@ -71,6 +71,33 @@ impl LaReviewApp {
             ctx.request_repaint_after(std::time::Duration::from_millis(16));
         }
 
+        if let Some(ref fatal_error) = self.state.ui.fatal_error {
+            catppuccin_egui::set_theme(ctx, catppuccin_egui::MOCHA);
+            egui::CentralPanel::default()
+                .frame(egui::Frame::NONE.fill(theme.bg_primary))
+                .show(ctx, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(100.0);
+                        ui.heading(
+                            egui::RichText::new("Fatal Initialization Error")
+                                .color(theme.destructive)
+                                .size(32.0),
+                        );
+                        ui.add_space(20.0);
+                        ui.label(
+                            egui::RichText::new(fatal_error)
+                                .color(theme.text_primary)
+                                .size(18.0),
+                        );
+                        ui.add_space(40.0);
+                        if ui.button("Exit Application").clicked() {
+                            std::process::exit(1);
+                        }
+                    });
+                });
+            return;
+        }
+
         self.render_header(ctx);
 
         egui::CentralPanel::default()

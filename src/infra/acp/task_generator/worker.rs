@@ -271,7 +271,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
     push_log(&logs, "new_session ok", debug);
 
     // Send prompt
-    let prompt_text = build_prompt(&run_context, repo_root.as_ref());
+    let prompt_text = build_prompt(&run_context, repo_root.as_ref())?;
     push_log(&logs, "prompt", debug);
     let prompt_result = connection
         .prompt(PromptRequest::new(

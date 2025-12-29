@@ -1,10 +1,14 @@
 use crate::infra::acp::task_mcp_server::RunContext;
 use crate::prompts;
 use agent_client_protocol::{ClientCapabilities, FileSystemCapability, Meta};
+use anyhow::Context;
 use serde_json::json;
 use std::path::PathBuf;
 
-pub(super) fn build_prompt(run: &RunContext, repo_root: Option<&PathBuf>) -> String {
+pub(super) fn build_prompt(
+    run: &RunContext,
+    repo_root: Option<&PathBuf>,
+) -> anyhow::Result<String> {
     let has_repo_access = repo_root.is_some();
     let source_json = serde_json::to_string(&run.source).unwrap_or_default();
 
@@ -32,7 +36,7 @@ pub(super) fn build_prompt(run: &RunContext, repo_root: Option<&PathBuf>) -> Str
             "repo_access_note": if has_repo_access { "read-only" } else { "none" }
         }),
     )
-    .expect("failed to render generate_tasks prompt")
+    .context("failed to render generate_tasks prompt")
 }
 
 pub(super) fn build_client_capabilities(has_repo_access: bool) -> ClientCapabilities {

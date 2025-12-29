@@ -25,41 +25,41 @@ impl LaReviewApp {
             .unwrap_or_else(|| "phosphor-regular".to_owned());
 
         // Load Geist for proportional text
-        fonts.font_data.insert(
-            "Geist".to_owned(),
-            FontData::from_static(
-                crate::assets::get_content("assets/fonts/Geist.ttf").expect("Geist font missing"),
-            )
-            .into(),
-        );
+        if let Some(content) = crate::assets::get_content("assets/fonts/Geist.ttf") {
+            fonts
+                .font_data
+                .insert("Geist".to_owned(), FontData::from_static(content).into());
+        } else {
+            eprintln!("Warning: Geist font missing");
+        }
 
-        fonts.font_data.insert(
-            "GeistBold".to_owned(),
-            FontData::from_static(
-                crate::assets::get_content("assets/fonts/Geist-Bold.ttf")
-                    .expect("Geist-Bold font missing"),
-            )
-            .into(),
-        );
+        if let Some(content) = crate::assets::get_content("assets/fonts/Geist-Bold.ttf") {
+            fonts.font_data.insert(
+                "GeistBold".to_owned(),
+                FontData::from_static(content).into(),
+            );
+        } else {
+            eprintln!("Warning: Geist-Bold font missing");
+        }
 
-        fonts.font_data.insert(
-            "GeistItalic".to_owned(),
-            FontData::from_static(
-                crate::assets::get_content("assets/fonts/Geist-Italic.ttf")
-                    .expect("Geist-Italic font missing"),
-            )
-            .into(),
-        );
+        if let Some(content) = crate::assets::get_content("assets/fonts/Geist-Italic.ttf") {
+            fonts.font_data.insert(
+                "GeistItalic".to_owned(),
+                FontData::from_static(content).into(),
+            );
+        } else {
+            eprintln!("Warning: Geist-Italic font missing");
+        }
 
         // Load Geist Mono for monospace text
-        fonts.font_data.insert(
-            "GeistMono".to_owned(),
-            FontData::from_static(
-                crate::assets::get_content("assets/fonts/GeistMono.ttf")
-                    .expect("GeistMono font missing"),
-            )
-            .into(),
-        );
+        if let Some(content) = crate::assets::get_content("assets/fonts/GeistMono.ttf") {
+            fonts.font_data.insert(
+                "GeistMono".to_owned(),
+                FontData::from_static(content).into(),
+            );
+        } else {
+            eprintln!("Warning: GeistMono font missing");
+        }
 
         fonts
             .families
@@ -111,14 +111,7 @@ impl LaReviewApp {
         Self::setup_fonts(&cc.egui_ctx);
         egui_extras::install_image_loaders(&cc.egui_ctx);
 
-        let db = Database::open().expect("db open");
-
-        let task_repo = Arc::new(db.task_repo());
-        let feedback_repo = Arc::new(db.feedback_repo());
-        let comment_repo = Arc::new(db.comment_repo());
-        let review_repo = Arc::new(db.review_repo());
-        let run_repo = Arc::new(db.run_repo());
-        let repo_repo = Arc::new(db.repo_repo());
+        let db_res = Database::open();
 
         let config = crate::infra::app_config::load_config();
 
@@ -133,6 +126,21 @@ impl LaReviewApp {
             },
             ..Default::default()
         };
+
+        if let Err(ref e) = db_res {
+            state.ui.fatal_error = Some(format!("Failed to open database: {e}"));
+        }
+
+        let db = db_res.unwrap_or_else(|_| {
+            Database::open_in_memory().expect("open in memory should not fail")
+        });
+
+        let task_repo = Arc::new(db.task_repo());
+        let feedback_repo = Arc::new(db.feedback_repo());
+        let comment_repo = Arc::new(db.comment_repo());
+        let review_repo = Arc::new(db.review_repo());
+        let run_repo = Arc::new(db.run_repo());
+        let repo_repo = Arc::new(db.repo_repo());
 
         state.ui.has_seen_requirements = config.has_seen_requirements;
         state.ui.show_requirements_modal = !config.has_seen_requirements;
