@@ -1,4 +1,4 @@
-use crate::domain::{ReviewStatus, Thread, ThreadImpact};
+use crate::domain::{Feedback, FeedbackImpact, ReviewStatus};
 use crate::ui::app::ReviewAction;
 use crate::ui::components::{PopupOption, popup_selector};
 use crate::ui::theme::Theme;
@@ -6,18 +6,18 @@ use crate::ui::{spacing, typography};
 use eframe::egui;
 use egui::Color32;
 
-pub(crate) fn render_thread_header(
+pub(crate) fn render_feedback_header(
     ui: &mut egui::Ui,
-    thread: Option<&Thread>,
-    thread_title_draft: &str,
+    feedback: Option<&Feedback>,
+    feedback_title_draft: &str,
     theme: &Theme,
     task_id: &str,
 ) -> Option<ReviewAction> {
     let mut action_out = None;
 
-    let thread_id = thread.map(|t| t.id.clone());
-    let existing_title = thread.map(|t| t.title.clone()).unwrap_or_default();
-    let can_edit_thread = thread_id.is_some();
+    let feedback_id = feedback.map(|t| t.id.clone());
+    let existing_title = feedback.map(|t| t.title.clone()).unwrap_or_default();
+    let can_edit_feedback = feedback_id.is_some();
 
     ui.horizontal(|ui| {
         let status_width = 120.0;
@@ -27,13 +27,13 @@ pub(crate) fn render_thread_header(
         let title_width = (ui.available_width() - selector_total_width).max(120.0);
 
         // Edit Title
-        let mut edit_text = thread_title_draft.to_string();
+        let mut edit_text = feedback_title_draft.to_string();
 
         let response = ui
             .scope(|ui| {
                 ui.add(
                     egui::TextEdit::singleline(&mut edit_text)
-                        .hint_text("Discussion Title")
+                        .hint_text("Feedback Title")
                         .desired_width(title_width)
                         .text_color(Color32::WHITE)
                         .text_color_opt(Some(theme.text_muted))
@@ -45,17 +45,17 @@ pub(crate) fn render_thread_header(
             .inner;
 
         if response.changed() {
-            action_out = Some(ReviewAction::SetThreadTitleDraft {
+            action_out = Some(ReviewAction::SetFeedbackTitleDraft {
                 text: edit_text.clone(),
             });
         }
 
         if response.lost_focus()
             && edit_text != existing_title
-            && let Some(thread_id) = thread_id.clone()
+            && let Some(feedback_id) = feedback_id.clone()
         {
-            action_out = Some(ReviewAction::UpdateThreadTitle {
-                thread_id,
+            action_out = Some(ReviewAction::UpdateFeedbackTitle {
+                feedback_id,
                 title: edit_text.clone(),
             });
         }
@@ -68,18 +68,18 @@ pub(crate) fn render_thread_header(
         let impact_choices = impact_options(theme);
 
         // Status selector
-        let status = thread.map(|t| t.status).unwrap_or(ReviewStatus::Todo);
+        let status = feedback.map(|t| t.status).unwrap_or(ReviewStatus::Todo);
         if let Some(next_status) = popup_selector(
             ui,
-            ui.make_persistent_id(("thread_status_popup", task_id, &thread_id)),
+            ui.make_persistent_id(("feedback_status_popup", task_id, &feedback_id)),
             status,
             &status_choices,
             status_width,
-            can_edit_thread,
-        ) && let Some(thread_id) = thread_id.clone()
+            can_edit_feedback,
+        ) && let Some(feedback_id) = feedback_id.clone()
         {
-            action_out = Some(ReviewAction::UpdateThreadStatus {
-                thread_id,
+            action_out = Some(ReviewAction::UpdateFeedbackStatus {
+                feedback_id,
                 status: next_status,
             });
         }
@@ -87,18 +87,20 @@ pub(crate) fn render_thread_header(
         ui.add_space(selector_gap);
 
         // Impact selector
-        let impact = thread.map(|t| t.impact).unwrap_or(ThreadImpact::Nitpick);
+        let impact = feedback
+            .map(|t| t.impact)
+            .unwrap_or(FeedbackImpact::Nitpick);
         if let Some(next_impact) = popup_selector(
             ui,
-            ui.make_persistent_id(("thread_impact_popup", task_id, &thread_id)),
+            ui.make_persistent_id(("feedback_impact_popup", task_id, &feedback_id)),
             impact,
             &impact_choices,
             impact_width,
-            can_edit_thread,
-        ) && let Some(thread_id) = thread_id.clone()
+            can_edit_feedback,
+        ) && let Some(feedback_id) = feedback_id.clone()
         {
-            action_out = Some(ReviewAction::UpdateThreadImpact {
-                thread_id,
+            action_out = Some(ReviewAction::UpdateFeedbackImpact {
+                feedback_id,
                 impact: next_impact,
             });
         }
@@ -127,11 +129,11 @@ fn status_options(theme: &Theme) -> [PopupOption<ReviewStatus>; 4] {
     })
 }
 
-fn impact_options(theme: &Theme) -> [PopupOption<ThreadImpact>; 3] {
+fn impact_options(theme: &Theme) -> [PopupOption<FeedbackImpact>; 3] {
     [
-        ThreadImpact::Blocking,
-        ThreadImpact::NiceToHave,
-        ThreadImpact::Nitpick,
+        FeedbackImpact::Blocking,
+        FeedbackImpact::NiceToHave,
+        FeedbackImpact::Nitpick,
     ]
     .map(|impact| {
         let v = crate::ui::views::review::visuals::impact_visuals(impact, theme);

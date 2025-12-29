@@ -1,9 +1,9 @@
 use super::super::super::LaReviewApp;
 use super::super::action::{
-    Action, AsyncAction, ReviewAction, ReviewDataPayload, ReviewThreadsPayload,
+    Action, AsyncAction, ReviewAction, ReviewDataPayload, ReviewFeedbacksPayload,
 };
 use super::super::command::ReviewDataRefreshReason;
-use crate::domain::{Comment, ReviewId, ReviewStatus, Thread, ThreadAnchor, ThreadImpact};
+use crate::domain::{Comment, Feedback, FeedbackAnchor, FeedbackImpact, ReviewId, ReviewStatus};
 use std::collections::HashMap;
 
 pub fn refresh_review_data(app: &mut LaReviewApp, reason: ReviewDataRefreshReason) {
@@ -33,28 +33,28 @@ pub fn refresh_review_data(app: &mut LaReviewApp, reason: ReviewDataRefreshReaso
     }));
 }
 
-pub fn load_review_threads(app: &mut LaReviewApp, review_id: ReviewId) {
-    let result = (|| -> Result<ReviewThreadsPayload, String> {
-        let threads = app
-            .thread_repo
+pub fn load_review_feedbacks(app: &mut LaReviewApp, review_id: ReviewId) {
+    let result = (|| -> Result<ReviewFeedbacksPayload, String> {
+        let feedbacks = app
+            .feedback_repo
             .find_by_review(&review_id)
-            .map_err(|e| format!("Failed to load threads: {e}"))?;
+            .map_err(|e| format!("Failed to load feedbacks: {e}"))?;
         let mut comments = HashMap::new();
-        for thread in &threads {
-            let thread_comments = app
+        for feedback in &feedbacks {
+            let feedback_comments = app
                 .comment_repo
-                .list_for_thread(&thread.id)
+                .list_for_feedback(&feedback.id)
                 .map_err(|e| format!("Failed to load comments: {e}"))?;
-            comments.insert(thread.id.clone(), thread_comments);
+            comments.insert(feedback.id.clone(), feedback_comments);
         }
-        Ok(ReviewThreadsPayload {
+        Ok(ReviewFeedbacksPayload {
             review_id,
-            threads,
+            feedbacks,
             comments,
         })
     })();
 
-    app.dispatch(Action::Async(AsyncAction::ReviewThreadsLoaded(result)));
+    app.dispatch(Action::Async(AsyncAction::ReviewFeedbacksLoaded(result)));
 }
 
 pub fn update_task_status(
@@ -107,25 +107,25 @@ pub fn delete_review(app: &mut LaReviewApp, review_id: ReviewId) {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn create_thread_comment(
+pub fn create_feedback_comment(
     app: &mut LaReviewApp,
     review_id: ReviewId,
     task_id: crate::domain::TaskId,
-    thread_id: Option<String>,
+    feedback_id: Option<String>,
     file_path: Option<String>,
     line_number: Option<u32>,
     title: Option<String>,
     body: String,
 ) {
     let now = chrono::Utc::now().to_rfc3339();
-    let is_new_thread = thread_id.is_none();
-    let thread_id = thread_id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    let is_new_feedback = feedback_id.is_none();
+    let feedback_id = feedback_id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
     let result = (|| -> Result<(), String> {
-        if is_new_thread {
-            let title = title.unwrap_or_else(|| default_thread_title(&body));
+        if is_new_feedback {
+            let title = title.unwrap_or_else(|| default_feedback_title(&body));
             let anchor = if file_path.is_some() || line_number.is_some() {
-                Some(ThreadAnchor {
+                Some(FeedbackAnchor {
                     file_path: file_path.clone(),
                     line_number,
                     side: None,
@@ -136,31 +136,31 @@ pub fn create_thread_comment(
                 None
             };
 
-            let thread = Thread {
-                id: thread_id.clone(),
+            let feedback = Feedback {
+                id: feedback_id.clone(),
                 review_id: review_id.clone(),
                 task_id: Some(task_id.clone()),
                 title,
                 status: ReviewStatus::Todo,
-                impact: ThreadImpact::Nitpick,
+                impact: FeedbackImpact::Nitpick,
                 anchor,
                 author: "User".to_string(),
                 created_at: now.clone(),
                 updated_at: now.clone(),
             };
 
-            app.thread_repo
-                .save(&thread)
-                .map_err(|e| format!("Failed to save thread: {e}"))?;
+            app.feedback_repo
+                .save(&feedback)
+                .map_err(|e| format!("Failed to save feedback: {e}"))?;
         } else {
-            app.thread_repo
-                .touch(&thread_id)
-                .map_err(|e| format!("Failed to update thread timestamp: {e}"))?;
+            app.feedback_repo
+                .touch(&feedback_id)
+                .map_err(|e| format!("Failed to update feedback timestamp: {e}"))?;
         }
 
         let comment = Comment {
             id: uuid::Uuid::new_v4().to_string(),
-            thread_id: thread_id.clone(),
+            feedback_id: feedback_id.clone(),
             author: "User".to_string(),
             body,
             parent_id: None,
@@ -175,69 +175,69 @@ pub fn create_thread_comment(
         Ok(())
     })();
 
-    app.dispatch(Action::Async(AsyncAction::ThreadCommentSaved(
+    app.dispatch(Action::Async(AsyncAction::FeedbackCommentSaved(
         result.clone(),
     )));
 
     if result.is_ok() {
-        load_review_threads(app, review_id.clone());
-        app.dispatch(Action::Review(ReviewAction::OpenThread {
+        load_review_feedbacks(app, review_id.clone());
+        app.dispatch(Action::Review(ReviewAction::OpenFeedback {
             task_id,
-            thread_id: Some(thread_id),
+            feedback_id: Some(feedback_id),
             file_path,
             line_number,
         }));
     }
 }
 
-pub fn update_thread_status(app: &mut LaReviewApp, thread_id: String, status: ReviewStatus) {
+pub fn update_feedback_status(app: &mut LaReviewApp, feedback_id: String, status: ReviewStatus) {
     let review_id = app.state.ui.selected_review_id.clone();
     let result = app
-        .thread_repo
-        .update_status(&thread_id, status)
+        .feedback_repo
+        .update_status(&feedback_id, status)
         .map(|_| ())
-        .map_err(|e| format!("Failed to update thread status: {e}"));
+        .map_err(|e| format!("Failed to update feedback status: {e}"));
 
-    app.dispatch(Action::Async(AsyncAction::ThreadCommentSaved(
+    app.dispatch(Action::Async(AsyncAction::FeedbackCommentSaved(
         result.clone(),
     )));
 
     if let (Ok(_), Some(review_id)) = (result, review_id) {
-        load_review_threads(app, review_id);
+        load_review_feedbacks(app, review_id);
     }
 }
 
-pub fn update_thread_impact(app: &mut LaReviewApp, thread_id: String, impact: ThreadImpact) {
+pub fn update_feedback_impact(app: &mut LaReviewApp, feedback_id: String, impact: FeedbackImpact) {
     let review_id = app.state.ui.selected_review_id.clone();
     let result = app
-        .thread_repo
-        .update_impact(&thread_id, impact)
+        .feedback_repo
+        .update_impact(&feedback_id, impact)
         .map(|_| ())
-        .map_err(|e| format!("Failed to update thread impact: {e}"));
+        .map_err(|e| format!("Failed to update feedback impact: {e}"));
 
-    app.dispatch(Action::Async(AsyncAction::ThreadCommentSaved(
+    app.dispatch(Action::Async(AsyncAction::FeedbackCommentSaved(
         result.clone(),
     )));
 
     if let (Ok(_), Some(review_id)) = (result, review_id) {
-        load_review_threads(app, review_id);
+        load_review_feedbacks(app, review_id);
     }
 }
 
-pub fn update_thread_title(app: &mut LaReviewApp, thread_id: String, title: String) {
+pub fn update_feedback_title(app: &mut LaReviewApp, feedback_id: String, title: String) {
     let review_id = app.state.ui.selected_review_id.clone();
     let result = app
-        .thread_repo
-        .update_title(&thread_id, &title)
+        .feedback_repo
+        .update_title(&feedback_id, &title)
         .map(|_| ())
-        .map_err(|e| format!("Failed to update thread title: {e}"));
+        .map_err(|e| format!("Failed to update feedback title: {e}"));
 
-    app.dispatch(Action::Async(AsyncAction::ThreadCommentSaved(
+    app.dispatch(Action::Async(AsyncAction::FeedbackCommentSaved(
         result.clone(),
     )));
 
     if let (Ok(_), Some(review_id)) = (result, review_id) {
-        load_review_threads(app, review_id);
+        load_review_feedbacks(app, review_id);
     }
 }
 
@@ -245,13 +245,13 @@ pub fn generate_export_preview(
     app: &mut LaReviewApp,
     review_id: crate::domain::ReviewId,
     run_id: crate::domain::ReviewRunId,
-    include_thread_ids: Option<Vec<String>>,
+    include_feedback_ids: Option<Vec<String>>,
     options: crate::application::review::export::ExportOptions,
 ) {
     let review_repo = app.review_repo.clone();
     let run_repo = app.run_repo.clone();
     let task_repo = app.task_repo.clone();
-    let thread_repo = app.thread_repo.clone();
+    let feedback_repo = app.feedback_repo.clone();
     let comment_repo = app.comment_repo.clone();
     let action_tx = app.action_tx.clone();
 
@@ -269,27 +269,27 @@ pub fn generate_export_preview(
                 .find_by_run(&run_id)
                 .map_err(|e: anyhow::Error| e.to_string())?;
 
-            let mut threads = thread_repo
+            let mut feedbacks = feedback_repo
                 .find_by_review(&review_id)
                 .map_err(|e: anyhow::Error| e.to_string())?;
 
-            if let Some(include_ids) = &include_thread_ids {
-                threads.retain(|t| include_ids.contains(&t.id));
+            if let Some(include_ids) = &include_feedback_ids {
+                feedbacks.retain(|t| include_ids.contains(&t.id));
             }
 
             let mut comments = Vec::new();
-            for thread in &threads {
-                let mut thread_comments = comment_repo
-                    .list_for_thread(&thread.id)
+            for feedback in &feedbacks {
+                let mut feedback_comments = comment_repo
+                    .list_for_feedback(&feedback.id)
                     .map_err(|e: anyhow::Error| e.to_string())?;
-                comments.append(&mut thread_comments);
+                comments.append(&mut feedback_comments);
             }
 
             let data = crate::application::review::export::ExportData {
                 review,
                 run,
                 tasks,
-                threads,
+                feedbacks,
                 comments,
             };
 
@@ -315,7 +315,7 @@ pub fn export_review(
     let review_repo = app.review_repo.clone();
     let run_repo = app.run_repo.clone();
     let task_repo = app.task_repo.clone();
-    let thread_repo = app.thread_repo.clone();
+    let feedback_repo = app.feedback_repo.clone();
     let comment_repo = app.comment_repo.clone();
     let action_tx = app.action_tx.clone();
 
@@ -333,22 +333,22 @@ pub fn export_review(
                 .find_by_run(&run_id)
                 .map_err(|e: anyhow::Error| anyhow::anyhow!(e))?;
 
-            let threads = thread_repo
+            let feedbacks = feedback_repo
                 .find_by_review(&review_id)
                 .map_err(|e: anyhow::Error| anyhow::anyhow!(e))?;
             let mut comments = Vec::new();
-            for thread in &threads {
-                let mut thread_comments = comment_repo
-                    .list_for_thread(&thread.id)
+            for feedback in &feedbacks {
+                let mut feedback_comments = comment_repo
+                    .list_for_feedback(&feedback.id)
                     .map_err(|e: anyhow::Error| anyhow::anyhow!(e))?;
-                comments.append(&mut thread_comments);
+                comments.append(&mut feedback_comments);
             }
 
             let data = crate::application::review::export::ExportData {
                 review,
                 run,
                 tasks,
-                threads,
+                feedbacks,
                 comments,
             };
 
@@ -383,10 +383,10 @@ pub fn export_review(
     });
 }
 
-fn default_thread_title(body: &str) -> String {
+fn default_feedback_title(body: &str) -> String {
     let first_line = body.lines().next().unwrap_or("").trim();
     if first_line.is_empty() {
-        return "Untitled thread".to_string();
+        return "Untitled feedback".to_string();
     }
     if first_line.len() > 80 {
         format!("{}...", &first_line[..77])

@@ -1,53 +1,55 @@
 use super::DbConn;
-use crate::domain::{HunkRef, ReviewStatus, Thread, ThreadAnchor, ThreadImpact, ThreadSide};
+use crate::domain::{
+    Feedback, FeedbackAnchor, FeedbackImpact, FeedbackSide, HunkRef, ReviewStatus,
+};
 use anyhow::Result;
 use chrono::Utc;
 use rusqlite::Row;
 
 use std::str::FromStr;
 
-pub struct ThreadRepository {
+pub struct FeedbackRepository {
     conn: DbConn,
 }
 
-impl ThreadRepository {
+impl FeedbackRepository {
     pub fn new(conn: DbConn) -> Self {
         Self { conn }
     }
 
-    pub fn save(&self, thread: &Thread) -> Result<()> {
+    pub fn save(&self, feedback: &Feedback) -> Result<()> {
         let conn = self.conn.lock().unwrap();
-        let anchor = thread.anchor.as_ref();
+        let anchor = feedback.anchor.as_ref();
         let hunk_ref = anchor
             .and_then(|a| a.hunk_ref.as_ref())
             .map(|h| serde_json::to_string(h).unwrap_or_default());
 
         conn.execute(
             r#"
-            INSERT OR REPLACE INTO threads (
+            INSERT OR REPLACE INTO feedback (
                 id, review_id, task_id, title, status, impact,
                 anchor_file_path, anchor_line, anchor_side, anchor_hunk_ref, anchor_head_sha,
                 author, created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
             "#,
             rusqlite::params![
-                thread.id,
-                thread.review_id,
-                thread.task_id,
-                thread.title,
-                thread.status.to_string(),
-                thread.impact.to_string(),
+                feedback.id,
+                feedback.review_id,
+                feedback.task_id,
+                feedback.title,
+                feedback.status.to_string(),
+                feedback.impact.to_string(),
                 anchor.and_then(|a| a.file_path.clone()),
                 anchor.and_then(|a| a.line_number.map(|n| n as i32)),
                 anchor.and_then(|a| a.side).map(|s| match s {
-                    ThreadSide::Old => "old",
-                    ThreadSide::New => "new",
+                    FeedbackSide::Old => "old",
+                    FeedbackSide::New => "new",
                 }),
                 hunk_ref,
                 anchor.and_then(|a| a.head_sha.clone()),
-                thread.author,
-                thread.created_at,
-                thread.updated_at
+                feedback.author,
+                feedback.created_at,
+                feedback.updated_at
             ],
         )?;
         Ok(())
@@ -56,16 +58,16 @@ impl ThreadRepository {
     pub fn update_status(&self, id: &str, status: ReviewStatus) -> Result<usize> {
         let conn = self.conn.lock().unwrap();
         let updated = conn.execute(
-            "UPDATE threads SET status = ?2, updated_at = ?3 WHERE id = ?1",
+            "UPDATE feedback SET status = ?2, updated_at = ?3 WHERE id = ?1",
             rusqlite::params![id, status.to_string(), Utc::now().to_rfc3339()],
         )?;
         Ok(updated)
     }
 
-    pub fn update_impact(&self, id: &str, impact: ThreadImpact) -> Result<usize> {
+    pub fn update_impact(&self, id: &str, impact: FeedbackImpact) -> Result<usize> {
         let conn = self.conn.lock().unwrap();
         let updated = conn.execute(
-            "UPDATE threads SET impact = ?2, updated_at = ?3 WHERE id = ?1",
+            "UPDATE feedback SET impact = ?2, updated_at = ?3 WHERE id = ?1",
             rusqlite::params![id, impact.to_string(), Utc::now().to_rfc3339()],
         )?;
         Ok(updated)
@@ -74,7 +76,7 @@ impl ThreadRepository {
     pub fn update_title(&self, id: &str, title: &str) -> Result<usize> {
         let conn = self.conn.lock().unwrap();
         let updated = conn.execute(
-            "UPDATE threads SET title = ?2, updated_at = ?3 WHERE id = ?1",
+            "UPDATE feedback SET title = ?2, updated_at = ?3 WHERE id = ?1",
             rusqlite::params![id, title, Utc::now().to_rfc3339()],
         )?;
         Ok(updated)
@@ -83,25 +85,25 @@ impl ThreadRepository {
     pub fn touch(&self, id: &str) -> Result<usize> {
         let conn = self.conn.lock().unwrap();
         let updated = conn.execute(
-            "UPDATE threads SET updated_at = ?2 WHERE id = ?1",
+            "UPDATE feedback SET updated_at = ?2 WHERE id = ?1",
             rusqlite::params![id, Utc::now().to_rfc3339()],
         )?;
         Ok(updated)
     }
 
-    pub fn find_by_id(&self, id: &str) -> Result<Option<Thread>> {
+    pub fn find_by_id(&self, id: &str) -> Result<Option<Feedback>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             r#"
             SELECT id, review_id, task_id, title, status, impact,
                    anchor_file_path, anchor_line, anchor_side, anchor_hunk_ref, anchor_head_sha,
                    author, created_at, updated_at
-            FROM threads
+            FROM feedback
             WHERE id = ?1
             "#,
         )?;
 
-        let mut rows = stmt.query_map([id], Self::row_to_thread)?;
+        let mut rows = stmt.query_map([id], Self::row_to_feedback)?;
         if let Some(row) = rows.next() {
             Ok(Some(row?))
         } else {
@@ -109,30 +111,30 @@ impl ThreadRepository {
         }
     }
 
-    pub fn find_by_review(&self, review_id: &str) -> Result<Vec<Thread>> {
+    pub fn find_by_review(&self, review_id: &str) -> Result<Vec<Feedback>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             r#"
             SELECT id, review_id, task_id, title, status, impact,
                    anchor_file_path, anchor_line, anchor_side, anchor_hunk_ref, anchor_head_sha,
                    author, created_at, updated_at
-            FROM threads
+            FROM feedback
             WHERE review_id = ?1
             ORDER BY anchor_file_path, anchor_line, updated_at DESC
             "#,
         )?;
 
-        let rows = stmt.query_map([review_id], Self::row_to_thread)?;
+        let rows = stmt.query_map([review_id], Self::row_to_feedback)?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
     pub fn delete_by_review(&self, review_id: &str) -> Result<usize> {
         let conn = self.conn.lock().unwrap();
-        let affected = conn.execute("DELETE FROM threads WHERE review_id = ?1", [review_id])?;
+        let affected = conn.execute("DELETE FROM feedback WHERE review_id = ?1", [review_id])?;
         Ok(affected)
     }
 
-    fn row_to_thread(row: &Row) -> rusqlite::Result<Thread> {
+    fn row_to_feedback(row: &Row) -> rusqlite::Result<Feedback> {
         let status: String = row.get(4)?;
         let impact: String = row.get(5)?;
         let anchor_file_path: Option<String> = row.get(6)?;
@@ -151,14 +153,14 @@ impl ThreadRepository {
                 .as_deref()
                 .and_then(|json| serde_json::from_str(json).ok());
 
-            Some(ThreadAnchor {
+            Some(FeedbackAnchor {
                 file_path: anchor_file_path,
                 line_number: anchor_line.map(|n| n as u32),
                 side: anchor_side.as_deref().and_then(|s| {
                     if s == "old" {
-                        Some(ThreadSide::Old)
+                        Some(FeedbackSide::Old)
                     } else if s == "new" {
-                        Some(ThreadSide::New)
+                        Some(FeedbackSide::New)
                     } else {
                         None
                     }
@@ -170,13 +172,13 @@ impl ThreadRepository {
             None
         };
 
-        Ok(Thread {
+        Ok(Feedback {
             id: row.get(0)?,
             review_id: row.get(1)?,
             task_id: row.get(2)?,
             title: row.get(3)?,
             status: ReviewStatus::from_str(&status).unwrap_or_default(),
-            impact: ThreadImpact::from_str(&impact).unwrap_or_default(),
+            impact: FeedbackImpact::from_str(&impact).unwrap_or_default(),
             anchor,
             author: row.get(11)?,
             created_at: row.get(12)?,

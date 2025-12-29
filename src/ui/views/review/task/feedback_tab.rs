@@ -7,7 +7,7 @@ use eframe::egui;
 use egui_phosphor::regular as icons;
 
 impl LaReviewApp {
-    pub(crate) fn render_discussion_tab(
+    pub(crate) fn render_feedback_tab(
         &mut self,
         ui: &mut egui::Ui,
         task: &crate::domain::ReviewTask,
@@ -16,28 +16,28 @@ impl LaReviewApp {
             return;
         }
 
-        if let Some(thread_ctx) = &self.state.ui.active_thread {
-            let view = crate::ui::views::review::thread_detail::ThreadDetailView {
+        if let Some(feedback_ctx) = &self.state.ui.active_feedback {
+            let view = crate::ui::views::review::feedback_detail::FeedbackDetailView {
                 task_id: task.id.clone(),
-                thread_id: thread_ctx.thread_id.clone(),
-                file_path: thread_ctx.file_path.clone(),
-                line_number: thread_ctx.line_number,
+                feedback_id: feedback_ctx.feedback_id.clone(),
+                file_path: feedback_ctx.file_path.clone(),
+                line_number: feedback_ctx.line_number,
             };
-            self.render_thread_detail(ui, &view);
+            self.render_feedback_detail(ui, &view);
             return;
         }
 
         let theme = current_theme();
-        let mut task_threads: Vec<crate::domain::Thread> = self
+        let mut task_feedbacks: Vec<crate::domain::Feedback> = self
             .state
             .domain
-            .threads
+            .feedbacks
             .iter()
-            .filter(|thread| thread.task_id.as_ref() == Some(&task.id))
+            .filter(|feedback| feedback.task_id.as_ref() == Some(&task.id))
             .cloned()
             .collect();
 
-        if task_threads.is_empty() {
+        if task_feedbacks.is_empty() {
             egui::Frame::NONE
                 .inner_margin(spacing::SPACING_XL)
                 .show(ui, |ui| {
@@ -49,16 +49,16 @@ impl LaReviewApp {
                                 .color(theme.text_disabled),
                         );
                         ui.add_space(spacing::SPACING_MD);
-                        ui.label(typography::h1("No discussions yet"));
+                        ui.label(typography::h1("No feedback yet"));
                         ui.label(typography::weak(
-                            "Add comments in the 'Changes' tab or start a general thread.",
+                            "Add comments in the 'Changes' tab or start a general feedback.",
                         ));
                     });
                 });
             return;
         }
 
-        task_threads.sort_by(|a, b| {
+        task_feedbacks.sort_by(|a, b| {
             a.status
                 .rank()
                 .cmp(&b.status.rank())
@@ -66,8 +66,8 @@ impl LaReviewApp {
                 .then_with(|| b.created_at.cmp(&a.created_at))
         });
 
-        for (index, thread) in task_threads.iter().enumerate() {
-            let (path, line) = thread
+        for (index, feedback) in task_feedbacks.iter().enumerate() {
+            let (path, line) = feedback
                 .anchor
                 .as_ref()
                 .map(|a| {
@@ -78,20 +78,22 @@ impl LaReviewApp {
                 })
                 .unwrap_or_default();
 
-            let title = if thread.title.is_empty() {
-                "Untitled thread".to_string()
+            let title = if feedback.title.is_empty() {
+                "Untitled feedback".to_string()
             } else {
-                thread.title.clone()
+                feedback.title.clone()
             };
 
-            let status_v = crate::ui::views::review::visuals::status_visuals(thread.status, &theme);
-            let impact_v = crate::ui::views::review::visuals::impact_visuals(thread.impact, &theme);
+            let status_v =
+                crate::ui::views::review::visuals::status_visuals(feedback.status, &theme);
+            let impact_v =
+                crate::ui::views::review::visuals::impact_visuals(feedback.impact, &theme);
 
-            let comments = self.state.domain.thread_comments.get(&thread.id);
+            let comments = self.state.domain.feedback_comments.get(&feedback.id);
             let reply_count = comments
                 .map(|items: &Vec<crate::domain::Comment>| items.len())
                 .unwrap_or(0);
-            let _updated_label = format_timestamp(&thread.updated_at);
+            let _updated_label = format_timestamp(&feedback.updated_at);
 
             // Metadata: status icon/label + impact icon/label + comments count
             let mut metadata_job = egui::text::LayoutJob::default();
@@ -156,9 +158,9 @@ impl LaReviewApp {
             ListItem::new(typography::bold(&title).color(theme.text_primary))
                 .metadata(egui::WidgetText::from(metadata_job))
                 .action(|| {
-                    action_out = Some(ReviewAction::OpenThread {
+                    action_out = Some(ReviewAction::OpenFeedback {
                         task_id: task.id.clone(),
-                        thread_id: Some(thread.id.clone()),
+                        feedback_id: Some(feedback.id.clone()),
                         file_path: if path.is_empty() {
                             None
                         } else {
@@ -173,7 +175,7 @@ impl LaReviewApp {
                 self.dispatch(Action::Review(action));
             }
 
-            if index + 1 < task_threads.len() {
+            if index + 1 < task_feedbacks.len() {
                 ui.separator();
             }
         }
@@ -187,30 +189,30 @@ mod tests {
     use egui_kittest::kittest::Queryable;
 
     #[test]
-    fn test_render_discussion_tab_with_threads() {
+    fn test_render_feedback_tab_with_feedbacks() {
         let mut app = LaReviewApp::new_for_test();
         let task = crate::domain::ReviewTask {
             id: "task1".into(),
             ..Default::default()
         };
-        let thread = crate::domain::Thread {
-            id: "thread1".into(),
+        let feedback = crate::domain::Feedback {
+            id: "feedback1".into(),
             review_id: "rev1".into(),
             task_id: Some("task1".into()),
-            title: "Discussion Title".into(),
+            title: "Feedback Title".into(),
             status: crate::domain::ReviewStatus::Todo,
-            impact: crate::domain::ThreadImpact::Nitpick,
+            impact: crate::domain::FeedbackImpact::Nitpick,
             anchor: None,
             author: "User".into(),
             created_at: "now".into(),
             updated_at: "now".into(),
         };
-        app.state.domain.threads.push(thread);
+        app.state.domain.feedbacks.push(feedback);
 
         let mut harness = Harness::new(|ctx| {
             crate::ui::app::LaReviewApp::setup_fonts(ctx);
             egui::CentralPanel::default().show(ctx, |ui| {
-                app.render_discussion_tab(ui, &task);
+                app.render_feedback_tab(ui, &task);
             });
         });
         harness.run();
@@ -218,7 +220,7 @@ mod tests {
         harness
             .get_all_by_role(egui::accesskit::Role::Label)
             .into_iter()
-            .find(|n| n.value().as_deref() == Some("Discussion Title"))
-            .expect("Discussion Title label not found");
+            .find(|n| n.value().as_deref() == Some("Feedback Title"))
+            .expect("Feedback Title label not found");
     }
 }

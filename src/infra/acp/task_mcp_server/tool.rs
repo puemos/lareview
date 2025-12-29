@@ -196,12 +196,12 @@ pub(super) fn create_finalize_review_tool(config: Arc<ServerConfig>) -> impl Too
     .with_schema(review_metadata_schema())
 }
 
-/// Create the add_comment tool for submitting inline comments.
-pub(super) fn create_add_comment_tool(config: Arc<ServerConfig>) -> impl ToolHandler {
-    SimpleTool::new("add_comment", move |args: Value, _extra| {
+/// Create the add_feedback tool for submitting inline feedback.
+pub(super) fn create_add_feedback_tool(config: Arc<ServerConfig>) -> impl ToolHandler {
+    SimpleTool::new("add_feedback", move |args: Value, _extra| {
         let config = config.clone();
         Box::pin(async move {
-            log_to_file(&config, "add_comment called");
+            log_to_file(&config, "add_feedback called");
             let persist_args = args.clone();
 
             let persist_config = config.clone();
@@ -211,37 +211,37 @@ pub(super) fn create_add_comment_tool(config: Arc<ServerConfig>) -> impl ToolHan
             .await;
 
             match persist_result {
-                Ok(Ok(thread_id)) => {
+                Ok(Ok(feedback_id)) => {
                     log_to_file(
                         &config,
-                        &format!("AddCommentTool persisted thread: {}", thread_id),
+                        &format!("AddFeedbackTool persisted feedback: {}", feedback_id),
                     );
-                    Ok(json!({ "status": "ok", "message": "Comment added successfully", "thread_id": thread_id }))
+                    Ok(json!({ "status": "ok", "message": "Feedback added successfully", "feedback_id": feedback_id }))
                 },
                 Ok(Err(err)) => {
                     log_to_file(
                         &config,
-                        &format!("AddCommentTool failed to save comment: {err:?}"),
+                        &format!("AddFeedbackTool failed to save feedback: {err:?}"),
                     );
-                    Err(pmcp::Error::Validation(format!("invalid add_comment payload: {err}")))
+                    Err(pmcp::Error::Validation(format!("invalid add_feedback payload: {err}")))
                 }
                 Err(join_err) => {
                     log_to_file(
                         &config,
-                        &format!("AddCommentTool task join error: {join_err}"),
+                        &format!("AddFeedbackTool task join error: {join_err}"),
                     );
                     Err(pmcp::Error::Internal(format!(
-                        "add_comment persistence join error: {join_err}"
+                        "add_feedback persistence join error: {join_err}"
                     )))
                 }
             }
         })
     })
     .with_description(
-        "Add a specific, inline comment on a file line. Use this for targeted feedback (nitpicks, questions, suggestions) \
+        "Add a specific, inline feedback on a file line. Use this for targeted feedback (nitpicks, questions, suggestions) \
          that doesn't warrant a full task. Requires file, line, body. Optional title, impact, task_id.",
     )
-    .with_schema(add_comment_schema())
+    .with_schema(add_feedback_schema())
 }
 
 #[derive(Debug, Deserialize)]
@@ -781,7 +781,7 @@ fn review_metadata_schema() -> Value {
     })
 }
 
-fn add_comment_schema() -> Value {
+fn add_feedback_schema() -> Value {
     json!({
         "type": "object",
         "properties": {

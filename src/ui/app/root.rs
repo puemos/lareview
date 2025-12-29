@@ -6,8 +6,8 @@ use tokio::sync::mpsc;
 
 use crate::infra::db::repository::RepoRepository;
 use crate::infra::db::{
-    CommentRepository, Database, ReviewRepository, ReviewRunRepository, TaskRepository,
-    ThreadRepository,
+    CommentRepository, Database, FeedbackRepository, ReviewRepository, ReviewRunRepository,
+    TaskRepository,
 };
 
 use super::messages::{GenMsg, GhMsg};
@@ -18,7 +18,7 @@ pub struct LaReviewApp {
     pub state: AppState,
 
     pub task_repo: Arc<TaskRepository>,
-    pub thread_repo: Arc<ThreadRepository>,
+    pub feedback_repo: Arc<FeedbackRepository>,
     pub comment_repo: Arc<CommentRepository>,
     pub review_repo: Arc<ReviewRepository>,
     pub run_repo: Arc<ReviewRunRepository>,

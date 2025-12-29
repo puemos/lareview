@@ -11,7 +11,7 @@ pub(crate) enum ReviewTab {
     Description,
     Diagram,
     Changes,
-    Discussion,
+    Feedback,
 }
 
 pub(crate) fn render_task_tabs(
@@ -28,20 +28,20 @@ pub(crate) fn render_task_tabs(
 
     let mut action_out = None;
 
-    // Force Discussion tab if thread is active
-    if ui_state.active_thread.is_some() {
-        active_tab = ReviewTab::Discussion;
+    // Force Feedback tab if feedback is active
+    if ui_state.active_feedback.is_some() {
+        active_tab = ReviewTab::Feedback;
     }
 
     let note_count = domain_state
-        .threads
+        .feedbacks
         .iter()
-        .filter(|thread| thread.task_id.as_ref() == Some(&task.id))
+        .filter(|feedback| feedback.task_id.as_ref() == Some(&task.id))
         .count();
-    let discussion_label = if note_count > 0 {
-        format!("Discussion ({})", note_count)
+    let feedback_label = if note_count > 0 {
+        format!("Feedback ({})", note_count)
     } else {
-        "Discussion".to_string()
+        "Feedback".to_string()
     };
 
     ui.horizontal(|ui| {
@@ -71,8 +71,8 @@ pub(crate) fn render_task_tabs(
             let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
 
             if resp.clicked() {
-                if ui_state.active_thread.is_some() {
-                    action_out = Some(ReviewAction::CloseThread);
+                if ui_state.active_feedback.is_some() {
+                    action_out = Some(ReviewAction::CloseFeedback);
                 }
                 active_tab = tab;
                 ui.ctx()
@@ -95,9 +95,9 @@ pub(crate) fn render_task_tabs(
 
         tab_button(
             ui,
-            ReviewTab::Discussion,
-            &discussion_label,
-            icons::TAB_DISCUSSION,
+            ReviewTab::Feedback,
+            &feedback_label,
+            icons::TAB_FEEDBACK,
         );
     });
 

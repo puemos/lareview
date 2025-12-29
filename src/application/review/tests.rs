@@ -17,7 +17,7 @@ async fn test_export_to_markdown_basics() {
     assert!(md.contains("### Flow A"));
     assert!(md.contains("#### [ ] 🟡 First Task"));
     assert!(md.contains("AI Insight"));
-    assert!(md.contains("### ⚪ [nitpick] Thread Title"));
+    assert!(md.contains("### ⚪ [nitpick] Feedback Title"));
     assert!(md.contains("Comment body"));
 }
 
@@ -71,14 +71,14 @@ async fn test_export_to_markdown_full() {
             status: ReviewStatus::Done,
             sub_flow: Some("Flow A".into()),
         }],
-        threads: vec![Thread {
-            id: "thread1".into(),
+        feedbacks: vec![Feedback {
+            id: "feedback1".into(),
             review_id: "r1".into(),
             task_id: Some("t1".into()),
-            title: "Discussion".into(),
+            title: "Feedback".into(),
             status: ReviewStatus::Todo,
-            impact: ThreadImpact::Blocking,
-            anchor: Some(ThreadAnchor {
+            impact: FeedbackImpact::Blocking,
+            anchor: Some(FeedbackAnchor {
                 file_path: Some("file.rs".into()),
                 line_number: Some(1),
                 ..Default::default()
@@ -89,7 +89,7 @@ async fn test_export_to_markdown_full() {
         }],
         comments: vec![Comment {
             id: "c1".into(),
-            thread_id: "thread1".into(),
+            feedback_id: "feedback1".into(),
             author: "User".into(),
             body: "Comment Body".into(),
             parent_id: None,
@@ -258,13 +258,13 @@ fn create_mock_data() -> ExportData {
             status: ReviewStatus::Todo,
             sub_flow: Some("Flow A".to_string()),
         }],
-        threads: vec![Thread {
-            id: "thread_1".to_string(),
+        feedbacks: vec![Feedback {
+            id: "feedback_1".to_string(),
             review_id: review_id.clone(),
             task_id: Some("task_1".to_string()),
-            title: "Thread Title".to_string(),
+            title: "Feedback Title".to_string(),
             status: ReviewStatus::Todo,
-            impact: ThreadImpact::Nitpick,
+            impact: FeedbackImpact::Nitpick,
             anchor: None,
             author: "Author".to_string(),
             created_at: "2023-01-01T00:00:00Z".to_string(),
@@ -272,7 +272,7 @@ fn create_mock_data() -> ExportData {
         }],
         comments: vec![Comment {
             id: "comment_1".to_string(),
-            thread_id: "thread_1".to_string(),
+            feedback_id: "feedback_1".to_string(),
             author: "Author".to_string(),
             body: "Comment body".to_string(),
             parent_id: None,

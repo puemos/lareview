@@ -1,7 +1,7 @@
 mod changes_tab;
 mod description_tab;
 mod diagram_tab;
-mod discussion_tab;
+mod feedback_tab;
 mod header;
 mod tabs;
 

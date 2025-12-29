@@ -585,18 +585,18 @@ async fn test_save_agent_comment() {
         "impact": "blocking"
     });
 
-    let thread_id =
+    let feedback_id =
         crate::infra::acp::task_mcp_server::comment_ingest::save_agent_comment(&config, args)
             .unwrap();
-    assert!(!thread_id.is_empty());
+    assert!(!feedback_id.is_empty());
 
-    let thread_repo = crate::infra::db::ThreadRepository::new(db.connection());
-    let thread = thread_repo.find_by_id(&thread_id).unwrap().unwrap();
-    assert_eq!(thread.task_id, Some("task-1".to_string()));
-    assert_eq!(thread.impact, crate::domain::ThreadImpact::Blocking);
+    let feedback_repo = crate::infra::db::FeedbackRepository::new(db.connection());
+    let feedback = feedback_repo.find_by_id(&feedback_id).unwrap().unwrap();
+    assert_eq!(feedback.task_id, Some("task-1".to_string()));
+    assert_eq!(feedback.impact, crate::domain::FeedbackImpact::Blocking);
 
     let comment_repo = crate::infra::db::CommentRepository::new(db.connection());
-    let comments = comment_repo.list_for_thread(&thread_id).unwrap();
+    let comments = comment_repo.list_for_feedback(&feedback_id).unwrap();
     assert_eq!(comments.len(), 1);
     assert_eq!(comments[0].body, "This is a comment");
 

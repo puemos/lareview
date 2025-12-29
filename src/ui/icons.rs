@@ -5,7 +5,7 @@
 
 use egui_phosphor::regular as icons;
 
-// --- Task & Thread Status ---
+// --- Task & Feedback Status ---
 pub const STATUS_PENDING: &str = icons::CIRCLE;
 pub const STATUS_IN_PROGRESS: &str = icons::CIRCLE_HALF;
 pub const STATUS_DONE: &str = icons::CHECK_CIRCLE;
@@ -28,7 +28,7 @@ pub const VIEW_SETTINGS: &str = icons::GEAR;
 pub const TAB_DESCRIPTION: &str = icons::FILE_TEXT;
 pub const TAB_DIAGRAM: &str = icons::CHART_BAR;
 pub const TAB_CHANGES: &str = icons::GIT_DIFF;
-pub const TAB_DISCUSSION: &str = icons::CHAT_CIRCLE;
+pub const TAB_FEEDBACK: &str = icons::CHAT_CIRCLE;
 
 // --- Common Actions ---
 pub const ACTION_RUN: &str = icons::PLAY;

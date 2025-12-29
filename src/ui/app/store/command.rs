@@ -40,7 +40,7 @@ pub enum Command {
     RefreshReviewData {
         reason: ReviewDataRefreshReason,
     },
-    LoadReviewThreads {
+    LoadReviewFeedbacks {
         review_id: ReviewId,
     },
     UpdateTaskStatus {
@@ -50,25 +50,25 @@ pub enum Command {
     DeleteReview {
         review_id: ReviewId,
     },
-    CreateThreadComment {
+    CreateFeedbackComment {
         review_id: ReviewId,
         task_id: TaskId,
-        thread_id: Option<String>,
+        feedback_id: Option<String>,
         file_path: Option<String>,
         line_number: Option<u32>,
         title: Option<String>,
         body: String,
     },
-    UpdateThreadStatus {
-        thread_id: String,
+    UpdateFeedbackStatus {
+        feedback_id: String,
         status: crate::domain::ReviewStatus,
     },
-    UpdateThreadImpact {
-        thread_id: String,
-        impact: crate::domain::ThreadImpact,
+    UpdateFeedbackImpact {
+        feedback_id: String,
+        impact: crate::domain::FeedbackImpact,
     },
-    UpdateThreadTitle {
-        thread_id: String,
+    UpdateFeedbackTitle {
+        feedback_id: String,
         title: String,
     },
     RunD2 {
@@ -77,7 +77,7 @@ pub enum Command {
     GenerateExportPreview {
         review_id: String,
         run_id: String,
-        include_thread_ids: Option<Vec<String>>,
+        include_feedback_ids: Option<Vec<String>>,
         options: Box<crate::application::review::export::ExportOptions>,
     },
     ExportReview {

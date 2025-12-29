@@ -187,7 +187,7 @@ impl LaReviewApp {
                                                     if icon_checkbox(ui, &theme, &mut options.include_stats, "Include Stats").clicked() { changed = true; }
                                                     if icon_checkbox(ui, &theme, &mut options.include_metadata, "Include Metadata").clicked() { changed = true; }
                                                     if icon_checkbox(ui, &theme, &mut options.include_tasks, "Include Tasks").clicked() { changed = true; }
-                                                    if icon_checkbox(ui, &theme, &mut options.include_threads, "Include Threads").clicked() { changed = true; }
+                                                    if icon_checkbox(ui, &theme, &mut options.include_feedbacks, "Include Feedbacks").clicked() { changed = true; }
 
                                                     if changed {
                                                         self.dispatch(Action::Review(ReviewAction::UpdateExportOptions(options)));
@@ -197,11 +197,11 @@ impl LaReviewApp {
 
                                                 ui.separator();
 
-                                                // Threads Section
+                                                // Feedback Section
                                                 ui.add_space(spacing::SPACING_SM);
                                                 ui.horizontal(|ui| {
                                                     ui.add_space(spacing::SPACING_MD);
-                                                    ui.label(typography::bold("Feedback Threads"));
+                                                    ui.label(typography::bold("Feedback"));
                                                 });
                                                 ui.add_space(spacing::SPACING_SM);
 
@@ -209,26 +209,26 @@ impl LaReviewApp {
                                                 ui.horizontal(|ui| {
                                                     ui.add_space(spacing::SPACING_MD);
                                                     if pill_action_button(ui, icons::ICON_CHECK, "Select All", true, theme.border).clicked() {
-                                                        self.dispatch(Action::Review(ReviewAction::SelectAllExportThreads));
+                                                        self.dispatch(Action::Review(ReviewAction::SelectAllExportFeedbacks));
                                                     }
                                                     ui.add_space(spacing::SPACING_XS);
                                                     if pill_action_button(ui, icons::ACTION_CLOSE, "Clear", true, theme.border).clicked() {
-                                                        self.dispatch(Action::Review(ReviewAction::ClearExportThreads));
+                                                        self.dispatch(Action::Review(ReviewAction::ClearExportFeedbacks));
                                                     }
                                                 });
                                                 ui.add_space(spacing::SPACING_SM);
 
-                                                let review_threads = self.state.domain.threads.clone();
+                                                let review_feedbacks = self.state.domain.feedbacks.clone();
 
                                                 ui.scope(|ui| {
                                                     ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
 
-                                                    if let Some(action) = crate::ui::views::review::thread_list::render_thread_list(
+                                                    if let Some(action) = crate::ui::views::review::feedback_list::render_feedback_list(
                                                         ui,
-                                                        &review_threads,
+                                                        &review_feedbacks,
                                                         None,
                                                         true,
-                                                        &self.state.ui.export_options.selected_thread_ids,
+                                                        &self.state.ui.export_options.selected_feedback_ids,
                                                         false,
                                                         &theme,
                                                     ) {

@@ -71,12 +71,12 @@
     - `repo_search` to locate symbols or strings in the linked repo when you need additional context
     - `repo_list_files` to scan repository structure or find candidate files before reading
     - `return_task` to submit individual review tasks (call this repeatedly for each task)
-    - `add_comment` to submit inline comments on specific file lines
+    - `add_feedback` to submit inline comments on specific file lines
     - `finalize_review` to submit the final review title and summary
 
     Prefer:
     - Use `repo_search` and `repo_list_files` proactively to verify assumptions, check for similar patterns elsewhere, or understand call sites.
-    - Use `add_comment` liberally for adding feedback.
+    - Use `add_feedback` liberally for adding feedback.
     - If the diff is sufficient for *understanding*, you should still verify your insights if possible.
 
     Forbidden:
@@ -86,12 +86,12 @@
 
     Always:
     - Use `return_task` to submit each task individually during analysis
-    - Use `add_comment` for feedback
+    - Use `add_feedback` for feedback
     - Use `finalize_review` to submit the final review title and summary
     {{else}}
     Rules:
     - Use `return_task` to submit each task individually during analysis
-    - Use `add_comment` for feedback
+    - Use `add_feedback` for feedback
     - Use `finalize_review` to submit the final review title and summary
     - Use ONLY the PR metadata and the provided <diff>.
     - Do NOT print review JSON in plain text; only submit via tools.
@@ -136,7 +136,7 @@
     4. Focus on correctness, safety, missing tests, risky refactors, performance, and maintainability
     5. Group related changes together (aim for around 2-7 well-scoped tasks total)
     6. Use `sub_flow` only when grouping 2+ tasks under the same flow; omit it for singletons
-    7. Use `add_comment` for targeted feedback (security, bugs, best practive, typos, naming suggestions, specific questions).
+    7. Use `add_feedback` for targeted feedback (security, bugs, best practive, typos, naming suggestions, specific questions).
 
     Go beyond the minimum - create thorough tasks that genuinely help reviewers understand the PR. Include insightful descriptions and thoughtful risk assessments.
   </goals>
@@ -259,13 +259,13 @@
     3. **Verify Context**: If you have repo access, use `repo_search` or `repo_list_files` to check usage of changed functions or definitions of modified types. Don't guess—verify.
     4. **Group**: Identify logical flows. Group changes by *behavior*, not just by file.
     5. **Draft**: Create tasks. For each ask, draft the `<description>` and `<insight>` first.
-    6. **Comment**: Look for specific things that need feedback (security, bugs, naming, style, potential bugs, questions). Use `add_comment` for these. **Aim for lots of applicable comments based on the context.**
+    6. **Comment**: Look for specific things that need feedback (security, bugs, naming, style, potential bugs, questions). Use `add_feedback` for these. **Aim for lots of applicable comments based on the context.**
     7. **Reference Hunks**: For each task's `diff_refs`, use the `<hunk_manifest>` to find exact coordinates. **Copy the JSON objects exactly** - do not guess or approximate coordinates.
     8. **Prioritize**: Order tasks by risk level (HIGH → MEDIUM → LOW)
     9. **Visualize**: Add a D2 diagram for every task (keep simple diagrams for low-risk changes)
     10. **Submit**:
       - Call the tool `return_task` for each task individually. **Ensure you populate the `insight` field!**
-      - Call the tool `add_comment` for specific feedback.
+      - Call the tool `add_feedback` for specific feedback.
       - Call the tool `finalize_review` once at the end with the review title and summary
 
     **Coverage verification**: Before finishing, mentally check that every file in the diff appears in at least one task's `diff_refs`. If some changes are trivial or miscellaneous, create a final "Verify remaining changes" task to cover them using empty hunk arrays `"hunks": []` to select all hunks in a file.
@@ -459,7 +459,7 @@
     }
     ```
 
-    **Optional: Call `add_comment` for specific inline feedback**:
+    **Optional: Call `add_feedback` for specific inline feedback**:
     ```json
     {
       "file": "string (relative file path)",
@@ -504,7 +504,7 @@
     - **Include a D2 diagram for every task**
     - Order by risk level: HIGH → MEDIUM → LOW
     - Call `return_task` for each task individually
-    - **Call `add_comment` for specific feedback**, aim for 2-3 per task but only if needed
+    - **Call `add_feedback` for specific feedback**, aim for 2-3 per task but only if needed
     - Call `finalize_review` once at the end with title and summary
   </reminders>
 </instructions>

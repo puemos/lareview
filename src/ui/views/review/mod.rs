@@ -1,12 +1,12 @@
 //! Review view module (split by feature parts).
 
 mod center_pane;
+mod feedback;
+mod feedback_detail;
+pub mod feedback_list;
 mod nav;
 mod task;
 mod task_detail;
-mod thread;
-mod thread_detail;
-pub mod thread_list;
 mod toolbar;
 mod view;
 mod visuals;

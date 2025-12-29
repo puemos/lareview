@@ -161,7 +161,7 @@ pub struct TaskStats {
     pub tags: Vec<String>,
 }
 
-/// Status of a review item (task or thread)
+/// Status of a review item (task or feedback)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum ReviewStatus {
@@ -357,10 +357,10 @@ impl From<agent_client_protocol::PlanEntry> for PlanEntry {
     }
 }
 
-/// Impact/severity level for a thread
+/// Impact/severity level for feedback
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum ThreadImpact {
+pub enum FeedbackImpact {
     /// Optional/nit-level feedback
     #[default]
     Nitpick,
@@ -371,7 +371,7 @@ pub enum ThreadImpact {
     NiceToHave,
 }
 
-impl fmt::Display for ThreadImpact {
+impl fmt::Display for FeedbackImpact {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Nitpick => write!(f, "nitpick"),
@@ -381,7 +381,7 @@ impl fmt::Display for ThreadImpact {
     }
 }
 
-impl FromStr for ThreadImpact {
+impl FromStr for FeedbackImpact {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
@@ -396,48 +396,48 @@ impl FromStr for ThreadImpact {
 /// Side of a diff line
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ThreadSide {
+pub enum FeedbackSide {
     Old,
     New,
 }
 
-/// Optional anchor tying a thread to a file/line/hunk
+/// Optional anchor tying feedback to a file/line/hunk
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub struct ThreadAnchor {
+pub struct FeedbackAnchor {
     #[serde(default)]
     pub file_path: Option<String>,
     #[serde(default)]
     pub line_number: Option<u32>,
     #[serde(default)]
-    pub side: Option<ThreadSide>,
+    pub side: Option<FeedbackSide>,
     #[serde(default)]
     pub hunk_ref: Option<HunkRef>,
     #[serde(default)]
     pub head_sha: Option<String>,
 }
 
-/// Feedback thread spanning one or more comments
+/// Feedback entry spanning one or more comments
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Thread {
+pub struct Feedback {
     pub id: String,
     pub review_id: ReviewId,
     #[serde(default)]
     pub task_id: Option<TaskId>,
     pub title: String,
     pub status: ReviewStatus,
-    pub impact: ThreadImpact,
+    pub impact: FeedbackImpact,
     #[serde(default)]
-    pub anchor: Option<ThreadAnchor>,
+    pub anchor: Option<FeedbackAnchor>,
     pub author: String,
     pub created_at: String,
     pub updated_at: String,
 }
 
-/// Comment within a feedback thread
+/// Comment within a feedback entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Comment {
     pub id: String,
-    pub thread_id: String,
+    pub feedback_id: String,
     pub author: String,
     pub body: String,
     #[serde(default)]
@@ -446,13 +446,13 @@ pub struct Comment {
     pub updated_at: String,
 }
 
-/// Mapping to an external provider thread (e.g., GitHub)
+/// Mapping to an external provider feedback (e.g., GitHub)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ThreadLink {
+pub struct FeedbackLink {
     pub id: String,
-    pub thread_id: String,
+    pub feedback_id: String,
     pub provider: String,
-    pub provider_thread_id: String,
+    pub provider_feedback_id: String,
     pub provider_root_comment_id: String,
     pub last_synced_at: String,
 }
@@ -480,11 +480,11 @@ mod tests {
     }
 
     #[test]
-    fn test_thread_impact_display_parse() {
-        assert_eq!(ThreadImpact::Nitpick.to_string(), "nitpick");
+    fn test_feedback_impact_display_parse() {
+        assert_eq!(FeedbackImpact::Nitpick.to_string(), "nitpick");
         assert_eq!(
-            ThreadImpact::from_str("BLOCKING").unwrap(),
-            ThreadImpact::Blocking
+            FeedbackImpact::from_str("BLOCKING").unwrap(),
+            FeedbackImpact::Blocking
         );
     }
 }

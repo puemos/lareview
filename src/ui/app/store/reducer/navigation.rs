@@ -9,7 +9,7 @@ pub fn reduce(
 ) -> Vec<Command> {
     match action {
         NavigationAction::SwitchTo(view) => {
-            ui.active_thread = None;
+            ui.active_feedback = None;
             ui.current_view = view;
             if matches!(view, AppView::Review) {
                 return vec![Command::RefreshReviewData {

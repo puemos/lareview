@@ -18,12 +18,12 @@ impl CommentRepository {
         conn.execute(
             r#"
             INSERT OR REPLACE INTO comments (
-                id, thread_id, author, body, parent_id, created_at, updated_at
+                id, feedback_id, author, body, parent_id, created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
             "#,
             rusqlite::params![
                 comment.id,
-                comment.thread_id,
+                comment.feedback_id,
                 comment.author,
                 comment.body,
                 comment.parent_id,
@@ -34,24 +34,25 @@ impl CommentRepository {
         Ok(())
     }
 
-    pub fn list_for_thread(&self, thread_id: &str) -> Result<Vec<Comment>> {
+    pub fn list_for_feedback(&self, feedback_id: &str) -> Result<Vec<Comment>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             r#"
-            SELECT id, thread_id, author, body, parent_id, created_at, updated_at
+            SELECT id, feedback_id, author, body, parent_id, created_at, updated_at
             FROM comments
-            WHERE thread_id = ?1
+            WHERE feedback_id = ?1
             ORDER BY created_at
             "#,
         )?;
 
-        let rows = stmt.query_map([thread_id], Self::row_to_comment)?;
+        let rows = stmt.query_map([feedback_id], Self::row_to_comment)?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
-    pub fn delete_by_thread(&self, thread_id: &str) -> Result<usize> {
+    pub fn delete_by_feedback(&self, feedback_id: &str) -> Result<usize> {
         let conn = self.conn.lock().unwrap();
-        let affected = conn.execute("DELETE FROM comments WHERE thread_id = ?1", [thread_id])?;
+        let affected =
+            conn.execute("DELETE FROM comments WHERE feedback_id = ?1", [feedback_id])?;
         Ok(affected)
     }
 
@@ -67,7 +68,7 @@ impl CommentRepository {
     fn row_to_comment(row: &Row) -> rusqlite::Result<Comment> {
         Ok(Comment {
             id: row.get(0)?,
-            thread_id: row.get(1)?,
+            feedback_id: row.get(1)?,
             author: row.get(2)?,
             body: row.get(3)?,
             parent_id: row.get(4)?,

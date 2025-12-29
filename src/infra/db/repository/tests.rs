@@ -1,6 +1,6 @@
 use crate::domain::{
-    Comment, LinkedRepo, Review, ReviewRun, ReviewSource, ReviewStatus, TaskStats, Thread,
-    ThreadImpact,
+    Comment, Feedback, FeedbackImpact, LinkedRepo, Review, ReviewRun, ReviewSource, ReviewStatus,
+    TaskStats,
 };
 use crate::infra::db::Database;
 use crate::infra::db::repository::*;
@@ -97,7 +97,7 @@ fn test_repo_repository() -> anyhow::Result<()> {
 fn test_comment_repository() -> anyhow::Result<()> {
     let db = Database::open_in_memory()?;
     let repo = CommentRepository::new(db.connection());
-    let thread_repo = ThreadRepository::new(db.connection());
+    let feedback_repo = FeedbackRepository::new(db.connection());
     let review_repo = ReviewRepository::new(db.connection());
 
     let review = Review {
@@ -113,23 +113,23 @@ fn test_comment_repository() -> anyhow::Result<()> {
     };
     review_repo.save(&review)?;
 
-    let thread = Thread {
+    let feedback = Feedback {
         id: "t-1".into(),
         review_id: "rev-1".into(),
         task_id: None,
-        title: "Thread".into(),
+        title: "Feedback".into(),
         status: ReviewStatus::Todo,
-        impact: ThreadImpact::Nitpick,
+        impact: FeedbackImpact::Nitpick,
         anchor: None,
         author: "me".into(),
         created_at: "now".into(),
         updated_at: "now".into(),
     };
-    thread_repo.save(&thread)?;
+    feedback_repo.save(&feedback)?;
 
     let comment = Comment {
         id: "c-1".into(),
-        thread_id: "t-1".into(),
+        feedback_id: "t-1".into(),
         author: "me".into(),
         body: "hello".into(),
         parent_id: None,
@@ -138,21 +138,21 @@ fn test_comment_repository() -> anyhow::Result<()> {
     };
 
     repo.save(&comment)?;
-    let list = repo.list_for_thread("t-1")?;
+    let list = repo.list_for_feedback("t-1")?;
     assert_eq!(list.len(), 1);
     assert_eq!(list[0].body, "hello");
 
     repo.touch("c-1")?;
-    repo.delete_by_thread("t-1")?;
-    assert_eq!(repo.list_for_thread("t-1")?.len(), 0);
+    repo.delete_by_feedback("t-1")?;
+    assert_eq!(repo.list_for_feedback("t-1")?.len(), 0);
 
     Ok(())
 }
 
 #[test]
-fn test_thread_repository() -> anyhow::Result<()> {
+fn test_feedback_repository() -> anyhow::Result<()> {
     let db = Database::open_in_memory()?;
-    let repo = ThreadRepository::new(db.connection());
+    let repo = FeedbackRepository::new(db.connection());
     let review_repo = ReviewRepository::new(db.connection());
 
     let review = Review {
@@ -168,32 +168,32 @@ fn test_thread_repository() -> anyhow::Result<()> {
     };
     review_repo.save(&review)?;
 
-    let thread = Thread {
+    let feedback = Feedback {
         id: "t-1".into(),
         review_id: "rev-1".into(),
         task_id: None,
-        title: "Thread".into(),
+        title: "Feedback".into(),
         status: ReviewStatus::Todo,
-        impact: ThreadImpact::Nitpick,
+        impact: FeedbackImpact::Nitpick,
         anchor: None,
         author: "me".into(),
         created_at: "now".into(),
         updated_at: "now".into(),
     };
 
-    repo.save(&thread)?;
+    repo.save(&feedback)?;
     let list = repo.find_by_review("rev-1")?;
     assert_eq!(list.len(), 1);
-    assert_eq!(list[0].title, "Thread");
+    assert_eq!(list[0].title, "Feedback");
 
     repo.update_status("t-1", ReviewStatus::Done)?;
-    repo.update_impact("t-1", ThreadImpact::Blocking)?;
+    repo.update_impact("t-1", FeedbackImpact::Blocking)?;
     repo.update_title("t-1", "New Title")?;
     repo.touch("t-1")?;
 
     let updated = repo.find_by_review("rev-1")?;
     assert_eq!(updated[0].status, ReviewStatus::Done);
-    assert_eq!(updated[0].impact, ThreadImpact::Blocking);
+    assert_eq!(updated[0].impact, FeedbackImpact::Blocking);
     assert_eq!(updated[0].title, "New Title");
 
     repo.delete_by_review("rev-1")?;

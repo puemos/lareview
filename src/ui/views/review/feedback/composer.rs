@@ -8,7 +8,7 @@ pub(crate) fn render_reply_composer(
     reply_draft: &str,
     title_draft: &str,
     task_id: &str,
-    thread_id: Option<String>,
+    feedback_id: Option<String>,
     file_path: Option<String>,
     line_number: Option<u32>,
 ) -> Option<ReviewAction> {
@@ -29,7 +29,7 @@ pub(crate) fn render_reply_composer(
         );
 
         if response.changed() {
-            action_out = Some(ReviewAction::SetThreadReplyDraft { text: text.clone() });
+            action_out = Some(ReviewAction::SetFeedbackReplyDraft { text: text.clone() });
         }
 
         ui.add_space(spacing::SPACING_SM);
@@ -50,9 +50,9 @@ pub(crate) fn render_reply_composer(
                     } else {
                         Some(title_draft.to_string())
                     };
-                    action_out = Some(ReviewAction::CreateThreadComment {
+                    action_out = Some(ReviewAction::CreateFeedbackComment {
                         task_id: task_id.to_string(),
-                        thread_id: thread_id.clone(),
+                        feedback_id: feedback_id.clone(),
                         file_path: file_path.clone(),
                         line_number,
                         title,

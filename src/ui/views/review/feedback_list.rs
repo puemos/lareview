@@ -1,14 +1,14 @@
-use crate::domain::{ReviewStatus, Thread};
+use crate::domain::{Feedback, ReviewStatus};
 use crate::ui::app::ReviewAction;
 use crate::ui::components::list_item::ListItem;
 use crate::ui::theme::Theme;
 use crate::ui::{icons, spacing, typography};
 use eframe::egui;
 
-pub fn render_thread_list(
+pub fn render_feedback_list(
     ui: &mut egui::Ui,
-    threads: &[Thread],
-    active_thread_id: Option<&str>,
+    feedbacks: &[Feedback],
+    active_feedback_id: Option<&str>,
     select_mode: bool,
     selected_ids: &std::collections::HashSet<String>,
     show_status_icons: bool,
@@ -16,7 +16,7 @@ pub fn render_thread_list(
 ) -> Option<ReviewAction> {
     let mut action = None;
 
-    if threads.is_empty() {
+    if feedbacks.is_empty() {
         ui.vertical_centered(|ui| {
             ui.add_space(spacing::SPACING_XL);
             ui.label(
@@ -26,7 +26,7 @@ pub fn render_thread_list(
             );
             ui.add_space(spacing::SPACING_XS);
             ui.label(
-                typography::body("No threads yet")
+                typography::body("No feedback yet")
                     .size(14.0)
                     .color(theme.text_muted),
             );
@@ -34,9 +34,9 @@ pub fn render_thread_list(
         return None;
     }
 
-    // Sort threads: Open/WIP first, then by date (newest first)
-    let mut display_threads: Vec<&Thread> = threads.iter().collect();
-    display_threads.sort_by(|a, b| {
+    // Sort feedbacks: Open/WIP first, then by date (newest first)
+    let mut display_feedbacks: Vec<&Feedback> = feedbacks.iter().collect();
+    display_feedbacks.sort_by(|a, b| {
         let rank_a = a.status.rank();
         let rank_b = b.status.rank();
         if rank_a != rank_b {
@@ -47,14 +47,14 @@ pub fn render_thread_list(
     });
 
     egui::ScrollArea::vertical()
-        .id_salt("thread_list_scroll")
+        .id_salt("feedback_list_scroll")
         .show(ui, |ui| {
             ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
-            for thread in display_threads {
-                let is_active = active_thread_id.is_some_and(|id| id == thread.id);
+            for feedback in display_feedbacks {
+                let is_active = active_feedback_id.is_some_and(|id| id == feedback.id);
 
                 // -- Status Icon --
-                let (icon, color) = match thread.status {
+                let (icon, color) = match feedback.status {
                     ReviewStatus::Todo => (icons::STATUS_TODO, theme.text_muted),
                     ReviewStatus::InProgress => (icons::STATUS_WIP, theme.accent),
                     ReviewStatus::Done => (icons::STATUS_DONE, theme.success),
@@ -62,22 +62,22 @@ pub fn render_thread_list(
                 };
 
                 // -- Title --
-                let title_text = typography::bold(&thread.title).color(theme.text_primary);
+                let title_text = typography::bold(&feedback.title).color(theme.text_primary);
 
                 // -- Metadata (Impact + Time) --
-                let (impact_icon, impact_label, impact_color) = match thread.impact {
-                    crate::domain::ThreadImpact::Blocking => {
+                let (impact_icon, impact_label, impact_color) = match feedback.impact {
+                    crate::domain::FeedbackImpact::Blocking => {
                         (icons::IMPACT_BLOCKING, "Blocking", theme.destructive)
                     }
-                    crate::domain::ThreadImpact::NiceToHave => {
+                    crate::domain::FeedbackImpact::NiceToHave => {
                         (icons::IMPACT_NICE_TO_HAVE, "Nice-to-have", theme.warning)
                     }
-                    crate::domain::ThreadImpact::Nitpick => {
+                    crate::domain::FeedbackImpact::Nitpick => {
                         (icons::IMPACT_NITPICK, "Nitpick", theme.text_muted)
                     }
                 };
 
-                let time_str = super::format_timestamp(&thread.updated_at);
+                let time_str = super::format_timestamp(&feedback.updated_at);
 
                 // Create a job for the metadata with icon + label + time
                 let mut metadata_job = egui::text::LayoutJob::default();
@@ -138,16 +138,17 @@ pub fn render_thread_list(
                 }
 
                 if select_mode {
-                    let mut selected = selected_ids.contains(&thread.id);
+                    let mut selected = selected_ids.contains(&feedback.id);
                     list_item = list_item.checkbox(&mut selected);
                 }
 
                 let response = list_item
                     .action(|| {
                         if select_mode {
-                            action = Some(ReviewAction::ToggleThreadSelection(thread.id.clone()));
+                            action =
+                                Some(ReviewAction::ToggleFeedbackSelection(feedback.id.clone()));
                         } else {
-                            action = Some(ReviewAction::NavigateToThread(thread.clone()));
+                            action = Some(ReviewAction::NavigateToFeedback(feedback.clone()));
                         }
                     })
                     .show_with_bg(ui, theme);

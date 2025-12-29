@@ -1,7 +1,9 @@
 use super::config::ServerConfig;
 use super::task_ingest::{load_run_context, open_database};
-use crate::domain::{Comment, ReviewStatus, Thread, ThreadAnchor, ThreadImpact, ThreadSide};
-use crate::infra::db::{CommentRepository, TaskRepository, ThreadRepository};
+use crate::domain::{
+    Comment, Feedback, FeedbackAnchor, FeedbackImpact, FeedbackSide, ReviewStatus,
+};
+use crate::infra::db::{CommentRepository, FeedbackRepository, TaskRepository};
 use crate::infra::diff_index::DiffIndex;
 use anyhow::{Context, Result, anyhow};
 use chrono::Utc;
@@ -21,6 +23,11 @@ pub(super) fn save_agent_comment(config: &ServerConfig, args: Value) -> Result<S
         .get("body")
         .and_then(|v| v.as_str())
         .ok_or_else(|| anyhow!("missing body"))?;
+
+    // Validate body is not empty or just whitespace
+    if body.trim().is_empty() {
+        return Err(anyhow!("feedback body cannot be empty"));
+    }
     let side_str = args.get("side").and_then(|v| v.as_str()).unwrap_or("new");
     let title = args
         .get("title")
@@ -45,20 +52,20 @@ pub(super) fn save_agent_comment(config: &ServerConfig, args: Value) -> Result<S
         .map(|s| s.to_string());
 
     let side = match side_str.to_lowercase().as_str() {
-        "old" => ThreadSide::Old,
-        _ => ThreadSide::New,
+        "old" => FeedbackSide::Old,
+        _ => FeedbackSide::New,
     };
 
     let impact = match impact_str.to_lowercase().as_str() {
-        "blocking" => ThreadImpact::Blocking,
-        "nice_to_have" | "nice-to-have" => ThreadImpact::NiceToHave,
-        _ => ThreadImpact::Nitpick,
+        "blocking" => FeedbackImpact::Blocking,
+        "nice_to_have" | "nice-to-have" => FeedbackImpact::NiceToHave,
+        _ => FeedbackImpact::Nitpick,
     };
 
     let ctx = load_run_context(config);
     let db = open_database(config)?;
     let conn = db.connection();
-    let thread_repo = ThreadRepository::new(conn.clone());
+    let feedback_repo = FeedbackRepository::new(conn.clone());
     let comment_repo = CommentRepository::new(conn.clone());
     let task_repo = TaskRepository::new(conn.clone());
 
@@ -100,18 +107,18 @@ pub(super) fn save_agent_comment(config: &ServerConfig, args: Value) -> Result<S
         }
     };
 
-    let thread_id = Uuid::new_v4().to_string();
+    let feedback_id = Uuid::new_v4().to_string();
     let comment_id = Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
 
-    let thread = Thread {
-        id: thread_id.clone(),
+    let feedback = Feedback {
+        id: feedback_id.clone(),
         review_id: ctx.review_id.clone(),
         task_id: final_task_id,
         title,
         status: ReviewStatus::Todo,
         impact,
-        anchor: Some(ThreadAnchor {
+        anchor: Some(FeedbackAnchor {
             file_path: Some(file.to_string()),
             line_number: Some(line),
             side: Some(side),
@@ -125,7 +132,7 @@ pub(super) fn save_agent_comment(config: &ServerConfig, args: Value) -> Result<S
 
     let comment = Comment {
         id: comment_id,
-        thread_id: thread_id.clone(),
+        feedback_id: feedback_id.clone(),
         author: format!("agent:{}", ctx.agent_id),
         body: body.to_string(),
         parent_id: None,
@@ -133,17 +140,17 @@ pub(super) fn save_agent_comment(config: &ServerConfig, args: Value) -> Result<S
         updated_at: now,
     };
 
-    thread_repo.save(&thread).context("save thread")?;
+    feedback_repo.save(&feedback).context("save feedback")?;
     comment_repo.save(&comment).context("save comment")?;
 
-    Ok(thread_id)
+    Ok(feedback_id)
 }
 
 fn validate_line_in_diff(
     diff_index: &DiffIndex,
     file: &str,
     _line: u32,
-    _side: ThreadSide,
+    _side: FeedbackSide,
 ) -> Result<()> {
     // 1. Check file exists
     diff_index
@@ -178,7 +185,7 @@ fn is_line_covered_by_task(
     task: &crate::domain::ReviewTask,
     file: &str,
     line: u32,
-    side: ThreadSide,
+    side: FeedbackSide,
 ) -> bool {
     // 1. Check if file matches
     if !task.files.contains(&file.to_string()) {
@@ -201,12 +208,12 @@ fn is_line_covered_by_task(
 
         for hunk in &diff_ref.hunks {
             match side {
-                ThreadSide::Old => {
+                FeedbackSide::Old => {
                     if line >= hunk.old_start && line < hunk.old_start + hunk.old_lines {
                         return true;
                     }
                 }
-                ThreadSide::New => {
+                FeedbackSide::New => {
                     if line >= hunk.new_start && line < hunk.new_start + hunk.new_lines {
                         return true;
                     }

@@ -56,44 +56,44 @@ pub enum ReviewAction {
         status: ReviewStatus,
     },
     DeleteReview(String),
-    CreateThreadComment {
+    CreateFeedbackComment {
         task_id: TaskId,
-        thread_id: Option<String>,
+        feedback_id: Option<String>,
         file_path: Option<String>,
         line_number: Option<u32>,
         title: Option<String>,
         body: String,
     },
-    UpdateThreadStatus {
-        thread_id: String,
+    UpdateFeedbackStatus {
+        feedback_id: String,
         status: crate::domain::ReviewStatus,
     },
-    UpdateThreadImpact {
-        thread_id: String,
-        impact: crate::domain::ThreadImpact,
+    UpdateFeedbackImpact {
+        feedback_id: String,
+        impact: crate::domain::FeedbackImpact,
     },
-    UpdateThreadTitle {
-        thread_id: String,
+    UpdateFeedbackTitle {
+        feedback_id: String,
         title: String,
     },
-    OpenThread {
+    OpenFeedback {
         task_id: TaskId,
-        thread_id: Option<String>,
+        feedback_id: Option<String>,
         file_path: Option<String>,
         line_number: Option<u32>,
     },
-    NavigateToThread(crate::domain::Thread),
-    CloseThread,
-    /// User is typing in the thread title field
-    SetThreadTitleDraft {
+    NavigateToFeedback(crate::domain::Feedback),
+    CloseFeedback,
+    /// User is typing in the feedback title field
+    SetFeedbackTitleDraft {
         text: String,
     },
     /// User is typing in the reply composer
-    SetThreadReplyDraft {
+    SetFeedbackReplyDraft {
         text: String,
     },
     /// Clear the reply draft after sending
-    ClearThreadReplyDraft,
+    ClearFeedbackReplyDraft,
     OpenFullDiff(FullDiffView),
     CloseFullDiff,
     RequestExportPreview,
@@ -105,11 +105,11 @@ pub enum ReviewAction {
         file_path: String,
         line_number: usize,
     },
-    ToggleThreadSelection(String),
+    ToggleFeedbackSelection(String),
     UpdateExportOptions(crate::ui::app::state::ExportOptions),
     ToggleExportOptionsMenu,
-    SelectAllExportThreads,
-    ClearExportThreads,
+    SelectAllExportFeedbacks,
+    ClearExportFeedbacks,
 }
 
 #[derive(Debug)]
@@ -147,8 +147,8 @@ pub enum AsyncAction {
         reason: ReviewDataRefreshReason,
         result: Result<ReviewDataPayload, String>,
     },
-    ReviewThreadsLoaded(Result<ReviewThreadsPayload, String>),
-    ThreadCommentSaved(Result<(), String>),
+    ReviewFeedbacksLoaded(Result<ReviewFeedbacksPayload, String>),
+    FeedbackCommentSaved(Result<(), String>),
     TaskStatusSaved(Result<(), String>),
     ReviewDeleted(Result<(), String>),
     D2InstallOutput(String),
@@ -169,8 +169,8 @@ pub struct ReviewDataPayload {
 }
 
 #[derive(Debug)]
-pub struct ReviewThreadsPayload {
+pub struct ReviewFeedbacksPayload {
     pub review_id: String,
-    pub threads: Vec<crate::domain::Thread>,
+    pub feedbacks: Vec<crate::domain::Feedback>,
     pub comments: std::collections::HashMap<String, Vec<crate::domain::Comment>>,
 }

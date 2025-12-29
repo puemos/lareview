@@ -22,7 +22,7 @@ pub mod tests;
 pub use messages::{GenMsg, GenResultPayload, GhMsg, GhStatusPayload};
 pub use root::LaReviewApp;
 pub use state::{
-    AppView, DomainState, FullDiffView, GeneratePreview, SelectedAgent, ThreadContext, UiState,
+    AppView, DomainState, FeedbackContext, FullDiffView, GeneratePreview, SelectedAgent, UiState,
 };
 pub use timeline::{TimelineContent, TimelineItem};
 

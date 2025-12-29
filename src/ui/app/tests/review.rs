@@ -159,26 +159,26 @@ async fn test_review_diagram_tab_rendering() {
 }
 
 #[tokio::test]
-async fn test_thread_reply_flow() {
+async fn test_feedback_reply_flow() {
     let app = Arc::new(Mutex::new(LaReviewApp::new_for_test()));
     {
         let mut app_lock = app.lock().unwrap();
         populate_app_with_mock_data(&mut app_lock);
         app_lock.state.ui.selected_task_id = Some("task_1".to_string());
 
-        let thread = crate::domain::Thread {
+        let feedback = crate::domain::Feedback {
             id: "thread_1".to_string(),
             review_id: "rev_1".to_string(),
             task_id: Some("task_1".to_string()),
-            title: "Test Thread".to_string(),
+            title: "Test Feedback".to_string(),
             status: crate::domain::ReviewStatus::Todo,
-            impact: crate::domain::ThreadImpact::Nitpick,
+            impact: crate::domain::FeedbackImpact::Nitpick,
             anchor: None,
             author: "User".to_string(),
             created_at: "2023-01-01T00:00:00Z".to_string(),
             updated_at: "2023-01-01T00:00:00Z".to_string(),
         };
-        app_lock.state.domain.threads.push(thread);
+        app_lock.state.domain.feedbacks.push(feedback);
     }
     let mut harness = setup_harness(app.clone());
 
@@ -187,22 +187,22 @@ async fn test_thread_reply_flow() {
     harness
         .get_all_by_role(Role::Button)
         .into_iter()
-        .find(|n| format!("{:?}", n).contains("Discussion"))
-        .expect("Discussion tab not found")
+        .find(|n| format!("{:?}", n).contains("Feedback"))
+        .expect("Feedback tab not found")
         .click();
     harness.run();
 
     harness
         .get_all_by_role(Role::Button)
         .into_iter()
-        .find(|n| format!("{:?}", n).contains("Test Thread"))
-        .expect("Test Thread button not found")
+        .find(|n| format!("{:?}", n).contains("Test Feedback"))
+        .expect("Test Feedback button not found")
         .click();
 
     {
         let mut app_lock = app.lock().unwrap();
-        app_lock.state.ui.active_thread = Some(crate::ui::app::ThreadContext {
-            thread_id: Some("thread_1".to_string()),
+        app_lock.state.ui.active_feedback = Some(crate::ui::app::FeedbackContext {
+            feedback_id: Some("thread_1".to_string()),
             task_id: "task_1".to_string(),
             file_path: None,
             line_number: None,
@@ -214,7 +214,7 @@ async fn test_thread_reply_flow() {
 
     {
         let mut app_lock = app.lock().unwrap();
-        app_lock.state.ui.thread_reply_draft = "My reply".to_string();
+        app_lock.state.ui.feedback_reply_draft = "My reply".to_string();
     }
     harness.run();
 
@@ -227,13 +227,13 @@ async fn test_thread_reply_flow() {
 }
 
 #[tokio::test]
-async fn test_review_discussion_tab_empty() {
+async fn test_review_feedback_tab_empty() {
     let app = Arc::new(Mutex::new(LaReviewApp::new_for_test()));
     {
         let mut app_lock = app.lock().unwrap();
         populate_app_with_mock_data(&mut app_lock);
         app_lock.state.ui.selected_task_id = Some("task_1".to_string());
-        app_lock.state.domain.threads.clear();
+        app_lock.state.domain.feedbacks.clear();
     }
     let mut harness = setup_harness(app.clone());
 
@@ -242,16 +242,16 @@ async fn test_review_discussion_tab_empty() {
     harness
         .get_all_by_role(Role::Button)
         .into_iter()
-        .find(|n| format!("{:?}", n).contains("Discussion"))
-        .expect("Discussion tab not found")
+        .find(|n| format!("{:?}", n).contains("Feedback"))
+        .expect("Feedback tab not found")
         .click();
     harness.run();
 
-    harness.get_by_label("No discussions yet");
+    assert!(harness.get_all_by_label("No feedback yet").next().is_some());
 }
 
 #[tokio::test]
-async fn test_review_all_threads_panel_rendered() {
+async fn test_review_all_feedbacks_panel_rendered() {
     let app = Arc::new(Mutex::new(LaReviewApp::new_for_test()));
     {
         let mut app_lock = app.lock().unwrap();
@@ -261,5 +261,5 @@ async fn test_review_all_threads_panel_rendered() {
 
     harness.run_steps(2);
 
-    harness.get_by_label("All Threads");
+    harness.get_by_label("All Feedback");
 }

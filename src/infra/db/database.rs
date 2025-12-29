@@ -98,18 +98,16 @@ impl Database {
     /// Initialize database schema
     fn init(&self) -> Result<()> {
         let conn = self.conn.lock().unwrap();
-        const SCHEMA_VERSION: i32 = 9;
+        const SCHEMA_VERSION: i32 = 10;
 
         conn.execute_batch("PRAGMA foreign_keys = ON;")?;
 
         let existing_version: i32 =
             conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
 
-        // Always ensure schema exists (using CREATE TABLE IF NOT EXISTS)
-        Self::create_schema(&conn)?;
-
         if existing_version == 0 {
             // Fresh database - skip migrations and go directly to current version
+            Self::create_schema(&conn)?;
             conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
         } else if existing_version < SCHEMA_VERSION {
             // Existing database - run migrations to bring it up to date
@@ -131,8 +129,8 @@ impl Database {
         crate::infra::db::repository::TaskRepository::new(self.connection())
     }
 
-    pub fn thread_repo(&self) -> crate::infra::db::repository::ThreadRepository {
-        crate::infra::db::repository::ThreadRepository::new(self.connection())
+    pub fn feedback_repo(&self) -> crate::infra::db::repository::FeedbackRepository {
+        crate::infra::db::repository::FeedbackRepository::new(self.connection())
     }
 
     pub fn comment_repo(&self) -> crate::infra::db::repository::CommentRepository {
@@ -205,7 +203,7 @@ impl Database {
                 FOREIGN KEY(run_id) REFERENCES review_runs(id) ON DELETE CASCADE
             );
 
-            CREATE TABLE IF NOT EXISTS threads (
+            CREATE TABLE IF NOT EXISTS feedback (
                 id TEXT PRIMARY KEY,
                 review_id TEXT NOT NULL,
                 task_id TEXT,
@@ -226,31 +224,31 @@ impl Database {
 
             CREATE TABLE IF NOT EXISTS comments (
                 id TEXT PRIMARY KEY,
-                thread_id TEXT NOT NULL,
+                feedback_id TEXT NOT NULL,
                 author TEXT NOT NULL,
                 body TEXT NOT NULL,
                 parent_id TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
-                FOREIGN KEY(thread_id) REFERENCES threads(id) ON DELETE CASCADE,
+                FOREIGN KEY(feedback_id) REFERENCES feedback(id) ON DELETE CASCADE,
                 FOREIGN KEY(parent_id) REFERENCES comments(id) ON DELETE CASCADE
             );
 
-            CREATE TABLE IF NOT EXISTS thread_links (
+            CREATE TABLE IF NOT EXISTS feedback_links (
                 id TEXT PRIMARY KEY,
-                thread_id TEXT NOT NULL,
+                feedback_id TEXT NOT NULL,
                 provider TEXT NOT NULL,
-                provider_thread_id TEXT NOT NULL,
+                provider_feedback_id TEXT NOT NULL,
                 provider_root_comment_id TEXT NOT NULL,
                 last_synced_at TEXT NOT NULL,
-                FOREIGN KEY(thread_id) REFERENCES threads(id) ON DELETE CASCADE
+                FOREIGN KEY(feedback_id) REFERENCES feedback(id) ON DELETE CASCADE
             );
 
-            CREATE INDEX IF NOT EXISTS idx_threads_task_id ON threads(task_id);
-            CREATE INDEX IF NOT EXISTS idx_threads_review_id ON threads(review_id);
-            CREATE INDEX IF NOT EXISTS idx_threads_anchor ON threads(anchor_file_path, anchor_line);
-            CREATE INDEX IF NOT EXISTS idx_comments_thread_id ON comments(thread_id);
-            CREATE INDEX IF NOT EXISTS idx_comments_thread_created_at ON comments(thread_id, created_at);
+            CREATE INDEX IF NOT EXISTS idx_feedback_task_id ON feedback(task_id);
+            CREATE INDEX IF NOT EXISTS idx_feedback_review_id ON feedback(review_id);
+            CREATE INDEX IF NOT EXISTS idx_feedback_anchor ON feedback(anchor_file_path, anchor_line);
+            CREATE INDEX IF NOT EXISTS idx_comments_feedback_id ON comments(feedback_id);
+            CREATE INDEX IF NOT EXISTS idx_comments_feedback_created_at ON comments(feedback_id, created_at);
             "#,
         )?;
         Ok(())
@@ -328,5 +326,158 @@ mod tests {
         let guard = conn.lock().unwrap();
         let res: i32 = guard.query_row("SELECT 1", [], |row| row.get(0)).unwrap();
         assert_eq!(res, 1);
+    }
+
+    #[test]
+    fn test_schema_migration_v9_to_v10() {
+        // 1. Create a v9 database manually
+        let conn = Connection::open_in_memory().unwrap();
+
+        // Create legacy v9-style tables
+        conn.execute_batch(
+            "
+            CREATE TABLE tasks (id TEXT PRIMARY KEY);
+            CREATE TABLE review_runs (id TEXT PRIMARY KEY);
+            CREATE TABLE repos (id TEXT PRIMARY KEY);
+            CREATE TABLE reviews (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                summary TEXT,
+                source_json TEXT,
+                active_run_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE threads (
+                id TEXT PRIMARY KEY,
+                review_id TEXT NOT NULL,
+                task_id TEXT,
+                title TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'todo',
+                impact TEXT NOT NULL DEFAULT 'nitpick',
+                anchor_file_path TEXT,
+                anchor_line INTEGER,
+                anchor_side TEXT,
+                anchor_hunk_ref TEXT,
+                anchor_head_sha TEXT,
+                author TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(review_id) REFERENCES reviews(id)
+            );
+            CREATE TABLE thread_links (
+                id TEXT PRIMARY KEY,
+                thread_id TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                provider_feedback_id TEXT NOT NULL,
+                provider_root_comment_id TEXT NOT NULL,
+                last_synced_at TEXT NOT NULL,
+                FOREIGN KEY(thread_id) REFERENCES threads(id)
+            );
+            CREATE TABLE comments (
+                id TEXT PRIMARY KEY,
+                thread_id TEXT NOT NULL,
+                author TEXT NOT NULL,
+                body TEXT NOT NULL,
+                parent_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(thread_id) REFERENCES threads(id)
+            );
+            PRAGMA user_version = 9;
+        ",
+        )
+        .unwrap();
+
+        // Insert legacy data
+        conn.execute(
+            r#"INSERT INTO reviews (id, title, created_at, updated_at) 
+             VALUES ('r1', 'Legacy Review', 'now', 'now')"#,
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            r#"INSERT INTO threads (id, review_id, title, author, created_at, updated_at) 
+             VALUES ('t1', 'r1', 'Legacy Thread', 'user', 'now', 'now')"#,
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            r#"INSERT INTO thread_links (id, thread_id, provider, provider_feedback_id, provider_root_comment_id, last_synced_at) 
+             VALUES ('l1', 't1', 'github', 'gh1', 'c1', 'now')"#,
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            r#"INSERT INTO comments (id, thread_id, author, body, created_at, updated_at) 
+             VALUES ('c1', 't1', 'author', 'Legacy Comment', 'now', 'now')"#,
+            [],
+        )
+        .unwrap();
+
+        let db = Database {
+            conn: Arc::new(Mutex::new(conn)),
+        };
+        let conn = db.connection();
+
+        // 2. Trigger migration to v10
+        // (In a real app this happens in init() called by open())
+        db.init().unwrap();
+
+        // 3. Verify data moved to feedback and columns renamed
+        let guard = conn.lock().unwrap();
+
+        // Check feedback table
+        let count: i32 = guard
+            .query_row("SELECT COUNT(*) FROM feedback", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+
+        let title: String = guard
+            .query_row("SELECT title FROM feedback WHERE id = 't1'", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(title, "Legacy Thread");
+
+        // Check feedback_links table
+        let provider: String = guard
+            .query_row(
+                "SELECT provider FROM feedback_links WHERE feedback_id = 't1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(provider, "github");
+
+        // Check comments table (column renamed)
+        let body: String = guard
+            .query_row(
+                "SELECT body FROM comments WHERE feedback_id = 't1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(body, "Legacy Comment");
+
+        // Check threads table dropped
+        let threads_exists: i32 = guard
+            .query_row(
+                "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='threads'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(threads_exists, 0);
+
+        // Check thread_links table dropped
+        let thread_links_exists: i32 = guard
+            .query_row(
+                "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='thread_links'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(thread_links_exists, 0);
     }
 }

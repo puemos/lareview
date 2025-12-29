@@ -114,7 +114,7 @@ impl LaReviewApp {
         let db = Database::open().expect("db open");
 
         let task_repo = Arc::new(db.task_repo());
-        let thread_repo = Arc::new(db.thread_repo());
+        let feedback_repo = Arc::new(db.feedback_repo());
         let comment_repo = Arc::new(db.comment_repo());
         let review_repo = Arc::new(db.review_repo());
         let run_repo = Arc::new(db.run_repo());
@@ -163,7 +163,7 @@ impl LaReviewApp {
         let mut app = Self {
             state,
             task_repo,
-            thread_repo,
+            feedback_repo,
             comment_repo,
             review_repo,
             run_repo,
@@ -211,7 +211,7 @@ impl LaReviewApp {
         let db = Database::open_in_memory().expect("db open");
 
         let task_repo = Arc::new(db.task_repo());
-        let thread_repo = Arc::new(db.thread_repo());
+        let feedback_repo = Arc::new(db.feedback_repo());
         let comment_repo = Arc::new(db.comment_repo());
         let review_repo = Arc::new(db.review_repo());
         let run_repo = Arc::new(db.run_repo());
@@ -237,7 +237,7 @@ impl LaReviewApp {
         Self {
             state,
             task_repo,
-            thread_repo,
+            feedback_repo,
             comment_repo,
             review_repo,
             run_repo,

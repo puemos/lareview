@@ -30,24 +30,24 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
             selected_agent_id,
         } => generate::start_generation(app, *run_context, selected_agent_id),
         Command::RefreshReviewData { reason } => review::refresh_review_data(app, reason),
-        Command::LoadReviewThreads { review_id } => review::load_review_threads(app, review_id),
+        Command::LoadReviewFeedbacks { review_id } => review::load_review_feedbacks(app, review_id),
         Command::UpdateTaskStatus { task_id, status } => {
             review::update_task_status(app, task_id, status)
         }
         Command::DeleteReview { review_id } => review::delete_review(app, review_id),
-        Command::CreateThreadComment {
+        Command::CreateFeedbackComment {
             review_id,
             task_id,
-            thread_id,
+            feedback_id,
             file_path,
             line_number,
             title,
             body,
-        } => review::create_thread_comment(
+        } => review::create_feedback_comment(
             app,
             review_id,
             task_id,
-            thread_id,
+            feedback_id,
             file_path,
             line_number,
             title,
@@ -57,23 +57,27 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
         Command::GenerateExportPreview {
             review_id,
             run_id,
-            include_thread_ids,
+            include_feedback_ids,
             options,
-        } => review::generate_export_preview(app, review_id, run_id, include_thread_ids, *options),
+        } => {
+            review::generate_export_preview(app, review_id, run_id, include_feedback_ids, *options)
+        }
         Command::ExportReview {
             review_id,
             run_id,
             path,
             options,
         } => review::export_review(app, review_id, run_id, path, *options),
-        Command::UpdateThreadStatus { thread_id, status } => {
-            review::update_thread_status(app, thread_id, status)
-        }
-        Command::UpdateThreadImpact { thread_id, impact } => {
-            review::update_thread_impact(app, thread_id, impact)
-        }
-        Command::UpdateThreadTitle { thread_id, title } => {
-            review::update_thread_title(app, thread_id, title)
+        Command::UpdateFeedbackStatus {
+            feedback_id,
+            status,
+        } => review::update_feedback_status(app, feedback_id, status),
+        Command::UpdateFeedbackImpact {
+            feedback_id,
+            impact,
+        } => review::update_feedback_impact(app, feedback_id, impact),
+        Command::UpdateFeedbackTitle { feedback_id, title } => {
+            review::update_feedback_title(app, feedback_id, title)
         }
         Command::SaveRepo { repo } => settings::save_repo(app, repo),
         Command::DeleteRepo { repo_id } => settings::delete_repo(app, repo_id),

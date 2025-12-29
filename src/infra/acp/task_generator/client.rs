@@ -702,8 +702,8 @@ impl agent_client_protocol::Client for LaReviewClient {
                     || tool_id.contains("finalize_review");
                 let is_return_task = matches!(tool_name.as_deref(), Some("return_task"))
                     || tool_id.contains("return_task");
-                let is_add_comment = matches!(tool_name.as_deref(), Some("add_comment"))
-                    || tool_id.contains("add_comment");
+                let is_add_feedback = matches!(tool_name.as_deref(), Some("add_feedback"))
+                    || tool_id.contains("add_feedback");
 
                 if is_completed {
                     if is_finalize {
@@ -733,7 +733,7 @@ impl agent_client_protocol::Client for LaReviewClient {
                         if let Some(tx) = &self.progress {
                             let _ = tx.send(ProgressEvent::TaskAdded(task_id.unwrap_or_default()));
                         }
-                    } else if is_add_comment && let Some(tx) = &self.progress {
+                    } else if is_add_feedback && let Some(tx) = &self.progress {
                         let _ = tx.send(ProgressEvent::CommentAdded);
                     }
                 }

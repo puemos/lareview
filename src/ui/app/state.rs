@@ -22,9 +22,9 @@ pub struct ExportOptions {
     pub include_summary: bool,
     pub include_stats: bool,
     pub include_tasks: bool,
-    pub include_threads: bool,
+    pub include_feedbacks: bool,
     pub include_metadata: bool,
-    pub selected_thread_ids: std::collections::HashSet<String>,
+    pub selected_feedback_ids: std::collections::HashSet<String>,
 }
 
 impl Default for ExportOptions {
@@ -33,9 +33,9 @@ impl Default for ExportOptions {
             include_summary: true,
             include_stats: true,
             include_tasks: true,
-            include_threads: true,
+            include_feedbacks: true,
             include_metadata: true,
-            selected_thread_ids: std::collections::HashSet::new(),
+            selected_feedback_ids: std::collections::HashSet::new(),
         }
     }
 }
@@ -67,8 +67,8 @@ impl std::fmt::Display for SelectedAgent {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ThreadContext {
-    pub thread_id: Option<String>,
+pub struct FeedbackContext {
+    pub feedback_id: Option<String>,
     pub task_id: String,
     pub file_path: Option<String>,
     pub line_number: Option<u32>,
@@ -86,8 +86,8 @@ pub struct DomainState {
     pub all_tasks: Vec<ReviewTask>,
     pub reviews: Vec<Review>,
     pub runs: Vec<crate::domain::ReviewRun>,
-    pub threads: Vec<crate::domain::Thread>,
-    pub thread_comments: HashMap<String, Vec<crate::domain::Comment>>,
+    pub feedbacks: Vec<crate::domain::Feedback>,
+    pub feedback_comments: HashMap<String, Vec<crate::domain::Comment>>,
     pub linked_repos: Vec<crate::domain::LinkedRepo>,
 }
 
@@ -228,7 +228,7 @@ pub struct UiState {
     pub export_preview: Option<String>,
     pub export_assets: HashMap<String, Vec<u8>>,
     pub cached_unified_diff: Option<(Vec<crate::domain::DiffRef>, Arc<str>)>,
-    pub active_thread: Option<ThreadContext>,
+    pub active_feedback: Option<FeedbackContext>,
     pub is_exporting: bool,
     pub d2_install_output: String,
     pub is_d2_installing: bool,
@@ -237,8 +237,8 @@ pub struct UiState {
     pub has_seen_requirements: bool,
     pub agent_panel_collapsed: bool,
     pub plan_panel_collapsed: bool,
-    pub thread_title_draft: String,
-    pub thread_reply_draft: String,
+    pub feedback_title_draft: String,
+    pub feedback_reply_draft: String,
     pub preferred_editor_id: Option<String>,
     pub show_editor_picker: bool,
     pub pending_editor_open: Option<EditorOpenRequest>,

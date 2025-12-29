@@ -1,4 +1,4 @@
-use crate::domain::{ReviewStatus, ThreadImpact};
+use crate::domain::ReviewStatus;
 use crate::ui::app::LaReviewApp;
 use crate::ui::app::store::runtime::{review, settings};
 use std::path::PathBuf;
@@ -60,11 +60,11 @@ async fn test_save_and_delete_repo_runtime() {
 }
 
 #[tokio::test]
-async fn test_update_thread_status_runtime() {
+async fn test_update_feedback_status_runtime() {
     let mut app = LaReviewApp::new_for_test();
     app.skip_runtime = false;
 
-    // Create review and thread
+    // Create review and feedback
     let review = crate::domain::Review {
         id: "rev1".into(),
         title: "T".into(),
@@ -79,30 +79,30 @@ async fn test_update_thread_status_runtime() {
     app.review_repo.save(&review).unwrap();
     app.state.ui.selected_review_id = Some("rev1".into());
 
-    let thread = crate::domain::Thread {
-        id: "thread1".into(),
+    let feedback = crate::domain::Feedback {
+        id: "feedback1".into(),
         review_id: "rev1".into(),
         task_id: None,
         title: "T".into(),
         status: ReviewStatus::Todo,
-        impact: ThreadImpact::Nitpick,
+        impact: crate::domain::FeedbackImpact::Nitpick,
         anchor: None,
         author: "A".into(),
         created_at: "now".into(),
         updated_at: "now".into(),
     };
-    app.thread_repo.save(&thread).unwrap();
+    app.feedback_repo.save(&feedback).unwrap();
 
-    review::update_thread_status(&mut app, "thread1".to_string(), ReviewStatus::Done);
+    review::update_feedback_status(&mut app, "feedback1".to_string(), ReviewStatus::Done);
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
     app.poll_action_messages();
 
-    let thread = app.thread_repo.find_by_id("thread1").unwrap().unwrap();
-    assert_eq!(thread.status, ReviewStatus::Done);
+    let feedback = app.feedback_repo.find_by_id("feedback1").unwrap().unwrap();
+    assert_eq!(feedback.status, ReviewStatus::Done);
 }
 
 #[tokio::test]
-async fn test_update_thread_impact_runtime() {
+async fn test_update_feedback_impact_runtime() {
     let mut app = LaReviewApp::new_for_test();
     app.skip_runtime = false;
 
@@ -120,27 +120,31 @@ async fn test_update_thread_impact_runtime() {
     };
     app.review_repo.save(&review).unwrap();
 
-    let thread = crate::domain::Thread {
-        id: "thread1".into(),
+    let feedback = crate::domain::Feedback {
+        id: "feedback1".into(),
         review_id: "rev1".into(),
         task_id: None,
         title: "T".into(),
         status: ReviewStatus::Todo,
-        impact: ThreadImpact::Nitpick,
+        impact: crate::domain::FeedbackImpact::Nitpick,
         anchor: None,
         author: "A".into(),
         created_at: "now".into(),
         updated_at: "now".into(),
     };
-    app.thread_repo.save(&thread).unwrap();
+    app.feedback_repo.save(&feedback).unwrap();
 
-    review::update_thread_impact(&mut app, "thread1".to_string(), ThreadImpact::Blocking);
+    review::update_feedback_impact(
+        &mut app,
+        "feedback1".to_string(),
+        crate::domain::FeedbackImpact::Blocking,
+    );
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
     app.poll_action_messages();
 }
 
 #[tokio::test]
-async fn test_update_thread_title_runtime() {
+async fn test_update_feedback_title_runtime() {
     let mut app = LaReviewApp::new_for_test();
     app.skip_runtime = false;
 
@@ -158,21 +162,21 @@ async fn test_update_thread_title_runtime() {
     };
     app.review_repo.save(&review).unwrap();
 
-    let thread = crate::domain::Thread {
-        id: "thread1".into(),
+    let feedback = crate::domain::Feedback {
+        id: "feedback1".into(),
         review_id: "rev1".into(),
         task_id: None,
         title: "T".into(),
         status: ReviewStatus::Todo,
-        impact: ThreadImpact::Nitpick,
+        impact: crate::domain::FeedbackImpact::Nitpick,
         anchor: None,
         author: "A".into(),
         created_at: "now".into(),
         updated_at: "now".into(),
     };
-    app.thread_repo.save(&thread).unwrap();
+    app.feedback_repo.save(&feedback).unwrap();
 
-    review::update_thread_title(&mut app, "thread1".to_string(), "New Title".to_string());
+    review::update_feedback_title(&mut app, "feedback1".to_string(), "New Title".to_string());
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
     app.poll_action_messages();
 }
@@ -237,7 +241,7 @@ async fn test_refresh_review_data_runtime() {
 }
 
 #[tokio::test]
-async fn test_create_thread_comment_runtime() {
+async fn test_create_feedback_comment_runtime() {
     let mut app = LaReviewApp::new_for_test();
     app.skip_runtime = false;
 
@@ -283,8 +287,8 @@ async fn test_create_thread_comment_runtime() {
     };
     app.task_repo.save(&task).unwrap();
 
-    // 2. Create a comment (new thread)
-    review::create_thread_comment(
+    // 2. Create a comment (new feedback)
+    review::create_feedback_comment(
         &mut app,
         "rev1".into(),
         "task1".into(),
@@ -298,16 +302,16 @@ async fn test_create_thread_comment_runtime() {
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     app.poll_action_messages();
 
-    let threads = app.thread_repo.find_by_review("rev1").unwrap();
-    assert_eq!(threads.len(), 1);
-    let thread_id = threads[0].id.clone();
+    let feedbacks = app.feedback_repo.find_by_review("rev1").unwrap();
+    assert_eq!(feedbacks.len(), 1);
+    let feedback_id = feedbacks[0].id.clone();
 
-    // 3. Add a reply to existing thread
-    review::create_thread_comment(
+    // 3. Add a reply to existing feedback
+    review::create_feedback_comment(
         &mut app,
         "rev1".into(),
         "task1".into(),
-        Some(thread_id),
+        Some(feedback_id),
         None,
         None,
         None,

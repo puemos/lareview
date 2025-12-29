@@ -1,4 +1,4 @@
-use crate::domain::{ReviewStatus, ThreadImpact};
+use crate::domain::{FeedbackImpact, ReviewStatus};
 use crate::ui::icons;
 use crate::ui::theme::Theme;
 use eframe::egui;
@@ -34,19 +34,19 @@ pub fn status_visuals(status: ReviewStatus, theme: &Theme) -> Visuals {
     }
 }
 
-pub fn impact_visuals(impact: ThreadImpact, theme: &Theme) -> Visuals {
+pub fn impact_visuals(impact: FeedbackImpact, theme: &Theme) -> Visuals {
     match impact {
-        ThreadImpact::Blocking => Visuals {
+        FeedbackImpact::Blocking => Visuals {
             label: "Blocking",
             icon: icons::IMPACT_BLOCKING,
             color: theme.destructive,
         },
-        ThreadImpact::NiceToHave => Visuals {
+        FeedbackImpact::NiceToHave => Visuals {
             label: "Nice to have",
             icon: icons::IMPACT_NICE_TO_HAVE,
             color: theme.brand,
         },
-        ThreadImpact::Nitpick => Visuals {
+        FeedbackImpact::Nitpick => Visuals {
             label: "Nitpick",
             icon: icons::IMPACT_NITPICK,
             color: theme.accent,

@@ -21,11 +21,11 @@ pub fn reduce(state: &mut AppState, action: Action) -> Vec<Command> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{Comment, ReviewStatus, ReviewTask, TaskStats, Thread, ThreadImpact};
+    use crate::domain::{Comment, Feedback, FeedbackImpact, ReviewStatus, ReviewTask, TaskStats};
     use crate::ui::app::state::{AppState, AppView, SessionState, UiState};
     use crate::ui::app::store::action::{
         AsyncAction, GenerateAction, NavigationAction, ReviewAction, ReviewDataPayload,
-        ReviewThreadsPayload,
+        ReviewFeedbacksPayload,
     };
     use crate::ui::app::store::command::{Command, D2Command, ReviewDataRefreshReason};
     use crate::ui::app::{GenMsg, GenResultPayload, SelectedAgent, SettingsAction};
@@ -138,10 +138,10 @@ mod tests {
         assert!(
             matches!(
                 commands.as_slice(),
-                [Command::LoadReviewThreads { review_id }]
+                [Command::LoadReviewFeedbacks { review_id }]
                 if review_id == "rev1"
             ),
-            "expected thread load for selected review"
+            "expected feedback load for selected review"
         );
     }
 
@@ -273,7 +273,7 @@ mod tests {
     }
 
     #[test]
-    fn create_thread_comment_emits_command() {
+    fn create_feedback_comment_emits_command() {
         let mut state = AppState {
             ui: UiState {
                 selected_review_id: Some("review-1".into()),
@@ -284,9 +284,9 @@ mod tests {
 
         let commands = reduce(
             &mut state,
-            Action::Review(ReviewAction::CreateThreadComment {
+            Action::Review(ReviewAction::CreateFeedbackComment {
                 task_id: "task-1".into(),
-                thread_id: None,
+                feedback_id: None,
                 file_path: Some("src/main.rs".into()),
                 line_number: Some(42),
                 title: Some("Title".into()),
@@ -297,20 +297,20 @@ mod tests {
         assert!(
             matches!(
                 commands.as_slice(),
-                [Command::CreateThreadComment { review_id, task_id, .. }]
+                [Command::CreateFeedbackComment { review_id, task_id, .. }]
                 if review_id == "review-1" && task_id == "task-1"
             ),
-            "expected CreateThreadComment command"
+            "expected CreateFeedbackComment command"
         );
     }
 
     #[test]
-    fn update_thread_status_emits_command() {
+    fn update_feedback_status_emits_command() {
         let mut state = AppState::default();
         let commands = reduce(
             &mut state,
-            Action::Review(ReviewAction::UpdateThreadStatus {
-                thread_id: "thread-1".into(),
+            Action::Review(ReviewAction::UpdateFeedbackStatus {
+                feedback_id: "feedback-1".into(),
                 status: ReviewStatus::InProgress,
             }),
         );
@@ -318,15 +318,15 @@ mod tests {
         assert!(
             matches!(
                 commands.as_slice(),
-                [Command::UpdateThreadStatus { thread_id, status }]
-                if thread_id == "thread-1" && *status == ReviewStatus::InProgress
+                [Command::UpdateFeedbackStatus { feedback_id, status }]
+                if feedback_id == "feedback-1" && *status == ReviewStatus::InProgress
             ),
-            "expected UpdateThreadStatus command"
+            "expected UpdateFeedbackStatus command"
         );
     }
 
     #[test]
-    fn review_threads_loaded_updates_state_for_selected_review() {
+    fn review_feedbacks_loaded_updates_state_for_selected_review() {
         let mut state = AppState {
             ui: UiState {
                 selected_review_id: Some("review-1".into()),
@@ -335,13 +335,13 @@ mod tests {
             ..AppState::default()
         };
 
-        let thread = Thread {
-            id: "thread-1".into(),
+        let feedback = Feedback {
+            id: "feedback-1".into(),
             review_id: "review-1".into(),
             task_id: Some("task-1".into()),
-            title: "Thread".into(),
+            title: "Feedback".into(),
             status: ReviewStatus::Todo,
-            impact: ThreadImpact::Nitpick,
+            impact: FeedbackImpact::Nitpick,
             anchor: None,
             author: "User".into(),
             created_at: "2025-01-01T00:00:00Z".into(),
@@ -350,7 +350,7 @@ mod tests {
 
         let comment = Comment {
             id: "comment-1".into(),
-            thread_id: "thread-1".into(),
+            feedback_id: "thread-1".into(),
             author: "User".into(),
             body: "Hello".into(),
             parent_id: None,
@@ -359,24 +359,26 @@ mod tests {
         };
 
         let mut comments = std::collections::HashMap::new();
-        comments.insert("thread-1".into(), vec![comment]);
+        comments.insert("feedback-1".into(), vec![comment]);
 
         let commands = reduce(
             &mut state,
-            Action::Async(AsyncAction::ReviewThreadsLoaded(Ok(ReviewThreadsPayload {
-                review_id: "review-1".into(),
-                threads: vec![thread],
-                comments,
-            }))),
+            Action::Async(AsyncAction::ReviewFeedbacksLoaded(Ok(
+                ReviewFeedbacksPayload {
+                    review_id: "review-1".into(),
+                    feedbacks: vec![feedback],
+                    comments,
+                },
+            ))),
         );
 
         assert!(commands.is_empty());
-        assert_eq!(state.domain.threads.len(), 1);
+        assert_eq!(state.domain.feedbacks.len(), 1);
         assert_eq!(
             state
                 .domain
-                .thread_comments
-                .get("thread-1")
+                .feedback_comments
+                .get("feedback-1")
                 .map(|items| items.len()),
             Some(1)
         );
@@ -449,7 +451,7 @@ mod tests {
         assert!(
             commands
                 .iter()
-                .any(|c| matches!(c, Command::LoadReviewThreads { .. }))
+                .any(|c| matches!(c, Command::LoadReviewFeedbacks { .. }))
         );
     }
 
@@ -471,15 +473,15 @@ mod tests {
     }
 
     #[test]
-    fn test_navigate_to_thread() {
+    fn test_navigate_to_feedback() {
         let mut state = AppState::default();
-        let thread = Thread {
+        let feedback = Feedback {
             id: "t1".into(),
             review_id: "r1".into(),
             task_id: Some("task1".into()),
             title: "Title".into(),
             status: ReviewStatus::Todo,
-            impact: ThreadImpact::Nitpick,
+            impact: FeedbackImpact::Nitpick,
             anchor: None,
             author: "User".into(),
             created_at: "now".into(),
@@ -488,12 +490,12 @@ mod tests {
 
         reduce(
             &mut state,
-            Action::Review(ReviewAction::NavigateToThread(thread)),
+            Action::Review(ReviewAction::NavigateToFeedback(feedback)),
         );
 
         assert_eq!(state.ui.selected_task_id.as_deref(), Some("task1"));
         assert_eq!(state.ui.current_view, AppView::Review);
-        assert!(state.ui.active_thread.is_some());
+        assert!(state.ui.active_feedback.is_some());
     }
 
     #[test]
@@ -664,11 +666,11 @@ mod tests {
     }
 
     #[test]
-    fn test_review_action_close_thread() {
+    fn test_review_action_close_feedback() {
         let mut state = AppState {
             ui: UiState {
-                active_thread: Some(crate::ui::app::ThreadContext {
-                    thread_id: None,
+                active_feedback: Some(crate::ui::app::FeedbackContext {
+                    feedback_id: None,
                     task_id: "t1".into(),
                     file_path: None,
                     line_number: None,
@@ -677,8 +679,8 @@ mod tests {
             },
             ..Default::default()
         };
-        reduce(&mut state, Action::Review(ReviewAction::CloseThread));
-        assert!(state.ui.active_thread.is_none());
+        reduce(&mut state, Action::Review(ReviewAction::CloseFeedback));
+        assert!(state.ui.active_feedback.is_none());
     }
 
     #[test]

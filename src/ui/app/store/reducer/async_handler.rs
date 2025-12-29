@@ -43,12 +43,12 @@ pub fn reduce(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
                 Vec::new()
             }
         },
-        AsyncAction::ReviewThreadsLoaded(result) => {
+        AsyncAction::ReviewFeedbacksLoaded(result) => {
             match result {
                 Ok(payload) => {
                     if state.ui.selected_review_id.as_deref() == Some(payload.review_id.as_str()) {
-                        state.domain.threads = payload.threads;
-                        state.domain.thread_comments = payload.comments;
+                        state.domain.feedbacks = payload.feedbacks;
+                        state.domain.feedback_comments = payload.comments;
                     }
                 }
                 Err(err) => {
@@ -88,7 +88,7 @@ pub fn reduce(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
             }
             Vec::new()
         }
-        AsyncAction::ThreadCommentSaved(result) => {
+        AsyncAction::FeedbackCommentSaved(result) => {
             if let Err(err) = result {
                 state.ui.review_error = Some(err);
             }

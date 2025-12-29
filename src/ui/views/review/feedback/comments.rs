@@ -44,7 +44,7 @@ mod tests {
     fn test_render_comment_list() {
         let comments = vec![Comment {
             id: "c1".into(),
-            thread_id: "t1".into(),
+            feedback_id: "t1".into(),
             author: "User A".into(),
             body: "Hello world".into(),
             parent_id: None,

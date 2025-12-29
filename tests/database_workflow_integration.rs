@@ -2,8 +2,8 @@
 //! These tests verify that different repository modules work together correctly
 
 use lareview::domain::{
-    Comment, LinkedRepo, Review, ReviewRun, ReviewSource, ReviewStatus, TaskStats, Thread,
-    ThreadImpact,
+    Comment, Feedback, FeedbackImpact, LinkedRepo, Review, ReviewRun, ReviewSource, ReviewStatus,
+    TaskStats,
 };
 use lareview::infra::db::{Database, repository::*};
 use std::path::PathBuf;
@@ -18,7 +18,7 @@ fn test_full_database_workflow() -> anyhow::Result<()> {
     let review_repo = ReviewRepository::new(conn.clone());
     let run_repo = ReviewRunRepository::new(conn.clone());
     let task_repo = TaskRepository::new(conn.clone());
-    let thread_repo = ThreadRepository::new(conn.clone());
+    let feedback_repo = FeedbackRepository::new(conn.clone());
     let comment_repo = CommentRepository::new(conn.clone());
     let repo_repo = RepoRepository::new(conn.clone());
 
@@ -78,25 +78,25 @@ fn test_full_database_workflow() -> anyhow::Result<()> {
     };
     task_repo.save(&task)?;
 
-    // Create a thread
-    let thread = Thread {
+    // Create a feedback
+    let feedback = Feedback {
         id: "t-1".into(),
         review_id: review.id.clone(),
         task_id: Some(task.id.clone()),
-        title: "Thread".into(),
+        title: "Feedback".into(),
         status: ReviewStatus::Todo,
-        impact: ThreadImpact::Nitpick,
+        impact: FeedbackImpact::Nitpick,
         anchor: None,
         author: "me".into(),
         created_at: "now".into(),
         updated_at: "now".into(),
     };
-    thread_repo.save(&thread)?;
+    feedback_repo.save(&feedback)?;
 
     // Create a comment
     let comment = Comment {
         id: "c-1".into(),
-        thread_id: thread.id.clone(),
+        feedback_id: feedback.id.clone(),
         author: "me".into(),
         body: "hello".into(),
         parent_id: None,
@@ -115,19 +115,19 @@ fn test_full_database_workflow() -> anyhow::Result<()> {
     let all_tasks = task_repo.find_all()?;
     assert_eq!(all_tasks.len(), 1);
 
-    let all_threads = thread_repo.find_by_review(&review.id)?;
-    assert_eq!(all_threads.len(), 1);
+    let all_feedbacks = feedback_repo.find_by_review(&review.id)?;
+    assert_eq!(all_feedbacks.len(), 1);
 
-    let thread_comments = comment_repo.list_for_thread(&thread.id)?;
-    assert_eq!(thread_comments.len(), 1);
-    assert_eq!(thread_comments[0].body, "hello");
+    let feedback_comments = comment_repo.list_for_feedback(&feedback.id)?;
+    assert_eq!(feedback_comments.len(), 1);
+    assert_eq!(feedback_comments[0].body, "hello");
 
     // Test that repositories can be used together
     let review_tasks = task_repo.find_by_run(&run.id)?;
     assert_eq!(review_tasks.len(), 1);
 
-    let review_threads = thread_repo.find_by_review(&review.id)?;
-    assert_eq!(review_threads.len(), 1);
+    let review_feedbacks = feedback_repo.find_by_review(&review.id)?;
+    assert_eq!(review_feedbacks.len(), 1);
 
     Ok(())
 }

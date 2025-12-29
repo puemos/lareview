@@ -10,27 +10,27 @@ use std::path::Path; // Keep Path as it's used
 
 pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
     match action {
-        ReviewAction::NavigateToThread(thread) => {
-            // 1. Select the task (this usually clears active_thread, so we do it first)
-            if let Some(task_id) = thread.task_id.clone() {
+        ReviewAction::NavigateToFeedback(feedback) => {
+            // 1. Select the task (this usually clears active_feedback, so we do it first)
+            if let Some(task_id) = feedback.task_id.clone() {
                 select_task(state, task_id.clone());
 
-                // 2. Set the active thread context
-                let file_path = thread.anchor.as_ref().and_then(|a| a.file_path.clone());
-                let line_number = thread.anchor.as_ref().and_then(|a| a.line_number);
+                // 2. Set the active feedback context
+                let file_path = feedback.anchor.as_ref().and_then(|a| a.file_path.clone());
+                let line_number = feedback.anchor.as_ref().and_then(|a| a.line_number);
 
-                state.ui.thread_title_draft = thread.title.clone();
-                state.ui.thread_reply_draft.clear();
+                state.ui.feedback_title_draft = feedback.title.clone();
+                state.ui.feedback_reply_draft.clear();
 
-                state.ui.active_thread = Some(crate::ui::app::ThreadContext {
-                    thread_id: Some(thread.id),
+                state.ui.active_feedback = Some(crate::ui::app::FeedbackContext {
+                    feedback_id: Some(feedback.id),
                     task_id,
                     file_path,
                     line_number,
                 });
             } else {
                 state.ui.selected_task_id = None;
-                state.ui.active_thread = None;
+                state.ui.active_feedback = None;
             }
 
             // 3. Ensure we are on the Review view
@@ -74,21 +74,21 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
 
             state.ui.selected_task_id = None;
             state.ui.cached_unified_diff = None;
-            state.ui.active_thread = None;
-            state.ui.thread_title_draft.clear();
-            state.ui.thread_reply_draft.clear();
+            state.ui.active_feedback = None;
+            state.ui.feedback_title_draft.clear();
+            state.ui.feedback_reply_draft.clear();
 
             let mut commands = select_default_task_for_current_run(state);
-            commands.push(Command::LoadReviewThreads { review_id });
+            commands.push(Command::LoadReviewFeedbacks { review_id });
             commands
         }
         ReviewAction::SelectRun { run_id } => {
             state.ui.selected_run_id = Some(run_id);
             state.ui.selected_task_id = None;
             state.ui.cached_unified_diff = None;
-            state.ui.active_thread = None;
-            state.ui.thread_title_draft.clear();
-            state.ui.thread_reply_draft.clear();
+            state.ui.active_feedback = None;
+            state.ui.feedback_title_draft.clear();
+            state.ui.feedback_reply_draft.clear();
             select_default_task_for_current_run(state)
         }
         ReviewAction::SelectTask { task_id } => select_task(state, task_id),
@@ -102,9 +102,9 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
         ReviewAction::ClearSelection => {
             state.ui.selected_task_id = None;
             state.ui.cached_unified_diff = None;
-            state.ui.active_thread = None;
-            state.ui.thread_title_draft.clear();
-            state.ui.thread_reply_draft.clear();
+            state.ui.active_feedback = None;
+            state.ui.feedback_title_draft.clear();
+            state.ui.feedback_reply_draft.clear();
             Vec::new()
         }
         ReviewAction::UpdateTaskStatus { task_id, status } => {
@@ -118,13 +118,13 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
                 state.ui.selected_review_id = None;
                 state.ui.selected_run_id = None;
                 state.ui.selected_task_id = None;
-                state.ui.active_thread = None;
+                state.ui.active_feedback = None;
             }
             vec![Command::DeleteReview { review_id }]
         }
-        ReviewAction::CreateThreadComment {
+        ReviewAction::CreateFeedbackComment {
             task_id,
-            thread_id,
+            feedback_id,
             file_path,
             line_number,
             title,
@@ -135,79 +135,112 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
                 None => return Vec::new(),
             };
             state.ui.review_error = None;
-            vec![Command::CreateThreadComment {
+            vec![Command::CreateFeedbackComment {
                 review_id,
                 task_id,
-                thread_id,
+                feedback_id,
                 file_path,
                 line_number,
                 title,
                 body,
             }]
         }
-        ReviewAction::UpdateThreadStatus { thread_id, status } => {
+        ReviewAction::UpdateFeedbackStatus {
+            feedback_id,
+            status,
+        } => {
             state.ui.review_error = None;
-            update_thread_in_state(state, &thread_id, |thread| {
-                thread.status = status;
-                thread.updated_at = Utc::now().to_rfc3339();
-            });
-            vec![Command::UpdateThreadStatus { thread_id, status }]
+            let mut commands = vec![Command::UpdateFeedbackStatus {
+                feedback_id: feedback_id.clone(),
+                status,
+            }];
+            if !update_feedback_in_state(state, &feedback_id, |feedback| {
+                feedback.status = status;
+                feedback.updated_at = Utc::now().to_rfc3339();
+            }) && let Some(review_id) = state.ui.selected_review_id.as_ref()
+            {
+                commands.push(Command::LoadReviewFeedbacks {
+                    review_id: review_id.clone(),
+                });
+            }
+            commands
         }
-        ReviewAction::UpdateThreadImpact { thread_id, impact } => {
+        ReviewAction::UpdateFeedbackImpact {
+            feedback_id,
+            impact,
+        } => {
             state.ui.review_error = None;
-            update_thread_in_state(state, &thread_id, |thread| {
-                thread.impact = impact;
-                thread.updated_at = Utc::now().to_rfc3339();
-            });
-            vec![Command::UpdateThreadImpact { thread_id, impact }]
+            let mut commands = vec![Command::UpdateFeedbackImpact {
+                feedback_id: feedback_id.clone(),
+                impact,
+            }];
+            if !update_feedback_in_state(state, &feedback_id, |feedback| {
+                feedback.impact = impact;
+                feedback.updated_at = Utc::now().to_rfc3339();
+            }) && let Some(review_id) = state.ui.selected_review_id.as_ref()
+            {
+                commands.push(Command::LoadReviewFeedbacks {
+                    review_id: review_id.clone(),
+                });
+            }
+            commands
         }
-        ReviewAction::UpdateThreadTitle { thread_id, title } => {
+        ReviewAction::UpdateFeedbackTitle { feedback_id, title } => {
             state.ui.review_error = None;
-            update_thread_in_state(state, &thread_id, |thread| {
-                thread.title = title.clone();
-                thread.updated_at = Utc::now().to_rfc3339();
-            });
-            vec![Command::UpdateThreadTitle { thread_id, title }]
+            let mut commands = vec![Command::UpdateFeedbackTitle {
+                feedback_id: feedback_id.clone(),
+                title: title.clone(),
+            }];
+            if !update_feedback_in_state(state, &feedback_id, |feedback| {
+                feedback.title = title.clone();
+                feedback.updated_at = Utc::now().to_rfc3339();
+            }) && let Some(review_id) = state.ui.selected_review_id.as_ref()
+            {
+                commands.push(Command::LoadReviewFeedbacks {
+                    review_id: review_id.clone(),
+                });
+            }
+            commands
         }
-        ReviewAction::OpenThread {
+        ReviewAction::OpenFeedback {
             task_id,
-            thread_id,
+            feedback_id,
             file_path,
             line_number,
         } => {
             // Initialize title draft from existing thread data
-            let existing_title = thread_id
+            let existing_title = feedback_id
                 .as_ref()
-                .and_then(|tid| state.domain.threads.iter().find(|t| &t.id == tid))
+                .and_then(|fid| state.domain.feedbacks.iter().find(|t| &t.id == fid))
                 .map(|t| t.title.clone())
                 .unwrap_or_default();
-            state.ui.thread_title_draft = existing_title;
-            state.ui.thread_reply_draft.clear();
+            state.ui.feedback_title_draft = existing_title;
+            state.ui.feedback_reply_draft.clear();
 
-            state.ui.active_thread = Some(crate::ui::app::ThreadContext {
-                thread_id,
+            state.ui.active_feedback = Some(crate::ui::app::FeedbackContext {
+                feedback_id,
                 task_id,
                 file_path,
                 line_number,
             });
             Vec::new()
         }
-        ReviewAction::CloseThread => {
-            state.ui.thread_title_draft.clear();
-            state.ui.thread_reply_draft.clear();
-            state.ui.active_thread = None;
+        ReviewAction::CloseFeedback => {
+            state.ui.feedback_title_draft.clear();
+            state.ui.feedback_reply_draft.clear();
+            state.ui.active_feedback = None;
             Vec::new()
         }
-        ReviewAction::SetThreadTitleDraft { text } => {
-            state.ui.thread_title_draft = text;
+        ReviewAction::SetFeedbackTitleDraft { text } => {
+            state.ui.feedback_title_draft = text;
             Vec::new()
         }
-        ReviewAction::SetThreadReplyDraft { text } => {
-            state.ui.thread_reply_draft = text;
+        ReviewAction::SetFeedbackReplyDraft { text } => {
+            state.ui.feedback_reply_draft = text;
             Vec::new()
         }
-        ReviewAction::ClearThreadReplyDraft => {
-            state.ui.thread_reply_draft.clear();
+        ReviewAction::ClearFeedbackReplyDraft => {
+            state.ui.feedback_reply_draft.clear();
             Vec::new()
         }
         ReviewAction::OpenFullDiff(view) => {
@@ -224,24 +257,26 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
             {
                 state.ui.is_exporting = true;
                 state.ui.review_error = None;
-                // Default to selecting all threads if none are selected yet
-                if state.ui.export_options.selected_thread_ids.is_empty() {
-                    state.ui.export_options.selected_thread_ids =
-                        state.domain.threads.iter().map(|t| t.id.clone()).collect();
-                }
+                // Default to selecting all feedbacks if none are selected yet
+                let include_feedback_ids =
+                    if state.ui.export_options.selected_feedback_ids.is_empty() {
+                        None
+                    } else {
+                        Some(
+                            state
+                                .ui
+                                .export_options
+                                .selected_feedback_ids
+                                .iter()
+                                .cloned()
+                                .collect(),
+                        )
+                    };
 
                 vec![Command::GenerateExportPreview {
                     review_id,
                     run_id,
-                    include_thread_ids: Some(
-                        state
-                            .ui
-                            .export_options
-                            .selected_thread_ids
-                            .iter()
-                            .cloned()
-                            .collect(),
-                    ),
+                    include_feedback_ids,
                     options: Box::new(map_export_options(&state.ui.export_options)),
                 }]
             } else {
@@ -307,9 +342,13 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
             state.ui.show_export_options_menu = !state.ui.show_export_options_menu;
             Vec::new()
         }
-        ReviewAction::SelectAllExportThreads => {
-            state.ui.export_options.selected_thread_ids =
-                state.domain.threads.iter().map(|t| t.id.clone()).collect();
+        ReviewAction::SelectAllExportFeedbacks => {
+            state.ui.export_options.selected_feedback_ids = state
+                .domain
+                .feedbacks
+                .iter()
+                .map(|t| t.id.clone())
+                .collect();
             let (review_id, run_id) = if let Some(r) = state.domain.reviews.first() {
                 (r.id.clone(), r.active_run_id.clone())
             } else {
@@ -321,11 +360,11 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
             vec![Command::GenerateExportPreview {
                 review_id,
                 run_id,
-                include_thread_ids: Some(
+                include_feedback_ids: Some(
                     state
                         .ui
                         .export_options
-                        .selected_thread_ids
+                        .selected_feedback_ids
                         .iter()
                         .cloned()
                         .collect(),
@@ -333,8 +372,8 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
                 options: Box::new(map_export_options(&state.ui.export_options)),
             }]
         }
-        ReviewAction::ClearExportThreads => {
-            state.ui.export_options.selected_thread_ids.clear();
+        ReviewAction::ClearExportFeedbacks => {
+            state.ui.export_options.selected_feedback_ids.clear();
             let (review_id, run_id) = if let Some(r) = state.domain.reviews.first() {
                 (r.id.clone(), r.active_run_id.clone())
             } else {
@@ -346,52 +385,53 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
             vec![Command::GenerateExportPreview {
                 review_id,
                 run_id,
-                include_thread_ids: Some(Vec::new()),
+                include_feedback_ids: Some(Vec::new()),
                 options: Box::new(map_export_options(&state.ui.export_options)),
             }]
         }
-        ReviewAction::ToggleThreadSelection(thread_id) => {
+        ReviewAction::ToggleFeedbackSelection(feedback_id) => {
             if state
                 .ui
                 .export_options
-                .selected_thread_ids
-                .contains(&thread_id)
+                .selected_feedback_ids
+                .contains(&feedback_id)
             {
                 state
                     .ui
                     .export_options
-                    .selected_thread_ids
-                    .remove(&thread_id);
+                    .selected_feedback_ids
+                    .remove(&feedback_id);
             } else {
                 state
                     .ui
                     .export_options
-                    .selected_thread_ids
-                    .insert(thread_id);
+                    .selected_feedback_ids
+                    .insert(feedback_id);
             }
             // Trigger regeneration
             if let Some(review_id) = state.ui.selected_review_id.clone()
                 && let Some(run_id) = state.ui.selected_run_id.clone()
             {
                 state.ui.is_exporting = true;
-                let include_thread_ids = if state.ui.export_options.selected_thread_ids.is_empty() {
-                    None
-                } else {
-                    Some(
-                        state
-                            .ui
-                            .export_options
-                            .selected_thread_ids
-                            .iter()
-                            .cloned()
-                            .collect(), // This already converts HashSet to Vec
-                    )
-                };
+                let include_feedback_ids =
+                    if state.ui.export_options.selected_feedback_ids.is_empty() {
+                        None
+                    } else {
+                        Some(
+                            state
+                                .ui
+                                .export_options
+                                .selected_feedback_ids
+                                .iter()
+                                .cloned()
+                                .collect(), // This already converts HashSet to Vec
+                        )
+                    };
 
                 vec![Command::GenerateExportPreview {
                     review_id,
                     run_id,
-                    include_thread_ids,
+                    include_feedback_ids,
                     options: Box::new(map_export_options(&state.ui.export_options)),
                 }]
             } else {
@@ -405,24 +445,25 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
                 && let Some(run_id) = state.ui.selected_run_id.clone()
             {
                 state.ui.is_exporting = true;
-                let include_thread_ids = if state.ui.export_options.selected_thread_ids.is_empty() {
-                    None
-                } else {
-                    Some(
-                        state
-                            .ui
-                            .export_options
-                            .selected_thread_ids
-                            .iter()
-                            .cloned()
-                            .collect(),
-                    ) // This already converts HashSet to Vec
-                };
+                let include_feedback_ids =
+                    if state.ui.export_options.selected_feedback_ids.is_empty() {
+                        None
+                    } else {
+                        Some(
+                            state
+                                .ui
+                                .export_options
+                                .selected_feedback_ids
+                                .iter()
+                                .cloned()
+                                .collect(),
+                        ) // This already converts HashSet to Vec
+                    };
 
                 vec![Command::GenerateExportPreview {
                     review_id,
                     run_id,
-                    include_thread_ids,
+                    include_feedback_ids,
                     options: Box::new(map_export_options(&state.ui.export_options)),
                 }]
             } else {
@@ -435,9 +476,9 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
 pub fn select_task(state: &mut AppState, task_id: TaskId) -> Vec<Command> {
     state.ui.selected_task_id = Some(task_id.clone());
     state.ui.cached_unified_diff = None;
-    state.ui.active_thread = None;
-    state.ui.thread_title_draft.clear();
-    state.ui.thread_reply_draft.clear();
+    state.ui.active_feedback = None;
+    state.ui.feedback_title_draft.clear();
+    state.ui.feedback_reply_draft.clear();
     let _ = task_id;
     Vec::new()
 }
@@ -455,12 +496,20 @@ pub fn select_default_task_for_current_run(state: &mut AppState) -> Vec<Command>
     Vec::new()
 }
 
-pub fn update_thread_in_state<F>(state: &mut AppState, thread_id: &str, mut updater: F)
+pub fn update_feedback_in_state<F>(state: &mut AppState, feedback_id: &str, mut updater: F) -> bool
 where
-    F: FnMut(&mut crate::domain::Thread),
+    F: FnMut(&mut crate::domain::Feedback),
 {
-    if let Some(thread) = state.domain.threads.iter_mut().find(|t| t.id == thread_id) {
-        updater(thread);
+    if let Some(feedback) = state
+        .domain
+        .feedbacks
+        .iter_mut()
+        .find(|t| t.id == feedback_id)
+    {
+        updater(feedback);
+        true
+    } else {
+        false
     }
 }
 
@@ -512,7 +561,7 @@ pub fn apply_review_data(state: &mut AppState, payload: ReviewDataPayload) -> Ve
         let mut commands = Vec::new();
 
         if let Some(review_id) = state.ui.selected_review_id.clone() {
-            commands.push(Command::LoadReviewThreads { review_id });
+            commands.push(Command::LoadReviewFeedbacks { review_id });
         }
 
         if state.ui.selected_task_id.is_none()
@@ -594,11 +643,11 @@ fn map_export_options(
         include_stats: ui_options.include_stats,
         include_metadata: ui_options.include_metadata,
         include_tasks: ui_options.include_tasks,
-        include_threads: ui_options.include_threads,
-        include_thread_ids: if ui_options.selected_thread_ids.is_empty() {
+        include_feedbacks: ui_options.include_feedbacks,
+        include_feedback_ids: if ui_options.selected_feedback_ids.is_empty() {
             None
         } else {
-            Some(ui_options.selected_thread_ids.clone())
+            Some(ui_options.selected_feedback_ids.clone())
         },
     }
 }

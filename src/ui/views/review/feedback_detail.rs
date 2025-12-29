@@ -6,37 +6,37 @@ use eframe::egui;
 use egui::epaint::MarginF32;
 use unidiff::PatchSet;
 
-use crate::ui::views::review::thread::{
-    render_comment_list, render_reply_composer, render_thread_context, render_thread_header,
+use crate::ui::views::review::feedback::{
+    render_comment_list, render_feedback_context, render_feedback_header, render_reply_composer,
 };
 
 #[allow(dead_code)]
-pub struct ThreadDetailView {
+pub struct FeedbackDetailView {
     pub task_id: String,
-    pub thread_id: Option<String>,
+    pub feedback_id: Option<String>,
     pub file_path: Option<String>,
     pub line_number: Option<u32>,
 }
 
 impl LaReviewApp {
     #[allow(dead_code)]
-    pub(crate) fn render_thread_detail(&mut self, ui: &mut egui::Ui, view: &ThreadDetailView) {
+    pub(crate) fn render_feedback_detail(&mut self, ui: &mut egui::Ui, view: &FeedbackDetailView) {
         if ui.available_width() < 50.0 {
             return;
         }
 
         let theme = current_theme();
 
-        let thread = view
-            .thread_id
+        let feedback = view
+            .feedback_id
             .as_ref()
-            .and_then(|id| self.state.domain.threads.iter().find(|t| &t.id == id))
+            .and_then(|id| self.state.domain.feedbacks.iter().find(|t| &t.id == id))
             .cloned();
 
-        let thread = if thread.is_none() {
+        let feedback = if feedback.is_none() {
             self.state
                 .domain
-                .threads
+                .feedbacks
                 .iter()
                 .find(|t| {
                     t.task_id.as_ref() == Some(&view.task_id)
@@ -46,13 +46,13 @@ impl LaReviewApp {
                 })
                 .cloned()
         } else {
-            thread
+            feedback
         };
 
-        let thread_id = thread.as_ref().map(|t| t.id.clone());
-        let comments = thread_id
+        let feedback_id = feedback.as_ref().map(|t| t.id.clone());
+        let comments = feedback_id
             .as_ref()
-            .and_then(|id| self.state.domain.thread_comments.get(id))
+            .and_then(|id| self.state.domain.feedback_comments.get(id))
             .cloned()
             .unwrap_or_default();
 
@@ -64,10 +64,10 @@ impl LaReviewApp {
                 bottom: 0.0,
             })
             .show(ui, |ui| {
-                if let Some(action) = render_thread_header(
+                if let Some(action) = render_feedback_header(
                     ui,
-                    thread.as_ref(),
-                    &self.state.ui.thread_title_draft,
+                    feedback.as_ref(),
+                    &self.state.ui.feedback_title_draft,
                     &theme,
                     &view.task_id,
                 ) {
@@ -76,14 +76,14 @@ impl LaReviewApp {
 
                 let diff_snippet =
                     if let (Some(path), Some(line)) = (view.file_path.as_ref(), view.line_number) {
-                        self.thread_diff_snippet(&view.task_id, path, line)
+                        self.feedback_diff_snippet(&view.task_id, path, line)
                     } else {
                         None
                     };
 
-                let action = render_thread_context(
+                let action = render_feedback_context(
                     ui,
-                    thread.as_ref(),
+                    feedback.as_ref(),
                     view.file_path.as_ref(),
                     view.line_number,
                     diff_snippet,
@@ -121,10 +121,10 @@ impl LaReviewApp {
                     ui.add_space(spacing::SPACING_MD);
                     if let Some(action) = render_reply_composer(
                         ui,
-                        &self.state.ui.thread_reply_draft,
-                        &self.state.ui.thread_title_draft,
+                        &self.state.ui.feedback_reply_draft,
+                        &self.state.ui.feedback_title_draft,
                         &view.task_id,
-                        thread_id,
+                        feedback_id,
                         view.file_path.clone(),
                         view.line_number,
                     ) {
@@ -134,7 +134,7 @@ impl LaReviewApp {
             });
     }
 
-    fn thread_diff_snippet(
+    fn feedback_diff_snippet(
         &self,
         task_id: &str,
         file_path: &str,

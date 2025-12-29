@@ -1,5 +1,5 @@
 use crate::domain::{
-    Comment, Review, ReviewRun, ReviewStatus, ReviewTask, RiskLevel, Thread, ThreadImpact,
+    Comment, Feedback, FeedbackImpact, Review, ReviewRun, ReviewStatus, ReviewTask, RiskLevel,
 };
 use crate::infra::d2::d2_to_ascii_async;
 use anyhow::Result;
@@ -11,7 +11,7 @@ pub struct ExportData {
     pub review: Review,
     pub run: ReviewRun,
     pub tasks: Vec<ReviewTask>,
-    pub threads: Vec<Thread>,
+    pub feedbacks: Vec<Feedback>,
     pub comments: Vec<Comment>,
 }
 
@@ -27,8 +27,8 @@ pub struct ExportOptions {
     pub include_stats: bool,
     pub include_metadata: bool,
     pub include_tasks: bool,
-    pub include_threads: bool,
-    pub include_thread_ids: Option<std::collections::HashSet<String>>,
+    pub include_feedbacks: bool,
+    pub include_feedback_ids: Option<std::collections::HashSet<String>>,
 }
 
 impl Default for ExportOptions {
@@ -38,8 +38,8 @@ impl Default for ExportOptions {
             include_stats: true,
             include_metadata: true,
             include_tasks: true,
-            include_threads: true,
-            include_thread_ids: None,
+            include_feedbacks: true,
+            include_feedback_ids: None,
         }
     }
 }
@@ -56,7 +56,7 @@ impl ReviewExporter {
 
         // 1. Prepare diagrams to render (ASCII for everything)
         let mut diagrams_to_render: Vec<Arc<str>> = Vec::new();
-        if options.include_tasks || options.include_threads {
+        if options.include_tasks || options.include_feedbacks {
             for task in &data.tasks {
                 if let Some(diagram_code) = &task.diagram
                     && !diagrams_to_render.contains(diagram_code)
@@ -244,16 +244,16 @@ impl ReviewExporter {
                         }
                     }
 
-                    let task_threads: Vec<_> = data
-                        .threads
+                    let task_feedbacks: Vec<_> = data
+                        .feedbacks
                         .iter()
                         .filter(|t| t.task_id.as_ref() == Some(&task.id))
                         .collect();
-                    if !task_threads.is_empty() && options.include_threads {
-                        md.push_str("##### Discussion\n\n");
-                        render_threads_inline(
+                    if !task_feedbacks.is_empty() && options.include_feedbacks {
+                        md.push_str("##### Feedback\n\n");
+                        render_feedbacks_inline(
                             &mut md,
-                            &task_threads,
+                            &task_feedbacks,
                             &data.comments,
                             &data.tasks,
                             &render_results,
@@ -262,14 +262,14 @@ impl ReviewExporter {
                     md.push_str("--- \n\n");
                 }
             }
-        } else if options.include_threads {
+        } else if options.include_feedbacks {
             // -- Selective Mode (Just Feedback) --
-            if data.threads.is_empty() {
-                md.push_str("_No feedback threads selected._\n");
+            if data.feedbacks.is_empty() {
+                md.push_str("_No feedback feedbacks selected._\n");
             } else {
-                render_threads_inline(
+                render_feedbacks_inline(
                     &mut md,
-                    &data.threads.iter().collect::<Vec<_>>(),
+                    &data.feedbacks.iter().collect::<Vec<_>>(),
                     &data.comments,
                     &data.tasks,
                     &render_results,
@@ -284,30 +284,30 @@ impl ReviewExporter {
     }
 }
 
-fn render_threads_inline(
+fn render_feedbacks_inline(
     md: &mut String,
-    threads: &[&Thread],
+    feedbacks: &[&Feedback],
     all_comments: &[Comment],
     tasks: &[ReviewTask],
     render_results: &HashMap<Arc<str>, Result<String, String>>,
 ) {
-    let mut comments_by_thread: HashMap<&str, Vec<&Comment>> = HashMap::new();
+    let mut comments_by_feedback: HashMap<&str, Vec<&Comment>> = HashMap::new();
     for comment in all_comments {
-        comments_by_thread
-            .entry(comment.thread_id.as_str())
+        comments_by_feedback
+            .entry(comment.feedback_id.as_str())
             .or_default()
             .push(comment);
     }
 
-    for thread in threads {
+    for feedback in feedbacks {
         md.push_str(&format!(
             "### {} [{}] {}\n\n",
-            impact_icon(thread.impact),
-            thread_impact_label(thread.impact),
-            thread.title
+            impact_icon(feedback.impact),
+            feedback_impact_label(feedback.impact),
+            feedback.title
         ));
 
-        if let Some(anchor) = &thread.anchor
+        if let Some(anchor) = &feedback.anchor
             && let Some(path) = anchor.file_path.as_deref()
             && let Some(line) = anchor.line_number
         {
@@ -315,7 +315,7 @@ fn render_threads_inline(
         }
 
         // Add diagram as ASCII if available
-        if let Some(task_id) = &thread.task_id
+        if let Some(task_id) = &feedback.task_id
             && let Some(task) = tasks.iter().find(|t| &t.id == task_id)
             && let Some(diagram_code) = &task.diagram
             && let Some(Ok(ascii)) = render_results.get(diagram_code)
@@ -325,7 +325,7 @@ fn render_threads_inline(
             md.push_str("\n```\n\n");
         }
 
-        if let Some(comments) = comments_by_thread.get(thread.id.as_str()) {
+        if let Some(comments) = comments_by_feedback.get(feedback.id.as_str()) {
             for (i, comment) in comments.iter().enumerate() {
                 if i == 0 {
                     md.push_str(&format!("{}\n\n", comment.body));
@@ -337,19 +337,19 @@ fn render_threads_inline(
     }
 }
 
-fn impact_icon(impact: ThreadImpact) -> &'static str {
+fn impact_icon(impact: FeedbackImpact) -> &'static str {
     match impact {
-        ThreadImpact::Blocking => "🔴",
-        ThreadImpact::Nitpick => "⚪",
-        ThreadImpact::NiceToHave => "🔵",
+        FeedbackImpact::Blocking => "🔴",
+        FeedbackImpact::Nitpick => "⚪",
+        FeedbackImpact::NiceToHave => "🔵",
     }
 }
 
-fn thread_impact_label(impact: ThreadImpact) -> &'static str {
+fn feedback_impact_label(impact: FeedbackImpact) -> &'static str {
     match impact {
-        ThreadImpact::Blocking => "blocking",
-        ThreadImpact::NiceToHave => "nice_to_have",
-        ThreadImpact::Nitpick => "nitpick",
+        FeedbackImpact::Blocking => "blocking",
+        FeedbackImpact::NiceToHave => "nice_to_have",
+        FeedbackImpact::Nitpick => "nitpick",
     }
 }
 

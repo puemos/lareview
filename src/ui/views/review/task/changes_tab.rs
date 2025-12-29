@@ -82,9 +82,9 @@ impl LaReviewApp {
                                 file_path,
                                 ..
                             } => {
-                                self.dispatch(Action::Review(ReviewAction::OpenThread {
+                                self.dispatch(Action::Review(ReviewAction::OpenFeedback {
                                     task_id: task.id.clone(),
-                                    thread_id: None,
+                                    feedback_id: None,
                                     file_path: Some(file_path),
                                     line_number: Some(line_number as u32),
                                 }));
@@ -93,25 +93,25 @@ impl LaReviewApp {
                                 file_path,
                                 line_number,
                             } => {
-                                let thread_id = self
+                                let feedback_id = self
                                     .state
                                     .domain
-                                    .threads
+                                    .feedbacks
                                     .iter()
-                                    .find(|thread| {
-                                        thread.task_id.as_ref() == Some(&task.id)
-                                            && thread
+                                    .find(|feedback| {
+                                        feedback.task_id.as_ref() == Some(&task.id)
+                                            && feedback
                                                 .anchor
                                                 .as_ref()
                                                 .and_then(|a| a.file_path.as_ref())
                                                 == Some(&file_path)
-                                            && thread.anchor.as_ref().and_then(|a| a.line_number)
+                                            && feedback.anchor.as_ref().and_then(|a| a.line_number)
                                                 == Some(line_number)
                                     })
-                                    .map(|thread| thread.id.clone());
-                                self.dispatch(Action::Review(ReviewAction::OpenThread {
+                                    .map(|feedback| feedback.id.clone());
+                                self.dispatch(Action::Review(ReviewAction::OpenFeedback {
                                     task_id: task.id.clone(),
-                                    thread_id,
+                                    feedback_id,
                                     file_path: Some(file_path),
                                     line_number: Some(line_number),
                                 }));

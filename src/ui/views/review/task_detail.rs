@@ -54,15 +54,15 @@ impl LaReviewApp {
                     .data(|d| d.get_temp::<ReviewTab>(egui::Id::new(("active_tab", &task.id))))
                     .unwrap_or(ReviewTab::Description);
 
-                if self.state.ui.active_thread.is_some() {
-                    active_tab = ReviewTab::Discussion;
+                if self.state.ui.active_feedback.is_some() {
+                    active_tab = ReviewTab::Feedback;
                 }
 
                 match active_tab {
                     ReviewTab::Description => self.render_description_tab(ui, task),
                     ReviewTab::Diagram => self.render_diagram_tab(ui, task),
                     ReviewTab::Changes => self.render_changes_tab(ui, task),
-                    ReviewTab::Discussion => self.render_discussion_tab(ui, task),
+                    ReviewTab::Feedback => self.render_feedback_tab(ui, task),
                 }
             });
     }

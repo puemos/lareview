@@ -243,17 +243,22 @@ impl LaReviewApp {
         };
 
         // --- Right Panel Width ---
-        let threads_width_id = ui.id().with("threads_panel_width");
-        let saved_threads_width = ui
-            .memory(|mem| mem.data.get_temp::<f32>(threads_width_id))
+        let feedback_width_id = ui.id().with("feedback_panel_width");
+        let saved_feedback_width = ui
+            .memory(|mem| mem.data.get_temp::<f32>(feedback_width_id))
             .unwrap_or(300.0);
 
         // Calculate remaining budget for Right Panel
         let remaining_for_right = (max_sidebar_budget - safe_tree_width).max(0.0);
 
         // Auto-hide Right Panel if not enough space
-        let safe_threads_width = if remaining_for_right >= MIN_SIDEBAR_WIDTH {
-            saved_threads_width.clamp(MIN_SIDEBAR_WIDTH, remaining_for_right)
+        // We allow squeezing the center panel a bit more (down to 300px) to keep sidebars visible
+        let squeeze_budget =
+            (available_width - 300.0 - safe_tree_width - (resize_handle_width * 2.0)).max(0.0);
+        let effective_feedback_budget = remaining_for_right.max(squeeze_budget);
+
+        let safe_feedback_width = if effective_feedback_budget >= MIN_SIDEBAR_WIDTH {
+            saved_feedback_width.clamp(MIN_SIDEBAR_WIDTH, effective_feedback_budget)
         } else {
             0.0
         };
@@ -270,10 +275,10 @@ impl LaReviewApp {
 
         let right_rect = egui::Rect::from_min_size(
             egui::pos2(
-                available_rect.max.x - safe_threads_width,
+                available_rect.max.x - safe_feedback_width,
                 available_rect.min.y,
             ),
-            egui::vec2(safe_threads_width, available_height),
+            egui::vec2(safe_feedback_width, available_height),
         );
         let right_resize_rect = egui::Rect::from_min_size(
             egui::pos2(
@@ -379,7 +384,7 @@ impl LaReviewApp {
         // --- C. Right Resize Handle ---
         let right_resize_response = ui.interact(
             right_resize_rect,
-            ui.id().with("resize_threads"),
+            ui.id().with("resize_feedback"),
             egui::Sense::drag(),
         );
         if right_resize_response.dragged()
@@ -387,7 +392,7 @@ impl LaReviewApp {
         {
             // Dragging left increases width (since it's anchored right)
             let new_width = available_rect.max.x - pointer_pos.x;
-            ui.memory_mut(|mem| mem.data.insert_temp(threads_width_id, new_width));
+            ui.memory_mut(|mem| mem.data.insert_temp(feedback_width_id, new_width));
         }
 
         let right_hover_active = right_resize_response.hovered() || right_resize_response.dragged();
@@ -408,8 +413,8 @@ impl LaReviewApp {
             egui::Stroke::new(1.0, right_line_color),
         );
 
-        // --- D. Right Panel (Thread List) ---
-        if safe_threads_width > min_viable_width {
+        // --- D. Right Panel (Feedback List) ---
+        if safe_feedback_width > min_viable_width {
             let mut right_ui = ui.new_child(egui::UiBuilder::new().max_rect(right_rect));
             egui::Frame::NONE
                 .inner_margin(MarginF32 {
@@ -424,13 +429,14 @@ impl LaReviewApp {
                         .show(ui, |ui| {
                             ui.horizontal(|ui| {
                                 ui.label(
-                                    typography::bold_label("All Threads").color(theme.text_primary),
+                                    typography::bold_label("All Feedback")
+                                        .color(theme.text_primary),
                                 );
 
                                 ui.with_layout(
                                     egui::Layout::right_to_left(egui::Align::Center),
                                     |_ui| {
-                                        // Removed thread selection toggle button
+                                        // Removed feedback selection toggle button
                                     },
                                 );
                             });
@@ -438,28 +444,28 @@ impl LaReviewApp {
 
                     ui.add_space(spacing::SPACING_SM);
                     if let Some(review_id) = &self.state.ui.selected_review_id {
-                        // Filter threads for current review
-                        let review_threads: Vec<_> = self
+                        // Filter feedbacks for current review
+                        let review_feedbacks: Vec<_> = self
                             .state
                             .domain
-                            .threads
+                            .feedbacks
                             .iter()
                             .filter(|t| &t.review_id == review_id)
                             .cloned()
                             .collect();
 
-                        let active_thread_id = self
+                        let active_feedback_id = self
                             .state
                             .ui
-                            .active_thread
+                            .active_feedback
                             .as_ref()
-                            .and_then(|t| t.thread_id.as_deref());
+                            .and_then(|t| t.feedback_id.as_deref());
 
                         if let Some(action) =
-                            crate::ui::views::review::thread_list::render_thread_list(
+                            crate::ui::views::review::feedback_list::render_feedback_list(
                                 ui,
-                                &review_threads,
-                                active_thread_id,
+                                &review_feedbacks,
+                                active_feedback_id,
                                 false,
                                 &std::collections::HashSet::new(),
                                 true,
