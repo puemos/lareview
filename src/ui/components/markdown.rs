@@ -99,6 +99,10 @@ fn code_cache_key(content_hash: u64, lang: &str, theme_hash: u64) -> u64 {
 
 /// Quantize a width to the nearest step (default 40px) to reduce text re-layout frequency.
 const WRAP_WIDTH_STEP: f32 = 40.0;
+// Size limit for code block syntax highlighting (50KB)
+// Large blocks can cause runaway highlighting time, so we fall back to plain text
+// This prevents rendering hangs on extremely large code blocks
+const CODE_BLOCK_SIZE_LIMIT: usize = 50000;
 
 fn quantize_width(width: f32) -> f32 {
     (width / WRAP_WIDTH_STEP).floor() * WRAP_WIDTH_STEP
@@ -188,12 +192,9 @@ fn markdown_cache_id() -> egui::Id {
     egui::Id::new("markdown_parse_cache")
 }
 
-pub fn render_markdown(ui: &mut egui::Ui, text: &str) {
-    let theme = current_theme();
-
-    ui.spacing_mut().item_spacing.y = 6.0;
-
-    let theme_hash = egui::util::hash((
+fn get_cached_theme_hash(ui: &egui::Ui, theme: &Theme) -> u64 {
+    let cache_key = egui::Id::new("theme_hash");
+    let current_hash = egui::util::hash((
         theme.bg_tertiary,
         theme.text_primary,
         theme.text_secondary,
@@ -204,6 +205,21 @@ pub fn render_markdown(ui: &mut egui::Ui, text: &str) {
         theme.border_secondary,
     ));
 
+    ui.ctx().memory_mut(|mem| {
+        let cached = mem.data.get_temp_mut_or_default::<u64>(cache_key);
+        if *cached != current_hash {
+            *cached = current_hash;
+        }
+        *cached
+    })
+}
+
+pub fn render_markdown(ui: &mut egui::Ui, text: &str) {
+    let theme = current_theme();
+
+    ui.spacing_mut().item_spacing.y = 6.0;
+
+    let theme_hash = get_cached_theme_hash(ui, &theme);
     let content_hash = egui::util::hash(text);
     let cache_key = mix_u64(content_hash, theme_hash);
 
@@ -362,6 +378,27 @@ fn render_code_block(
             .get_temp_mut_or_default::<CodeHighlightCache>(code_cache_id());
 
         cache.get_or_insert_with(cache_key, || {
+            // Only highlight if content is reasonably sized to avoid runaway highlighting
+            // Very large blocks (>50KB) fall back to plain text to prevent rendering hangs
+            // Note: This trades off syntax highlighting for stability on massive code blocks
+            if content.len() > CODE_BLOCK_SIZE_LIMIT {
+                let mono = egui::FontId::monospace(13.0);
+                let mut job = egui::text::LayoutJob::default();
+                job.wrap.max_width = f32::INFINITY;
+                for line in content.lines() {
+                    job.append(
+                        line,
+                        0.0,
+                        egui::TextFormat {
+                            font_id: mono.clone(),
+                            color: theme.text_primary,
+                            ..Default::default()
+                        },
+                    );
+                }
+                return Arc::new(job);
+            }
+
             let syntax = SYNTAX_SET
                 .find_syntax_by_token(lang)
                 .unwrap_or_else(|| SYNTAX_SET.find_syntax_plain_text());
@@ -400,23 +437,18 @@ fn render_code_block(
         })
     });
 
-    let available_width = ui.available_width();
-
     egui::Frame::NONE
         .fill(theme.bg_tertiary)
         .corner_radius(crate::ui::spacing::RADIUS_MD)
         .inner_margin(egui::Margin::same(spacing::SPACING_MD as i8))
         .show(ui, |ui| {
-            // Constraint the frame's inner area to the available width
-            ui.set_max_width(available_width - (spacing::SPACING_MD * 2.0));
-            // But we want the background to be full width if possible
-            ui.set_width(ui.available_width());
-
+            // Use Extend mode for horizontal scroll (no wrapping)
+            // This preserves layout for wide code blocks and diagrams
             egui::ScrollArea::horizontal()
                 .id_salt(ui.id().with("code_h_scroll").with(counter))
                 .auto_shrink([false, true])
                 .show(ui, |ui| {
-                    ui.add(egui::Label::new(job.clone()).wrap_mode(egui::TextWrapMode::Wrap));
+                    ui.add(egui::Label::new(job.clone()).wrap_mode(egui::TextWrapMode::Extend));
                 });
         });
 
@@ -447,7 +479,7 @@ fn render_table(
                 .show(ui, |ui| {
                     for row in rows {
                         for cell in row {
-                            ui.label(cell.as_ref().clone());
+                            ui.label((*cell).clone());
                         }
                         ui.end_row();
                     }

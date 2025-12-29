@@ -2,6 +2,29 @@ use crate::ui::app::LaReviewApp;
 use crate::ui::theme::current_theme;
 use crate::ui::{spacing, typography};
 use eframe::egui;
+use std::sync::Arc;
+
+fn get_or_normalize_text(
+    ui: &egui::Ui,
+    task_id: &str,
+    field_name: &str,
+    original: &str,
+) -> Arc<str> {
+    // Cache key includes content hash to invalidate when content changes
+    let content_hash = egui::util::hash(original);
+    let cache_key = egui::Id::new(("norm_text", task_id, field_name, content_hash));
+
+    ui.ctx().memory_mut(|mem| {
+        let entry = mem
+            .data
+            .get_temp_mut_or_default::<(bool, Arc<str>)>(cache_key);
+        if !entry.0 {
+            entry.0 = true;
+            entry.1 = Arc::from(crate::infra::normalize_newlines(original).as_str());
+        }
+        entry.1.clone()
+    })
+}
 
 impl LaReviewApp {
     pub(crate) fn render_description_tab(
@@ -15,7 +38,8 @@ impl LaReviewApp {
                 ui.vertical(|ui| {
                     ui.spacing_mut().item_spacing.y = 16.0;
 
-                    let description = crate::infra::normalize_newlines(&task.description);
+                    let description =
+                        get_or_normalize_text(ui, &task.id, "description", &task.description);
 
                     ui.scope(|ui| {
                         ui.spacing_mut().item_spacing.y = 16.0;
@@ -53,7 +77,7 @@ impl LaReviewApp {
                                         ui.add_space(spacing::SPACING_XS);
 
                                         let insight_text =
-                                            crate::infra::normalize_newlines(insight);
+                                            get_or_normalize_text(ui, &task.id, "insight", insight);
                                         crate::ui::components::render_markdown(ui, &insight_text);
                                     });
                                 });
