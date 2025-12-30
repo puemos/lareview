@@ -5,19 +5,23 @@ All notable changes to this project will be documented here. This project follow
 ## [0.0.14] - 2025-12-27
 
 ### Added
+
 - **Open in Editor**: Added editor picker and diff integration for open-in-editor flow.
 - **Landing**: Added a new landing page with build config and GitHub Pages deploy workflow.
 
 ### Changed
+
 - **Branding**: Refreshed logo assets and screenshots; updated README logo.
 - **Release**: Minor tweaks to the release workflow.
 
 ### Fixed
+
 - **ACP**: Fixed opencode ACP agent handling.
 
 ## [0.0.13] - 2025-12-26
 
 ### Added
+
 - **Generate Input**: Added GitHub PR URL/owner#num parsing with `gh` metadata/diff fetch and preview.
 - **Agent Settings**: Added per-agent executable overrides, environment variables, and custom ACP agents in Settings.
 - **ACP Task Flow**: Added streaming `return_task`/`finalize_review` handling, diff ref validation, and task stats via diff index.
@@ -25,6 +29,7 @@ All notable changes to this project will be documented here. This project follow
 - **Tooling**: Added login-shell PATH hydration and git remote discovery helpers.
 
 ### Changed
+
 - **Navigation**: Removed the Home view; Generate remains the default entry point.
 - **Tool Discovery**: Standardized on login-shell PATH plus per-agent overrides for external tools.
 - **macOS App Bundle**: Simplified app packaging to use a single binary name; updated codesign target.
@@ -32,28 +37,33 @@ All notable changes to this project will be documented here. This project follow
 - **Docs**: Updated architecture/dev guidance and test organization notes.
 
 ### Fixed
+
 - **Shell PATH**: Resolved PATH edge cases for CLI tool discovery.
 - **UI Details**: Improved pill hover tint and layout alignment.
 
 ## [0.0.12] - 2025-12-24
 
 ### Added
+
 - **Generate View**: Added a spinning animation to the "Generate" tab icon when a review is being generated.
 - **Agent Generation**: Added the ability to abort/cancel agent generation from the UI.
 - **Licensing**: Project is now dual-licensed under MIT OR Apache-2.0.
 
 ### Changed
+
 - **Navigation**: Simplified and improved the header navigation layout with better centering and more robust width calculations.
 - **UI Performance**: Increased the UI repaint frequency (to 16ms) during active generation to ensure smooth animations.
 - **Contributing**: Added licensing information to contributing guidelines.
 
 ### Fixed
+
 - **UI Consistency**: Ensured consistent text opacity and alignment across header tabs.
 - **Cleanup**: Fixed unused variable warnings in the review navigation component.
 
 ## [0.0.11] - 2025-12-24
 
 ### Added
+
 - **Home View**: Introduced a new Home view as the default entry point, showing recent reviews and available agents.
 - **Agent Discovery**: Added agent discovery and availability display on the Home view.
 - **Typography**: Added centralized typography utilities and migrated UI text to consistent font helpers.
@@ -61,6 +71,7 @@ All notable changes to this project will be documented here. This project follow
 - **Navigation**: Added Home navigation tab and routing support.
 
 ### Changed
+
 - **Navigation**: Updated header navigation layout with dynamic tab sizing and centered container.
 - **Default View**: Switched default app view from Generate to Home.
 - **Theming**: Standardized spacing constants and adjusted header height; refined theme text colors for better visual hierarchy.
@@ -68,26 +79,30 @@ All notable changes to this project will be documented here. This project follow
 - **Components**: Reworked multiple UI components to use shared typography and spacing utilities.
 
 ### Internal
+
 - **GEMINI.md**: Added Git workflow guidelines.
 - **CI**: Updated clippy invocation to include all targets and features.
 
 ## [0.0.10] - 2025-12-23
 
 ### Added
+
 - **Generate View**: Enhanced generation timeline with better visual feedback.
 - **Review View**: Added custom review selector dropdown with improved interactivity, sorting (selected first), and visual styling (brand colors, pointer cursors).
 
 ### Changed
+
 - **UI/UX**: Unified status colors across the application:
-    - `Todo` is now consistently gray (`text_muted`).
-    - `Ignored` is now consistently red (`destructive`).
-    - `InProgress` plan items now match the global accent color.
+  - `Todo` is now consistently gray (`text_muted`).
+  - `Ignored` is now consistently red (`destructive`).
+  - `InProgress` plan items now match the global accent color.
 - **Assets**: Optimized application assets by converting screenshots to WebP format, reducing bundle size.
 - **Documentation**: Updated README and Architecture docs; removed obsolete planning documents.
 - **Review View**: Refined center pane layout and navigation tree styling.
 - **Infra**: Updates to ACP task generator client and type definitions.
 
 ### Fixed
+
 - **Review Selector**: Resolved issues with item clickability, hover states, and deprecated popup API usage.
 - **Animations**: Improved cyber animation components.
 

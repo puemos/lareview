@@ -235,18 +235,15 @@ Generate a Markdown summary of your review, including stats, metadata, task deta
 - Toolchain: nightly Rust with `rustfmt` and `clippy` components (edition 2024; see `rust-toolchain.toml`)
 - Run the app: `cargo run`
 - Reset/seed sample data:
-
   - `cargo run --bin reset_db`
   - `cargo run --bin seed_db`
 
 - Checks:
-
   - `cargo fmt -- --check`
   - `cargo clippy --all-targets --all-features -- -D warnings`
   - `cargo test`
 
 - Tests:
-
   - Unit tests: Located alongside modules in `src/` (usually as `tests.rs`)
   - Integration tests: Located in the root `tests/` directory
   - Run all tests: `cargo test`
