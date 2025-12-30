@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.15] - 2025-12-30
+
+### Added
+
+- **Export**: Enhanced markdown export with diagrams, improved formatting, selection/options UI, and copy-to-clipboard functionality.
+- **Review**: Added feedback deletion capability.
+- **D2**: Added async D2 to ASCII rendering.
+
+### Changed
+
+- **Refactor**: Renamed "threads" to "feedback" across the domain and database.
+- **UI State**: Moved transient UI state to `UiMemory` for better state management.
+- **UI**: Updated `ListItem` and icons for selection support; minor polish and theme fixes.
+
+### Fixed
+
+- **Markdown**: Prevented hangs on large code blocks and improved caching.
+- **App**: Improved error handling and robustness across export, prompts, and UI.
+
 ## [0.0.14] - 2025-12-27
 
 ### Added
