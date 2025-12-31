@@ -1,0 +1,285 @@
+use super::review::ReviewRunId;
+use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::str::FromStr;
+use std::sync::Arc;
+
+/// Unique identifier for a review task
+pub type TaskId = String;
+
+/// Risk level associated with a review task, indicating the potential impact of the changes
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum RiskLevel {
+    /// Low risk changes with minimal impact
+    #[default]
+    Low,
+    /// Medium risk changes that require attention
+    Medium,
+    /// High risk changes that require careful review
+    High,
+}
+
+impl fmt::Display for RiskLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "LOW"),
+            Self::Medium => write!(f, "MEDIUM"),
+            Self::High => write!(f, "HIGH"),
+        }
+    }
+}
+
+impl FromStr for RiskLevel {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "LOW" => Ok(Self::Low),
+            "MEDIUM" => Ok(Self::Medium),
+            "HIGH" => Ok(Self::High),
+            _ => Err(format!("Unknown risk level: {}", s)),
+        }
+    }
+}
+
+impl RiskLevel {
+    pub fn rank(self) -> u8 {
+        match self {
+            Self::Low => 0,
+            Self::Medium => 1,
+            Self::High => 2,
+        }
+    }
+}
+
+/// Status of a review item (task or feedback)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum ReviewStatus {
+    /// Work to do
+    #[default]
+    #[serde(alias = "PENDING")]
+    #[serde(alias = "TODO")]
+    Todo,
+    /// Work in progress
+    #[serde(alias = "INPROGRESS")]
+    #[serde(alias = "IN_PROGRESS")]
+    #[serde(alias = "inprogress")]
+    #[serde(alias = "in_progress")]
+    #[serde(alias = "WIP")]
+    #[serde(alias = "wip")]
+    InProgress,
+    /// Work completed
+    #[serde(alias = "REVIEWED")]
+    #[serde(alias = "COMPLETED")]
+    #[serde(alias = "DONE")]
+    Done,
+    /// Work ignored or rejected
+    #[serde(alias = "IGNORED")]
+    #[serde(alias = "REJECT")]
+    #[serde(alias = "REJECTED")]
+    Ignored,
+}
+
+impl fmt::Display for ReviewStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Todo => write!(f, "todo"),
+            Self::InProgress => write!(f, "in_progress"),
+            Self::Done => write!(f, "done"),
+            Self::Ignored => write!(f, "ignored"),
+        }
+    }
+}
+
+impl FromStr for ReviewStatus {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "PENDING" | "TODO" => Ok(Self::Todo),
+            "IN_PROGRESS" | "INPROGRESS" | "WIP" => Ok(Self::InProgress),
+            "DONE" | "REVIEWED" | "COMPLETED" => Ok(Self::Done),
+            "IGNORED" | "REJECT" | "REJECTED" => Ok(Self::Ignored),
+            _ => Ok(Self::Todo),
+        }
+    }
+}
+
+impl ReviewStatus {
+    pub fn is_closed(self) -> bool {
+        matches!(self, Self::Done | Self::Ignored)
+    }
+
+    pub fn rank(self) -> u8 {
+        match self {
+            Self::Todo => 0,
+            Self::InProgress => 1,
+            Self::Ignored => 2,
+            Self::Done => 3,
+        }
+    }
+}
+
+/// A reference to a specific hunk within a file's diff.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct HunkRef {
+    /// The starting line number of the hunk in the old file.
+    pub old_start: u32,
+    /// The number of lines in the hunk from the old file.
+    pub old_lines: u32,
+    /// The starting line number of the hunk in the new file.
+    pub new_start: u32,
+    /// The number of lines in the hunk from the new file.
+    pub new_lines: u32,
+}
+
+/// A reference to changed sections of a file, represented by a list of hunks.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct DiffRef {
+    /// The path to the file that was changed.
+    pub file: String,
+    /// A list of specific hunks that are relevant to a task.
+    pub hunks: Vec<HunkRef>,
+}
+
+/// Statistics for a review task
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskStats {
+    /// Number of lines added in the changes
+    pub additions: u32,
+    /// Number of lines deleted in the changes
+    pub deletions: u32,
+    /// Risk level of the changes
+    pub risk: RiskLevel,
+    /// Tags describing the nature of the changes
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+/// A review task spanning one or more files
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ReviewTask {
+    /// Unique identifier for the task
+    pub id: TaskId,
+    /// ID of the review run this task belongs to
+    pub run_id: ReviewRunId,
+    /// Title of the review task
+    pub title: String,
+    /// Detailed description of the review task
+    pub description: String,
+    /// List of files affected by this task. Derived from `diff_refs`.
+    pub files: Vec<String>,
+    /// Statistical information about the changes
+    pub stats: TaskStats,
+    /// References to the specific diff hunks relevant to this task.
+    #[serde(default)]
+    pub diff_refs: Vec<DiffRef>,
+    /// AI-generated insight about the task (optional)
+    pub insight: Option<Arc<str>>,
+    /// Optional diagram describing the task context
+    pub diagram: Option<Arc<str>>,
+    /// Flag indicating if the task was generated by AI
+    #[serde(default)]
+    pub ai_generated: bool,
+    /// Current review status of the task
+    #[serde(default)]
+    pub status: ReviewStatus,
+    /// Optional sub-flow name this task belongs to for organizational purposes
+    #[serde(default)]
+    pub sub_flow: Option<String>,
+}
+
+/// Status of a plan entry
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum PlanStatus {
+    /// Plan entry has not been started yet
+    #[default]
+    #[serde(alias = "PENDING")]
+    Pending,
+    /// Plan entry is currently in progress
+    #[serde(alias = "INPROGRESS")]
+    #[serde(alias = "IN_PROGRESS")]
+    #[serde(alias = "inprogress")]
+    #[serde(alias = "in_progress")]
+    InProgress,
+    /// Plan entry has been completed
+    #[serde(alias = "COMPLETED")]
+    Completed,
+}
+
+/// Priority level of a plan entry
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum PlanPriority {
+    /// Low priority plan entry
+    #[serde(alias = "LOW")]
+    Low,
+    /// Medium priority plan entry
+    #[default]
+    #[serde(alias = "MEDIUM")]
+    Medium,
+    /// High priority plan entry
+    #[serde(alias = "HIGH")]
+    High,
+}
+
+/// A single entry in a plan
+#[allow(dead_code)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanEntry {
+    /// Content/narrative description of the plan entry
+    pub content: String,
+    /// Priority level of the plan entry
+    #[serde(default)]
+    pub priority: PlanPriority,
+    /// Current status of the plan entry
+    #[serde(default)]
+    pub status: PlanStatus,
+    /// Optional metadata associated with the plan entry
+    #[serde(default)]
+    pub meta: Option<serde_json::Value>,
+}
+
+/// A plan containing multiple entries
+#[allow(dead_code)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Plan {
+    /// List of plan entries
+    pub entries: Vec<PlanEntry>,
+    /// Optional metadata associated with the plan
+    #[serde(default)]
+    pub meta: Option<serde_json::Value>,
+}
+
+impl From<agent_client_protocol::Plan> for Plan {
+    fn from(p: agent_client_protocol::Plan) -> Self {
+        Self {
+            entries: p.entries.into_iter().map(PlanEntry::from).collect(),
+            meta: p.meta.map(serde_json::Value::Object),
+        }
+    }
+}
+
+impl From<agent_client_protocol::PlanEntry> for PlanEntry {
+    fn from(e: agent_client_protocol::PlanEntry) -> Self {
+        Self {
+            content: e.content,
+            priority: match e.priority {
+                agent_client_protocol::PlanEntryPriority::Low => PlanPriority::Low,
+                agent_client_protocol::PlanEntryPriority::Medium => PlanPriority::Medium,
+                agent_client_protocol::PlanEntryPriority::High => PlanPriority::High,
+                _ => PlanPriority::Medium,
+            },
+            status: match e.status {
+                agent_client_protocol::PlanEntryStatus::Pending => PlanStatus::Pending,
+                agent_client_protocol::PlanEntryStatus::InProgress => PlanStatus::InProgress,
+                agent_client_protocol::PlanEntryStatus::Completed => PlanStatus::Completed,
+                _ => PlanStatus::Pending,
+            },
+            meta: e.meta.map(serde_json::Value::Object),
+        }
+    }
+}
