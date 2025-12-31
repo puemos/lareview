@@ -28,7 +28,7 @@ pub fn rotating_reticle(painter: &Painter, params: ReticleParams) {
     }
 }
 
-/// A pulsing circle that grows and shrinks.
+/// A pulsing circle.
 pub fn pulsing_circle(
     painter: &Painter,
     center: Pos2,
@@ -47,7 +47,7 @@ pub fn pulsing_circle(
     );
 }
 
-/// A combined loader widget using cyber elements.
+/// Combined loader widget.
 pub fn paint_cyber_loader(
     painter: &Painter,
     center: Pos2,
@@ -198,13 +198,6 @@ fn smooth_wave(time: f64, speed: f32) -> f32 {
 
 fn pulse_wave(time: f64, speed: f32) -> f32 {
     let t = ((time * speed as f64 * 2.0).cos() + 1.0) / 2.0;
-    // Sharpen the wave to create a short pulse effect
-    // As cos() -> -1, t -> 0 (Primary Color). We want to narrow this region.
-    // 1.0 - (1.0 - t)^4 will keep the value close to 1 (Muted) for most of the range
-    // and only dip to 0 (Primary) briefly.
-    // t=0 -> 0 (Primary)
-    // t=0.5 -> 0.984 (Mostly Muted)
-    // t=1 -> 1 (Muted)
     (1.0 - (1.0 - t).powi(12)) as f32
 }
 
@@ -260,16 +253,9 @@ pub fn color_wave_multi(colors: &[Color32], time: f64, speed: f32) -> Color32 {
 
 // === Pulse effects ===
 
-/// Pulse between a color and transparent
 pub fn color_pulse(color: Color32, time: f64, speed: f32) -> Color32 {
     let t = smooth_wave(time, speed);
     let rgba = egui::Rgba::from(color);
-    // Directly access components since index access might not be available or clean
-    // Rgba is conventionally r, g, b, a.
-    // However, Rgba in egui fields are public: r, g, b, a.
-    // Wait, the snippet used `rgba[3]`. Rgba usually implements Index.
-    // Let's use `.a()` getter and create new.
-    // Actually, Rgba struct fields are public in most versions, but let's be safe.
     let new_a = rgba.a() * t;
     Color32::from(egui::Rgba::from_rgba_premultiplied(
         rgba.r(),

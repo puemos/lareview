@@ -11,12 +11,12 @@ pub type TaskId = String;
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum RiskLevel {
-    /// Low risk changes with minimal impact
+    /// Low risk
     #[default]
     Low,
-    /// Medium risk changes that require attention
+    /// Medium risk
     Medium,
-    /// High risk changes that require careful review
+    /// High risk
     High,
 }
 
@@ -56,28 +56,14 @@ impl RiskLevel {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum ReviewStatus {
-    /// Work to do
     #[default]
     #[serde(alias = "PENDING")]
-    #[serde(alias = "TODO")]
     Todo,
-    /// Work in progress
-    #[serde(alias = "INPROGRESS")]
     #[serde(alias = "IN_PROGRESS")]
-    #[serde(alias = "inprogress")]
-    #[serde(alias = "in_progress")]
-    #[serde(alias = "WIP")]
-    #[serde(alias = "wip")]
     InProgress,
-    /// Work completed
-    #[serde(alias = "REVIEWED")]
-    #[serde(alias = "COMPLETED")]
     #[serde(alias = "DONE")]
     Done,
-    /// Work ignored or rejected
     #[serde(alias = "IGNORED")]
-    #[serde(alias = "REJECT")]
-    #[serde(alias = "REJECTED")]
     Ignored,
 }
 
@@ -196,16 +182,8 @@ pub struct ReviewTask {
 pub enum PlanStatus {
     /// Plan entry has not been started yet
     #[default]
-    #[serde(alias = "PENDING")]
     Pending,
-    /// Plan entry is currently in progress
-    #[serde(alias = "INPROGRESS")]
-    #[serde(alias = "IN_PROGRESS")]
-    #[serde(alias = "inprogress")]
-    #[serde(alias = "in_progress")]
     InProgress,
-    /// Plan entry has been completed
-    #[serde(alias = "COMPLETED")]
     Completed,
 }
 

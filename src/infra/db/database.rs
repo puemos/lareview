@@ -1,24 +1,18 @@
-//! SQLite database setup and connection management for LaReview
-//! Handles database initialization, schema creation, and connection management.
-
 use anyhow::Result;
 use rusqlite::Connection;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-/// Database wrapper that manages SQLite connections
 pub struct Database {
     conn: Arc<Mutex<Connection>>,
 }
 
 impl Database {
-    /// Create or open the database at the default location
     pub fn open() -> Result<Self> {
         let path = Self::default_path();
         Self::open_at(path)
     }
 
-    /// Create an in-memory database (useful for testing)
     pub fn open_in_memory() -> Result<Self> {
         let conn = Connection::open_in_memory()?;
         let db = Self {
@@ -28,9 +22,7 @@ impl Database {
         Ok(db)
     }
 
-    /// Create or open the database at a specific path
     pub fn open_at(path: PathBuf) -> Result<Self> {
-        // Ensure parent directory exists
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
@@ -41,7 +33,6 @@ impl Database {
         };
         db.init()?;
 
-        // Expose chosen path for downstream consumers (ACP worker) if not already set
         if std::env::var("LAREVIEW_DB_PATH").is_err() {
             // set_var is currently unsafe on nightly; this is limited to process-local config.
             unsafe {
@@ -51,7 +42,6 @@ impl Database {
         Ok(db)
     }
 
-    /// Get the default database path
     fn default_path() -> PathBuf {
         if let Ok(path) = std::env::var("LAREVIEW_DB_PATH") {
             return PathBuf::from(path);
@@ -95,7 +85,6 @@ impl Database {
             .join("db.sqlite")
     }
 
-    /// Initialize database schema
     fn init(&self) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         const SCHEMA_VERSION: i32 = 10;
@@ -106,11 +95,9 @@ impl Database {
             conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
 
         if existing_version == 0 {
-            // Fresh database - skip migrations and go directly to current version
             Self::create_schema(&conn)?;
             conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
         } else if existing_version < SCHEMA_VERSION {
-            // Existing database - run migrations to bring it up to date
             for version in (existing_version + 1)..=SCHEMA_VERSION {
                 Self::run_migration(&conn, version)?;
             }
@@ -120,7 +107,6 @@ impl Database {
         Ok(())
     }
 
-    /// Get a reference to the connection
     pub fn connection(&self) -> Arc<Mutex<Connection>> {
         self.conn.clone()
     }
@@ -258,12 +244,7 @@ impl Database {
         Ok(())
     }
 
-    /// Execute a migration for the specified version.
-    ///
-    /// Migration scripts are embedded into the binary at compile time to
-    /// ensure reliable execution in all environments without external dependencies.
     fn run_migration(conn: &Connection, version: i32) -> Result<()> {
-        // SQL is loaded from the /migrations directory in the workspace root.
         let sql = match version {
             9 => include_str!("../../../migrations/0009_update_feedback_status_constraint.sql"),
             10 => include_str!("../../../migrations/0010_rename_thread_to_feedback.sql"),

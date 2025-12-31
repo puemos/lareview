@@ -72,10 +72,6 @@ impl<'a> ListItem<'a> {
             egui::Color32::TRANSPARENT
         };
 
-        // We use an egui::Frame to allocate the background area for the item.
-        // This ensures the background color covers the entire inner area,
-        // including the specified padding/margin.
-
         let margin = self
             .inner_margin
             .unwrap_or(egui::Margin::same(spacing::SPACING_SM as i8));
@@ -84,9 +80,6 @@ impl<'a> ListItem<'a> {
             .inner_margin(margin)
             .fill(bg_color)
             .corner_radius(spacing::RADIUS_MD);
-
-        // Frame::show returns a response for the inner content. We manually
-        // manage the interactive sense to make the entire frame clickable.
 
         let response = frame
             .show(ui, |ui| {
@@ -98,8 +91,6 @@ impl<'a> ListItem<'a> {
                         // We want the icon to be aligned with the first line of text.
                         // A simple way is to use `ui.with_layout` to align to TOP-LEFT.
                         ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
-                            // Apply a small vertical offset if fonts differ significantly
-                            // in size to achieve optical centering.
                             ui.label(typography::body(icon).color(color).size(16.0));
                         });
 
