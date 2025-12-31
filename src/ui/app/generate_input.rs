@@ -4,7 +4,7 @@ use std::sync::Arc;
 use crate::domain::Review;
 use crate::domain::ReviewSource;
 use crate::infra::acp::RunContext;
-use crate::infra::github;
+use crate::infra::vcs::github;
 use crate::ui::app::messages::GenerateResolvedPayload;
 use crate::ui::app::state::{GeneratePreview, GitHubPreview};
 

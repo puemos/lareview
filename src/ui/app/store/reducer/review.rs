@@ -592,10 +592,12 @@ fn default_send_to_pr_selection(state: &AppState) -> HashSet<String> {
         .iter()
         .filter(|f| &f.review_id == review_id)
     {
-        if let Some(anchor) = &feedback.anchor {
-            if anchor.file_path.is_some() && anchor.line_number.is_some() && anchor.side.is_some() {
-                selection.insert(feedback.id.clone());
-            }
+        if let Some(anchor) = &feedback.anchor
+            && anchor.file_path.is_some()
+            && anchor.line_number.is_some()
+            && anchor.side.is_some()
+        {
+            selection.insert(feedback.id.clone());
         }
     }
 

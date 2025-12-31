@@ -1,4 +1,5 @@
 use crate::domain::{DiffRef, ReviewStatus, ReviewTask, RiskLevel, TaskStats};
+use crate::infra::diagram::parse_json;
 use anyhow::Result;
 use serde::Deserialize;
 use serde_json::Value;
@@ -187,11 +188,11 @@ pub(crate) fn parse_task(args: Value) -> Result<ReviewTask> {
         count_line_changes_legacy(&task.diffs)
     };
 
-    let diagram = task.diagram.and_then(clean_d2_code);
+    let diagram = task.diagram.and_then(clean_diagram_json);
 
-    // Validate D2 if present
+    // Validate JSON by parsing, surface clear error
     if let Some(ref d) = diagram {
-        crate::infra::d2::validate_d2(d.as_ref()).map_err(|e| anyhow::anyhow!(e))?;
+        parse_json(d).map_err(|e| anyhow::anyhow!(format!("Invalid diagram JSON: {e}")))?;
     }
 
     Ok(ReviewTask {
@@ -215,7 +216,7 @@ pub(crate) fn parse_task(args: Value) -> Result<ReviewTask> {
     })
 }
 
-fn clean_d2_code(code: String) -> Option<Arc<str>> {
+fn clean_diagram_json(code: String) -> Option<Arc<str>> {
     let trimmed = code.trim();
     if trimmed.is_empty() {
         return None;
@@ -252,34 +253,41 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn test_clean_d2_code() {
+    fn test_clean_diagram_json() {
         // Case 1: Clean code stays clean
-        let clean = "x -> y";
-        assert_eq!(clean_d2_code(clean.to_string()), Some(Arc::from(clean)));
+        let clean = "{\"type\":\"flow\",\"data\":{\"direction\":\"LR\",\"nodes\":[{\"id\":\"a\",\"label\":\"A\",\"kind\":\"generic\"}]}}";
+        assert_eq!(
+            clean_diagram_json(clean.to_string()),
+            Some(Arc::from(clean))
+        );
 
         // Case 2: Markdown block with language
-        let md_lang = "```d2\nx -> y\n```";
+        let md_lang = "```json\n{\"type\":\"flow\",\"data\":{\"direction\":\"LR\",\"nodes\":[{\"id\":\"a\",\"label\":\"A\",\"kind\":\"generic\"}]}}\n```";
         assert_eq!(
-            clean_d2_code(md_lang.to_string()),
-            Some(Arc::from("x -> y"))
+            clean_diagram_json(md_lang.to_string()),
+            Some(Arc::from(
+                "{\"type\":\"flow\",\"data\":{\"direction\":\"LR\",\"nodes\":[{\"id\":\"a\",\"label\":\"A\",\"kind\":\"generic\"}]}}"
+            ))
         );
 
         // Case 3: Markdown block without language
-        let md_plain = "```\nx -> y\n```";
+        let md_plain = "```\n{\"type\":\"flow\",\"data\":{\"direction\":\"LR\",\"nodes\":[{\"id\":\"a\",\"label\":\"A\",\"kind\":\"generic\"}]}}\n```";
         assert_eq!(
-            clean_d2_code(md_plain.to_string()),
-            Some(Arc::from("x -> y"))
+            clean_diagram_json(md_plain.to_string()),
+            Some(Arc::from(
+                "{\"type\":\"flow\",\"data\":{\"direction\":\"LR\",\"nodes\":[{\"id\":\"a\",\"label\":\"A\",\"kind\":\"generic\"}]}}"
+            ))
         );
 
         // Case 4: Empty block
         let empty = "```d2\n```";
-        assert_eq!(clean_d2_code(empty.to_string()), None);
+        assert_eq!(clean_diagram_json(empty.to_string()), None);
 
         // Case 5: Empty string
-        assert_eq!(clean_d2_code("".to_string()), None);
+        assert_eq!(clean_diagram_json("".to_string()), None);
 
         // Case 6: Whitespace only
-        assert_eq!(clean_d2_code("   ".to_string()), None);
+        assert_eq!(clean_diagram_json("   ".to_string()), None);
     }
 
     #[test]
@@ -306,7 +314,7 @@ mod tests {
             "id": "T1",
             "title": "Title",
             "description": "Desc",
-            "diagram": "x -> y",
+            "diagram": "{\"type\":\"flow\",\"data\":{\"direction\":\"LR\",\"nodes\":[{\"id\":\"a\",\"label\":\"A\",\"kind\":\"generic\"},{\"id\":\"b\",\"label\":\"B\",\"kind\":\"generic\"}],\"edges\":[{\"from\":\"a\",\"to\":\"b\",\"label\":\"edge\"}]}}",
             "stats": { "risk": "HIGH", "tags": ["tag1"] },
             "diff_refs": [
                 { "file": "test.rs", "hunks": [] }

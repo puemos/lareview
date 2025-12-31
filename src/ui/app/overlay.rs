@@ -521,7 +521,7 @@ impl LaReviewApp {
         let path_line = feedback
             .anchor
             .as_ref()
-            .and_then(|a| a.file_path.as_ref().map(|p| p.clone()))
+            .and_then(|a| a.file_path.clone())
             .unwrap_or_else(|| "<no file>".to_string());
         let line_num = feedback
             .anchor

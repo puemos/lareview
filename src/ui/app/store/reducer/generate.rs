@@ -42,7 +42,7 @@ pub fn reduce(
             session.diff_text = text.clone();
 
             // Auto-fetch PR context if it looks like a GitHub PR ref
-            if crate::infra::github::parse_pr_ref(&text).is_some()
+            if crate::infra::vcs::github::parse_pr_ref(&text).is_some()
                 && !session.is_preview_fetching
                 && session.last_preview_input_ref.as_deref() != Some(text.trim())
             {

@@ -3,7 +3,7 @@ use super::parsing::parse_task;
 use super::run_context::RunContext;
 use crate::domain::ReviewTask;
 use crate::infra::db::{Database, ReviewRepository, TaskRepository};
-use crate::infra::diff_index::DiffIndex;
+use crate::infra::diff::index::DiffIndex;
 use anyhow::{Context, Result};
 use chrono::Utc;
 use serde_json::Value;
@@ -93,10 +93,16 @@ fn validate_task_diagram(task: &ReviewTask) -> Result<()> {
         .is_some_and(|diagram| !diagram.trim().is_empty());
     if !has_diagram {
         anyhow::bail!(
-            "Task {} missing D2 diagram. Every task must include a diagram.",
+            "Task {} missing diagram. Every task must include a diagram JSON block.",
             task.id
         );
     }
+
+    if let Some(diagram) = &task.diagram {
+        crate::infra::diagram::parse_json(diagram)
+            .map_err(|e| anyhow::anyhow!("Invalid diagram JSON: {e}"))?;
+    }
+
     Ok(())
 }
 

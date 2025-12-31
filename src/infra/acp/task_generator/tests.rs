@@ -40,7 +40,7 @@ fn sample_task(id: &str, files: &[&str]) -> ReviewTask {
         diff_refs: vec![],
         insight: None,
         diagram: Some(Arc::from(
-            "Flow: { shape: sequence_diagram Reviewer -> Code: \"review\" }",
+            "{\"type\":\"sequence\",\"data\":{\"actors\":[{\"id\":\"reviewer\",\"label\":\"Reviewer\",\"kind\":\"user\"},{\"id\":\"code\",\"label\":\"Code\",\"kind\":\"service\"}],\"messages\":[{\"type\":\"call\",\"data\":{\"from\":\"reviewer\",\"to\":\"code\",\"label\":\"review\"}}]}}",
         )),
         ai_generated: true,
         status: ReviewStatus::Todo,

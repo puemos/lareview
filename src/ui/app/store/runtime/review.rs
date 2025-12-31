@@ -159,7 +159,7 @@ pub fn send_feedback_to_pr(app: &mut LaReviewApp, feedback_id: String) {
 
             let body = ReviewExporter::render_single_feedback_markdown(&feedback, &comments);
 
-            let posted = crate::infra::github::create_review_comment(
+            let posted = crate::infra::vcs::github::create_review_comment(
                 &owner, &repo, number, &body, &commit_id, path, position,
             )
             .await
@@ -269,7 +269,7 @@ pub fn send_feedbacks_to_pr(
                     .await
                     .map_err(|e| format!("Failed to render summary: {e}"))?;
 
-                let posted = crate::infra::github::create_review(
+                let posted = crate::infra::vcs::github::create_review(
                     &owner,
                     &repo,
                     number,
@@ -326,7 +326,7 @@ pub fn send_feedbacks_to_pr(
 
                 let body = ReviewExporter::render_single_feedback_markdown(&feedback, &comments);
 
-                let posted = crate::infra::github::create_review_comment(
+                let posted = crate::infra::vcs::github::create_review_comment(
                     &owner,
                     &repo,
                     number,

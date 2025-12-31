@@ -76,7 +76,10 @@ async fn test_export_to_markdown_full() {
                 }],
             }],
             insight: Some("AI Insight".into()),
-            diagram: Some("x -> y".into()),
+            diagram: Some(
+                "{\"type\":\"flow\",\"data\":{\"direction\":\"LR\",\"nodes\":[{\"id\":\"a\",\"label\":\"A\",\"kind\":\"generic\"},{\"id\":\"b\",\"label\":\"B\",\"kind\":\"generic\"}],\"edges\":[{\"from\":\"a\",\"to\":\"b\",\"label\":\"edge\"}]}}"
+                    .into(),
+            ),
             ai_generated: true,
             status: ReviewStatus::Done,
             sub_flow: Some("Flow A".into()),

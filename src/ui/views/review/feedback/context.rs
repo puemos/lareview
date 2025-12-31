@@ -16,29 +16,28 @@ pub(crate) fn render_feedback_context(
     let mut action = DiffAction::None;
     if let (Some(_file_path), Some(line_number)) = (file_path, line_number)
         && line_number > 0
+        && let Some(diff_snippet) = diff_snippet
     {
-        if let Some(diff_snippet) = diff_snippet {
-            ui.add_space(spacing::SPACING_MD);
-            ui.label(
-                typography::body("Diff context")
-                    .size(12.0)
-                    .color(theme.text_muted),
-            );
-            ui.add_space(spacing::SPACING_XS);
+        ui.add_space(spacing::SPACING_MD);
+        ui.label(
+            typography::body("Diff context")
+                .size(12.0)
+                .color(theme.text_muted),
+        );
+        ui.add_space(spacing::SPACING_XS);
 
-            egui::Frame::NONE
-                .fill(theme.bg_tertiary)
-                .stroke(egui::Stroke::new(1.0, theme.border_secondary))
-                .corner_radius(crate::ui::spacing::RADIUS_MD)
-                .inner_margin(egui::Margin::same(spacing::SPACING_SM as i8))
-                .show(ui, |ui| {
-                    egui::ScrollArea::vertical()
-                        .max_height(220.0)
-                        .show(ui, |ui| {
-                            action = render_diff_editor_full_view(ui, &diff_snippet, "diff");
-                        });
-                });
-        }
+        egui::Frame::NONE
+            .fill(theme.bg_tertiary)
+            .stroke(egui::Stroke::new(1.0, theme.border_secondary))
+            .corner_radius(crate::ui::spacing::RADIUS_MD)
+            .inner_margin(egui::Margin::same(spacing::SPACING_SM as i8))
+            .show(ui, |ui| {
+                egui::ScrollArea::vertical()
+                    .max_height(220.0)
+                    .show(ui, |ui| {
+                        action = render_diff_editor_full_view(ui, &diff_snippet, "diff");
+                    });
+            });
     }
 
     action

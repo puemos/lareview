@@ -629,38 +629,30 @@ index aaa1111..bbb2222 100644
                 })
             ])?),
             diagram: Some(
-                r#"direction: right
-
-Client: {
-  shape: person
-  label: User
-}
-
-WebApp: {
-  label: "Next.js\nBookingLogsView"
-}
-
-API: {
-  label: "tRPC\ngetAuditLogs"
-}
-
-ViewerService: {
-  label: BookingAuditViewerService
-}
-
-Repos: {
-  shape: cylinder
-  label: Repositories
-}
-
-Client -> WebApp: Open booking logs
-WebApp -> API: getAuditLogs
-API -> ViewerService: Fetch audit data
-ViewerService -> Repos: Load logs & metadata
-Repos -> ViewerService: Raw audit records
-ViewerService -> API: Enriched logs
-API -> WebApp: JSON response
-WebApp -> Client: Render timeline"#.trim().to_string(),
+                r#"{
+  "type": "flow",
+  "data": {
+    "direction": "LR",
+    "nodes": [
+      { "id": "client", "label": "User", "kind": "user" },
+      { "id": "web_app", "label": "Next.js BookingLogsView", "kind": "service" },
+      { "id": "api", "label": "tRPC getAuditLogs", "kind": "service" },
+      { "id": "viewer_service", "label": "BookingAuditViewerService", "kind": "service" },
+      { "id": "repos", "label": "Repositories", "kind": "database" }
+    ],
+    "edges": [
+      { "from": "client", "to": "web_app", "label": "Open booking logs" },
+      { "from": "web_app", "to": "api", "label": "getAuditLogs" },
+      { "from": "api", "to": "viewer_service", "label": "Fetch audit data" },
+      { "from": "viewer_service", "to": "repos", "label": "Load logs & metadata" },
+      { "from": "repos", "to": "viewer_service", "label": "Raw audit records" },
+      { "from": "viewer_service", "to": "api", "label": "Enriched logs" },
+      { "from": "api", "to": "web_app", "label": "JSON response" },
+      { "from": "web_app", "to": "client", "label": "Render timeline" }
+    ]
+  }
+}"#
+                .to_string(),
             ),
             ai_generated: true,
             status: "PENDING".to_string(),
@@ -741,42 +733,30 @@ WebApp -> Client: Render timeline"#.trim().to_string(),
                 })
             ])?),
             diagram: Some(
-                r#"direction: right
-
-Producer: {
-  label: "Producer Service"
-}
-
-Tasker: {
-  shape: queue
-  label: "Tasker Queue"
-}
-
-Consumer: {
-  label: "Task Consumer"
-}
-
-Registry: {
-  shape: hexagon
-  label: "Action Registry"
-}
-
-ActionServices: {
-  label: "Action Services\nCreated, Rescheduled\nCancelled, ..."
-}
-
-Repo: {
-  shape: cylinder
-  label: "Audit Repository"
-}
-
-Producer -> Tasker: Queue audit
-Producer -> Tasker: Enqueue task
-Tasker -> Consumer: Deliver payload
-Consumer -> Registry: Get service
-Registry -> ActionServices: Route to action
-ActionServices -> Consumer: Process & migrate
-Consumer -> Repo: Store versioned data"#.trim().to_string(),
+                r#"{
+  "type": "flow",
+  "data": {
+    "direction": "LR",
+    "nodes": [
+      { "id": "producer", "label": "Producer Service", "kind": "service" },
+      { "id": "tasker", "label": "Tasker Queue", "kind": "queue" },
+      { "id": "consumer", "label": "Task Consumer", "kind": "service" },
+      { "id": "registry", "label": "Action Registry", "kind": "lambda" },
+      { "id": "action_services", "label": "Action Services", "kind": "service" },
+      { "id": "repo", "label": "Audit Repository", "kind": "database" }
+    ],
+    "edges": [
+      { "from": "producer", "to": "tasker", "label": "Queue audit" },
+      { "from": "producer", "to": "tasker", "label": "Enqueue task" },
+      { "from": "tasker", "to": "consumer", "label": "Deliver payload" },
+      { "from": "consumer", "to": "registry", "label": "Get service" },
+      { "from": "registry", "to": "action_services", "label": "Route to action" },
+      { "from": "action_services", "to": "consumer", "label": "Process & migrate" },
+      { "from": "consumer", "to": "repo", "label": "Store versioned data" }
+    ]
+  }
+}"#
+                .to_string(),
             ),
             ai_generated: true,
             status: "PENDING".to_string(),
@@ -851,40 +831,29 @@ Consumer -> Repo: Store versioned data"#.trim().to_string(),
                 })
             ])?),
             diagram: Some(
-                r#"direction: right
-
-API: {
-  label: "Booking Service"
-}
-
-Producer: {
-  label: "BookingAuditTasker\nProducerService"
-}
-
-Tasker: {
-  label: "Tasker\nbookingAudit"
-}
-
-Consumer: {
-  label: "BookingAuditTask\nConsumer"
-}
-
-Registry: {
-  shape: hexagon
-  label: "Action Service\nRegistry"
-}
-
-Repo: {
-  shape: cylinder
-  label: "BookingAudit\nRepository"
-}
-
-API -> Producer: "queueCreatedAudit\nqueueRescheduledAudit"
-Producer -> Tasker: "create task\nwith base payload"
-Tasker -> Consumer: deliver payload
-Consumer -> Registry: getActionService
-Registry -> Consumer: return typed service
-Consumer -> Repo: "insert audit row\nwith versioned data""#.trim().to_string(),
+                r#"{
+  "type": "flow",
+  "data": {
+    "direction": "LR",
+    "nodes": [
+      { "id": "api", "label": "Booking Service", "kind": "service" },
+      { "id": "producer", "label": "BookingAuditTasker ProducerService", "kind": "service" },
+      { "id": "tasker", "label": "Tasker bookingAudit", "kind": "queue" },
+      { "id": "consumer", "label": "BookingAuditTask Consumer", "kind": "service" },
+      { "id": "registry", "label": "Action Service Registry", "kind": "lambda" },
+      { "id": "repo", "label": "BookingAudit Repository", "kind": "database" }
+    ],
+    "edges": [
+      { "from": "api", "to": "producer", "label": "queueCreatedAudit, queueRescheduledAudit" },
+      { "from": "producer", "to": "tasker", "label": "create task with base payload" },
+      { "from": "tasker", "to": "consumer", "label": "deliver payload" },
+      { "from": "consumer", "to": "registry", "label": "getActionService" },
+      { "from": "registry", "to": "consumer", "label": "return typed service" },
+      { "from": "consumer", "to": "repo", "label": "insert audit row with versioned data" }
+    ]
+  }
+}"#
+                .to_string(),
             ),
             ai_generated: true,
             status: "PENDING".to_string(),
@@ -929,44 +898,32 @@ Consumer -> Repo: "insert audit row\nwith versioned data""#.trim().to_string(),
                 })
             ])?),
             diagram: Some(
-                r#"direction: right
-
-WebAPI: {
-  label: "tRPC endpoint\ntviewer.bookings.getAuditLogs"
-}
-
-Viewer: {
-  label: BookingAuditViewerService
-}
-
-AuditRepo: {
-  shape: cylinder
-  label: "BookingAudit\nRepository"
-}
-
-BookingRepo: {
-  shape: cylinder
-  label: "Booking\nRepository"
-}
-
-Registry: {
-  shape: hexagon
-  label: "Action Service\nRegistry"
-}
-
-RescheduledSvc: {
-  label: "Rescheduled\nAuditActionService"
-}
-
-WebAPI -> Viewer: "bookingUid\nuserTimeZone"
-Viewer -> AuditRepo: findAllForBooking
-Viewer -> BookingRepo: getFromRescheduleUid
-BookingRepo -> Viewer: "fromRescheduleUid\n or null"
-Viewer -> Registry: getActionService
-Registry -> Viewer: action service
-Viewer -> AuditRepo: "findRescheduled\nLogsOfBooking"
-Viewer -> RescheduledSvc: "build rescheduled-from\ntitle"
-Viewer -> WebAPI: "enriched logs with\nactionDisplayTitle\ndata, displayFields""#.trim().to_string(),
+                r#"{
+  "type": "flow",
+  "data": {
+    "direction": "LR",
+    "nodes": [
+      { "id": "web_api", "label": "tRPC endpoint tviewer.bookings.getAuditLogs", "kind": "service" },
+      { "id": "viewer", "label": "BookingAuditViewerService", "kind": "service" },
+      { "id": "audit_repo", "label": "BookingAudit Repository", "kind": "database" },
+      { "id": "booking_repo", "label": "Booking Repository", "kind": "database" },
+      { "id": "registry", "label": "Action Service Registry", "kind": "lambda" },
+      { "id": "rescheduled_svc", "label": "Rescheduled AuditActionService", "kind": "service" }
+    ],
+    "edges": [
+      { "from": "web_api", "to": "viewer", "label": "bookingUid, userTimeZone" },
+      { "from": "viewer", "to": "audit_repo", "label": "findAllForBooking" },
+      { "from": "viewer", "to": "booking_repo", "label": "getFromRescheduleUid" },
+      { "from": "booking_repo", "to": "viewer", "label": "fromRescheduleUid or null" },
+      { "from": "viewer", "to": "registry", "label": "getActionService" },
+      { "from": "registry", "to": "viewer", "label": "action service" },
+      { "from": "viewer", "to": "audit_repo", "label": "findRescheduled logs of booking" },
+      { "from": "viewer", "to": "rescheduled_svc", "label": "build rescheduled-from title" },
+      { "from": "viewer", "to": "web_api", "label": "enriched logs with actionDisplayTitle data, displayFields" }
+    ]
+  }
+}"#
+                .to_string(),
             ),
             ai_generated: true,
             status: "PENDING".to_string(),
@@ -991,37 +948,28 @@ Viewer -> WebAPI: "enriched logs with\nactionDisplayTitle\ndata, displayFields""
             insight: Some("These are the edges of the system. If a DI token or module wiring is wrong, audit logs will silently stop recording or viewing without obvious type errors. Treat this as a sanity check that the booking audit stack is reachable in real environments, not just in tests.".to_string()),
             diff_refs: None, // DI wiring typically doesn't reference specific hunks
             diagram: Some(
-                r#"direction: down
-
-Container: {
-  label: "DI Container"
-}
-
-TaskerMod: {
-  label: "Tasker Module"
-}
-
-LoggerMod: {
-  label: "Logger Module"
-}
-
-ConsumerMod: {
-  label: "BookingAuditTaskConsumer\nModule"
-}
-
-ProducerMod: {
-  label: "BookingAuditTaskerProducerService\nModule"
-}
-
-ViewerMod: {
-  label: "BookingAuditViewerService\nModule"
-}
-
-Container -> TaskerMod: load tasker
-Container -> LoggerMod: load logger
-Container -> ConsumerMod: "bind consumer deps:\nrepositories, features,\nuser repo"
-Container -> ProducerMod: "bind producer deps:\ntasker, logger"
-Container -> ViewerMod: "bind viewer deps:\naudit repo, user repo,\nbooking repo""#.trim().to_string(),
+                r#"{
+  "type": "flow",
+  "data": {
+    "direction": "TB",
+    "nodes": [
+      { "id": "container", "label": "DI Container", "kind": "service" },
+      { "id": "tasker_mod", "label": "Tasker Module", "kind": "service" },
+      { "id": "logger_mod", "label": "Logger Module", "kind": "service" },
+      { "id": "consumer_mod", "label": "BookingAuditTaskConsumer Module", "kind": "service" },
+      { "id": "producer_mod", "label": "BookingAuditTaskerProducerService Module", "kind": "service" },
+      { "id": "viewer_mod", "label": "BookingAuditViewerService Module", "kind": "service" }
+    ],
+    "edges": [
+      { "from": "container", "to": "tasker_mod", "label": "load tasker" },
+      { "from": "container", "to": "logger_mod", "label": "load logger" },
+      { "from": "container", "to": "consumer_mod", "label": "bind consumer deps: repositories, features, user repo" },
+      { "from": "container", "to": "producer_mod", "label": "bind producer deps: tasker, logger" },
+      { "from": "container", "to": "viewer_mod", "label": "bind viewer deps: audit repo, user repo, booking repo" }
+    ]
+  }
+}"#
+                .to_string(),
             ),
             ai_generated: true,
             status: "PENDING".to_string(),

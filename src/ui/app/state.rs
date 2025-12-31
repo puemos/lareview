@@ -290,8 +290,8 @@ pub struct GeneratePreview {
 
 #[derive(Debug, Clone)]
 pub struct GitHubPreview {
-    pub pr: crate::infra::github::GitHubPrRef,
-    pub meta: crate::infra::github::GitHubPrMetadata,
+    pub pr: crate::infra::vcs::github::GitHubPrRef,
+    pub meta: crate::infra::vcs::github::GitHubPrMetadata,
 }
 
 #[derive(Debug, Clone)]

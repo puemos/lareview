@@ -1,9 +1,7 @@
 use crate::domain::{Comment, Feedback, FeedbackImpact, Review, ReviewRun, ReviewTask, RiskLevel};
-use crate::infra::d2::d2_to_ascii_async;
+use crate::infra::diagram::{MermaidRenderer, Renderer, parse_json};
 use anyhow::Result;
-use futures::future::join_all;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 pub struct ExportData {
     pub review: Review,
@@ -52,28 +50,7 @@ impl ReviewExporter {
         let mut md = String::new();
         let assets = std::collections::HashMap::new();
 
-        // 1. Prepare diagrams to render (ASCII for everything)
-        let mut diagrams_to_render: Vec<Arc<str>> = Vec::new();
-        if options.include_tasks || options.include_feedbacks {
-            for task in &data.tasks {
-                if let Some(diagram_code) = &task.diagram
-                    && !diagrams_to_render.contains(diagram_code)
-                {
-                    diagrams_to_render.push(diagram_code.clone());
-                }
-            }
-        }
-
-        // 2. Render all diagrams in parallel as ASCII
-        let render_tasks = diagrams_to_render.iter().map(|code| {
-            let code_clone = code.clone();
-            async move { (code_clone.clone(), d2_to_ascii_async(&code_clone).await) }
-        });
-
-        let render_results: HashMap<Arc<str>, Result<String, String>> =
-            join_all(render_tasks).await.into_iter().collect();
-
-        // 3. Generate Markdown
+        // Generate Markdown
         // Title
         md.push_str(&format!("# {}\n\n", data.review.title));
 
@@ -131,7 +108,7 @@ impl ReviewExporter {
                     .push(task);
             }
 
-            let mut subflow_names: Vec<_> = tasks_by_subflow.keys().collect();
+            let mut subflow_names: Vec<Option<String>> = tasks_by_subflow.keys().cloned().collect();
             subflow_names.sort_by(|a, b| match (a, b) {
                 (Some(a), Some(b)) => a.cmp(b),
                 (Some(_), None) => std::cmp::Ordering::Less,
@@ -165,7 +142,7 @@ impl ReviewExporter {
                     anchor_id
                 ));
 
-                let tasks = tasks_by_subflow.get(subflow).unwrap();
+                let tasks = tasks_by_subflow.get(&subflow).unwrap();
                 for task in tasks {
                     let anchor_id = sanitized_anchor_id(&task.title).replace("#", "");
                     let risk_icon = get_risk_icon(task.stats.risk);
@@ -229,15 +206,20 @@ impl ReviewExporter {
 
                     if let Some(diagram_code) = &task.diagram {
                         md.push_str("**Diagram**\n\n");
-                        if let Some(Ok(ascii)) = render_results.get(diagram_code) {
-                            md.push_str("```text\n");
-                            md.push_str(ascii);
-                            md.push_str("\n```\n\n");
-                        } else {
-                            // Fallback to raw code if rendering failed
-                            md.push_str("```d2\n");
-                            md.push_str(diagram_code);
-                            md.push_str("\n```\n\n");
+                        match parse_json(diagram_code) {
+                            Ok(diagram) => match MermaidRenderer.render(&diagram) {
+                                Ok(mermaid) => {
+                                    md.push_str("```mermaid\n");
+                                    md.push_str(&mermaid);
+                                    md.push_str("\n```\n\n");
+                                }
+                                Err(e) => {
+                                    md.push_str(&format!("_Failed to render diagram: {}_\n\n", e));
+                                }
+                            },
+                            Err(e) => {
+                                md.push_str(&format!("_Invalid diagram JSON: {}_\n\n", e));
+                            }
                         }
                     }
 
@@ -256,20 +238,9 @@ impl ReviewExporter {
                                 .cloned()
                                 .collect();
                             md.push_str(&Self::render_single_feedback_markdown(
-                                &feedback,
+                                feedback,
                                 &f_comments,
                             ));
-                            // Add diagram if present? The old code added diagrams.
-                            // The new spec implies unified logic, but render_single_feedback_markdown
-                            // is supposed to be for GitHub comments where diagrams might be awkward unless ASCII.
-                            // Let's stick to the spec "render_single_feedback_markdown"
-                            // and if we need diagrams inside, we might need to pass them or decide.
-                            // For now, let's assume the helper handles text/comments only as per plan.
-                            // Wait, the plan says "This function will generate the body of a feedback item (Title, Impact, Comments)".
-                            // It doesn't mention diagrams. But the old code did.
-                            // I should probably pass the diagram rendered map?
-                            // The plan says "skip file links... maybe adjust headers".
-                            // Let's start with basic implementation.
                         }
                     }
                     md.push_str("--- \n\n");
@@ -322,8 +293,6 @@ impl ReviewExporter {
             md.push_str("No comments provided.\n");
         } else {
             for comment in comments {
-                // We don't have the "normalize_author" helper here easily accessbile unless we duplicate it or move it.
-                // For now, let's just use the author as is, or reimplement simple cleanup.
                 let author = if let Some(stripped) = comment.author.strip_prefix("agent:") {
                     let mut s = String::from("Agent ");
                     // Capitalize first letter of agent name

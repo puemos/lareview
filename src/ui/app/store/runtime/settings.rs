@@ -148,7 +148,7 @@ pub fn pick_folder_for_link(app: &mut LaReviewApp) {
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| "Unknown".to_string());
 
-            let remotes = crate::infra::git::extract_git_remotes(&path);
+            let remotes = crate::infra::vcs::git::extract_git_remotes(&path);
 
             let repo = crate::domain::LinkedRepo {
                 id: uuid::Uuid::new_v4().to_string(),

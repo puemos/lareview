@@ -140,7 +140,9 @@ async fn test_review_diagram_tab_rendering() {
             .iter_mut()
             .find(|t| t.id == "task_1")
         {
-            task.diagram = Some(std::sync::Arc::from("x -> y"));
+            task.diagram = Some(std::sync::Arc::from(
+                "{\"type\":\"flow\",\"data\":{\"direction\":\"LR\",\"nodes\":[{\"id\":\"x\",\"label\":\"X\",\"kind\":\"generic\"},{\"id\":\"y\",\"label\":\"Y\",\"kind\":\"generic\"}],\"edges\":[{\"from\":\"x\",\"to\":\"y\",\"label\":\"rel\"}]}}",
+            ));
         }
     }
     let mut harness = setup_harness(app.clone());

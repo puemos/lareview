@@ -23,7 +23,7 @@ impl LaReviewApp {
                 let run = self.state.domain.runs.iter().find(|r| r.id == task.run_id);
 
                 match run {
-                    Some(run) => match crate::infra::diff_index::DiffIndex::new(&run.diff_text) {
+                    Some(run) => match crate::infra::diff::index::DiffIndex::new(&run.diff_text) {
                         Ok(diff_index) => match diff_index.render_unified_diff(&task.diff_refs) {
                             Ok((diff_text, _ordered_files)) => diff_text,
                             Err(_) => String::new(),

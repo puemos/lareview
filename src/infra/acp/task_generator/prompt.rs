@@ -14,7 +14,7 @@ pub(super) fn build_prompt(
 
     // Generate a hunk manifest to help agents accurately reference hunks
     let (hunk_manifest, hunk_manifest_json) =
-        match crate::infra::diff_index::DiffIndex::new(&run.diff_text) {
+        match crate::infra::diff::index::DiffIndex::new(&run.diff_text) {
             Ok(index) => (
                 index.generate_hunk_manifest(),
                 index.generate_hunk_manifest_json(),
@@ -71,7 +71,7 @@ pub(super) fn build_client_capabilities(has_repo_access: bool) -> ClientCapabili
                             "tags": ["string"]
                         },
                         "insight": "string",
-                        "diagram": "string (required D2 diagram)",
+                        "diagram": "string (required diagram JSON)",
                         "sub_flow": "string (optional grouping)",
                         "diff_refs": [{
                             "file": "string",

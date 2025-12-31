@@ -4,7 +4,7 @@ use crate::domain::{
     Comment, Feedback, FeedbackAnchor, FeedbackImpact, FeedbackSide, ReviewStatus,
 };
 use crate::infra::db::{CommentRepository, FeedbackRepository, TaskRepository};
-use crate::infra::diff_index::DiffIndex;
+use crate::infra::diff::index::DiffIndex;
 use anyhow::{Context, Result, anyhow};
 use chrono::Utc;
 use serde_json::Value;

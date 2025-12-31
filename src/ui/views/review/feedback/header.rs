@@ -114,8 +114,8 @@ pub(crate) fn render_feedback_header(
 
         ui.add_space(spacing::SPACING_SM);
 
-        if let Some(url) = link_url.as_ref() {
-            if pill_action_button(
+        if let Some(url) = link_url.as_ref()
+            && pill_action_button(
                 ui,
                 crate::ui::icons::ACTION_OPEN_WINDOW,
                 "See on GitHub",
@@ -124,14 +124,13 @@ pub(crate) fn render_feedback_header(
             )
             .on_hover_text("Open in Browser")
             .clicked()
-            {
-                ui.ctx().open_url(egui::OpenUrl::new_tab(url));
-            }
+        {
+            ui.ctx().open_url(egui::OpenUrl::new_tab(url));
         }
 
         // Delete
-        if let Some(feedback_id) = feedback_id.clone() {
-            if pill_action_button(
+        if let Some(feedback_id) = feedback_id.clone()
+            && pill_action_button(
                 ui,
                 crate::ui::icons::ACTION_DELETE,
                 "Delete",
@@ -140,9 +139,8 @@ pub(crate) fn render_feedback_header(
             )
             .on_hover_text("Delete Feedback")
             .clicked()
-            {
-                action_out = Some(ReviewAction::DeleteFeedback(feedback_id));
-            }
+        {
+            action_out = Some(ReviewAction::DeleteFeedback(feedback_id));
         }
     });
 

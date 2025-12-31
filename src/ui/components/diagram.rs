@@ -1,3 +1,4 @@
+use crate::infra::diagram::{D2Renderer, Renderer, parse_json};
 use crate::ui::theme::current_theme;
 use crate::ui::{icons, typography};
 use egui::{Id, Image, Rect, TextureOptions, Ui, load::SizedTexture};
@@ -50,20 +51,6 @@ impl Default for DiagramMemory {
 lazy_static::lazy_static! {
     static ref DIAGRAM_RECEIVERS: Arc<Mutex<HashMap<DiagramKey, Receiver<DiagramState>>>> =
         Arc::new(Mutex::new(HashMap::new()));
-
-    static ref FONT_DB: Arc<fontdb::Database> = {
-        let mut db = fontdb::Database::new();
-        if let Some(font_data) = crate::assets::get_content("assets/fonts/GeistMono.ttf") {
-            db.load_font_data(font_data.to_vec());
-        }
-        // Set Geist as the fallback for all generic families, with Geist Mono for monospace
-        db.set_serif_family("Geist Mono");
-        db.set_sans_serif_family("Geist Mono");
-        db.set_monospace_family("Geist Mono");
-        db.set_cursive_family("Geist Mono");
-        db.set_fantasy_family("Geist Mono");
-        Arc::new(db)
-    };
 }
 
 /// Renders a D2 diagram using egui Scene for zooming.
@@ -77,22 +64,43 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<Arc<str>>, is_dark_mode: bool)
     // Generate stable ID for memory storage
     let memory_id = Id::new("d2_diagram_memory");
 
-    let Some(d2_code) = diagram else {
+    let Some(diagram_code) = diagram else {
         ui.centered_and_justified(|ui| {
             ui.label(typography::weak("No diagram code provided"));
         });
         return false;
     };
 
-    let trimmed_code = normalize_d2_code(d2_code);
+    let trimmed_code = normalize_diagram_code(diagram_code);
     if trimmed_code.is_empty() {
         ui.centered_and_justified(|ui| {
-            ui.label(typography::weak("Enter D2 code to render a diagram"));
+            ui.label(typography::weak("Enter diagram JSON to render"));
         });
         return false;
     }
 
-    let diagram_key = diagram_key(&trimmed_code, is_dark_mode);
+    // Parse JSON -> Diagram -> D2
+    let diagram_model = match parse_json(&trimmed_code) {
+        Ok(d) => d,
+        Err(e) => {
+            ui.centered_and_justified(|ui| {
+                ui.label(typography::bold(format!("Invalid diagram JSON: {e}")));
+            });
+            return false;
+        }
+    };
+
+    let d2_code = match D2Renderer.render(&diagram_model) {
+        Ok(code) => code,
+        Err(e) => {
+            ui.centered_and_justified(|ui| {
+                ui.label(typography::bold(format!("D2 render error: {e}")));
+            });
+            return false;
+        }
+    };
+
+    let diagram_key = diagram_key(&d2_code, is_dark_mode);
 
     let (mut state, is_expanded, mut scene_rect) = ui.ctx().memory_mut(|mem| {
         let memory = mem.data.get_temp_mut_or_default::<DiagramMemory>(memory_id);
@@ -115,30 +123,21 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<Arc<str>>, is_dark_mode: bool)
             }
 
             // Spawn background task to generate SVG and rasterize it
-            let trimmed_code = trimmed_code.clone();
+            let d2_code = d2_code.clone();
             let ctx = ui.ctx().clone();
 
             std::thread::spawn(move || {
-                let result = crate::infra::d2::d2_to_svg(&trimmed_code, is_dark_mode);
+                let result = crate::infra::diagram::d2::d2_to_svg(&d2_code, is_dark_mode);
 
                 let state = match result {
                     Ok(svg_str) => {
-                        // Replace D2's generated font family with "Geist"
-                        // D2 generates CSS like: font-family: "d2-73211304-font-regular";
-                        // We want: font-family: "Geist";
-                        lazy_static::lazy_static! {
-                            static ref FONT_RE: regex::Regex = regex::Regex::new(r#"font-family:\s*"[^"]+";"#).unwrap();
-                        }
-                        let svg_str = FONT_RE.replace_all(&svg_str, r#"font-family: "Geist";"#);
-
                         // Background Rasterization using resvg
-                        let opt = usvg::Options {
-                            fontdb: FONT_DB.clone(),
-                            font_family: "Geist".to_string(),
-                            font_size: 10.0,
-                            ..Default::default()
-                        };
-                        let rtree = usvg::Tree::from_str(&svg_str, &opt);
+                        let mut opts = usvg::Options::default();
+                        let mut fontdb = fontdb::Database::new();
+                        fontdb.load_system_fonts();
+                        opts.fontdb = Arc::new(fontdb);
+
+                        let rtree = usvg::Tree::from_str(&svg_str, &opts);
 
                         match rtree {
                             Ok(rtree) => {
@@ -423,14 +422,14 @@ fn render_error(ui: &mut Ui, error: &str, trimmed_code: &str, go_to_settings: &m
             }
 
             ui.add_space(16.0);
-            ui.label("D2 Code:");
+            ui.label("Diagram JSON:");
             ui.code(trimmed_code);
         });
     });
 }
 
-fn normalize_d2_code(code: &str) -> String {
-    code.replace("\\n", "\n").trim().to_string()
+fn normalize_diagram_code(code: &str) -> String {
+    code.trim().to_string()
 }
 
 #[cfg(test)]
@@ -462,7 +461,7 @@ mod tests {
             });
         });
         harness.run_steps(5);
-        harness.get_by_label("Enter D2 code to render a diagram");
+        harness.get_by_label("Enter diagram JSON to render");
     }
 
     #[test]
@@ -478,7 +477,7 @@ mod tests {
                 let memory = mem.data.get_temp_mut_or_default::<DiagramMemory>(memory_id);
                 memory
                     .cache
-                    .insert(key, DiagramState::Error("D2 executable not found".into()));
+                    .insert(key, DiagramState::Error("Invalid diagram JSON: Diagram parse error: JSON parse error: expected value at line 1 column 1".into()));
                 memory.last_key = Some(key);
             });
 
@@ -488,15 +487,16 @@ mod tests {
             });
         });
         harness.run_steps(5);
-        harness.get_by_label("Failed to load diagram.");
-        harness.get_by_label("D2 executable not found");
-        harness.get_by_label("Install D2");
+        harness.get_by_label_contains("Invalid diagram JSON");
     }
 
     #[test]
-    fn test_normalize_d2_code() {
-        assert_eq!(normalize_d2_code("  x -> y  "), "x -> y");
-        assert_eq!(normalize_d2_code("x\\ny"), "x\ny");
+    fn test_normalize_diagram_code() {
+        assert_eq!(normalize_diagram_code("  {}  "), "{}");
+        assert_eq!(
+            normalize_diagram_code("{\"a\": 1}\\n{\"b\": 2}"),
+            "{\"a\": 1}\\n{\"b\": 2}"
+        );
     }
 
     #[test]

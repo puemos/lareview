@@ -1,5 +1,5 @@
 use crate::domain::ReviewTask;
-use crate::infra::diff_index::DiffIndex;
+use crate::infra::diff::index::DiffIndex;
 use anyhow::Result;
 use std::collections::HashSet;
 
@@ -26,7 +26,7 @@ pub(super) fn validate_tasks_payload(
             .is_some_and(|diagram| !diagram.trim().is_empty());
         if !has_diagram {
             anyhow::bail!(
-                "Task {} is missing a D2 diagram. Every task must include a diagram.",
+                "Task {} is missing a diagram JSON block. Every task must include a diagram.",
                 task.id
             );
         }
@@ -41,7 +41,7 @@ pub(super) fn validate_tasks_payload(
             if diff_ref.hunks.is_empty() {
                 if let Err(err) = diff_index.validate_file_exists(diff_ref.file.as_str()) {
                     if let Some(diff_index_err) =
-                        err.downcast_ref::<crate::infra::diff_index::DiffIndexError>()
+                        err.downcast_ref::<crate::infra::diff::index::DiffIndexError>()
                     {
                         anyhow::bail!(
                             "Task {} references file {} that does not exist in diff. Error: {}. Use file paths from the hunk manifest.",
@@ -64,7 +64,7 @@ pub(super) fn validate_tasks_payload(
                 if let Err(err) = diff_index.validate_hunk_exists(diff_ref.file.as_str(), hunk_ref)
                 {
                     if let Some(diff_index_err) =
-                        err.downcast_ref::<crate::infra::diff_index::DiffIndexError>()
+                        err.downcast_ref::<crate::infra::diff::index::DiffIndexError>()
                     {
                         anyhow::bail!(
                             "Task {} references invalid hunk in {} at old_start={}, new_start={}. Nearest hunk: {:?}. Copy coordinates from the hunk manifest.",

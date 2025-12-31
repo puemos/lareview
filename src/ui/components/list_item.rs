@@ -310,10 +310,8 @@ impl<'a> ListItem<'a> {
         }
 
         let triggered = checkbox_clicked || response.clicked();
-        if triggered {
-            if let Some(action) = action.take() {
-                action();
-            }
+        if triggered && let Some(action) = action.take() {
+            action();
         }
 
         response

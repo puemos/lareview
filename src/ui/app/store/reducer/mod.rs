@@ -750,13 +750,13 @@ mod tests {
         };
         state.domain.linked_repos.push(linked_repo);
 
-        let pr_ref = crate::infra::github::GitHubPrRef {
+        let pr_ref = crate::infra::vcs::github::GitHubPrRef {
             owner: "owner".into(),
             repo: "repo".into(),
             number: 123,
             url: "url".into(),
         };
-        let meta = crate::infra::github::GitHubPrMetadata {
+        let meta = crate::infra::vcs::github::GitHubPrMetadata {
             title: "Title".into(),
             url: "url".into(),
             head_sha: None,

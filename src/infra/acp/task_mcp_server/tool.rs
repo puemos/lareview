@@ -77,7 +77,7 @@ pub(super) fn create_return_task_tool(config: Arc<ServerConfig>) -> impl ToolHan
                     }
 
                     // Check if this is a DiffIndexError and format appropriately
-                    let error_msg = if let Some(diff_index_err) = err.downcast_ref::<crate::infra::diff_index::DiffIndexError>() {
+                    let error_msg = if let Some(diff_index_err) = err.downcast_ref::<crate::infra::diff::index::DiffIndexError>() {
                         // Return structured JSON error for agent parsing
                         diff_index_err.to_json()
                     } else {
@@ -168,7 +168,7 @@ pub(super) fn create_finalize_review_tool(config: Arc<ServerConfig>) -> impl Too
                     }
 
                     // Check if this is a DiffIndexError and format appropriately
-                    let error_msg = if let Some(diff_index_err) = err.downcast_ref::<crate::infra::diff_index::DiffIndexError>() {
+                    let error_msg = if let Some(diff_index_err) = err.downcast_ref::<crate::infra::diff::index::DiffIndexError>() {
                         // Return structured JSON error for agent parsing
                         diff_index_err.to_json()
                     } else {
@@ -686,7 +686,7 @@ fn single_task_schema() -> Value {
             },
             "diagram": {
                 "type": "string",
-                "description": "REQUIRED: D2 diagram visualizing the flow, sequence, architecture, or data model. Must be valid D2 syntax (e.g., 'Client -> API: Request\\nAPI -> DB: Query')"
+                "description": "REQUIRED: diagram JSON string describing the flow, sequence, architecture, or data model. Must be valid JSON matching the diagram schema (type/data/messages)."
             }
         },
         "required": ["id", "title", "description", "stats", "diff_refs", "diagram"]

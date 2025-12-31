@@ -873,7 +873,7 @@ mod tests {
             "id": "T1",
             "title": "Title",
             "description": "Desc",
-            "diagram": "x -> y",
+            "diagram": "{\"type\":\"flow\",\"data\":{\"direction\":\"LR\",\"nodes\":[{\"id\":\"x\",\"label\":\"X\",\"kind\":\"generic\"},{\"id\":\"y\",\"label\":\"Y\",\"kind\":\"generic\"}],\"edges\":[{\"from\":\"x\",\"to\":\"y\",\"label\":\"rel\"}]}}",
             "stats": { "risk": "LOW", "tags": [] },
             "diff_refs": []
         });
