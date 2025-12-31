@@ -9,6 +9,7 @@ homepage = "https://github.com/puemos/lareview"
 readme = "README.md"
 keywords = ["code-review", "gui", "ai", "acp", "developer-tools"]
 categories = ["development-tools", "gui"]
+default-run = "lareview"
 
 [dependencies]
 egui = "0.33.2"
