@@ -117,7 +117,8 @@ pub(super) fn open_database(config: &ServerConfig) -> Result<Database> {
 pub(super) fn save_task(config: &ServerConfig, raw_task: Value) -> Result<ReviewTask> {
     let ctx = load_run_context(config);
 
-    // Fail fast on malformed hunks to avoid silently changing scope.
+    // Verify the structural integrity of hunk data before proceeding with
+    // database operations. This prevents storing malformed or incomplete tasks.
     validate_raw_task_hunks(&raw_task)?;
 
     let db = open_database(config)?;
@@ -139,7 +140,8 @@ pub(super) fn save_task(config: &ServerConfig, raw_task: Value) -> Result<Review
             .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
     };
 
-    // Also ensure the parent review exists. `save` is non-destructive.
+    // Upsert the parent review to ensure data consistency. Repository `save`
+    // operations are idempotent and non-destructive.
     let review_repo = crate::infra::db::ReviewRepository::new(conn.clone());
     let review = crate::domain::Review {
         id: ctx.review_id.clone(),
@@ -216,7 +218,7 @@ pub(super) fn update_review_metadata(config: &ServerConfig, args: Value) -> Resu
     let review_repo = ReviewRepository::new(conn.clone());
     let review_run_repo = crate::infra::db::ReviewRunRepository::new(conn.clone());
 
-    // Ensure the review exists by saving a placeholder. `save` is non-destructive.
+    // Ensure the review record exists before updating its metadata.
     let review_placeholder = crate::domain::Review {
         id: ctx.review_id.clone(),
         title: ctx

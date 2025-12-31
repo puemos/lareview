@@ -3,7 +3,9 @@ use pmcp::ToolHandler;
 use std::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
-// Mutex to ensure database tests run sequentially since they share global state via environment variables
+// `DB_TEST_MUTEX` ensures that database-dependent tests execute sequentially.
+// This is necessary because the tests share global state via the
+// `LAREVIEW_DB_PATH` environment variable.
 static DB_TEST_MUTEX: Mutex<()> = Mutex::new(());
 
 #[tokio::test]
@@ -14,8 +16,8 @@ async fn test_return_task_tool_writes_file() {
     let tmp_dir = tempfile::tempdir().expect("tempdir");
     let db_path = tmp_dir.path().join("db.sqlite");
 
-    // Set the database path so Database::open() uses our temp path
-    // Save original value to restore later
+    // Use a temporary database path specifically for this test execution.
+    // The original `LAREVIEW_DB_PATH` is cached to be restored after the test completes.
     let original_db_path = std::env::var("LAREVIEW_DB_PATH").ok();
     unsafe {
         std::env::set_var("LAREVIEW_DB_PATH", db_path.to_string_lossy().to_string());
@@ -105,8 +107,8 @@ async fn test_return_task_tool_persists_to_db() {
     let db_path = tmp_dir.path().join("db.sqlite");
     let run_context_path = tmp_dir.path().join("run.json");
 
-    // Set the database path so Database::open() uses our temp path
-    // Save original value to restore later
+    // Use a temporary database path specifically for this test execution.
+    // The original `LAREVIEW_DB_PATH` is cached to be restored after the test completes.
     let original_db_path = std::env::var("LAREVIEW_DB_PATH").ok();
     unsafe {
         std::env::set_var("LAREVIEW_DB_PATH", db_path.to_string_lossy().to_string());
@@ -195,8 +197,8 @@ async fn test_finalize_review_tool_updates_metadata() {
     let tmp_dir = tempfile::tempdir().expect("tempdir");
     let db_path = tmp_dir.path().join("db.sqlite");
 
-    // Set the database path so Database::open() uses our temp path
-    // Save original value to restore later
+    // Use a temporary database path specifically for this test execution.
+    // The original `LAREVIEW_DB_PATH` is cached to be restored after the test completes.
     let original_db_path = std::env::var("LAREVIEW_DB_PATH").ok();
     unsafe {
         std::env::set_var("LAREVIEW_DB_PATH", db_path.to_string_lossy().to_string());
@@ -251,8 +253,8 @@ async fn test_multiple_tasks_and_finalize_persists_correctly() {
     let db_path = tmp_dir.path().join("db.sqlite");
     let run_context_path = tmp_dir.path().join("run.json");
 
-    // Set the database path so Database::open() uses our temp path
-    // Save original value to restore later
+    // Use a temporary database path specifically for this test execution.
+    // The original `LAREVIEW_DB_PATH` is cached to be restored after the test completes.
     let original_db_path = std::env::var("LAREVIEW_DB_PATH").ok();
     unsafe {
         std::env::set_var("LAREVIEW_DB_PATH", db_path.to_string_lossy().to_string());

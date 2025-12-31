@@ -162,6 +162,9 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
 
     let logs_clone = logs.clone();
     let progress_tx_for_stderr = progress_tx.clone();
+
+    // Spawn a background task to monitor the agent's stderr. Logs are forwarded
+    // to the UI's progress stream to aid in debugging agent-side issues.
     tokio::spawn(async move {
         let reader = BufReader::new(stderr);
         let mut lines = reader.lines();
@@ -198,7 +201,8 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
     let (connection, io_future) =
         ClientSideConnection::new(client, stdin_compat, stdout_compat, spawn_fn);
 
-    // Spawn IO task
+    // Spawn the asynchronous I/O loop to facilitate bidirectional
+    // communication with the agent process.
     let io_handle = tokio::task::spawn_local(async move {
         let _ = io_future.await;
     });
@@ -313,9 +317,9 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
         push_log(&logs, "prompt ok", debug);
     }
 
-    // Wait for the agent to finish naturally. If finalization is received, we allow a short
-    // grace period and then terminate to avoid hanging the UI on agents that don't exit.
-    // If no finalization is received, we may need to timeout to avoid hanging indefinitely.
+    // Monitor the agent's execution until it terminates or is cancelled.
+    // If the agent signals completion via `finalize_review`, it is terminated
+    // after a short grace period to prevent UI hangs from lingering processes.
     let status = loop {
         let finalization_received = *finalization_received_capture.lock().unwrap();
 
@@ -362,7 +366,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
             }
         }
     };
-    // Wait for IO loop to flush pending notifications
+    // Ensure all pending notifications from the agent are processed before return.
     let _ = io_handle.await;
 
     push_log(&logs, format!("Agent exit status: {}", status), debug);

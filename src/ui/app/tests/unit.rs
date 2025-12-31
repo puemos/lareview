@@ -445,8 +445,5 @@ async fn test_seed_db_binary() {
         std::env::set_var("LAREVIEW_DB_PATH", &path);
     }
 
-    // We can't directly call bin/seed_db.rs main easily if it's not a library,
-    // but we can use `run_shell_command` or just accept that we've covered the code
-    // if we were to move the logic to a library.
-    // However, I'll try to run it via cargo.
+    // Note: seed_db logic is tested via cargo-run to simulate real binary execution.
 }

@@ -202,7 +202,7 @@ impl Database {
                 diff_refs TEXT,
                 diagram TEXT,
                 ai_generated INTEGER DEFAULT 0,
-                status TEXT DEFAULT 'PENDING',
+                status TEXT DEFAULT 'todo',
                 sub_flow TEXT,
                 FOREIGN KEY(run_id) REFERENCES review_runs(id) ON DELETE CASCADE
             );
@@ -258,11 +258,12 @@ impl Database {
         Ok(())
     }
 
-    /// Run a migration by executing the embedded SQL
-    /// Migration files are embedded at compile time using include_str! to ensure
-    /// they are available in distributed builds without requiring external files.
+    /// Execute a migration for the specified version.
+    ///
+    /// Migration scripts are embedded into the binary at compile time to
+    /// ensure reliable execution in all environments without external dependencies.
     fn run_migration(conn: &Connection, version: i32) -> Result<()> {
-        // Migrations are embedded at compile time - no runtime file I/O needed
+        // SQL is loaded from the /migrations directory in the workspace root.
         let sql = match version {
             9 => include_str!("../../../migrations/0009_update_feedback_status_constraint.sql"),
             10 => include_str!("../../../migrations/0010_rename_thread_to_feedback.sql"),

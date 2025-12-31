@@ -34,7 +34,8 @@ async fn test_save_and_delete_repo_runtime() {
 
     settings::save_repo(&mut app, repo.clone());
 
-    // Wait a bit for tokio::spawn to finish
+    // Allow a brief interval for asynchronous tasks to complete before polling
+    // the application's action queue.
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     app.poll_action_messages();
 
@@ -234,7 +235,7 @@ async fn test_refresh_review_data_runtime() {
         crate::ui::app::store::command::ReviewDataRefreshReason::Manual,
     );
 
-    // Wait for async
+    // Wait for the asynchronous refresh operation to complete.
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
     // Poll messages - RefreshReviewData is synchronous but it dispatches an Async action
     app.poll_action_messages();

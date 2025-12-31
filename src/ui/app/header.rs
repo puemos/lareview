@@ -94,7 +94,9 @@ impl LaReviewApp {
                 }
                 total_tabs_width += spacing_between * (tabs_data.len() - 1) as f32;
 
-                let container_width = total_tabs_width + 12.0; // 6.0 inner margin on each side
+                // Calculate the total width of the navigation container, accounting for
+                // the inner margin (6.0px) on each side.
+                let container_width = total_tabs_width + 12.0;
                 let container_height = 34.0;
                 let center_rect = egui::Rect::from_center_size(
                     rect.center(),

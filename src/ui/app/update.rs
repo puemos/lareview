@@ -15,15 +15,17 @@ impl LaReviewApp {
         // Set the base Catppuccin theme for overall UI appearance
         catppuccin_egui::set_theme(ctx, catppuccin_egui::MOCHA);
 
-        // Apply TUI-like visuals: disable corner rounding and set terminal backgrounds
+        // Apply a high-contrast visual style inspired by terminal user interfaces (TUI).
+        // This involves using solid borders, transparent widget backgrounds, and
+        // the application's brand color for interactive states.
         let theme = crate::ui::theme::current_theme();
         let mut visuals = egui::Visuals::dark();
 
-        // Backgrounds
+        // Configure panel and window backgrounds
         visuals.panel_fill = theme.bg_primary;
         visuals.window_fill = theme.bg_primary;
 
-        // Borders and Backgrounds for Widgets - TUI style (transparent bg, solid border)
+        // Configure widget aesthetics for a "flat" TUI look with distinct borders
         visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0, theme.border);
         visuals.widgets.noninteractive.bg_fill = egui::Color32::TRANSPARENT;
 
@@ -31,7 +33,7 @@ impl LaReviewApp {
         visuals.widgets.inactive.bg_fill = egui::Color32::TRANSPARENT;
 
         visuals.widgets.hovered.bg_stroke = egui::Stroke::new(1.0, theme.brand);
-        visuals.widgets.hovered.bg_fill = theme.bg_secondary; // Subtle lift on hover
+        visuals.widgets.hovered.bg_fill = theme.bg_secondary; // Subtle elevation on hover
 
         visuals.widgets.active.bg_stroke = egui::Stroke::new(1.0, theme.brand);
         visuals.widgets.active.bg_fill = theme.bg_secondary;
@@ -39,11 +41,11 @@ impl LaReviewApp {
         visuals.widgets.open.bg_stroke = egui::Stroke::new(1.0, theme.border);
         visuals.widgets.open.bg_fill = theme.bg_primary;
 
-        // Selection
+        // Selection styling
         visuals.selection.bg_fill = theme.brand.gamma_multiply(0.3);
         visuals.selection.stroke = egui::Stroke::new(1.0, theme.brand);
 
-        // Corner Radii
+        // Configure standard corner radii for the application
         visuals.window_corner_radius = egui::CornerRadius::same(crate::ui::spacing::RADIUS_LG);
         visuals.widgets.noninteractive.corner_radius =
             egui::CornerRadius::same(crate::ui::spacing::RADIUS_MD);

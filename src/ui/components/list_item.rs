@@ -72,9 +72,9 @@ impl<'a> ListItem<'a> {
             egui::Color32::TRANSPARENT
         };
 
-        // We need to allocate space first to handle hover state for background
-        // But since we want the background to cover the whole area including padding,
-        // we use a Frame.
+        // We use an egui::Frame to allocate the background area for the item.
+        // This ensures the background color covers the entire inner area,
+        // including the specified padding/margin.
 
         let margin = self
             .inner_margin
@@ -85,38 +85,21 @@ impl<'a> ListItem<'a> {
             .fill(bg_color)
             .corner_radius(spacing::RADIUS_MD);
 
-        // We need to handle interaction. The Frame doesn't directly return an Interact/Response
-        // that covers the whole area easily unless we treat the content as the interactive part.
-        // However, standard egui pattern for selectable list items often involves allocating the rect first
-        // or using `ui.interact`.
-
-        // Let's use `frame.show` and interact with the inner response,
-        // but we might want the hover effect to be on the *frame* area.
-        // A common trick is to use `ui.scope` or just rely on the fact that if we click the content, it works.
-        // To make the WHOLE frame clickable and hoverable (changing bg), we can use a button-like behavior
-        // or manually paint the background on hover.
-
-        // Let's manually handle the background on hover to match `thread_list.rs` behavior logic
-        // which was: draw transparent rect, check hover, paint rect if hovered.
-
-        // Allocate space? No, let's just use the Frame, get the response, and then check interactions.
+        // Frame::show returns a response for the inner content. We manually
+        // manage the interactive sense to make the entire frame clickable.
 
         let response = frame
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
-                    // Top-align the icon with the title
-                    // To do this, we can't just center vertically.
-                    // We'll use a specific vertical alignment or just lay them out.
+                    // Align icons with the first line of text (the title).
 
                     if let Some((icon, color)) = self.status_icon {
                         // We want the icon to be aligned with the first line of text.
                         // A simple way is to use `ui.with_layout` to align to TOP-LEFT.
                         ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
-                            // Add a little vertical spacing if needed to visually center with text cap height
-                            // But usually straight top align is fine if fonts match.
-                            // Let's add a tiny bit of spacing if the font size difference is large.
-                            // Assuming standard icon size 16.0 and text 13.0/14.0.
+                            // Apply a small vertical offset if fonts differ significantly
+                            // in size to achieve optical centering.
                             ui.label(typography::body(icon).color(color).size(16.0));
                         });
 
@@ -140,40 +123,13 @@ impl<'a> ListItem<'a> {
             })
             .response;
 
-        // Interaction
+        // Interaction handling
         let response = response.interact(egui::Sense::click());
 
-        // Hover Effect
-        if response.hovered() && !is_selected {
-            // Paint the hover background behind the content
-            // We need to be careful about z-index or just paint it.
-            // Since we already painted a transparent/selected background in Frame,
-            // we can paint over it or use the painter to paint *before* if we were allocating manually.
-            // But `frame.fill` happened already.
+        // Note: The hover effect in this simplified `show` implementation is handled
+        // after drawing. For perfect hover states without frame lag, use `show_with_bg`.
 
-            // `thread_list.rs` did: `bg_shape_idx = ui.painter().add(egui::Shape::Noop)` BEFORE content
-            // then `ui.painter().set(...)` AFTER content if hovered.
-            // That is a cleaner way to handle "hover style on top" or "replace background".
-
-            // However, since we are inside `show`, we can't easily modify the *previous* frame's fill
-            // unless we used that `Shape::Noop` trick.
-
-            // Simplified approach for now:
-            // Just rely on egui's immediate mode: checking hover *after* drawing is too late for *this* frame's background
-            // unless we use layers or the shape trick.
-            // Given I want to preserve the `thread_list` logic which worked well:
-        }
-
-        // Let's rewrite `show` to use the Shape trick for perfect hover states.
-
-        // Re-do show logic
-
-        // 1. Get rect/layout
-        // But we have dynamic content heavily dependent on width.
-        // So we really want `frame.show`.
-
-        // Let's stick to the `thread_list.rs` implementation pattern exactly.
-
+        // Handle user interaction feedback
         ui.ctx().set_cursor_icon(if response.hovered() {
             egui::CursorIcon::PointingHand
         } else {
@@ -199,7 +155,8 @@ impl<'a> ListItem<'a> {
         let mut action = self.action;
         let mut checkbox_clicked = false;
 
-        // Placeholder for background
+        // Allocate a placeholder for the background shape to be painted after
+        // inner layout and interaction ares are determined.
         let bg_shape_idx = ui.painter().add(egui::Shape::Noop);
         let title_text = self.title.text().to_string();
 
@@ -209,7 +166,6 @@ impl<'a> ListItem<'a> {
 
         let frame = egui::Frame::NONE
             .inner_margin(margin)
-            // We do NOT set fill here, we handle it manually
             .fill(egui::Color32::TRANSPARENT);
 
         let response = frame
@@ -220,7 +176,7 @@ impl<'a> ListItem<'a> {
                     ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
                         if let Some(checked) = self.checkbox {
                             ui.vertical(|ui| {
-                                ui.add_space(2.0); // Optical alignment
+                                ui.add_space(2.0); // Optical alignment with title text
                                 let icon = if checked {
                                     crate::ui::icons::ICON_CHECK_SQUARE
                                 } else {
@@ -250,9 +206,9 @@ impl<'a> ListItem<'a> {
                         }
 
                         if let Some((icon, color)) = self.status_icon {
-                            // Icon Column
+                            // Status Icon Column
                             ui.vertical(|ui| {
-                                // ensure icon is positioned correctly, maybe add small Y offset to optical center with text
+                                // Apply small vertical offset to center icon with adjacent text
                                 ui.label(typography::body(icon).color(color).size(16.0));
                             });
                             ui.add_space(spacing::SPACING_SM);

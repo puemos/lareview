@@ -33,7 +33,10 @@ struct RawStats {
     tags: Vec<String>,
 }
 
-// Support legacy diffs field for backward compatibility
+/// Extract changed file paths from raw unified diff text.
+///
+/// This function provides backward compatibility for agents that emit
+/// raw diff strings instead of structured `DiffRef` objects.
 fn extract_files_from_diffs_legacy(diffs: &[String]) -> Vec<String> {
     let mut seen = HashSet::new();
     let mut files = Vec::new();
@@ -61,7 +64,7 @@ fn extract_files_from_diffs_legacy(diffs: &[String]) -> Vec<String> {
     files
 }
 
-// Extract files from diff_refs
+/// Extract changed file paths from structured `DiffRef` objects.
 fn extract_files_from_diff_refs(diff_refs: &[DiffRef]) -> Vec<String> {
     let mut seen = HashSet::new();
     let mut files = Vec::new();
@@ -73,6 +76,9 @@ fn extract_files_from_diff_refs(diff_refs: &[DiffRef]) -> Vec<String> {
     files
 }
 
+/// Calculate approximate line-level change statistics from unified diff text.
+///
+/// Used as a fallback mechanism when structured change counts are unavailable.
 fn count_line_changes_legacy(diffs: &[String]) -> (u32, u32) {
     let mut additions = 0u32;
     let mut deletions = 0u32;
@@ -137,7 +143,7 @@ fn normalize_single_task_payload(args: Value) -> Result<Value> {
         return Ok(current);
     }
 
-    // Try to extract from params or arguments
+    // Attempt to extract task payload from standard protocol envelopes ('params' or 'arguments').
     if let Some(params) = current.get("params")
         && params.get("id").is_some()
         && params.get("title").is_some()
@@ -169,7 +175,8 @@ pub(crate) fn parse_task(args: Value) -> Result<ReviewTask> {
         _ => RiskLevel::Low,
     };
 
-    // Determine which field to use: diff_refs takes precedence, fall back to diffs
+    // Prefer structured file references (`diff_refs`) for path extraction;
+    // fall back to legacy diff text parsing if necessary.
     let files = if !task.diff_refs.is_empty() {
         extract_files_from_diff_refs(&task.diff_refs)
     } else {
@@ -177,12 +184,13 @@ pub(crate) fn parse_task(args: Value) -> Result<ReviewTask> {
     };
 
     let (additions, deletions) = if !task.diff_refs.is_empty() {
-        // If we have diff_refs, we'd need to calculate from the actual diff text using the diff index
-        // For now, we'll fall back to the legacy calculation if diffs exist
+        // When using `diff_refs`, precise statistics are recomputed during
+        // the persistence phase using the global `DiffIndex`. If legacy
+        // `diffs` are present, they are used as an initial heuristic.
         if !task.diffs.is_empty() {
             count_line_changes_legacy(&task.diffs)
         } else {
-            (0, 0) // Placeholder values that will be recomputed later
+            (0, 0) // Placeholder; statistics will be recomputed during save_task.
         }
     } else {
         count_line_changes_legacy(&task.diffs)

@@ -73,13 +73,19 @@ pub enum ReviewSource {
     },
     /// Review is derived from a GitHub pull request fetched locally via `gh`.
     GitHubPr {
+        /// GitHub owner (organization or user)
         owner: String,
+        /// GitHub repository name
         repo: String,
+        /// Pull request number
         number: u32,
+        /// Optional canonical URL for the PR
         #[serde(default)]
         url: Option<String>,
+        /// Topmost commit SHA of the PR
         #[serde(default)]
         head_sha: Option<String>,
+        /// Base commit SHA of the target branch
         #[serde(default)]
         base_sha: Option<String>,
     },
@@ -397,21 +403,28 @@ impl FromStr for FeedbackImpact {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FeedbackSide {
+    /// Line changed from the old version
     Old,
+    /// Line changed or added in the new version
     New,
 }
 
 /// Optional anchor tying feedback to a file/line/hunk
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct FeedbackAnchor {
+    /// Relative path to the file
     #[serde(default)]
     pub file_path: Option<String>,
+    /// Line number in the file
     #[serde(default)]
     pub line_number: Option<u32>,
+    /// Which side of the diff the comment is on
     #[serde(default)]
     pub side: Option<FeedbackSide>,
+    /// Specific hunk reference (optional)
     #[serde(default)]
     pub hunk_ref: Option<HunkRef>,
+    /// Commit SHA (optional)
     #[serde(default)]
     pub head_sha: Option<String>,
 }
@@ -419,41 +432,64 @@ pub struct FeedbackAnchor {
 /// Feedback entry spanning one or more comments
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Feedback {
+    /// Unique identifier for the feedback
     pub id: String,
+    /// Parent review ID
     pub review_id: ReviewId,
+    /// Linked task ID (optional)
     #[serde(default)]
     pub task_id: Option<TaskId>,
+    /// Brief title/summary of the feedback
     pub title: String,
+    /// Current status of the feedback
     pub status: ReviewStatus,
+    /// Impact/severity of the feedback
     pub impact: FeedbackImpact,
+    /// Location of the feedback in the code
     #[serde(default)]
     pub anchor: Option<FeedbackAnchor>,
+    /// Author identifier (agent or user)
     pub author: String,
+    /// Creation timestamp
     pub created_at: String,
+    /// Last update timestamp
     pub updated_at: String,
 }
 
 /// Comment within a feedback entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Comment {
+    /// Unique identifier for the comment
     pub id: String,
+    /// Parent feedback ID
     pub feedback_id: String,
+    /// Author identifier
     pub author: String,
+    /// Body text of the comment (markdown)
     pub body: String,
+    /// Parent comment ID (for nested replies)
     #[serde(default)]
     pub parent_id: Option<String>,
+    /// Creation timestamp
     pub created_at: String,
+    /// Last update timestamp
     pub updated_at: String,
 }
 
 /// Mapping to an external provider feedback (e.g., GitHub)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeedbackLink {
+    /// Unique identifier for the link
     pub id: String,
+    /// Local feedback ID
     pub feedback_id: String,
+    /// Provider name (e.g., "github")
     pub provider: String,
+    /// ID on the provider side
     pub provider_feedback_id: String,
+    /// Root comment ID on the provider side
     pub provider_root_comment_id: String,
+    /// Last sync timestamp
     pub last_synced_at: String,
 }
 

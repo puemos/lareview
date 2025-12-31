@@ -14,15 +14,15 @@ async fn test_export_to_markdown_basics() {
     assert!(md.contains("# Test Review"));
     assert!(md.contains("This is a summary"));
     assert!(md.contains("## Overview"));
-    // "Details" renamed to "Review Tasks"
+    // Verify that the overview section is correctly included.
     assert!(md.contains("## Review Tasks"));
-    // Flow headers are now numbered
+    // Verify that sub-flows are prefixed with their sequence numbers.
     assert!(md.contains("## Flow 1: Flow A"));
-    // Task headers changed format
+    // Verify the specific formatting of task headers.
     assert!(md.contains("### Task: First Task"));
-    // Risk is on its own line
+    // Verify that risk level is rendered on a dedicated line with the appropriate icon.
     assert!(md.contains("**Risk:** 🟡 Medium"));
-    // Insight renamed
+    // Verify that insights are rendered as blockquotes with the appropriate prefix.
     assert!(md.contains("> **Insight:** AI Insight"));
 
     // Feedback rendering (now using render_single_feedback_markdown styles)

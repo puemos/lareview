@@ -131,12 +131,15 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<Arc<str>>, is_dark_mode: bool)
 
                 let state = match result {
                     Ok(svg_str) => {
-                        // Background Rasterization using resvg
+                        // Initialize SVG rendering options and font database.
+                        // We load system fonts to ensure consistent text rendering
+                        // in diagrams across different environments.
                         let mut opts = usvg::Options::default();
                         let mut fontdb = fontdb::Database::new();
                         fontdb.load_system_fonts();
                         opts.fontdb = Arc::new(fontdb);
 
+                        // Parse the generated SVG string into a renderable tree.
                         let rtree = usvg::Tree::from_str(&svg_str, &opts);
 
                         match rtree {

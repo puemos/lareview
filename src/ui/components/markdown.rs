@@ -378,9 +378,8 @@ fn render_code_block(
             .get_temp_mut_or_default::<CodeHighlightCache>(code_cache_id());
 
         cache.get_or_insert_with(cache_key, || {
-            // Only highlight if content is reasonably sized to avoid runaway highlighting
-            // Very large blocks (>50KB) fall back to plain text to prevent rendering hangs
-            // Note: This trades off syntax highlighting for stability on massive code blocks
+            // Syntax highlighting is skipped for very large blocks (>50KB) to
+            // maintain application stability and prevent rendering hangs.
             if content.len() > CODE_BLOCK_SIZE_LIMIT {
                 let mono = egui::FontId::monospace(13.0);
                 let mut job = egui::text::LayoutJob::default();
@@ -799,17 +798,9 @@ impl MarkdownState {
         let link = self.job_has_link.take();
 
         if self.in_table {
-            // Table cells are handled in end_tag
-            self.job = egui::text::LayoutJob::default();
-            // If we were building up a job for a cell, we need to put it back or handle it differently
-            // Actually, in `start_tag(TableCell)`, we reset job. In `end_tag(TableCell)`, we push it.
-            // But if flush is called *during* a cell (e.g. hard break), we might split it?
-            // Markdown tables usually don't support hard breaks or complex blocks inside cells.
-            // For now, let's assume flush inside table is only happening at end of inline content
-            // which should be fine if we are accumulating into one job per cell.
-            // Wait, standard `flush` logic pushes to `self.items`. We don't want that for tables.
-
-            // Revert the take if we are in table, because `end_tag` will handle it.
+            // Table cell content is accumulated into segments and flushed into
+            // rows by TableCell/TableRow end tags. Standard text items are not
+            // added to the main list while parsing a table.
             self.job = Arc::try_unwrap(job).unwrap_or_else(|arc| (*arc).clone());
             return;
         }

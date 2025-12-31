@@ -111,19 +111,19 @@ pub fn cyber_button(
             },
         );
     } else {
-        // Dynamic Diamond (One-shot animation on hover)
+        // Dynamic Diamond icon with interactive animations.
         let is_custom = color.is_some();
 
-        // Use hover_ratio to drive a "one-shot" feel.
-        // sin(ratio * PI) goes 0 -> 1 -> 0, creating a perfect pulse.
+        // Calculate a pulsating scale factor using the hover animation ratio.
+        // A sine function over the normalized ratio creates a smooth pulse effect.
         let pulse = 1.0 + (hover_ratio * std::f32::consts::PI).sin() * 0.2;
 
         let angle = if enabled {
             if is_custom {
-                // Reset: A satisfying 180-degree flip
+                // Secondary actions undergo a full 180-degree flip.
                 hover_ratio * std::f32::consts::PI
             } else {
-                // Run: Professional 45-degree shift
+                // Primary actions perform a professional 45-degree rotation.
                 hover_ratio * std::f32::consts::PI / 4.0
             }
         } else {

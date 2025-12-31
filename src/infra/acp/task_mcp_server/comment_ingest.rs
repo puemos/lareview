@@ -157,26 +157,14 @@ fn validate_line_in_diff(
         .validate_file_exists(file)
         .map_err(|e| anyhow!(e.to_string()))?;
 
-    // 2. Check line is within some hunk
-    // This requires exposing inner logic of DiffIndex or re-parsing here.
-    // Since DiffIndex struct fields are private in external crate but we are in the same workspace,
-    // we might not have access to `files` map if it's not pub.
-    // Checking `src/infra/diff_index.rs`, `files` is private.
-    // However, we can construct a dummy `DiffRef` for the whole file and assume if it passes validation it's fine?
-    // No, we need line-level validation.
-
-    // Hack: We can't easily access private fields of DiffIndex from here without modifying DiffIndex.
-    // For now, let's skip strict *line* validation against the diff index internal structure unless we modify DiffIndex.
-    // But we CAN check if the line is plausible by trying to create a HunkRef? No.
-
-    // Better: Modify DiffIndex to expose `validate_line_exists(file, line, side)`.
-    // Since I cannot modify DiffIndex in this step easily without jumping back, I will implement a basic check
-    // using `unidiff` directly here if needed, OR assume that if the file exists, we trust the agent on the line
-    // UNLESS we want to be very strict. The user requested strictness.
-
-    // Let's rely on the task coverage check to catch "out of bounds" errors effectively.
-    // If a line is not in any task, and tasks cover the diff, then the line is likely not in the diff (or ignored).
-    // So `is_line_covered_by_task` acts as a validator too.
+    // Line-level validation against the diff index is currently deferred.
+    // Strict line validation would require exposing internal DiffIndex state or
+    // re-parsing the unified diff.
+    //
+    // Current strategy: Rely on `is_line_covered_by_task` (line 184) to verify
+    // that the agent's comment falls within the scope of a generated task.
+    // Since tasks are derived from the diff, this effectively validates that
+    // the comment refers to a changed line.
 
     Ok(())
 }

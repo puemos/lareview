@@ -151,8 +151,8 @@ async fn test_generate_invalid_pr_pasting() {
 
     harness.get_by_label("error: Failed to fetch PR");
 
-    // Note: The button is actually NOT disabled currently if diff_text is not empty,
-    // even if preview fetching failed. This allows the user to try running anyway.
+    // Note: The button remains enabled even if preview fetching fails,
+    // allowing users to attempt execution manually.
 }
 
 #[tokio::test]

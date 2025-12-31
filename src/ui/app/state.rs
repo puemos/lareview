@@ -133,20 +133,35 @@ pub struct DomainState {
 /// State related to the active agent session.
 #[derive(Default)]
 pub struct SessionState {
+    /// Items to display in the agent activity timeline
     pub agent_timeline: Vec<TimelineItem>,
+    /// Index for lookups by stream key in the timeline
     pub agent_timeline_index: HashMap<String, usize>,
+    /// Monotonic sequence for timeline items
     pub next_agent_timeline_seq: u64,
+    /// Flag indicating if an agent is currently running
     pub is_generating: bool,
+    /// Last error encountered during generation
     pub generation_error: Option<String>,
+    /// Currently selected agent ID
     pub selected_agent: SelectedAgent,
+    /// Most recently received generation plan
     pub latest_plan: Option<crate::domain::Plan>,
+    /// Text of the diff currently being processed
     pub diff_text: String,
+    /// Preview of the generation input (e.g., GH PR meta)
     pub generate_preview: Option<GeneratePreview>,
+    /// Flag for async preview fetching
     pub is_preview_fetching: bool,
+    /// Last input ref used for fetching a preview
     pub last_preview_input_ref: Option<String>,
+    /// Status of GitHub integration
     pub gh_status: Option<crate::ui::app::GhStatusPayload>,
+    /// Error from GitHub status check
     pub gh_status_error: Option<String>,
+    /// Flag for async GitHub status checking
     pub is_gh_status_checking: bool,
+    /// ID of the review currently being generated
     pub generating_review_id: Option<String>,
 }
 
@@ -257,39 +272,71 @@ use std::sync::Arc;
 /// Transient UI state.
 #[derive(Default)]
 pub struct UiState {
+    /// Screen currently being displayed
     pub current_view: AppView,
+    /// ID of the selected review
     pub selected_review_id: Option<String>,
+    /// ID of the selected generation run
     pub selected_run_id: Option<ReviewRunId>,
+    /// ID of the selected review task
     pub selected_task_id: Option<String>,
+    /// ID of the selected repository
     pub selected_repo_id: Option<String>,
+    /// Error specific to the review view
     pub review_error: Option<String>,
+    /// Application-level fatal error
     pub fatal_error: Option<String>,
 
+    /// State of any active modal overlay
     pub active_overlay: Option<OverlayState>,
 
+    /// Cached assets for export (e.g., diagram SVGs)
     pub export_assets: HashMap<String, Vec<u8>>,
+    /// Context for creating new feedback or viewing existing one
     pub active_feedback: Option<FeedbackContext>,
+    /// Captured output from D2 tool installation
     pub d2_install_output: String,
+    /// Flag for async D2 installation
     pub is_d2_installing: bool,
+    /// User permission to install D2
     pub allow_d2_install: bool,
+    /// Flag to ensure requirements modal is shown once
     pub has_seen_requirements: bool,
+    /// User-preferred editor command/ID
     pub preferred_editor_id: Option<String>,
+    /// Request to open a file in an external editor
     pub pending_editor_open: Option<EditorOpenRequest>,
+    /// Error from editor detection or launching
     pub editor_picker_error: Option<String>,
+    /// Flag for clipboard copy success animation
     pub export_copy_success: bool,
+    /// Frame counter for copy success hint
     pub export_copy_shown_frames: u8,
+    /// Flag for file save success animation
     pub export_save_success: bool,
+    /// Frame counter for save success hint
     pub export_save_shown_frames: u8,
+
     // Feedback → PR sync
+    /// Pending feedback ID being pushed to GH
     pub push_feedback_pending: Option<String>,
+    /// Last error from GH feedback push
     pub push_feedback_error: Option<String>,
+    /// Mapping of review IDs to GH summary comment links
     pub review_summary_links: HashMap<String, String>,
+
     // Agent settings
+    /// User-defined binary paths for agents
     pub agent_path_overrides: std::collections::HashMap<String, String>,
+    /// User-defined custom agent configurations
     pub custom_agents: Vec<crate::infra::app_config::CustomAgentConfig>,
+    /// Environment variables per agent
     pub agent_envs: std::collections::HashMap<String, std::collections::HashMap<String, String>>,
+
     // --- Export UI ---
+    /// Flag for export options menu visibility
     pub show_export_options_menu: bool,
+    /// Content pending to be copied to system clipboard
     pub pending_clipboard_copy: Option<String>,
 }
 
