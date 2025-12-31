@@ -28,10 +28,10 @@ impl LaReviewApp {
                 );
             }
             OverlayState::Requirements => {
-                crate::ui::views::settings_overlays::render_requirements_overlay(ctx, self);
+                crate::ui::views::settings::overlays::render_requirements_overlay(ctx, self);
             }
             OverlayState::EditorPicker => {
-                crate::ui::views::settings_overlays::render_editor_picker_overlay(ctx, self);
+                crate::ui::views::settings::overlays::render_editor_picker_overlay(ctx, self);
             }
         }
     }

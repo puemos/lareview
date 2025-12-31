@@ -1,14 +1,12 @@
 use crate::ui::app::{Action, LaReviewApp, SettingsAction};
-use crate::ui::spacing::TOP_HEADER_HEIGHT;
 use crate::ui::{icons, spacing, typography};
+use crate::ui::theme;
 use eframe::egui;
 use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
-
-use crate::ui::theme;
 
 static LOGO_BYTES_CACHE: Lazy<Mutex<HashMap<String, Arc<[u8]>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
@@ -28,362 +26,8 @@ fn load_logo_bytes(path: &str) -> Option<Arc<[u8]>> {
 }
 
 impl LaReviewApp {
-    pub fn ui_settings(&mut self, ui: &mut egui::Ui) {
-        if ui.available_width() < 100.0 {
-            return;
-        }
-
+    pub fn ui_settings_agents(&mut self, ui: &mut egui::Ui) {
         let theme = theme::current_theme();
-
-        egui::Frame::NONE
-            .inner_margin(egui::Margin::symmetric(spacing::SPACING_XL as i8, 0))
-            .show(ui, |ui| {
-                ui.set_min_height(TOP_HEADER_HEIGHT);
-                ui.allocate_ui_with_layout(
-                    egui::vec2(ui.available_width(), TOP_HEADER_HEIGHT),
-                    egui::Layout::left_to_right(egui::Align::Center),
-                    |ui| {
-                        // A. Left Side: Context Selectors
-                        ui.horizontal(|ui| ui.label(typography::h2("Settings")));
-                    },
-                );
-            });
-
-        ui.separator();
-
-        // --- GitHub Section ---
-        egui::Frame::NONE
-            .inner_margin(egui::Margin::symmetric(
-                spacing::SPACING_XL as i8,
-                spacing::SPACING_MD as i8,
-            ))
-            .show(ui, |ui| {
-                // Title Block
-                ui.horizontal(|ui| {
-                    ui.label(typography::label("GitHub CLI Integration").color(theme.text_primary));
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if self.state.session.is_gh_status_checking {
-                            ui.label(typography::body("Checking...").color(theme.warning));
-                        } else if self.state.session.gh_status.is_some()
-                            && self.state.session.gh_status_error.is_none()
-                        {
-                            ui.label(
-                                typography::label(format!("{} Ready", icons::ICON_CHECK))
-                                    .color(theme.success),
-                            );
-                        } else {
-                            ui.label(
-                                typography::label(format!(
-                                    "{} Error/Unknown",
-                                    icons::STATUS_IGNORED
-                                ))
-                                .color(theme.destructive),
-                            );
-                        }
-                    });
-                });
-
-                ui.add_space(spacing::SPACING_SM);
-
-                // Content Block
-                egui::Grid::new("gh_settings_grid")
-                    .num_columns(2)
-                    .spacing([spacing::SPACING_LG, spacing::SPACING_MD])
-                    .show(ui, |ui| {
-                        ui.label(typography::label("Connection:"));
-                        ui.horizontal(|ui| {
-                            if let Some(err) = &self.state.session.gh_status_error {
-                                ui.label(
-                                    typography::label("Disconnected").color(theme.destructive),
-                                );
-                                ui.label(typography::weak(format!("(Error: {})", err)));
-                            } else if let Some(status) = &self.state.session.gh_status {
-                                ui.label(typography::label("Connected").color(theme.success));
-                                if let Some(login) = &status.login {
-                                    ui.label(
-                                        typography::bold(format!("(@{})", login))
-                                            .color(theme.text_disabled),
-                                    );
-                                }
-                            } else {
-                                ui.label(typography::label("Unknown").color(theme.warning));
-                            }
-                        });
-                        ui.end_row();
-
-                        if let Some(status) = &self.state.session.gh_status {
-                            ui.label(typography::label("Executable Path:"));
-                            ui.label(typography::mono(&status.gh_path));
-                            ui.end_row();
-                        }
-                    });
-
-                ui.add_space(spacing::SPACING_MD);
-
-                ui.horizontal(|ui| {
-                    let btn_label = if self.state.session.is_gh_status_checking {
-                        typography::label("Checking...")
-                    } else {
-                        typography::label("Refresh Status")
-                    };
-                    if ui
-                        .add_enabled(
-                            !self.state.session.is_gh_status_checking,
-                            egui::Button::new(btn_label),
-                        )
-                        .clicked()
-                    {
-                        self.dispatch(Action::Settings(SettingsAction::CheckGitHubStatus));
-                    }
-                });
-
-                // Troubleshooting
-                if self.state.session.gh_status.is_none()
-                    || self.state.session.gh_status_error.is_some()
-                {
-                    ui.add_space(spacing::SPACING_LG);
-                    egui::CollapsingHeader::new(
-                        typography::bold("Setup Instructions").color(theme.text_secondary),
-                    )
-                    .default_open(true)
-                    .show(ui, |ui| {
-                        ui.add_space(spacing::SPACING_SM);
-                        egui::Frame::NONE
-                            .fill(theme.bg_secondary)
-                            .inner_margin(spacing::SPACING_MD)
-                            .corner_radius(crate::ui::spacing::RADIUS_MD)
-                            .show(ui, |ui| {
-                                ui.vertical(|ui| {
-                                    self.ui_copyable_command(
-                                        ui,
-                                        "1. Install via Homebrew",
-                                        "brew install gh",
-                                    );
-                                    ui.add_space(spacing::SPACING_MD);
-                                    self.ui_copyable_command(
-                                        ui,
-                                        "2. Authenticate",
-                                        "gh auth login",
-                                    );
-                                });
-                            });
-                    });
-                }
-            });
-
-        ui.separator();
-
-        // --- D2 Section ---
-        egui::Frame::NONE
-            .inner_margin(egui::Margin::symmetric(
-                spacing::SPACING_XL as i8,
-                spacing::SPACING_MD as i8,
-            ))
-            .show(ui, |ui| {
-                let d2_installed = crate::infra::shell::find_bin("d2").is_some();
-
-                ui.horizontal(|ui| {
-                    ui.label(typography::label("D2 Diagram Engine").color(theme.text_primary));
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if self.state.ui.is_d2_installing {
-                            ui.label(typography::body("Installing...").color(theme.warning));
-                        } else if d2_installed {
-                            ui.label(
-                                typography::label(format!("{} Installed", icons::ICON_CHECK))
-                                    .color(theme.success),
-                            );
-                        } else {
-                            ui.label(typography::label("Not Installed").color(theme.text_disabled));
-                        }
-                    });
-                });
-
-                ui.add_space(spacing::SPACING_SM);
-
-                let install_cmd = "curl -fsSL https://d2lang.com/install.sh | sh -s --";
-                let uninstall_cmd =
-                    "curl -fsSL https://d2lang.com/install.sh | sh -s -- --uninstall";
-
-                if d2_installed {
-                    ui.label(typography::body("D2 is ready to render diagrams."));
-                    ui.add_space(spacing::SPACING_MD);
-
-                    ui.collapsing(typography::label("Uninstall Options"), |ui| {
-                        ui.add_space(spacing::SPACING_SM);
-                        self.ui_copyable_command(ui, "Manual Uninstall", uninstall_cmd);
-
-                        ui.add_space(spacing::SPACING_SM);
-                        let btn = egui::Button::new(typography::label("Run Uninstall Script"))
-                            .fill(theme.bg_card);
-                        if ui.add_enabled(!self.state.ui.is_d2_installing, btn).clicked() {
-                            self.dispatch(Action::Settings(SettingsAction::RequestD2Uninstall));
-                        }
-                    });
-                } else {
-                    egui::Frame::NONE
-                        .fill(theme.bg_surface)
-                        .inner_margin(spacing::SPACING_SM)
-                        .stroke(egui::Stroke::new(1.0, theme.warning))
-                        .show(ui, |ui| {
-                            ui.horizontal(|ui| {
-                                ui.label(
-                                    typography::body(icons::ICON_WARNING)
-                                        .color(theme.warning)
-                                        .size(16.0),
-                                );
-                                ui.vertical(|ui| {
-                                    ui.label(typography::bold("Remote Script Warning"));
-                                    ui.label(typography::body("Installation requires running a remote shell script. You can run it manually or allow LaReview to run it."));
-                                });
-                            });
-                        });
-
-                    ui.add_space(spacing::SPACING_MD);
-
-                    let mut allow = self.state.ui.allow_d2_install;
-                    if ui
-                        .checkbox(
-                            &mut allow,
-                            typography::label("I understand and want to proceed"),
-                        )
-                        .changed()
-                    {
-                        self.dispatch(Action::Settings(SettingsAction::SetAllowD2Install(allow)));
-                    }
-
-                    ui.add_space(12.0);
-
-                    ui.horizontal(|ui| {
-                        let can_install =
-                            self.state.ui.allow_d2_install && !self.state.ui.is_d2_installing;
-                        if ui
-                            .add_enabled(
-                                can_install,
-                                egui::Button::new(typography::label("Install Automatically")),
-                            )
-                            .clicked()
-                    {
-                        self.dispatch(Action::Settings(SettingsAction::RequestD2Install));
-                    }
-                    });
-
-                    ui.add_space(8.0);
-                    ui.separator();
-                    ui.add_space(8.0);
-
-                    self.ui_copyable_command(ui, "Manual Install Command", install_cmd);
-                }
-
-                if self.state.ui.is_d2_installing {
-                    ui.add_space(12.0);
-                    ui.horizontal(|ui| {
-                        crate::ui::animations::cyber::cyber_spinner(
-                            ui,
-                            theme.brand,
-                            Some(crate::ui::animations::cyber::CyberSpinnerSize::Sm),
-                        );
-                        ui.label(typography::body("Processing..."));
-                    });
-                }
-
-                if !self.state.ui.d2_install_output.is_empty() {
-                    ui.add_space(12.0);
-                    egui::CollapsingHeader::new(typography::bold("Script Output Log"))
-                        .default_open(true)
-                        .show(ui, |ui| {
-                            egui::ScrollArea::vertical()
-                                .max_height(150.0)
-                                .show(ui, |ui| {
-                                    ui.add(
-                                        egui::TextEdit::multiline(
-                                            &mut self.state.ui.d2_install_output.as_str(),
-                                        )
-                                        .font(typography::mono_font(13.0))
-                                        .desired_width(f32::INFINITY)
-                                        .lock_focus(true),
-                                    );
-                                });
-                        });
-                }
-            });
-
-        ui.separator();
-
-        // --- Editor Section ---
-        egui::Frame::NONE
-            .inner_margin(egui::Margin::symmetric(
-                spacing::SPACING_XL as i8,
-                spacing::SPACING_MD as i8,
-            ))
-            .show(ui, |ui| {
-                let editors = crate::infra::editor::list_available_editors();
-                let preferred_id = self.state.ui.preferred_editor_id.clone();
-                let selected_value = preferred_id.as_deref().unwrap_or("none");
-
-                let mut options = Vec::with_capacity(editors.len() + 1);
-                options.push(crate::ui::components::PopupOption {
-                    label: "None",
-                    value: "none",
-                    fg: theme.text_disabled,
-                    icon: None,
-                });
-                for editor in &editors {
-                    options.push(crate::ui::components::PopupOption {
-                        label: editor.label,
-                        value: editor.id,
-                        fg: theme.text_primary,
-                        icon: None,
-                    });
-                }
-
-                ui.horizontal(|ui| {
-                    ui.label(typography::label("Default Editor").color(theme.text_primary));
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let status_label = if preferred_id.is_some() {
-                            "Selected"
-                        } else {
-                            "Not Set"
-                        };
-                        let status_color = if preferred_id.is_some() {
-                            theme.success
-                        } else {
-                            theme.text_disabled
-                        };
-                        ui.label(typography::label(status_label).color(status_color));
-                    });
-                });
-
-                ui.add_space(spacing::SPACING_SM);
-
-                if let Some(next) = crate::ui::components::popup_selector(
-                    ui,
-                    ui.make_persistent_id("default_editor_selector"),
-                    selected_value,
-                    &options,
-                    240.0,
-                    true,
-                ) {
-                    if next == "none" {
-                        self.dispatch(Action::Settings(SettingsAction::ClearPreferredEditor));
-                    } else {
-                        self.dispatch(Action::Settings(SettingsAction::SetPreferredEditor(
-                            next.to_string(),
-                        )));
-                    }
-                }
-
-                if editors.is_empty() {
-                    ui.add_space(spacing::SPACING_SM);
-                    ui.label(
-                        typography::weak("No supported editors detected on PATH.")
-                            .color(theme.warning),
-                    );
-                }
-            });
-
-        ui.separator();
-
-        // --- Agents Section ---
         egui::Frame::NONE
             .inner_margin(egui::Margin::symmetric(
                 spacing::SPACING_XL as i8,
@@ -437,7 +81,6 @@ impl LaReviewApp {
         // --- Modals ---
         self.ui_agent_settings_modal(ui.ctx());
         self.ui_add_custom_agent_modal(ui.ctx());
-        // Modals are now handled by the central overlay dispatcher in render_overlays
     }
 
     fn ui_agent_card(&mut self, ui: &mut egui::Ui, candidate: &crate::infra::acp::AgentCandidate) {
@@ -807,7 +450,6 @@ impl LaReviewApp {
                                                                 &mut val,
                                                             )
                                                             .hint_text(typography::weak("VALUE"))
-                                                            .password(true)
                                                             .desired_width(val_width),
                                                         )
                                                         .changed()
@@ -829,24 +471,30 @@ impl LaReviewApp {
                                                             egui::Align::Center,
                                                         ),
                                                         |ui| {
-                                                            let ui_mem = crate::ui::app::ui_memory::get_ui_memory(ui.ctx());
+                                                            let key = crate::ui::app::ui_memory::get_ui_memory(ui.ctx()).settings.agent_env_draft_key;
+                                                            let val = crate::ui::app::ui_memory::get_ui_memory(ui.ctx()).settings.agent_env_draft_value;
                                                             if ui
-                                                                .button(typography::label(
-                                                                    "Add more",
-                                                                ))
+                                                                .add_enabled(
+                                                                    !key.is_empty()
+                                                                        && !val.is_empty(),
+                                                                    egui::Button::new(
+                                                                        typography::label(
+                                                                            icons::ICON_PLUS,
+                                                                        ),
+                                                                    ),
+                                                                )
                                                                 .clicked()
-                                                                && !ui_mem.settings.agent_env_draft_key.is_empty()
                                                             {
                                                                 self.dispatch(Action::Settings(
                                                                     SettingsAction::UpdateAgentEnv(
                                                                         agent_id.clone(),
-                                                                        ui_mem.settings.agent_env_draft_key.clone(),
-                                                                        ui_mem.settings.agent_env_draft_value.clone(),
+                                                                        key,
+                                                                        val,
                                                                     ),
                                                                 ));
                                                                 crate::ui::app::ui_memory::with_ui_memory_mut(ui.ctx(), |mem| {
-                                                                    mem.settings.agent_env_draft_key.clear();
-                                                                    mem.settings.agent_env_draft_value.clear();
+                                                                    mem.settings.agent_env_draft_key = String::new();
+                                                                    mem.settings.agent_env_draft_value = String::new();
                                                                 });
                                                             }
                                                         },
@@ -857,38 +505,52 @@ impl LaReviewApp {
 
                                     if let Some(key) = to_remove {
                                         self.dispatch(Action::Settings(
-                                            SettingsAction::RemoveAgentEnv(agent_id.clone(), key),
+                                            SettingsAction::RemoveAgentEnv(
+                                                agent_id.clone(),
+                                                key,
+                                            ),
                                         ));
                                     }
                                 });
 
                             ui.add_space(spacing::SPACING_XL);
+
                             ui.horizontal(|ui| {
-                                ui.with_layout(
-                                    egui::Layout::right_to_left(egui::Align::Center),
-                                    |ui| {
-                                        if ui.button(typography::label("Done")).clicked() {
-                                            crate::ui::app::ui_memory::with_ui_memory_mut(ui.ctx(), |mem| {
-                                                mem.settings.editing_agent_id = None;
-                                            });
-                                        }
-                                        if is_agent_dirty
-                                            && ui
-                                                .button(
-                                                    typography::bold(format!(
-                                                        "{} Save Changes",
-                                                        icons::ACTION_SAVE
-                                                    ))
-                                                    .color(theme.brand),
-                                                )
-                                                .clicked()
-                                        {
-                                            self.dispatch(Action::Settings(
-                                                SettingsAction::SaveAgentSettings,
-                                            ));
-                                        }
-                                    },
-                                );
+                                if ui
+                                    .add_enabled(
+                                        is_agent_dirty,
+                                        egui::Button::new(
+                                            typography::label("Save Changes").color(theme.brand),
+                                        ),
+                                    )
+                                    .clicked()
+                                {
+                                    self.dispatch(Action::Settings(
+                                        SettingsAction::SaveAgentSettings,
+                                    ));
+                                    crate::ui::app::ui_memory::with_ui_memory_mut(
+                                        ctx,
+                                        |mem| {
+                                            mem.settings.agent_settings_snapshot = Some(
+                                                crate::ui::app::state::AgentSettingsSnapshot {
+                                                    agent_id: agent_id.clone(),
+                                                    path_override: current_path,
+                                                    envs: current_envs,
+                                                },
+                                            );
+                                        },
+                                    );
+                                }
+
+                                if ui.button(typography::label("Close")).clicked() {
+                                    crate::ui::app::ui_memory::with_ui_memory_mut(
+                                        ctx,
+                                        |mem| {
+                                            mem.settings.editing_agent_id = None;
+                                            mem.settings.agent_settings_snapshot = None;
+                                        },
+                                    );
+                                }
                             });
                         });
                     });
@@ -897,114 +559,104 @@ impl LaReviewApp {
         if !open {
             crate::ui::app::ui_memory::with_ui_memory_mut(ctx, |mem| {
                 mem.settings.editing_agent_id = None;
+                mem.settings.agent_settings_snapshot = None;
             });
         }
     }
 
     fn ui_add_custom_agent_modal(&mut self, ctx: &egui::Context) {
-        if !crate::ui::app::ui_memory::get_ui_memory(ctx)
+        let show = crate::ui::app::ui_memory::get_ui_memory(ctx)
             .settings
-            .show_add_custom_agent_modal
-        {
+            .show_add_custom_agent_modal;
+        if !show {
             return;
         }
 
         let mut open = true;
-        egui::Window::new(typography::bold("Add Custom ACP Agent"))
+        egui::Window::new(typography::bold("Add Custom Agent"))
             .open(&mut open)
             .resizable(false)
             .collapsible(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
             .show(ctx, |ui| {
-                ui.set_width(450.0);
+                ui.set_width(400.0);
 
                 egui::Frame::NONE
                     .inner_margin(spacing::SPACING_LG)
                     .show(ui, |ui| {
                         ui.vertical(|ui| {
-                            egui::Grid::new("add_custom_agent_grid")
-                                .num_columns(2)
-                                .spacing([spacing::SPACING_LG, spacing::SPACING_LG])
-                                .show(ui, |ui| {
-                                    let mut draft =
-                                        crate::ui::app::ui_memory::get_ui_memory(ui.ctx())
-                                            .settings
-                                            .custom_agent_draft;
-
-                                    ui.label(typography::bold("Unique ID:"));
-                                    if ui.text_edit_singleline(&mut draft.id).changed() {
-                                        crate::ui::app::ui_memory::with_ui_memory_mut(
-                                            ui.ctx(),
-                                            |mem| {
-                                                mem.settings.custom_agent_draft.id =
-                                                    draft.id.clone();
-                                            },
-                                        );
-                                    }
-                                    ui.end_row();
-
-                                    ui.label(typography::bold("Display Label:"));
-                                    if ui.text_edit_singleline(&mut draft.label).changed() {
-                                        crate::ui::app::ui_memory::with_ui_memory_mut(
-                                            ui.ctx(),
-                                            |mem| {
-                                                mem.settings.custom_agent_draft.label =
-                                                    draft.label.clone();
-                                            },
-                                        );
-                                    }
-                                    ui.end_row();
-
-                                    ui.label(typography::bold("Command/Binary:"));
-                                    if ui.text_edit_singleline(&mut draft.command).changed() {
-                                        crate::ui::app::ui_memory::with_ui_memory_mut(
-                                            ui.ctx(),
-                                            |mem| {
-                                                mem.settings.custom_agent_draft.command =
-                                                    draft.command.clone();
-                                            },
-                                        );
-                                    }
-                                    ui.end_row();
+                            ui.label(typography::label("Agent ID (unique)"));
+                            let mut id = crate::ui::app::ui_memory::get_ui_memory(ui.ctx()).settings.custom_agent_draft.id.clone();
+                            if ui
+                                .add(
+                                    egui::TextEdit::singleline(&mut id)
+                                        .desired_width(f32::INFINITY),
+                                )
+                                .changed()
+                            {
+                                crate::ui::app::ui_memory::with_ui_memory_mut(ui.ctx(), |mem| {
+                                    mem.settings.custom_agent_draft.id = id;
                                 });
+                            }
+
+                            ui.add_space(spacing::SPACING_MD);
+
+                            ui.label(typography::label("Display Name"));
+                            let mut name = crate::ui::app::ui_memory::get_ui_memory(ui.ctx()).settings.custom_agent_draft.label.clone();
+                            if ui
+                                .add(
+                                    egui::TextEdit::singleline(&mut name)
+                                        .desired_width(f32::INFINITY),
+                                )
+                                .changed()
+                            {
+                                crate::ui::app::ui_memory::with_ui_memory_mut(ui.ctx(), |mem| {
+                                    mem.settings.custom_agent_draft.label = name;
+                                });
+                            }
+
+                            ui.add_space(spacing::SPACING_MD);
+
+                            ui.label(typography::label("Execution Command"));
+                            let mut cmd = crate::ui::app::ui_memory::get_ui_memory(ui.ctx()).settings.custom_agent_draft.command.clone();
+                            if ui
+                                .add(
+                                    egui::TextEdit::singleline(&mut cmd)
+                                        .desired_width(f32::INFINITY),
+                                )
+                                .changed()
+                            {
+                                crate::ui::app::ui_memory::with_ui_memory_mut(ui.ctx(), |mem| {
+                                    mem.settings.custom_agent_draft.command = cmd;
+                                });
+                            }
+                            ui.label(typography::weak("e.g. /usr/local/bin/my-agent or my-agent"));
 
                             ui.add_space(spacing::SPACING_XL);
+
                             ui.horizontal(|ui| {
-                                ui.with_layout(
-                                    egui::Layout::right_to_left(egui::Align::Center),
-                                    |ui| {
-                                        let draft =
-                                            crate::ui::app::ui_memory::get_ui_memory(ui.ctx())
-                                                .settings
-                                                .custom_agent_draft;
-                                        if ui.button(typography::label("Add Agent")).clicked()
-                                            && !draft.id.is_empty()
-                                        {
-                                            self.dispatch(Action::Settings(
-                                                SettingsAction::AddCustomAgent(draft.clone()),
-                                            ));
-                                            crate::ui::app::ui_memory::with_ui_memory_mut(
-                                                ui.ctx(),
-                                                |mem| {
-                                                    mem.settings.show_add_custom_agent_modal =
-                                                        false;
-                                                },
-                                            );
-                                        }
+                                let draft = crate::ui::app::ui_memory::get_ui_memory(ui.ctx()).settings.custom_agent_draft.clone();
+                                let is_valid = !draft.id.is_empty()
+                                    && !draft.label.is_empty()
+                                    && !draft.command.is_empty();
 
-                                        ui.add_space(spacing::SPACING_MD);
+                                if ui
+                                    .add_enabled(is_valid, egui::Button::new(typography::label("Add Agent")))
+                                    .clicked()
+                                {
+                                    self.dispatch(Action::Settings(SettingsAction::AddCustomAgent(
+                                        draft,
+                                    )));
+                                    crate::ui::app::ui_memory::with_ui_memory_mut(ctx, |mem| {
+                                        mem.settings.show_add_custom_agent_modal = false;
+                                    });
+                                }
 
-                                        if ui.button(typography::label("Cancel")).clicked() {
-                                            crate::ui::app::ui_memory::with_ui_memory_mut(
-                                                ui.ctx(),
-                                                |mem| {
-                                                    mem.settings.show_add_custom_agent_modal =
-                                                        false;
-                                                },
-                                            );
-                                        }
-                                    },
-                                );
+                                if ui.button(typography::label("Cancel")).clicked() {
+                                    crate::ui::app::ui_memory::with_ui_memory_mut(ctx, |mem| {
+                                        mem.settings.show_add_custom_agent_modal = false;
+                                    });
+                                }
                             });
                         });
                     });
@@ -1015,82 +667,5 @@ impl LaReviewApp {
                 mem.settings.show_add_custom_agent_modal = false;
             });
         }
-    }
-
-    /// Helper UI component for commands
-    fn ui_copyable_command(&self, ui: &mut egui::Ui, label: &str, cmd: &str) {
-        let theme = theme::current_theme();
-        ui.label(typography::label(label));
-        ui.horizontal(|ui| {
-            // Command text in a box
-            egui::Frame::NONE
-                .fill(theme.bg_surface)
-                .inner_margin(spacing::SPACING_SM) // Using SPACING_SM (8.0) as closest to 6.0
-                .corner_radius(4.0)
-                .show(ui, |ui| {
-                    ui.label(typography::mono(cmd));
-                });
-
-            // Copy button
-            if ui
-                .button(typography::label(format!("{} Copy", icons::ACTION_COPY)))
-                .clicked()
-            {
-                ui.ctx().copy_text(cmd.to_string());
-            }
-        });
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use egui_kittest::Harness;
-    use egui_kittest::kittest::Queryable;
-
-    #[test]
-    fn test_ui_copyable_command() {
-        let app = LaReviewApp::new_for_test();
-        let mut harness = Harness::new_ui(|ui| {
-            app.ui_copyable_command(ui, "Label", "ls -la");
-        });
-        harness.run();
-        harness.get_by_label("Label");
-        harness.get_by_label("ls -la");
-        harness
-            .get_by_label(&format!("{} Copy", icons::ACTION_COPY))
-            .click();
-    }
-
-    #[test]
-    fn test_ui_settings_rendering() {
-        let mut app = LaReviewApp::new_for_test();
-        let mut harness = Harness::new(|ctx| {
-            crate::ui::app::LaReviewApp::setup_fonts(ctx);
-            egui::CentralPanel::default().show(ctx, |ui| {
-                app.ui_settings(ui);
-            });
-        });
-        harness.run();
-        harness.get_by_label("Settings");
-        harness.get_by_label("GitHub CLI Integration");
-        harness.get_by_label("D2 Diagram Engine");
-    }
-
-    #[test]
-    fn test_ui_settings_gh_troubleshoot() {
-        let mut app = LaReviewApp::new_for_test();
-        app.state.session.gh_status = None;
-        app.state.session.gh_status_error = Some("Mock Error".into());
-
-        let mut harness = Harness::new(|ctx| {
-            crate::ui::app::LaReviewApp::setup_fonts(ctx);
-            egui::CentralPanel::default().show(ctx, |ui| {
-                app.ui_settings(ui);
-            });
-        });
-        harness.run();
-        harness.get_by_label("Setup Instructions");
-        harness.get_by_label("brew install gh");
     }
 }
