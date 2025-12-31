@@ -9,10 +9,11 @@ async fn test_full_diff_overlay_flow() {
     let app = Arc::new(Mutex::new(LaReviewApp::new_for_test()));
     {
         let mut app_lock = app.lock().unwrap();
-        app_lock.state.ui.full_diff = Some(FullDiffView {
-            title: "Overlay Diff".to_string(),
-            text: Arc::from("diff content"),
-        });
+        app_lock.state.ui.active_overlay =
+            Some(crate::ui::app::OverlayState::FullDiff(FullDiffView {
+                title: "Overlay Diff".to_string(),
+                text: Arc::from("diff content"),
+            }));
     }
     let mut harness = setup_harness(app.clone());
 
@@ -32,7 +33,7 @@ async fn test_full_diff_overlay_flow() {
     // Simulate reducer closing it
     {
         let mut app_lock = app.lock().unwrap();
-        app_lock.state.ui.full_diff = None;
+        app_lock.state.ui.active_overlay = None;
     }
     harness.run();
 }
@@ -42,7 +43,12 @@ async fn test_export_preview_overlay_flow() {
     let app = Arc::new(Mutex::new(LaReviewApp::new_for_test()));
     {
         let mut app_lock = app.lock().unwrap();
-        app_lock.state.ui.export_preview = Some("# Export Preview".to_string());
+        app_lock.state.ui.active_overlay = Some(crate::ui::app::OverlayState::Export(
+            crate::ui::app::ExportOverlayData {
+                preview: Some("# Export Preview".to_string()),
+                ..Default::default()
+            },
+        ));
     }
     let mut harness = setup_harness(app.clone());
 
@@ -65,7 +71,7 @@ async fn test_export_preview_overlay_flow() {
 
     {
         let mut app_lock = app.lock().unwrap();
-        app_lock.state.ui.export_preview = None;
+        app_lock.state.ui.active_overlay = None;
     }
     harness.run();
 }

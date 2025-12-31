@@ -518,7 +518,12 @@ impl LaReviewApp {
             .as_ref()
             .is_some_and(|id| self.state.domain.all_tasks.iter().any(|t| &t.id == id));
 
-        if !selection_valid && !self.state.ui.is_exporting {
+        if !selection_valid
+            && !matches!(
+                self.state.ui.active_overlay,
+                Some(crate::ui::app::OverlayState::Export(_))
+            )
+        {
             // Logic: If user was doing something, clear it. If just starting, maybe wait?
             // Current logic: clear if invalid.
             if self.state.ui.selected_task_id.is_some() {

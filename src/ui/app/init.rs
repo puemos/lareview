@@ -144,7 +144,9 @@ impl LaReviewApp {
         let repo_repo = Arc::new(db.repo_repo());
 
         state.ui.has_seen_requirements = config.has_seen_requirements;
-        state.ui.show_requirements_modal = !config.has_seen_requirements;
+        if !config.has_seen_requirements {
+            state.ui.active_overlay = Some(crate::ui::app::OverlayState::Requirements);
+        }
         state.ui.agent_path_overrides = config.agent_path_overrides;
         state.ui.custom_agents = config.custom_agents;
         state.ui.agent_envs = config.agent_envs;

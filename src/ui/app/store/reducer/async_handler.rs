@@ -71,21 +71,29 @@ pub fn reduce(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
             Vec::new()
         }
         AsyncAction::ExportPreviewGenerated(result) => {
-            state.ui.is_exporting = false;
-            match result {
-                Ok(res) => {
-                    state.ui.export_preview = Some(res.markdown);
-                    state.ui.review_error = None;
-                }
-                Err(err) => {
-                    state.ui.export_preview = None;
-                    state.ui.review_error = Some(err);
+            if let Some(crate::ui::app::OverlayState::Export(ref mut data)) =
+                state.ui.active_overlay
+            {
+                data.is_exporting = false;
+                match result {
+                    Ok(res) => {
+                        data.preview = Some(res.markdown);
+                        state.ui.review_error = None;
+                    }
+                    Err(err) => {
+                        data.preview = None;
+                        state.ui.review_error = Some(err);
+                    }
                 }
             }
             Vec::new()
         }
         AsyncAction::ExportFinished(result) => {
-            state.ui.is_exporting = false;
+            if let Some(crate::ui::app::OverlayState::Export(ref mut data)) =
+                state.ui.active_overlay
+            {
+                data.is_exporting = false;
+            }
             if let Err(err) = result {
                 state.ui.review_error = Some(err);
             } else {
@@ -138,7 +146,12 @@ pub fn reduce(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
             state.ui.push_feedback_pending = None;
             match result {
                 Ok(link) => {
-                    state.ui.show_push_feedback_modal = None;
+                    if matches!(
+                        state.ui.active_overlay,
+                        Some(crate::ui::app::OverlayState::PushFeedback(_))
+                    ) {
+                        state.ui.active_overlay = None;
+                    }
                     state.ui.push_feedback_error = None;
                     state
                         .domain
@@ -160,11 +173,14 @@ pub fn reduce(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
             Vec::new()
         }
         AsyncAction::SendToPrFinished(result) => {
-            state.ui.send_to_pr_pending = false;
             match result {
                 Ok(res) => {
-                    state.ui.send_to_pr_modal_open = false;
-                    state.ui.send_to_pr_error = None;
+                    if matches!(
+                        state.ui.active_overlay,
+                        Some(crate::ui::app::OverlayState::SendToPr(_))
+                    ) {
+                        state.ui.active_overlay = None;
+                    }
                     for link in res.links {
                         state
                             .domain
@@ -189,7 +205,12 @@ pub fn reduce(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
                     }
                 }
                 Err(err) => {
-                    state.ui.send_to_pr_error = Some(err);
+                    if let Some(crate::ui::app::OverlayState::SendToPr(ref mut data)) =
+                        state.ui.active_overlay
+                    {
+                        data.pending = false;
+                        data.error = Some(err);
+                    }
                 }
             }
             Vec::new()

@@ -10,7 +10,7 @@ async fn test_requirements_modal_interaction() {
     let app = Arc::new(Mutex::new(LaReviewApp::new_for_test()));
     {
         let mut app_lock = app.lock().unwrap();
-        app_lock.state.ui.show_requirements_modal = true;
+        app_lock.state.ui.active_overlay = Some(crate::ui::app::OverlayState::Requirements);
     }
     let mut harness = setup_harness(app.clone());
 
@@ -23,7 +23,7 @@ async fn test_requirements_modal_interaction() {
     harness.get_by_label("Dismiss").click();
     harness.run();
 
-    assert!(!app.lock().unwrap().state.ui.show_requirements_modal);
+    assert!(app.lock().unwrap().state.ui.active_overlay.is_none());
     assert!(app.lock().unwrap().state.ui.has_seen_requirements);
 }
 

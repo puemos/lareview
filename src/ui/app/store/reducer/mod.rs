@@ -390,14 +390,14 @@ mod tests {
     #[test]
     fn test_dismiss_requirements_emits_save_config() {
         let mut state = AppState::default();
-        state.ui.show_requirements_modal = true;
+        state.ui.active_overlay = Some(crate::ui::app::OverlayState::Requirements);
 
         let commands = reduce(
             &mut state,
             Action::Settings(SettingsAction::DismissRequirements),
         );
 
-        assert!(!state.ui.show_requirements_modal);
+        assert!(state.ui.active_overlay.is_none());
         assert!(state.ui.has_seen_requirements);
         assert!(matches!(
             commands.as_slice(),
@@ -834,7 +834,12 @@ mod tests {
     #[test]
     fn test_async_action_export_preview_generated() {
         let mut state = AppState::default();
-        state.ui.is_exporting = true;
+        state.ui.active_overlay = Some(crate::ui::app::OverlayState::Export(
+            crate::ui::app::ExportOverlayData {
+                is_exporting: true,
+                ..Default::default()
+            },
+        ));
 
         reduce(
             &mut state,
@@ -846,8 +851,12 @@ mod tests {
             ))),
         );
 
-        assert!(!state.ui.is_exporting);
-        assert_eq!(state.ui.export_preview.as_deref(), Some("MD"));
+        let Some(crate::ui::app::OverlayState::Export(ref data)) = state.ui.active_overlay else {
+            panic!("expected Export overlay");
+        };
+
+        assert!(!data.is_exporting);
+        assert_eq!(data.preview.as_deref(), Some("MD"));
         assert!(state.ui.review_error.is_none());
 
         reduce(
@@ -856,7 +865,10 @@ mod tests {
                 Err("Error".to_string()),
             )),
         );
-        assert!(state.ui.export_preview.is_none());
+        let Some(crate::ui::app::OverlayState::Export(ref data)) = state.ui.active_overlay else {
+            panic!("expected Export overlay");
+        };
+        assert!(data.preview.is_none());
         assert_eq!(state.ui.review_error.as_deref(), Some("Error"));
     }
 

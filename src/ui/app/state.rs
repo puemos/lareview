@@ -40,6 +40,43 @@ impl Default for ExportOptions {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ExportOverlayData {
+    pub is_exporting: bool,
+    pub preview: Option<String>,
+    pub options: ExportOptions,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SendToPrOverlayData {
+    pub selection: HashSet<String>,
+    pub include_summary: bool,
+    pub pending: bool,
+    pub error: Option<String>,
+}
+
+impl Default for SendToPrOverlayData {
+    fn default() -> Self {
+        Self {
+            selection: HashSet::new(),
+            include_summary: true,
+            pending: false,
+            error: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OverlayState {
+    FullDiff(FullDiffView),
+    Export(ExportOverlayData),
+    /// String is feedback_id
+    PushFeedback(String),
+    SendToPr(SendToPrOverlayData),
+    Requirements,
+    EditorPicker,
+}
+
 /// Which agent is selected.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct SelectedAgent {
@@ -227,18 +264,16 @@ pub struct UiState {
     pub selected_repo_id: Option<String>,
     pub review_error: Option<String>,
     pub fatal_error: Option<String>,
-    pub full_diff: Option<FullDiffView>,
-    pub export_preview: Option<String>,
+
+    pub active_overlay: Option<OverlayState>,
+
     pub export_assets: HashMap<String, Vec<u8>>,
     pub active_feedback: Option<FeedbackContext>,
-    pub is_exporting: bool,
     pub d2_install_output: String,
     pub is_d2_installing: bool,
     pub allow_d2_install: bool,
-    pub show_requirements_modal: bool,
     pub has_seen_requirements: bool,
     pub preferred_editor_id: Option<String>,
-    pub show_editor_picker: bool,
     pub pending_editor_open: Option<EditorOpenRequest>,
     pub editor_picker_error: Option<String>,
     pub export_copy_success: bool,
@@ -248,22 +283,13 @@ pub struct UiState {
     // Feedback → PR sync
     pub push_feedback_pending: Option<String>,
     pub push_feedback_error: Option<String>,
-    pub show_push_feedback_modal: Option<String>,
-    // Batch Send to PR
-    pub send_to_pr_modal_open: bool,
-    pub send_to_pr_selection: HashSet<String>,
-    pub send_to_pr_include_summary: bool,
-    pub send_to_pr_pending: bool,
-    pub send_to_pr_error: Option<String>,
     pub review_summary_links: HashMap<String, String>,
     // Agent settings
     pub agent_path_overrides: std::collections::HashMap<String, String>,
     pub custom_agents: Vec<crate::infra::app_config::CustomAgentConfig>,
     pub agent_envs: std::collections::HashMap<String, std::collections::HashMap<String, String>>,
     // --- Export UI ---
-    pub export_options: ExportOptions,
     pub show_export_options_menu: bool,
-    pub export_sidebar_width: f32,
     pub pending_clipboard_copy: Option<String>,
 }
 
@@ -294,7 +320,7 @@ pub struct GitHubPreview {
     pub meta: crate::infra::vcs::github::GitHubPrMetadata,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FullDiffView {
     pub title: String,
     pub text: Arc<str>,

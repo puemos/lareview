@@ -437,8 +437,7 @@ impl LaReviewApp {
         // --- Modals ---
         self.ui_agent_settings_modal(ui.ctx());
         self.ui_add_custom_agent_modal(ui.ctx());
-        self.render_requirements_overlay(ui.ctx());
-        self.render_editor_picker_overlay(ui.ctx());
+        // Modals are now handled by the central overlay dispatcher in render_overlays
     }
 
     fn ui_agent_card(&mut self, ui: &mut egui::Ui, candidate: &crate::infra::acp::AgentCandidate) {

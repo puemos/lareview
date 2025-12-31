@@ -74,7 +74,12 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
 
             state.ui.selected_task_id = None;
             state.ui.active_feedback = None;
-            state.ui.show_push_feedback_modal = None;
+            if matches!(
+                state.ui.active_overlay,
+                Some(crate::ui::app::OverlayState::PushFeedback(_))
+            ) {
+                state.ui.active_overlay = None;
+            }
             state.ui.push_feedback_error = None;
             state.ui.push_feedback_pending = None;
 
@@ -223,48 +228,63 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
             Vec::new()
         }
         ReviewAction::OpenFullDiff(view) => {
-            state.ui.full_diff = Some(view);
+            state.ui.active_overlay = Some(crate::ui::app::OverlayState::FullDiff(view));
             Vec::new()
         }
         ReviewAction::CloseFullDiff => {
-            state.ui.full_diff = None;
+            if matches!(
+                state.ui.active_overlay,
+                Some(crate::ui::app::OverlayState::FullDiff(_))
+            ) {
+                state.ui.active_overlay = None;
+            }
             Vec::new()
         }
         ReviewAction::RequestExportPreview => {
             if let Some(review_id) = state.ui.selected_review_id.clone()
                 && let Some(run_id) = state.ui.selected_run_id.clone()
             {
-                state.ui.is_exporting = true;
                 state.ui.review_error = None;
-                // Default to selecting all feedbacks if none are selected yet
-                let include_feedback_ids =
-                    if state.ui.export_options.selected_feedback_ids.is_empty() {
-                        None
-                    } else {
-                        Some(
-                            state
-                                .ui
-                                .export_options
-                                .selected_feedback_ids
-                                .iter()
-                                .cloned()
-                                .collect(),
-                        )
-                    };
 
-                vec![Command::GenerateExportPreview {
+                let data = if let Some(crate::ui::app::OverlayState::Export(mut data)) =
+                    state.ui.active_overlay.take()
+                {
+                    data.is_exporting = true;
+                    data
+                } else {
+                    crate::ui::app::ExportOverlayData {
+                        is_exporting: true,
+                        ..Default::default()
+                    }
+                };
+
+                let include_feedback_ids = if data.options.selected_feedback_ids.is_empty() {
+                    None
+                } else {
+                    Some(data.options.selected_feedback_ids.iter().cloned().collect())
+                };
+
+                let cmd = Command::GenerateExportPreview {
                     review_id,
                     run_id,
                     include_feedback_ids,
-                    options: Box::new(map_export_options(&state.ui.export_options)),
-                }]
+                    options: Box::new(map_export_options(&data.options)),
+                };
+
+                state.ui.active_overlay = Some(crate::ui::app::OverlayState::Export(data));
+                vec![cmd]
             } else {
                 state.ui.review_error = Some("No review or run selected for export".into());
                 vec![]
             }
         }
         ReviewAction::CloseExportPreview => {
-            state.ui.export_preview = None;
+            if matches!(
+                state.ui.active_overlay,
+                Some(crate::ui::app::OverlayState::Export(_))
+            ) {
+                state.ui.active_overlay = None;
+            }
             Vec::new()
         }
         ReviewAction::ResetExportCopySuccess => {
@@ -282,13 +302,19 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
                 state.ui.selected_review_id.as_ref(),
                 state.ui.selected_run_id.as_ref(),
             ) {
-                state.ui.is_exporting = true;
-                vec![Command::ExportReview {
-                    review_id: review_id.clone(),
-                    run_id: run_id.clone(),
-                    path,
-                    options: Box::new(map_export_options(&state.ui.export_options)),
-                }]
+                if let Some(crate::ui::app::OverlayState::Export(ref mut data)) =
+                    state.ui.active_overlay
+                {
+                    data.is_exporting = true;
+                    vec![Command::ExportReview {
+                        review_id: review_id.clone(),
+                        run_id: run_id.clone(),
+                        path,
+                        options: Box::new(map_export_options(&data.options)),
+                    }]
+                } else {
+                    Vec::new()
+                }
             } else {
                 Vec::new()
             }
@@ -308,8 +334,7 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
             if let Some(editor_id) = state.ui.preferred_editor_id.clone() {
                 if crate::infra::editor::is_editor_available(&editor_id) {
                     state.ui.pending_editor_open = None;
-                    state.ui.show_editor_picker = false;
-                    state.ui.editor_picker_error = None;
+                    state.ui.active_overlay = None;
                     return vec![Command::OpenInEditor {
                         editor_id,
                         file_path: request.file_path,
@@ -324,7 +349,7 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
             }
 
             state.ui.pending_editor_open = Some(request);
-            state.ui.show_editor_picker = true;
+            state.ui.active_overlay = Some(crate::ui::app::OverlayState::EditorPicker);
             Vec::new()
         }
         ReviewAction::ToggleExportOptionsMenu => {
@@ -332,129 +357,117 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
             Vec::new()
         }
         ReviewAction::SelectAllExportFeedbacks => {
-            state.ui.export_options.selected_feedback_ids = state
-                .domain
-                .feedbacks
-                .iter()
-                .map(|t| t.id.clone())
-                .collect();
-            let (review_id, run_id) = if let Some(r) = state.domain.reviews.first() {
-                (r.id.clone(), r.active_run_id.clone())
-            } else {
-                return Vec::new();
-            };
-            let Some(run_id) = run_id else {
-                return Vec::new();
-            };
-            vec![Command::GenerateExportPreview {
-                review_id,
-                run_id,
-                include_feedback_ids: Some(
-                    state
-                        .ui
-                        .export_options
-                        .selected_feedback_ids
-                        .iter()
-                        .cloned()
-                        .collect(),
-                ),
-                options: Box::new(map_export_options(&state.ui.export_options)),
-            }]
-        }
-        ReviewAction::ClearExportFeedbacks => {
-            state.ui.export_options.selected_feedback_ids.clear();
-            let (review_id, run_id) = if let Some(r) = state.domain.reviews.first() {
-                (r.id.clone(), r.active_run_id.clone())
-            } else {
-                return Vec::new();
-            };
-            let Some(run_id) = run_id else {
-                return Vec::new();
-            };
-            vec![Command::GenerateExportPreview {
-                review_id,
-                run_id,
-                include_feedback_ids: Some(Vec::new()),
-                options: Box::new(map_export_options(&state.ui.export_options)),
-            }]
-        }
-        ReviewAction::ToggleFeedbackSelection(feedback_id) => {
-            if state
-                .ui
-                .export_options
-                .selected_feedback_ids
-                .contains(&feedback_id)
+            if let Some(crate::ui::app::OverlayState::Export(ref mut data)) =
+                state.ui.active_overlay
             {
-                state
-                    .ui
-                    .export_options
-                    .selected_feedback_ids
-                    .remove(&feedback_id);
-            } else {
-                state
-                    .ui
-                    .export_options
-                    .selected_feedback_ids
-                    .insert(feedback_id);
-            }
-            // Trigger regeneration
-            if let Some(review_id) = state.ui.selected_review_id.clone()
-                && let Some(run_id) = state.ui.selected_run_id.clone()
-            {
-                state.ui.is_exporting = true;
-                let include_feedback_ids =
-                    if state.ui.export_options.selected_feedback_ids.is_empty() {
-                        None
-                    } else {
-                        Some(
-                            state
-                                .ui
-                                .export_options
-                                .selected_feedback_ids
-                                .iter()
-                                .cloned()
-                                .collect(), // This already converts HashSet to Vec
-                        )
-                    };
+                data.options.selected_feedback_ids = state
+                    .domain
+                    .feedbacks
+                    .iter()
+                    .map(|t| t.id.clone())
+                    .collect();
 
+                let (review_id, run_id) = if let Some(r) = state.domain.reviews.first() {
+                    (r.id.clone(), r.active_run_id.clone())
+                } else {
+                    return Vec::new();
+                };
+                let Some(run_id) = run_id else {
+                    return Vec::new();
+                };
                 vec![Command::GenerateExportPreview {
                     review_id,
                     run_id,
-                    include_feedback_ids,
-                    options: Box::new(map_export_options(&state.ui.export_options)),
+                    include_feedback_ids: Some(
+                        data.options.selected_feedback_ids.iter().cloned().collect(),
+                    ),
+                    options: Box::new(map_export_options(&data.options)),
                 }]
             } else {
                 Vec::new()
             }
         }
-        ReviewAction::UpdateExportOptions(options) => {
-            state.ui.export_options = options.clone();
-            // Trigger regeneration
-            if let Some(review_id) = state.ui.selected_review_id.clone()
-                && let Some(run_id) = state.ui.selected_run_id.clone()
+        ReviewAction::ClearExportFeedbacks => {
+            if let Some(crate::ui::app::OverlayState::Export(ref mut data)) =
+                state.ui.active_overlay
             {
-                state.ui.is_exporting = true;
-                let include_feedback_ids =
-                    if state.ui.export_options.selected_feedback_ids.is_empty() {
-                        None
-                    } else {
-                        Some(
-                            state
-                                .ui
-                                .export_options
-                                .selected_feedback_ids
-                                .iter()
-                                .cloned()
-                                .collect(),
-                        ) // This already converts HashSet to Vec
-                    };
-
+                data.options.selected_feedback_ids.clear();
+                let (review_id, run_id) = if let Some(r) = state.domain.reviews.first() {
+                    (r.id.clone(), r.active_run_id.clone())
+                } else {
+                    return Vec::new();
+                };
+                let Some(run_id) = run_id else {
+                    return Vec::new();
+                };
                 vec![Command::GenerateExportPreview {
                     review_id,
                     run_id,
-                    include_feedback_ids,
-                    options: Box::new(map_export_options(&state.ui.export_options)),
+                    include_feedback_ids: Some(Vec::new()),
+                    options: Box::new(map_export_options(&data.options)),
                 }]
+            } else {
+                Vec::new()
+            }
+        }
+        ReviewAction::ToggleFeedbackSelection(feedback_id) => {
+            if let Some(crate::ui::app::OverlayState::Export(ref mut data)) =
+                state.ui.active_overlay
+            {
+                if data.options.selected_feedback_ids.contains(&feedback_id) {
+                    data.options.selected_feedback_ids.remove(&feedback_id);
+                } else {
+                    data.options.selected_feedback_ids.insert(feedback_id);
+                }
+                // Trigger regeneration
+                if let Some(review_id) = state.ui.selected_review_id.clone()
+                    && let Some(run_id) = state.ui.selected_run_id.clone()
+                {
+                    data.is_exporting = true;
+                    let include_feedback_ids = if data.options.selected_feedback_ids.is_empty() {
+                        None
+                    } else {
+                        Some(data.options.selected_feedback_ids.iter().cloned().collect())
+                    };
+
+                    vec![Command::GenerateExportPreview {
+                        review_id,
+                        run_id,
+                        include_feedback_ids,
+                        options: Box::new(map_export_options(&data.options)),
+                    }]
+                } else {
+                    Vec::new()
+                }
+            } else {
+                Vec::new()
+            }
+        }
+        ReviewAction::UpdateExportOptions(options) => {
+            if let Some(crate::ui::app::OverlayState::Export(ref mut data)) =
+                state.ui.active_overlay
+            {
+                data.options = options.clone();
+                // Trigger regeneration
+                if let Some(review_id) = state.ui.selected_review_id.clone()
+                    && let Some(run_id) = state.ui.selected_run_id.clone()
+                {
+                    data.is_exporting = true;
+                    let include_feedback_ids = if data.options.selected_feedback_ids.is_empty() {
+                        None
+                    } else {
+                        Some(data.options.selected_feedback_ids.iter().cloned().collect())
+                    };
+
+                    vec![Command::GenerateExportPreview {
+                        review_id,
+                        run_id,
+                        include_feedback_ids,
+                        options: Box::new(map_export_options(&data.options)),
+                    }]
+                } else {
+                    Vec::new()
+                }
             } else {
                 Vec::new()
             }
@@ -479,11 +492,16 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
         }
         ReviewAction::ShowSendFeedbackConfirm { feedback_id } => {
             state.ui.push_feedback_error = None;
-            state.ui.show_push_feedback_modal = Some(feedback_id);
+            state.ui.active_overlay = Some(crate::ui::app::OverlayState::PushFeedback(feedback_id));
             Vec::new()
         }
         ReviewAction::CancelSendFeedbackConfirm => {
-            state.ui.show_push_feedback_modal = None;
+            if matches!(
+                state.ui.active_overlay,
+                Some(crate::ui::app::OverlayState::PushFeedback(_))
+            ) {
+                state.ui.active_overlay = None;
+            }
             state.ui.push_feedback_error = None;
             Vec::new()
         }
@@ -493,44 +511,67 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
             vec![Command::SendFeedbackToPr { feedback_id }]
         }
         ReviewAction::OpenSendToPrModal => {
-            state.ui.send_to_pr_modal_open = true;
-            state.ui.send_to_pr_pending = false;
-            state.ui.send_to_pr_error = None;
-            state.ui.send_to_pr_include_summary = true;
-            state.ui.send_to_pr_selection = default_send_to_pr_selection(state);
+            state.ui.active_overlay = Some(crate::ui::app::OverlayState::SendToPr(
+                crate::ui::app::SendToPrOverlayData {
+                    selection: default_send_to_pr_selection(state),
+                    ..Default::default()
+                },
+            ));
             Vec::new()
         }
         ReviewAction::CloseSendToPrModal => {
-            state.ui.send_to_pr_modal_open = false;
-            state.ui.send_to_pr_pending = false;
-            state.ui.send_to_pr_error = None;
+            if matches!(
+                state.ui.active_overlay,
+                Some(crate::ui::app::OverlayState::SendToPr(_))
+            ) {
+                state.ui.active_overlay = None;
+            }
             Vec::new()
         }
         ReviewAction::ToggleSendToPrSummary { include } => {
-            state.ui.send_to_pr_include_summary = include;
+            if let Some(crate::ui::app::OverlayState::SendToPr(ref mut data)) =
+                state.ui.active_overlay
+            {
+                data.include_summary = include;
+            }
             Vec::new()
         }
         ReviewAction::ToggleSendToPrFeedback { feedback_id } => {
-            if state.ui.send_to_pr_selection.contains(&feedback_id) {
-                state.ui.send_to_pr_selection.remove(&feedback_id);
-            } else {
-                state.ui.send_to_pr_selection.insert(feedback_id);
+            if let Some(crate::ui::app::OverlayState::SendToPr(ref mut data)) =
+                state.ui.active_overlay
+            {
+                if data.selection.contains(&feedback_id) {
+                    data.selection.remove(&feedback_id);
+                } else {
+                    data.selection.insert(feedback_id);
+                }
             }
             Vec::new()
         }
         ReviewAction::ConfirmSendToPr => {
             let Some(review_id) = state.ui.selected_review_id.clone() else {
-                state.ui.send_to_pr_error = Some("Select a review first.".into());
+                if let Some(crate::ui::app::OverlayState::SendToPr(ref mut data)) =
+                    state.ui.active_overlay
+                {
+                    data.error = Some("Select a review first.".into());
+                }
                 return Vec::new();
             };
-            state.ui.send_to_pr_pending = true;
-            state.ui.send_to_pr_error = None;
-            let feedback_ids: Vec<String> = state.ui.send_to_pr_selection.iter().cloned().collect();
-            vec![Command::SendFeedbacksToPr {
-                review_id,
-                feedback_ids,
-                include_summary: state.ui.send_to_pr_include_summary,
-            }]
+
+            if let Some(crate::ui::app::OverlayState::SendToPr(ref mut data)) =
+                state.ui.active_overlay
+            {
+                data.pending = true;
+                data.error = None;
+                let feedback_ids: Vec<String> = data.selection.iter().cloned().collect();
+                vec![Command::SendFeedbacksToPr {
+                    review_id,
+                    feedback_ids,
+                    include_summary: data.include_summary,
+                }]
+            } else {
+                Vec::new()
+            }
         }
     }
 }

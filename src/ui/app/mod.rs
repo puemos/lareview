@@ -23,8 +23,8 @@ pub mod tests;
 pub use messages::{GenMsg, GenResultPayload, GhMsg, GhStatusPayload};
 pub use root::LaReviewApp;
 pub use state::{
-    AgentSettingsSnapshot, AppView, DomainState, FeedbackContext, FullDiffView, GeneratePreview,
-    SelectedAgent, UiState,
+    AgentSettingsSnapshot, AppView, DomainState, ExportOverlayData, FeedbackContext, FullDiffView,
+    GeneratePreview, OverlayState, SelectedAgent, SendToPrOverlayData, UiState,
 };
 pub use timeline::{TimelineContent, TimelineItem};
 

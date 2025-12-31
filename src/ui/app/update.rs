@@ -67,7 +67,11 @@ impl LaReviewApp {
             ctx.request_repaint();
         }
 
-        if self.state.session.is_generating || self.state.ui.is_exporting {
+        let is_exporting = matches!(
+            self.state.ui.active_overlay,
+            Some(crate::ui::app::OverlayState::Export(ref data)) if data.is_exporting
+        );
+        if self.state.session.is_generating || is_exporting {
             ctx.request_repaint_after(std::time::Duration::from_millis(16));
         }
 
@@ -113,12 +117,7 @@ impl LaReviewApp {
                     });
             });
 
-        self.render_full_diff_overlay(ctx);
-        self.render_export_preview_overlay(ctx);
-        self.render_requirements_overlay(ctx);
-        self.render_editor_picker_overlay(ctx);
-        self.render_push_feedback_overlay(ctx);
-        self.render_send_to_pr_overlay(ctx);
+        self.render_overlays(ctx);
 
         if let Some(text) = self.state.ui.pending_clipboard_copy.take() {
             ctx.output_mut(|o| o.commands.push(egui::OutputCommand::CopyText(text)));

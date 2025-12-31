@@ -47,7 +47,12 @@ pub fn reduce(
             vec![Command::DeleteRepo { repo_id }]
         }
         SettingsAction::DismissRequirements => {
-            ui.show_requirements_modal = false;
+            if matches!(
+                ui.active_overlay,
+                Some(crate::ui::app::OverlayState::Requirements)
+            ) {
+                ui.active_overlay = None;
+            }
             ui.has_seen_requirements = true;
             vec![Command::SaveAppConfigFull {
                 has_seen_requirements: ui.has_seen_requirements,
@@ -59,7 +64,12 @@ pub fn reduce(
         }
         SettingsAction::SetPreferredEditor(editor_id) => {
             ui.preferred_editor_id = Some(editor_id.clone());
-            ui.show_editor_picker = false;
+            if matches!(
+                ui.active_overlay,
+                Some(crate::ui::app::OverlayState::EditorPicker)
+            ) {
+                ui.active_overlay = None;
+            }
             ui.editor_picker_error = None;
 
             let mut commands = vec![Command::SaveAppConfigFull {
@@ -83,6 +93,12 @@ pub fn reduce(
 
         SettingsAction::ClearPreferredEditor => {
             ui.preferred_editor_id = None;
+            if matches!(
+                ui.active_overlay,
+                Some(crate::ui::app::OverlayState::EditorPicker)
+            ) {
+                ui.active_overlay = None;
+            }
             ui.editor_picker_error = None;
             vec![Command::SaveAppConfigFull {
                 has_seen_requirements: ui.has_seen_requirements,

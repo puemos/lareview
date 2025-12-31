@@ -5,10 +5,11 @@ mod feedback;
 mod feedback_detail;
 pub mod feedback_list;
 mod nav;
+pub mod overlays;
 mod task;
 mod task_detail;
-mod toolbar;
-mod view;
+pub mod toolbar;
+pub mod view;
 pub mod visuals;
 
 pub(super) fn format_timestamp(value: &str) -> String {
