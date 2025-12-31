@@ -1,6 +1,6 @@
 [package]
 name = "lareview"
-version = "0.0.15"
+version = "0.0.16"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 description = "LaReview is a desktop code review companion that generates intent-driven review plans with AI."

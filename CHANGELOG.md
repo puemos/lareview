@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.16] - 2026-01-01
+
+### Added
+
+- **GitHub PR Feedback**: Added batch feedback submission to GitHub PRs with summary review support and unified markdown rendering.
+- **Diagrams**: Implemented a new unified diagram engine and custom DSL with SVG rendering and auto-healing parser resilience.
+- **Infrastructure**: Transitioned to compile-time embedded database migrations for improved distribution stability.
+
+### Changed
+
+- **UI**: Standardized review visuals, icons, and "Send to PR" list patterns. Centralized all overlays into a modular state system.
+- **Domain**: Refactored monolithic domain structures into focused submodules (task, review, feedback).
+- **Settings**: Modularized settings view layout and organized configurations by feature.
+- **Seed Data**: Switched seed database script to a data-driven approach using external fixtures.
+
+### Fixed
+
+- **Diagrams**: Resolved multi-participant note rendering in D2.
+- **UI**: Restored toolbar dropdown icon and checkbox click interactions; improved markdown layout alignment.
+- **Project**: Set `lareview` as the default binary for `cargo run`.
+
 ## [0.0.15] - 2025-12-30
 
 ### Added
