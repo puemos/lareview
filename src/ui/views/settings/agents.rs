@@ -1,6 +1,6 @@
 use crate::ui::app::{Action, LaReviewApp, SettingsAction};
-use crate::ui::{icons, spacing, typography};
 use crate::ui::theme;
+use crate::ui::{icons, spacing, typography};
 use eframe::egui;
 use once_cell::sync::Lazy;
 use std::{
@@ -586,7 +586,11 @@ impl LaReviewApp {
                     .show(ui, |ui| {
                         ui.vertical(|ui| {
                             ui.label(typography::label("Agent ID (unique)"));
-                            let mut id = crate::ui::app::ui_memory::get_ui_memory(ui.ctx()).settings.custom_agent_draft.id.clone();
+                            let mut id = crate::ui::app::ui_memory::get_ui_memory(ui.ctx())
+                                .settings
+                                .custom_agent_draft
+                                .id
+                                .clone();
                             if ui
                                 .add(
                                     egui::TextEdit::singleline(&mut id)
@@ -602,7 +606,11 @@ impl LaReviewApp {
                             ui.add_space(spacing::SPACING_MD);
 
                             ui.label(typography::label("Display Name"));
-                            let mut name = crate::ui::app::ui_memory::get_ui_memory(ui.ctx()).settings.custom_agent_draft.label.clone();
+                            let mut name = crate::ui::app::ui_memory::get_ui_memory(ui.ctx())
+                                .settings
+                                .custom_agent_draft
+                                .label
+                                .clone();
                             if ui
                                 .add(
                                     egui::TextEdit::singleline(&mut name)
@@ -618,7 +626,11 @@ impl LaReviewApp {
                             ui.add_space(spacing::SPACING_MD);
 
                             ui.label(typography::label("Execution Command"));
-                            let mut cmd = crate::ui::app::ui_memory::get_ui_memory(ui.ctx()).settings.custom_agent_draft.command.clone();
+                            let mut cmd = crate::ui::app::ui_memory::get_ui_memory(ui.ctx())
+                                .settings
+                                .custom_agent_draft
+                                .command
+                                .clone();
                             if ui
                                 .add(
                                     egui::TextEdit::singleline(&mut cmd)
@@ -635,18 +647,24 @@ impl LaReviewApp {
                             ui.add_space(spacing::SPACING_XL);
 
                             ui.horizontal(|ui| {
-                                let draft = crate::ui::app::ui_memory::get_ui_memory(ui.ctx()).settings.custom_agent_draft.clone();
+                                let draft = crate::ui::app::ui_memory::get_ui_memory(ui.ctx())
+                                    .settings
+                                    .custom_agent_draft
+                                    .clone();
                                 let is_valid = !draft.id.is_empty()
                                     && !draft.label.is_empty()
                                     && !draft.command.is_empty();
 
                                 if ui
-                                    .add_enabled(is_valid, egui::Button::new(typography::label("Add Agent")))
+                                    .add_enabled(
+                                        is_valid,
+                                        egui::Button::new(typography::label("Add Agent")),
+                                    )
                                     .clicked()
                                 {
-                                    self.dispatch(Action::Settings(SettingsAction::AddCustomAgent(
-                                        draft,
-                                    )));
+                                    self.dispatch(Action::Settings(
+                                        SettingsAction::AddCustomAgent(draft),
+                                    ));
                                     crate::ui::app::ui_memory::with_ui_memory_mut(ctx, |mem| {
                                         mem.settings.show_add_custom_agent_modal = false;
                                     });
