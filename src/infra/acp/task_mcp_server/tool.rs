@@ -102,7 +102,7 @@ pub(super) fn create_return_task_tool(config: Arc<ServerConfig>) -> impl ToolHan
         "Submit a single code review task for a pull request. Call this repeatedly to submit each task individually. \
          Each task must include: id, title, description, stats (risk, tags), and diff_refs. \
          The server computes files and line additions/deletions from the provided diff_refs using the canonical diff. \
-         Optionally include sub_flow (grouping name). Diagram (D2 format) is required.",
+         Optionally include sub_flow (grouping name). Diagram JSON is required.",
     )
     .with_schema(single_task_schema())
 }
@@ -685,8 +685,8 @@ fn single_task_schema() -> Value {
                 "description": "Optional logical grouping name for this task. Use when multiple tasks belong to the same larger feature or concern (e.g., 'authentication-flow', 'data-migration', 'payment-processing'). Helps organize related tasks."
             },
             "diagram": {
-                "type": "string",
-                "description": "REQUIRED: diagram JSON string describing the flow, sequence, architecture, or data model. Must be valid JSON matching the diagram schema (type/data/messages)."
+                "type": "object",
+                "description": "REQUIRED: diagram JSON object describing the flow, sequence, architecture, or data model. Must be valid JSON matching the diagram schema (type/data/messages)."
             }
         },
         "required": ["id", "title", "description", "stats", "diff_refs", "diagram"]

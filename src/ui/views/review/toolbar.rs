@@ -10,6 +10,7 @@ pub(crate) fn render_header_selectors(
     ui: &mut egui::Ui,
     reviews: &[Review],
     selected_review_id: Option<&String>,
+    is_generating: bool,
     theme: &Theme,
 ) -> Option<ReviewAction> {
     if reviews.is_empty() {
@@ -42,11 +43,10 @@ pub(crate) fn render_header_selectors(
         visuals.widgets.open.bg_stroke = egui::Stroke::NONE;
 
         let text_content = format!("{} {}", current_label, regular::CARET_UP_DOWN);
-        let mut text = typography::body(text_content).size(16.0);
 
         // 1. Calculate size
         let galley = ui.painter().layout_no_wrap(
-            text.text().to_string(),
+            text_content.clone(),
             typography::body_font(16.0),
             theme.text_primary,
         );
@@ -59,25 +59,48 @@ pub(crate) fn render_header_selectors(
             egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &current_label)
         });
 
-        // 3. Determine color
-        let text_color = if response.hovered() || is_open {
-            theme.brand
+        // 3. Draw
+        if is_generating && !(response.hovered() || is_open) {
+            let mut job = egui::text::LayoutJob::default();
+            for (i, c) in text_content.chars().enumerate() {
+                // Delay each char to create movement
+                let offset = i as f64 * 0.05;
+                let char_color = crate::ui::animations::cyber::color_wave_advanced(
+                    theme.text_primary,
+                    theme.text_muted,
+                    ui.input(|i| i.time) - offset,
+                    4.0, // Higher speed
+                    crate::ui::animations::cyber::Easing::Pulse,
+                );
+                job.append(
+                    &c.to_string(),
+                    0.0,
+                    egui::TextFormat {
+                        font_id: typography::body_font(16.0),
+                        color: char_color,
+                        ..Default::default()
+                    },
+                );
+            }
+            let galley = ui.painter().layout_job(job);
+            ui.painter()
+                .galley(rect.min, galley, egui::Color32::TRANSPARENT);
         } else {
-            theme.text_primary
-        };
-
-        text = text.color(text_color);
-
-        // 4. Draw
-        ui.painter().galley(
-            rect.min,
-            ui.painter().layout_no_wrap(
-                text.text().to_string(),
-                typography::body_font(16.0),
+            let text_color = if response.hovered() || is_open {
+                theme.brand
+            } else {
+                theme.text_primary
+            };
+            ui.painter().galley(
+                rect.min,
+                ui.painter().layout_no_wrap(
+                    text_content.clone(),
+                    typography::body_font(16.0),
+                    text_color,
+                ),
                 text_color,
-            ),
-            text_color,
-        );
+            );
+        }
 
         if response.clicked() {
             egui::Popup::toggle_id(ui.ctx(), id);
@@ -167,7 +190,13 @@ mod tests {
     fn test_render_header_selectors_empty() {
         let reviews = vec![];
         let mut harness = Harness::new_ui(|ui| {
-            render_header_selectors(ui, &reviews, None, &crate::ui::theme::current_theme());
+            render_header_selectors(
+                ui,
+                &reviews,
+                None,
+                false,
+                &crate::ui::theme::current_theme(),
+            );
         });
         harness.run();
     }
@@ -187,7 +216,13 @@ mod tests {
         }];
         let mut harness = Harness::new_ui(|ui| {
             crate::ui::app::LaReviewApp::setup_fonts(ui.ctx());
-            render_header_selectors(ui, &reviews, None, &crate::ui::theme::current_theme());
+            render_header_selectors(
+                ui,
+                &reviews,
+                None,
+                false,
+                &crate::ui::theme::current_theme(),
+            );
         });
         harness.run_steps(5);
         harness
@@ -216,6 +251,7 @@ mod tests {
                 ui,
                 &reviews,
                 Some(&"rev1".to_string()),
+                false,
                 &crate::ui::theme::current_theme(),
             );
         });
@@ -259,6 +295,7 @@ mod tests {
                 ui,
                 &reviews,
                 Some(&"rev1".to_string()),
+                false,
                 &crate::ui::theme::current_theme(),
             );
         });

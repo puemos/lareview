@@ -71,7 +71,7 @@ pub(super) fn build_client_capabilities(has_repo_access: bool) -> ClientCapabili
                             "tags": ["string"]
                         },
                         "insight": "string",
-                        "diagram": "string (required diagram JSON)",
+                        "diagram": "object (required diagram JSON)",
                         "sub_flow": "string (optional grouping)",
                         "diff_refs": [{
                             "file": "string",

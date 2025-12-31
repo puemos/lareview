@@ -54,7 +54,18 @@ async fn test_return_task_tool_writes_file() {
         "title": "test",
         "description": "test task",
         "stats": { "risk": "LOW", "tags": ["test"] },
-        "diagram": "{\"type\":\"sequence\",\"data\":{\"actors\":[{\"id\":\"reviewer\",\"label\":\"Reviewer\",\"kind\":\"user\"},{\"id\":\"code\",\"label\":\"Code\",\"kind\":\"service\"}],\"messages\":[{\"type\":\"call\",\"data\":{\"from\":\"reviewer\",\"to\":\"code\",\"label\":\"review\"}}]}}",
+        "diagram": {
+            "type": "sequence",
+            "data": {
+                "actors": [
+                    { "id": "reviewer", "label": "Reviewer", "kind": "user" },
+                    { "id": "code", "label": "Code", "kind": "service" }
+                ],
+                "messages": [
+                    { "type": "call", "data": { "from": "reviewer", "to": "code", "label": "review" } }
+                ]
+            }
+        },
         "diff_refs": [
             {
                 "file": "src/a.rs",
@@ -141,7 +152,18 @@ async fn test_return_task_tool_persists_to_db() {
         "title": "DB Task",
         "description": "persist me",
         "stats": { "risk": "HIGH", "tags": ["database"] },
-        "diagram": "{\"type\":\"sequence\",\"data\":{\"actors\":[{\"id\":\"reviewer\",\"label\":\"Reviewer\",\"kind\":\"user\"},{\"id\":\"db\",\"label\":\"DB\",\"kind\":\"database\"}],\"messages\":[{\"type\":\"call\",\"data\":{\"from\":\"reviewer\",\"to\":\"db\",\"label\":\"check\"}}]}}",
+        "diagram": {
+            "type": "sequence",
+            "data": {
+                "actors": [
+                    { "id": "reviewer", "label": "Reviewer", "kind": "user" },
+                    { "id": "db", "label": "DB", "kind": "database" }
+                ],
+                "messages": [
+                    { "type": "call", "data": { "from": "reviewer", "to": "db", "label": "check" } }
+                ]
+            }
+        },
         "diff_refs": [
             {
                 "file": "src/a.rs",
@@ -289,7 +311,18 @@ async fn test_multiple_tasks_and_finalize_persists_correctly() {
         "title": "First Task",
         "description": "First task description",
         "stats": { "risk": "LOW", "tags": ["one"] },
-        "diagram": "{\"type\":\"sequence\",\"data\":{\"actors\":[{\"id\":\"reviewer\",\"label\":\"Reviewer\",\"kind\":\"user\"},{\"id\":\"code\",\"label\":\"Code\",\"kind\":\"service\"}],\"messages\":[{\"type\":\"call\",\"data\":{\"from\":\"reviewer\",\"to\":\"code\",\"label\":\"review\"}}]}}",
+        "diagram": {
+            "type": "sequence",
+            "data": {
+                "actors": [
+                    { "id": "reviewer", "label": "Reviewer", "kind": "user" },
+                    { "id": "code", "label": "Code", "kind": "service" }
+                ],
+                "messages": [
+                    { "type": "call", "data": { "from": "reviewer", "to": "code", "label": "review" } }
+                ]
+            }
+        },
         "diff_refs": [
             {
                 "file": "src/a.rs",
@@ -321,7 +354,18 @@ async fn test_multiple_tasks_and_finalize_persists_correctly() {
         "title": "Second Task",
         "description": "Second task description",
         "stats": { "risk": "MEDIUM", "tags": ["two"] },
-        "diagram": "{\"type\":\"sequence\",\"data\":{\"actors\":[{\"id\":\"reviewer\",\"label\":\"Reviewer\",\"kind\":\"user\"},{\"id\":\"code\",\"label\":\"Code\",\"kind\":\"service\"}],\"messages\":[{\"type\":\"call\",\"data\":{\"from\":\"reviewer\",\"to\":\"code\",\"label\":\"verify\"}}]}}",
+        "diagram": {
+            "type": "sequence",
+            "data": {
+                "actors": [
+                    { "id": "reviewer", "label": "Reviewer", "kind": "user" },
+                    { "id": "code", "label": "Code", "kind": "service" }
+                ],
+                "messages": [
+                    { "type": "call", "data": { "from": "reviewer", "to": "code", "label": "verify" } }
+                ]
+            }
+        },
         "diff_refs": [
             {
                 "file": "src/a.rs",

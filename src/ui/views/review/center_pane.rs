@@ -164,7 +164,7 @@ pub(crate) fn render_ready_state(
 pub(crate) fn render_empty_state(
     ui: &mut egui::Ui,
     theme: &Theme,
-    is_generating: bool,
+    _is_generating: bool,
 ) -> Option<Action> {
     let mut action_out = None;
 
@@ -173,28 +173,15 @@ pub(crate) fn render_empty_state(
         egui::Layout::centered_and_justified(egui::Direction::TopDown),
         |ui| {
             ui.vertical_centered(|ui| {
-                if is_generating {
-                    crate::ui::animations::cyber::cyber_spinner(
-                        ui,
-                        theme.brand,
-                        Some(crate::ui::animations::cyber::CyberSpinnerSize::Lg),
-                    );
-                    ui.add_space(spacing::SPACING_LG);
-                    ui.label(typography::h2("Analyzing Codebase").color(theme.text_primary));
-                    ui.add_space(spacing::SPACING_SM);
-                    ui.label(
-                        typography::body("The agent is generating a review plan based on your changes.")
-                            .color(theme.text_secondary)
-                    );
-                } else {
-                    // Text Content
-                    ui.label(typography::h2("No Active Review").color(theme.text_primary));
+                // Text Content
+                ui.label(typography::h2("No Active Review").color(theme.text_primary));
 
-                    ui.add_space(spacing::SPACING_SM);
-                    ui.label(
-                        typography::body("Your review queue is empty. Generate a new review plan from your local changes to get started.")
-                            .color(theme.text_secondary)
-                    );
+                ui.add_space(spacing::SPACING_SM);
+                ui.label(
+                    typography::body("Your review queue is empty. Generate a new review plan from your local changes to get started.")
+                        .color(theme.text_secondary)
+                );
+
 
                     ui.add_space(spacing::SPACING_XL);
 
@@ -208,11 +195,10 @@ pub(crate) fn render_empty_state(
                     ).clicked() {
                         action_out = Some(Action::Navigation(
                             crate::ui::app::NavigationAction::SwitchTo(
-                                crate::ui::app::AppView::Generate,
+                            crate::ui::app::AppView::Generate,
                             ),
                         ));
                     }
-                }
             });
         },
     );
@@ -263,7 +249,7 @@ mod tests {
             });
         });
         harness.run_steps(5);
-        harness.get_by_label("Analyzing Codebase");
+        harness.get_by_label("No Active Review");
     }
 
     #[test]

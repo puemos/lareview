@@ -78,28 +78,19 @@ impl LaReviewApp {
                     egui::Layout::left_to_right(egui::Align::Center),
                     |ui| {
                         // A. Left Side: Context Selectors
-                        ui.horizontal(|ui| {
-                            if let Some(action) = render_header_selectors(
-                                ui,
-                                &self.state.domain.reviews,
-                                self.state.ui.selected_review_id.as_ref(),
-                                &theme,
-                            ) {
-                                self.dispatch(Action::Review(action));
-                            }
+                        let is_generating_this = self.state.session.is_generating
+                            && self.state.ui.selected_review_id
+                                == self.state.session.generating_review_id;
 
-                            if self.state.session.is_generating
-                                && self.state.ui.selected_review_id
-                                    == self.state.session.generating_review_id
-                            {
-                                ui.add_space(spacing::SPACING_XS);
-                                crate::ui::animations::cyber::cyber_spinner(
-                                    ui,
-                                    theme.brand,
-                                    Some(crate::ui::animations::cyber::CyberSpinnerSize::Sm),
-                                );
-                            }
-                        });
+                        if let Some(action) = render_header_selectors(
+                            ui,
+                            &self.state.domain.reviews,
+                            self.state.ui.selected_review_id.as_ref(),
+                            is_generating_this,
+                            &theme,
+                        ) {
+                            self.dispatch(Action::Review(action));
+                        }
 
                         // B. Spacer
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {

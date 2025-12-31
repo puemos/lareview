@@ -18,7 +18,7 @@ struct SingleTaskPayload {
     #[serde(default)]
     diff_refs: Vec<DiffRef>,
     #[serde(default)]
-    diagram: Option<String>,
+    diagram: Option<Value>,
     #[serde(default)]
     sub_flow: Option<String>,
     #[serde(default)]
@@ -196,7 +196,7 @@ pub(crate) fn parse_task(args: Value) -> Result<ReviewTask> {
         count_line_changes_legacy(&task.diffs)
     };
 
-    let diagram = task.diagram.and_then(clean_diagram_json);
+    let diagram = normalize_diagram_value(task.diagram)?;
 
     // Validate JSON by parsing, surface clear error
     if let Some(ref d) = diagram {
@@ -224,79 +224,30 @@ pub(crate) fn parse_task(args: Value) -> Result<ReviewTask> {
     })
 }
 
-fn clean_diagram_json(code: String) -> Option<Arc<str>> {
-    let trimmed = code.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-
-    // Strip wrapping markdown code blocks if present
-    // e.g. ```d2 ... ``` or ``` ... ```
-    let lines: Vec<&str> = trimmed.lines().collect();
-    if lines.is_empty() {
-        return None;
-    }
-
-    let has_start_fence = lines.first().is_some_and(|l| l.trim().starts_with("```"));
-    let has_end_fence = lines.last().is_some_and(|l| l.trim().starts_with("```"));
-
-    let content = if has_start_fence && has_end_fence && lines.len() >= 2 {
-        // Remove first and last lines
-        lines[1..lines.len() - 1].join("\n")
-    } else {
-        trimmed.to_string()
+fn normalize_diagram_value(value: Option<Value>) -> Result<Option<Arc<str>>> {
+    let Some(value) = value else {
+        return Ok(None);
     };
 
-    let cleaned = content.trim();
-    if cleaned.is_empty() {
-        None
-    } else {
-        Some(Arc::from(cleaned))
+    if value.is_null() {
+        return Ok(None);
     }
+
+    if value.is_string() {
+        anyhow::bail!("diagram must be a JSON object, not a string");
+    }
+
+    if !value.is_object() {
+        anyhow::bail!("diagram must be a JSON object with type/data");
+    }
+
+    Ok(Some(Arc::from(value.to_string())))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
-
-    #[test]
-    fn test_clean_diagram_json() {
-        // Case 1: Clean code stays clean
-        let clean = "{\"type\":\"flow\",\"data\":{\"direction\":\"LR\",\"nodes\":[{\"id\":\"a\",\"label\":\"A\",\"kind\":\"generic\"}]}}";
-        assert_eq!(
-            clean_diagram_json(clean.to_string()),
-            Some(Arc::from(clean))
-        );
-
-        // Case 2: Markdown block with language
-        let md_lang = "```json\n{\"type\":\"flow\",\"data\":{\"direction\":\"LR\",\"nodes\":[{\"id\":\"a\",\"label\":\"A\",\"kind\":\"generic\"}]}}\n```";
-        assert_eq!(
-            clean_diagram_json(md_lang.to_string()),
-            Some(Arc::from(
-                "{\"type\":\"flow\",\"data\":{\"direction\":\"LR\",\"nodes\":[{\"id\":\"a\",\"label\":\"A\",\"kind\":\"generic\"}]}}"
-            ))
-        );
-
-        // Case 3: Markdown block without language
-        let md_plain = "```\n{\"type\":\"flow\",\"data\":{\"direction\":\"LR\",\"nodes\":[{\"id\":\"a\",\"label\":\"A\",\"kind\":\"generic\"}]}}\n```";
-        assert_eq!(
-            clean_diagram_json(md_plain.to_string()),
-            Some(Arc::from(
-                "{\"type\":\"flow\",\"data\":{\"direction\":\"LR\",\"nodes\":[{\"id\":\"a\",\"label\":\"A\",\"kind\":\"generic\"}]}}"
-            ))
-        );
-
-        // Case 4: Empty block
-        let empty = "```d2\n```";
-        assert_eq!(clean_diagram_json(empty.to_string()), None);
-
-        // Case 5: Empty string
-        assert_eq!(clean_diagram_json("".to_string()), None);
-
-        // Case 6: Whitespace only
-        assert_eq!(clean_diagram_json("   ".to_string()), None);
-    }
 
     #[test]
     fn test_extract_files_from_diffs_legacy() {
@@ -322,7 +273,19 @@ mod tests {
             "id": "T1",
             "title": "Title",
             "description": "Desc",
-            "diagram": "{\"type\":\"flow\",\"data\":{\"direction\":\"LR\",\"nodes\":[{\"id\":\"a\",\"label\":\"A\",\"kind\":\"generic\"},{\"id\":\"b\",\"label\":\"B\",\"kind\":\"generic\"}],\"edges\":[{\"from\":\"a\",\"to\":\"b\",\"label\":\"edge\"}]}}",
+            "diagram": {
+                "type": "flow",
+                "data": {
+                    "direction": "LR",
+                    "nodes": [
+                        { "id": "a", "label": "A", "kind": "generic" },
+                        { "id": "b", "label": "B", "kind": "generic" }
+                    ],
+                    "edges": [
+                        { "from": "a", "to": "b", "label": "edge" }
+                    ]
+                }
+            },
             "stats": { "risk": "HIGH", "tags": ["tag1"] },
             "diff_refs": [
                 { "file": "test.rs", "hunks": [] }
@@ -332,6 +295,25 @@ mod tests {
         assert_eq!(task.id, "T1");
         assert_eq!(task.stats.risk, RiskLevel::High);
         assert_eq!(task.files, vec!["test.rs"]);
+    }
+
+    #[test]
+    fn test_parse_task_rejects_diagram_string() {
+        let payload = json!({
+            "id": "T2",
+            "title": "Title2",
+            "description": "Desc2",
+            "diagram": "{\"type\":\"flow\",\"data\":{\"direction\":\"LR\",\"nodes\":[{\"id\":\"a\",\"label\":\"A\",\"kind\":\"generic\"}]}}",
+            "stats": { "risk": "LOW", "tags": [] },
+            "diff_refs": [
+                { "file": "test.rs", "hunks": [] }
+            ]
+        });
+        let err = parse_task(payload).unwrap_err();
+        assert!(
+            err.to_string().contains("diagram must be a JSON object"),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]

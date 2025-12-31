@@ -58,7 +58,7 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                     .show(ui, |ui| {
                         ui.set_max_width(ui.available_width());
 
-                        let (status_color, status_label) = get_status_style(&call.status);
+                        let (_status_color, _status_label) = get_status_style(&call.status);
                         let tool_label =
                             tool_label_from_parts(Some(&call.title), call.raw_input.as_ref());
 
@@ -87,24 +87,16 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                                         egui::Layout::right_to_left(egui::Align::Center),
                                         |ui| {
                                             ui.label(
-                                                typography::small_mono(format!("[{}]", status_label))
-                                                    .color(status_color)
-                                                    .size(11.0),
+                                                typography::small_mono(format!(
+                                                    "[{}]",
+                                                    _status_label
+                                                ))
+                                                .color(_status_color)
+                                                .size(11.0),
                                             );
-
-                                            if matches!(call.status, ToolCallStatus::InProgress) {
-                                                ui.add_space(4.0);
-                                                crate::ui::animations::cyber::cyber_spinner(
-                                                    ui,
-                                                    current_theme().brand,
-                                                    Some(
-                                                        crate::ui::animations::cyber::CyberSpinnerSize::Sm,
-                                                    ),
-                                                );
-                                            }
                                         },
                                     );
-                                });
+                                })
                             })
                             .body(|ui| {
                                 ui.add_space(4.0);
@@ -141,15 +133,6 @@ fn render_session_update(ui: &mut egui::Ui, update: &SessionUpdate) {
                         .color(current_theme().text_muted)
                         .size(12.0),
                 );
-
-                if matches!(status, ToolCallStatus::InProgress) {
-                    ui.add_space(4.0);
-                    crate::ui::animations::cyber::cyber_spinner(
-                        ui,
-                        current_theme().brand,
-                        Some(crate::ui::animations::cyber::CyberSpinnerSize::Sm),
-                    );
-                }
 
                 ui.label(
                     typography::small_mono(format!("[{}]", label))

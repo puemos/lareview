@@ -130,3 +130,198 @@ pub fn cyber_spinner(
 
     response
 }
+
+#[derive(Debug, Clone, Copy)]
+pub enum Easing {
+    Linear,
+    Smooth,
+    EaseInOut,
+    Bounce,
+    Elastic,
+    Pulse,
+}
+
+/// Interpolate between two colors with a smooth wave pattern
+pub fn color_wave(c1: Color32, c2: Color32, time: f64) -> Color32 {
+    let t = smooth_wave(time, 1.0);
+    lerp_color(c1, c2, t)
+}
+
+/// Advanced color wave with customizable speed and easing
+pub fn color_wave_advanced(
+    c1: Color32,
+    c2: Color32,
+    time: f64,
+    speed: f32,
+    easing: Easing,
+) -> Color32 {
+    let t = match easing {
+        Easing::Linear => linear_wave(time, speed),
+        Easing::Smooth => smooth_wave(time, speed),
+        Easing::EaseInOut => ease_in_out_wave(time, speed),
+        Easing::Bounce => bounce_wave(time, speed),
+        Easing::Elastic => elastic_wave(time, speed),
+        Easing::Pulse => pulse_wave(time, speed),
+    };
+    lerp_color(c1, c2, t)
+}
+
+// === Core interpolation ===
+
+/// Lerp between two colors in linear RGB space
+fn lerp_color(c1: Color32, c2: Color32, t: f32) -> Color32 {
+    let rgba1 = egui::Rgba::from(c1);
+    let rgba2 = egui::Rgba::from(c2);
+
+    // Use egui's built-in lerp for smooth blending
+    Color32::from(egui::Rgba::from_rgba_premultiplied(
+        rgba1.r() + (rgba2.r() - rgba1.r()) * t,
+        rgba1.g() + (rgba2.g() - rgba1.g()) * t,
+        rgba1.b() + (rgba2.b() - rgba1.b()) * t,
+        rgba1.a() + (rgba2.a() - rgba1.a()) * t,
+    ))
+}
+
+// === Wave functions ===
+
+fn linear_wave(time: f64, speed: f32) -> f32 {
+    let t = ((time * speed as f64 * 2.0).cos() + 1.0) / 2.0;
+    t as f32
+}
+
+fn smooth_wave(time: f64, speed: f32) -> f32 {
+    let t = ((time * speed as f64 * 2.0).cos() + 1.0) / 2.0;
+    // Smoothstep for extra smoothness
+    let t = t * t * (3.0 - 2.0 * t);
+    t as f32
+}
+
+fn pulse_wave(time: f64, speed: f32) -> f32 {
+    let t = ((time * speed as f64 * 2.0).cos() + 1.0) / 2.0;
+    // Sharpen the wave to create a short pulse effect
+    // As cos() -> -1, t -> 0 (Primary Color). We want to narrow this region.
+    // 1.0 - (1.0 - t)^4 will keep the value close to 1 (Muted) for most of the range
+    // and only dip to 0 (Primary) briefly.
+    // t=0 -> 0 (Primary)
+    // t=0.5 -> 0.984 (Mostly Muted)
+    // t=1 -> 1 (Muted)
+    (1.0 - (1.0 - t).powi(12)) as f32
+}
+
+fn ease_in_out_wave(time: f64, speed: f32) -> f32 {
+    let t = ((time * speed as f64 * 2.0).cos() + 1.0) / 2.0;
+    // Cubic easing
+    let t = if t < 0.5 {
+        4.0 * t * t * t
+    } else {
+        1.0 - (-2.0 * t + 2.0).powi(3) / 2.0
+    };
+    t as f32
+}
+
+fn bounce_wave(time: f64, speed: f32) -> f32 {
+    let t = ((time * speed as f64 * 2.0).cos() + 1.0) / 2.0;
+    let t = if t < 0.5 {
+        8.0 * t * t * t * t
+    } else {
+        1.0 - (-2.0 * t + 2.0).powi(4) / 2.0
+    };
+    t as f32
+}
+
+fn elastic_wave(time: f64, speed: f32) -> f32 {
+    let angle = time * speed as f64 * 2.0;
+    let t = (angle.cos() + 1.0) / 2.0;
+    // Add a subtle elastic effect
+    let elastic = (angle * 4.0).sin() * 0.1 * (1.0 - t).abs();
+    (t + elastic).clamp(0.0, 1.0) as f32
+}
+
+// === Multi-color gradients ===
+
+/// Animate through multiple colors
+pub fn color_wave_multi(colors: &[Color32], time: f64, speed: f32) -> Color32 {
+    if colors.is_empty() {
+        return Color32::BLACK;
+    }
+    if colors.len() == 1 {
+        return colors[0];
+    }
+
+    let cycle = (time * speed as f64).rem_euclid(colors.len() as f64);
+    let idx = cycle.floor() as usize;
+    let next_idx = (idx + 1) % colors.len();
+    let t = (cycle - idx as f64) as f32;
+
+    // Smoothstep for smooth transitions
+    let t = t * t * (3.0 - 2.0 * t);
+    lerp_color(colors[idx], colors[next_idx], t)
+}
+
+// === Pulse effects ===
+
+/// Pulse between a color and transparent
+pub fn color_pulse(color: Color32, time: f64, speed: f32) -> Color32 {
+    let t = smooth_wave(time, speed);
+    let rgba = egui::Rgba::from(color);
+    // Directly access components since index access might not be available or clean
+    // Rgba is conventionally r, g, b, a.
+    // However, Rgba in egui fields are public: r, g, b, a.
+    // Wait, the snippet used `rgba[3]`. Rgba usually implements Index.
+    // Let's use `.a()` getter and create new.
+    // Actually, Rgba struct fields are public in most versions, but let's be safe.
+    let new_a = rgba.a() * t;
+    Color32::from(egui::Rgba::from_rgba_premultiplied(
+        rgba.r(),
+        rgba.g(),
+        rgba.b(),
+        new_a,
+    ))
+}
+
+/// Pulse brightness
+pub fn brightness_pulse(color: Color32, time: f64, speed: f32, intensity: f32) -> Color32 {
+    let t = smooth_wave(time, speed);
+    let factor = 1.0 + (t - 0.5) * 2.0 * intensity;
+
+    let rgba = egui::Rgba::from(color);
+    Color32::from(egui::Rgba::from_rgba_premultiplied(
+        (rgba.r() * factor).clamp(0.0, 1.0),
+        (rgba.g() * factor).clamp(0.0, 1.0),
+        (rgba.b() * factor).clamp(0.0, 1.0),
+        rgba.a(),
+    ))
+}
+
+/// Renders text with a directional wave effect (light travels across characters)
+pub fn render_wave_text(
+    ui: &mut egui::Ui,
+    text: &str,
+    font_id: egui::FontId,
+    c1: Color32,
+    c2: Color32,
+    time: f64,
+    speed: f32,
+) {
+    let mut job = egui::text::LayoutJob::default();
+
+    for (i, c) in text.chars().enumerate() {
+        // Delay each character by a fraction of the cycle
+        // 0.1 is a good spacing for most words
+        let offset = i as f64 * 0.1;
+
+        let char_color = color_wave_advanced(c1, c2, time - offset, speed, Easing::Pulse);
+
+        job.append(
+            &c.to_string(),
+            0.0,
+            egui::TextFormat {
+                font_id: font_id.clone(),
+                color: char_color,
+                ..Default::default()
+            },
+        );
+    }
+
+    ui.label(job);
+}

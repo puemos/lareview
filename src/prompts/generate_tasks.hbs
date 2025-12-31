@@ -256,7 +256,8 @@
   </diagram_selection_guide>
 
   <diagram_json_guide>
-    JSON-only: always output a JSON object in `diagram`; do NOT emit Mermaid or raw D2; do NOT wrap in code fences. The app will render JSON → D2/Mermaid.
+    JSON-only: `diagram` must be a JSON object value (not a string); do NOT emit Mermaid or raw D2; do NOT wrap in code fences. The app will render JSON → D2/Mermaid.
+    Do NOT prefix with `diagram` or append extra text (like `diff_refs[...]` or "..."); only the JSON object belongs in `diagram`.
 
     Supported node/actor kinds (use snake_case): user, service, database (db), queue, external, file, lambda, cache, load_balancer, generic.
     Directions: LR, RL, TB, BT. Colors: `style.color` accepts hex or a name (blue/green/red/orange/purple/gray).
@@ -370,7 +371,25 @@
           "tags": ["security", "authentication", "breaking-change", "needs-tests"]
         },
         "sub_flow": "authentication-flow",
-        "diagram": "{\"type\":\"sequence\",\"data\":{\"actors\":[{\"id\":\"client\",\"label\":\"Client\",\"kind\":\"user\"},{\"id\":\"api\",\"label\":\"API\",\"kind\":\"service\"},{\"id\":\"jwt_service\",\"label\":\"JWTService\",\"kind\":\"service\"},{\"id\":\"middleware\",\"label\":\"Middleware\",\"kind\":\"service\"}],\"messages\":[{\"type\":\"call\",\"data\":{\"from\":\"client\",\"to\":\"api\",\"label\":\"POST /login\"}},{\"type\":\"call\",\"data\":{\"from\":\"api\",\"to\":\"jwt_service\",\"label\":\"generate()\"}},{\"type\":\"return\",\"data\":{\"from\":\"jwt_service\",\"to\":\"api\",\"label\":\"token\"}},{\"type\":\"call\",\"data\":{\"from\":\"client\",\"to\":\"api\",\"label\":\"request with token\"}},{\"type\":\"call\",\"data\":{\"from\":\"api\",\"to\":\"middleware\",\"label\":\"validate()\"}},{\"type\":\"call\",\"data\":{\"from\":\"middleware\",\"to\":\"jwt_service\",\"label\":\"verify()\"}}]}}",
+        "diagram": {
+          "type": "sequence",
+          "data": {
+            "actors": [
+              { "id": "client", "label": "Client", "kind": "user" },
+              { "id": "api", "label": "API", "kind": "service" },
+              { "id": "jwt_service", "label": "JWTService", "kind": "service" },
+              { "id": "middleware", "label": "Middleware", "kind": "service" }
+            ],
+            "messages": [
+              { "type": "call", "data": { "from": "client", "to": "api", "label": "POST /login" } },
+              { "type": "call", "data": { "from": "api", "to": "jwt_service", "label": "generate()" } },
+              { "type": "return", "data": { "from": "jwt_service", "to": "api", "label": "token" } },
+              { "type": "call", "data": { "from": "client", "to": "api", "label": "request with token" } },
+              { "type": "call", "data": { "from": "api", "to": "middleware", "label": "validate()" } },
+              { "type": "call", "data": { "from": "middleware", "to": "jwt_service", "label": "verify()" } }
+            ]
+          }
+        },
         "diff_refs": [
           {
             "file": "src/auth/jwt.rs",
@@ -418,7 +437,23 @@
           "tags": ["refactor", "database", "type-safety"]
         },
         "sub_flow": "query-builder-refactor",
-        "diagram": "{\"type\":\"sequence\",\"data\":{\"actors\":[{\"id\":\"repository\",\"label\":\"Repository\",\"kind\":\"service\"},{\"id\":\"query_builder\",\"label\":\"QueryBuilder\",\"kind\":\"service\"},{\"id\":\"sql\",\"label\":\"SQL\",\"kind\":\"service\"},{\"id\":\"database\",\"label\":\"Database\",\"kind\":\"database\"}],\"messages\":[{\"type\":\"call\",\"data\":{\"from\":\"repository\",\"to\":\"query_builder\",\"label\":\"new()\"}},{\"type\":\"call\",\"data\":{\"from\":\"query_builder\",\"to\":\"query_builder\",\"label\":\"where(condition)\"}},{\"type\":\"call\",\"data\":{\"from\":\"query_builder\",\"to\":\"sql\",\"label\":\"build()\"}},{\"type\":\"call\",\"data\":{\"from\":\"sql\",\"to\":\"database\",\"label\":\"execute()\"}}]}}",
+        "diagram": {
+          "type": "sequence",
+          "data": {
+            "actors": [
+              { "id": "repository", "label": "Repository", "kind": "service" },
+              { "id": "query_builder", "label": "QueryBuilder", "kind": "service" },
+              { "id": "sql", "label": "SQL", "kind": "service" },
+              { "id": "database", "label": "Database", "kind": "database" }
+            ],
+            "messages": [
+              { "type": "call", "data": { "from": "repository", "to": "query_builder", "label": "new()" } },
+              { "type": "call", "data": { "from": "query_builder", "to": "query_builder", "label": "where(condition)" } },
+              { "type": "call", "data": { "from": "query_builder", "to": "sql", "label": "build()" } },
+              { "type": "call", "data": { "from": "sql", "to": "database", "label": "execute()" } }
+            ]
+          }
+        },
         "diff_refs": [
           {
             "file": "src/db/query_builder.rs",
@@ -462,7 +497,22 @@
           "tags": ["database", "integration", "needs-tests"]
         },
         "sub_flow": "query-builder-refactor",
-        "diagram": "{\"type\":\"sequence\",\"data\":{\"actors\":[{\"id\":\"repository\",\"label\":\"Repository\",\"kind\":\"service\"},{\"id\":\"query_builder\",\"label\":\"QueryBuilder\",\"kind\":\"service\"},{\"id\":\"sql\",\"label\":\"SQL\",\"kind\":\"service\"},{\"id\":\"database\",\"label\":\"Database\",\"kind\":\"database\"}],\"messages\":[{\"type\":\"call\",\"data\":{\"from\":\"repository\",\"to\":\"query_builder\",\"label\":\"apply_filters()\"}},{\"type\":\"call\",\"data\":{\"from\":\"query_builder\",\"to\":\"sql\",\"label\":\"build()\"}},{\"type\":\"call\",\"data\":{\"from\":\"sql\",\"to\":\"database\",\"label\":\"execute()\"}}]}}",
+        "diagram": {
+          "type": "sequence",
+          "data": {
+            "actors": [
+              { "id": "repository", "label": "Repository", "kind": "service" },
+              { "id": "query_builder", "label": "QueryBuilder", "kind": "service" },
+              { "id": "sql", "label": "SQL", "kind": "service" },
+              { "id": "database", "label": "Database", "kind": "database" }
+            ],
+            "messages": [
+              { "type": "call", "data": { "from": "repository", "to": "query_builder", "label": "apply_filters()" } },
+              { "type": "call", "data": { "from": "query_builder", "to": "sql", "label": "build()" } },
+              { "type": "call", "data": { "from": "sql", "to": "database", "label": "execute()" } }
+            ]
+          }
+        },
         "diff_refs": [
           {
             "file": "src/db/repository.rs",
@@ -523,7 +573,14 @@
         "tags": ["tag1", "tag2", "tag3"]
       },
       "sub_flow": "optional-grouping-name",
-      "diagram": "required diagram JSON string",
+      "diagram": {
+        "type": "flow",
+        "data": {
+          "direction": "LR",
+          "nodes": [{ "id": "a", "label": "A", "kind": "generic" }],
+          "edges": []
+        }
+      },
       "diff_refs": [
         {
           "file": "string (relative file path)",
