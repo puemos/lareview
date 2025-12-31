@@ -1,5 +1,5 @@
 use crate::domain::{Comment, Feedback, FeedbackImpact, Review, ReviewRun, ReviewTask, RiskLevel};
-use crate::infra::diagram::{MermaidRenderer, Renderer, parse_json};
+use crate::infra::diagram::{DiagramRenderer, MermaidRenderer, parse_json};
 use anyhow::Result;
 use std::collections::HashMap;
 

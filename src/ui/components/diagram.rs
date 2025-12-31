@@ -1,4 +1,4 @@
-use crate::infra::diagram::{D2Renderer, Renderer, parse_json};
+use crate::infra::diagram::{D2Renderer, DiagramRenderer, parse_json};
 use crate::ui::theme::current_theme;
 use crate::ui::{icons, typography};
 use egui::{Id, Image, Rect, TextureOptions, Ui, load::SizedTexture};
@@ -127,7 +127,7 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<Arc<str>>, is_dark_mode: bool)
             let ctx = ui.ctx().clone();
 
             std::thread::spawn(move || {
-                let result = crate::infra::diagram::d2::d2_to_svg(&d2_code, is_dark_mode);
+                let result = crate::infra::diagram::engine::d2_to_svg(&d2_code, is_dark_mode);
 
                 let state = match result {
                     Ok(svg_str) => {
