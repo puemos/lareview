@@ -258,55 +258,23 @@ impl Database {
         Ok(())
     }
 
-    /// Run a migration by loading and executing the corresponding SQL file
+    /// Run a migration by executing the embedded SQL
+    /// Migration files are embedded at compile time using include_str! to ensure
+    /// they are available in distributed builds without requiring external files.
     fn run_migration(conn: &Connection, version: i32) -> Result<()> {
-        // Migration files are expected to be in migrations/ folder at the project root
-        // with naming pattern: {version:04}_description.sql
+        // Migrations are embedded at compile time - no runtime file I/O needed
+        let sql = match version {
+            9 => include_str!("../../../migrations/0009_update_feedback_status_constraint.sql"),
+            10 => include_str!("../../../migrations/0010_rename_thread_to_feedback.sql"),
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Unknown migration version: {}. Add the migration to run_migration() in database.rs",
+                    version
+                ));
+            }
+        };
 
-        // Find the migration file for this version
-        let migrations_dir = std::env::current_exe()
-            .ok()
-            .and_then(|exe| exe.parent().map(|p| p.to_path_buf()))
-            .and_then(|mut p| {
-                // Try relative to executable first (for installed builds)
-                p.push("migrations");
-                if p.exists() {
-                    Some(p)
-                } else {
-                    // Fall back to workspace root for development
-                    std::env::current_dir()
-                        .ok()
-                        .map(|cwd| cwd.join("migrations"))
-                }
-            })
-            .unwrap_or_else(|| PathBuf::from("migrations"));
-
-        // Find migration file matching this version
-        let version_prefix = format!("{:04}_", version);
-
-        let migration_file = std::fs::read_dir(&migrations_dir)
-            .map_err(|e| anyhow::anyhow!("Failed to read migrations directory: {}", e))?
-            .filter_map(|entry| entry.ok())
-            .find(|entry| {
-                entry
-                    .file_name()
-                    .to_string_lossy()
-                    .starts_with(&version_prefix)
-                    && entry.file_name().to_string_lossy().ends_with(".sql")
-            })
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "Migration file not found for version {} in {}",
-                    version,
-                    migrations_dir.display()
-                )
-            })?;
-
-        // Read and execute the migration SQL
-        let sql = std::fs::read_to_string(migration_file.path())
-            .map_err(|e| anyhow::anyhow!("Failed to read migration file: {}", e))?;
-
-        conn.execute_batch(&sql)
+        conn.execute_batch(sql)
             .map_err(|e| anyhow::anyhow!("Failed to execute migration {}: {}", version, e))?;
 
         Ok(())
