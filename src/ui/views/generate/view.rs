@@ -28,7 +28,7 @@ impl LaReviewApp {
                 .memory(|mem| mem.data.get_temp::<f32>(pane_width_id))
                 .unwrap_or(300.0);
             let right_width =
-                crate::ui::layout::clamp_width(saved_right_width, 450.0, content_width * 0.5);
+                crate::ui::layout::clamp_width(saved_right_width, 480.0, content_width * 0.5);
 
             let left_width = content_width - right_width;
 
