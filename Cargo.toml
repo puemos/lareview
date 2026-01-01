@@ -29,6 +29,7 @@ tokio-util = { version = "0.7", features = ["compat"] }
 futures = "0.3"
 which = "6"
 anyhow = "1.0"
+thiserror = "2"
 async-trait = "0.1"
 pmcp = "1.8.6"
 tempfile = "3"

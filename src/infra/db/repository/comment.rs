@@ -12,7 +12,9 @@ impl CommentRepository {
     pub fn new(conn: DbConn) -> Self {
         Self { conn }
     }
+}
 
+impl CommentRepository {
     pub fn save(&self, comment: &Comment) -> Result<()> {
         let conn = self
             .conn

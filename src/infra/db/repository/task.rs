@@ -14,7 +14,9 @@ impl TaskRepository {
     pub fn new(conn: DbConn) -> Self {
         Self { conn }
     }
+}
 
+impl TaskRepository {
     pub fn save(&self, task: &ReviewTask) -> Result<()> {
         let conn = self
             .conn

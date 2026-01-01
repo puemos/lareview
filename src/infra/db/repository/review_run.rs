@@ -11,7 +11,9 @@ impl ReviewRunRepository {
     pub fn new(conn: DbConn) -> Self {
         Self { conn }
     }
+}
 
+impl ReviewRunRepository {
     pub fn save(&self, run: &ReviewRun) -> Result<()> {
         let conn = self
             .conn

@@ -11,7 +11,7 @@ pub fn open_in_editor(editor_id: String, file_path: PathBuf, line_number: usize)
         return;
     };
 
-    crate::RUNTIME.get().unwrap().spawn(async move {
+    crate::spawn(async move {
         let mut cmd = tokio::process::Command::new(command);
         cmd.args(args);
 

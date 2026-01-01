@@ -1,11 +1,13 @@
 //! Domain types for LaReview application
 //! Defines the core data structures and business objects used throughout the application.
 
+pub mod error;
 pub mod feedback;
 pub mod repo;
 pub mod review;
 pub mod task;
 
+pub use error::*;
 pub use feedback::*;
 pub use repo::*;
 pub use review::*;

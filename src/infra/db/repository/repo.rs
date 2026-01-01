@@ -10,7 +10,9 @@ impl RepoRepository {
     pub fn new(conn: DbConn) -> Self {
         Self { conn }
     }
+}
 
+impl RepoRepository {
     pub fn save(&self, repo: &LinkedRepo) -> Result<()> {
         let conn = self
             .conn

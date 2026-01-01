@@ -61,7 +61,7 @@ pub fn run_d2_command(app: &mut LaReviewApp, command: D2Command) {
 
     let d2_install_tx = app.d2_install_tx.clone();
 
-    crate::RUNTIME.get().unwrap().spawn(async move {
+    crate::spawn(async move {
         let mut child = match tokio::process::Command::new("sh")
             .arg("-c")
             .arg(command_str)

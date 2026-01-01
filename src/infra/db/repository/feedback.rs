@@ -16,7 +16,9 @@ impl FeedbackRepository {
     pub fn new(conn: DbConn) -> Self {
         Self { conn }
     }
+}
 
+impl FeedbackRepository {
     pub fn save(&self, feedback: &Feedback) -> Result<()> {
         let conn = self
             .conn

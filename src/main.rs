@@ -3,7 +3,7 @@
 //! Initializes the egui application framework and sets up the Tokio runtime.
 
 use eframe::egui;
-use lareview::{RUNTIME, assets, infra, ui};
+use lareview::{self, assets, infra, ui};
 
 /// Main entry point for the LaReview application
 /// Sets up the Tokio runtime and initializes the egui UI framework
@@ -23,7 +23,7 @@ fn main() -> Result<(), eframe::Error> {
         || std::env::var("MCP_SERVER_NAME").is_ok();
 
     if is_mcp_server {
-        // Initialize the global Tokio runtime
+        // Initialize the global Tokio runtime for MCP mode
         let rt = match tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
@@ -35,17 +35,16 @@ fn main() -> Result<(), eframe::Error> {
             }
         };
 
-        if let Err(e) = RUNTIME.set(rt) {
+        if let Err(e) = lareview::set_runtime(rt) {
             eprintln!("Runtime already initialized: {e:?}");
             std::process::exit(1);
         }
 
         // Enter the runtime context and run the MCP server
-        let _guard = RUNTIME.get().unwrap().enter();
+        let _guard = lareview::enter_runtime();
 
         // Run the MCP server instead of the UI
-        let rt = RUNTIME.get().unwrap();
-        rt.block_on(async {
+        lareview::block_on(async {
             if let Err(e) = infra::acp::run_task_mcp_server().await {
                 eprintln!("MCP server error: {e}");
                 std::process::exit(1);
@@ -67,13 +66,13 @@ fn main() -> Result<(), eframe::Error> {
         }
     };
 
-    if let Err(e) = RUNTIME.set(rt) {
+    if let Err(e) = lareview::set_runtime(rt) {
         eprintln!("Runtime already initialized: {e:?}");
         std::process::exit(1);
     }
 
     // Enter the runtime context
-    let _guard = RUNTIME.get().unwrap().enter();
+    let _guard = lareview::enter_runtime();
 
     // Load the app icon
     let icon = crate::assets::get_content("assets/logo/512-mac.png")

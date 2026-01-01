@@ -23,5 +23,26 @@ use std::sync::{Arc, Mutex};
 
 pub(super) type DbConn = Arc<Mutex<Connection>>;
 
+/// Marker trait for repository types.
+///
+/// This trait documents that a type follows the common repository pattern
+/// of being constructed with a `DbConn`. It does not provide a default
+/// implementation to avoid breaking existing code that calls `.new()` directly.
+///
+/// # Example
+///
+/// ```rust
+/// use crate::infra::DbConn;
+///
+/// trait Repository {}
+///
+/// struct MyRepository {
+///     conn: DbConn,
+/// }
+///
+/// impl Repository for MyRepository {}
+/// ```
+pub trait Repository {}
+
 #[cfg(test)]
 mod tests;
