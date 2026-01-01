@@ -16,7 +16,7 @@ use utils::{
 };
 
 pub fn render_diff_editor(ui: &mut egui::Ui, diff_text: &str, language: &str) -> DiffAction {
-    render_diff_editor_with_options(ui, diff_text, language, true, None, None)
+    render_diff_editor_with_options(ui, diff_text, language, true, false, None, None)
 }
 
 pub fn render_diff_editor_full_view(
@@ -24,7 +24,7 @@ pub fn render_diff_editor_full_view(
     diff_text: &str,
     language: &str,
 ) -> DiffAction {
-    render_diff_editor_with_options(ui, diff_text, language, false, None, None)
+    render_diff_editor_with_options(ui, diff_text, language, false, true, None, None)
 }
 
 pub fn render_diff_editor_with_comment_callback(
@@ -40,6 +40,7 @@ pub fn render_diff_editor_with_comment_callback(
         diff_text,
         language,
         show_full_window_button,
+        true,
         active_line,
         on_comment_requested,
     )
@@ -50,6 +51,7 @@ pub fn render_diff_editor_with_options(
     diff_text: &str,
     _language: &str,
     show_full_window_button: bool,
+    show_row_actions: bool,
     active_line: Option<LineContext>,
     on_comment_requested: Option<&dyn Fn(usize, usize, usize)>,
 ) -> DiffAction {
@@ -289,6 +291,7 @@ pub fn render_diff_editor_with_options(
                                 &diff_line_info,
                                 ctx,
                                 is_active,
+                                show_row_actions,
                                 on_comment_requested,
                             );
 

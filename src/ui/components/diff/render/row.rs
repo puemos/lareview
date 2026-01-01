@@ -5,23 +5,19 @@ use super::super::{
 use super::types::DiffLineInfo;
 use super::utils::{DIFF_FONT_SIZE, paint_inline_text_job};
 use crate::domain::FeedbackSide;
-use crate::ui::{spacing, theme};
+use crate::ui::{icons, spacing, theme};
 use eframe::egui::{self, FontId, TextFormat, text::LayoutJob};
-use egui_phosphor::regular::{ARROW_SQUARE_OUT, PENCIL};
 
 pub fn render_unified_row(
     ui: &mut egui::Ui,
     line: &DiffLineInfo,
     ctx: LineContext,
     is_active: bool,
+    show_actions: bool,
     on_comment_click: Option<&dyn Fn(usize, usize, usize)>,
 ) -> DiffAction {
     let theme = theme::current_theme();
     let mut action = DiffAction::None;
-
-    let comment_open_id = ui.id().with(("comment_open", ctx.file_idx, ctx.line_idx));
-    let mut is_comment_active =
-        ui.memory(|mem| mem.data.get_temp::<bool>(comment_open_id).unwrap_or(false));
 
     let line_number = match line.change_type {
         ChangeType::Equal | ChangeType::Delete => line.old_line_num,
@@ -175,100 +171,122 @@ pub fn render_unified_row(
         .response;
 
     let line_number_for_action = line_number;
-    let mut comment_button_rect: Option<egui::Rect> = None;
-    let mut open_button_rect: Option<egui::Rect> = None;
+    let mut menu_button_rect: Option<egui::Rect> = None;
 
     let pointer_pos = ui.ctx().input(|i| i.pointer.hover_pos());
     let is_line_hovered = pointer_pos.is_some_and(|p| main_response.rect.contains(p));
     let is_modifier_pressed = ui.ctx().input(|i| i.modifiers.ctrl || i.modifiers.command);
 
-    let show_comment_button = line_number.is_some() && !is_comment_active && is_line_hovered;
-    let show_open_button = line_number.is_some() && is_line_hovered;
+    let popup_id = ui.id().with(("menu_popup", ctx.file_idx, ctx.line_idx));
+    let is_popup_open = egui::Popup::is_id_open(ui.ctx(), popup_id);
 
-    if show_comment_button {
-        let row_rect = main_response.rect;
-        let size: f32 = 18.0;
-        let gap: f32 = 4.0;
-        let right_offset: f32 = 4.0;
+    if show_actions && line_number.is_some() && (is_line_hovered || is_popup_open) {
+        let size: f32 = 20.0;
+        let left_offset: f32 = 74.0;
         let button_size = egui::vec2(size, size);
-        let top_y = row_rect.center().y - size * 0.5 - 1.0;
-        let open_x = row_rect.right() - size - right_offset;
-        let comment_x = open_x - gap - size;
-        let button_rect = egui::Rect::from_min_size(egui::pos2(comment_x, top_y), button_size);
-        comment_button_rect = Some(button_rect);
 
-        let painter = ui.painter();
-        painter.rect_filled(button_rect, size * 0.5, theme.accent);
-        painter.text(
-            button_rect.center(),
-            egui::Align2::CENTER_CENTER,
-            PENCIL.to_string(),
-            FontId::proportional(size - 2.0),
-            theme.bg_primary,
-        );
+        // Anchor to the far left of the row
+        let align_left_x = main_response.rect.min.x;
+        let top_y = main_response.rect.center().y - size * 0.5;
 
-        let hovered_button = pointer_pos.is_some_and(|p| button_rect.contains(p));
-        let clicked = ui
-            .ctx()
-            .input(|i| hovered_button && i.pointer.button_clicked(egui::PointerButton::Primary));
+        let button_rect =
+            egui::Rect::from_min_size(egui::pos2(align_left_x + left_offset, top_y), button_size);
+        menu_button_rect = Some(button_rect);
 
-        if clicked {
-            ui.memory_mut(|mem| {
-                mem.data.insert_temp(comment_open_id, true);
-            });
-            is_comment_active = true;
+        let response = ui
+            .interact(
+                button_rect,
+                ui.id().with(("menu", ctx.file_idx, ctx.line_idx)),
+                egui::Sense::click(),
+            )
+            .on_hover_cursor(egui::CursorIcon::PointingHand);
 
-            if let Some(num) = line_number_for_action {
-                if let Some(callback) = on_comment_click {
-                    callback(ctx.file_idx, ctx.line_idx, num);
-                }
-                action = DiffAction::AddNote {
-                    file_idx: ctx.file_idx,
-                    line_idx: ctx.line_idx,
-                    line_number: num,
-                    file_path: ctx.file_path.clone(),
-                    side: side_for_action,
-                };
-            }
+        if response.clicked() {
+            egui::Popup::toggle_id(ui.ctx(), popup_id);
         }
-    }
-
-    if show_open_button {
-        let row_rect = main_response.rect;
-        let size: f32 = 18.0;
-        let right_offset: f32 = 4.0;
-        let button_size = egui::vec2(size, size);
-        let top_y = row_rect.center().y - size * 0.5 - 1.0;
-        let button_rect = egui::Rect::from_min_size(
-            egui::pos2(row_rect.right() - size - right_offset, top_y),
-            button_size,
-        );
-        open_button_rect = Some(button_rect);
 
         let painter = ui.painter();
-        painter.rect_filled(button_rect, size * 0.5, theme.brand);
+
+        // Permanent muted background as requested
+        let bg_color = if response.hovered() || is_popup_open {
+            theme.bg_tertiary
+        } else {
+            theme.bg_primary
+        };
+        painter.circle_filled(button_rect.center(), size * 0.5, bg_color);
+
+        let icon_color = if response.hovered() || is_popup_open {
+            theme.brand
+        } else {
+            theme.text_primary
+        };
+
         painter.text(
             button_rect.center(),
             egui::Align2::CENTER_CENTER,
-            ARROW_SQUARE_OUT.to_string(),
+            egui_phosphor::regular::DOTS_THREE_CIRCLE.to_string(),
             FontId::proportional(size - 4.0),
-            theme.bg_primary,
+            icon_color,
         );
 
-        let hovered_button = pointer_pos.is_some_and(|p| button_rect.contains(p));
-        let clicked = ui
-            .ctx()
-            .input(|i| hovered_button && i.pointer.button_clicked(egui::PointerButton::Primary));
+        egui::Popup::new(popup_id, ui.ctx().clone(), button_rect, ui.layer_id())
+            .open_memory(None)
+            .show(|ui| {
+                let frame_response = egui::Frame::NONE
+                    .inner_margin(egui::Margin::symmetric(4, 2))
+                    .show(ui, |ui| {
+                        ui.set_max_width(150.0);
 
-        if clicked
-            && matches!(action, DiffAction::None)
-            && let Some(num) = line_number_for_action
-        {
-            action = DiffAction::OpenInEditor {
-                file_path: ctx.file_path.clone(),
-                line_number: num,
-            };
-        }
+                        if ui
+                            .selectable_label(
+                                false,
+                                format!("{} Add Feedback", icons::TAB_FEEDBACK),
+                            )
+                            .clicked()
+                        {
+                            if let Some(num) = line_number_for_action {
+                                if let Some(callback) = on_comment_click {
+                                    callback(ctx.file_idx, ctx.line_idx, num);
+                                }
+                                action = DiffAction::AddNote {
+                                    file_idx: ctx.file_idx,
+                                    line_idx: ctx.line_idx,
+                                    line_number: num,
+                                    file_path: ctx.file_path.clone(),
+                                    side: side_for_action,
+                                };
+                            }
+                            ui.close();
+                        }
+
+                        if ui
+                            .selectable_label(
+                                false,
+                                format!(
+                                    "{} Open in Editor",
+                                    egui_phosphor::regular::ARROW_SQUARE_OUT
+                                ),
+                            )
+                            .clicked()
+                        {
+                            if let Some(num) = line_number_for_action {
+                                action = DiffAction::OpenInEditor {
+                                    file_path: ctx.file_path.clone(),
+                                    line_number: num,
+                                };
+                            }
+                            ui.close();
+                        }
+                    });
+
+                // Block cursor fallthrough by making the entire popup area interactive
+                ui.interact(
+                    frame_response.response.rect,
+                    ui.id().with("popup_bg"),
+                    egui::Sense::hover(),
+                )
+                .on_hover_cursor(egui::CursorIcon::Default);
+            });
     }
 
     let show_jump_hint = is_line_hovered && is_modifier_pressed && line_number_for_action.is_some();
@@ -299,11 +317,10 @@ pub fn render_unified_row(
     }
 
     if let Some(pos) = pointer_pos {
-        let hover_comment = comment_button_rect.is_some_and(|rect| rect.contains(pos));
-        let hover_open = open_button_rect.is_some_and(|rect| rect.contains(pos));
+        let hover_menu = menu_button_rect.is_some_and(|rect| rect.contains(pos));
         let hover_row = main_response.rect.contains(pos);
 
-        if hover_comment || hover_open || (hover_row && is_modifier_pressed) {
+        if hover_menu || (hover_row && is_modifier_pressed) {
             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
         } else if hover_row {
             ui.ctx().set_cursor_icon(egui::CursorIcon::Text);
@@ -314,20 +331,15 @@ pub fn render_unified_row(
         .ctx()
         .input(|i| i.pointer.button_clicked(egui::PointerButton::Primary));
     let clicked_in_row = pointer_pos.is_some_and(|p| main_response.rect.contains(p));
-    let clicked_comment_button = comment_button_rect
-        .zip(pointer_pos)
-        .is_some_and(|(rect, pos)| rect.contains(pos));
-    let clicked_open_button = open_button_rect
+    let clicked_menu_button = menu_button_rect
         .zip(pointer_pos)
         .is_some_and(|(rect, pos)| rect.contains(pos));
 
     if matches!(action, DiffAction::None)
-        && !is_comment_active
         && is_modifier_pressed
         && is_primary_clicked
         && clicked_in_row
-        && !clicked_comment_button
-        && !clicked_open_button
+        && !clicked_menu_button
         && line_number_for_action.is_some()
         && let Some(num) = line_number_for_action
     {

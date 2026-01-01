@@ -25,7 +25,7 @@ pub const VIEW_SETTINGS: &str = icons::GEAR;
 
 pub const TAB_DESCRIPTION: &str = icons::FILE_TEXT;
 pub const TAB_DIAGRAM: &str = icons::CHART_BAR;
-pub const TAB_CHANGES: &str = icons::GIT_DIFF;
+pub const TAB_CHANGES: &str = icons::FILES;
 pub const TAB_FEEDBACK: &str = icons::CHAT_CIRCLE;
 
 // --- Common Actions ---
