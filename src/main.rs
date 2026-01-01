@@ -16,6 +16,10 @@ fn main() -> Result<(), eframe::Error> {
 
     infra::shell::init_process_path();
 
+    // Initialize logging early - respects RUST_LOG environment variable
+    // Usage: RUST_LOG=debug cargo run  (or RUST_LOG=acp=debug for ACP only)
+    let _ = env_logger::try_init();
+
     // Check if we're running as an MCP server
     // Also check for MCP-related environment variables that may indicate MCP mode
     let is_mcp_server = args.contains(&"--task-mcp-server".to_string())

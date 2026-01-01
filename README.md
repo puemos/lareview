@@ -243,6 +243,14 @@ Generate a Markdown summary of your review, including stats, metadata, task deta
   - `cargo clippy --all-targets --all-features -- -D warnings`
   - `cargo test`
 
+- Logging:
+  - LaReview uses the `log` crate with `env_logger`.
+  - Set `RUST_LOG` to control log levels:
+    - `RUST_LOG=debug cargo run` - Full debug output
+    - `RUST_LOG=acp=debug cargo run` - ACP agent debug output only
+    - `RUST_LOG=error cargo run` - Errors only
+  - Logs appear in the terminal when running from source.
+
 - Tests:
   - Unit tests: Located alongside modules in `src/` (usually as `tests.rs`)
   - Integration tests: Located in the root `tests/` directory

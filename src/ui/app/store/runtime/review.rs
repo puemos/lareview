@@ -9,6 +9,7 @@ use crate::domain::{
     Comment, Feedback, FeedbackAnchor, FeedbackImpact, FeedbackSide, ReviewId, ReviewStatus,
 };
 use crate::ui::app::store::action::SendToPrResult;
+use log::warn;
 use std::collections::HashMap;
 use unidiff::PatchSet;
 
@@ -606,7 +607,7 @@ pub fn update_feedback_status(app: &mut LaReviewApp, feedback_id: String, status
     if result.is_err()
         && let Some(ref _review_id) = review_id
     {
-        eprintln!("[review] Failed to update feedback status, skipping reload");
+        warn!("[review] Failed to update feedback status, skipping reload");
     }
 
     if let (Ok(_), Some(review_id)) = (result, review_id) {
@@ -629,7 +630,7 @@ pub fn update_feedback_impact(app: &mut LaReviewApp, feedback_id: String, impact
     if result.is_err()
         && let Some(ref _review_id) = review_id
     {
-        eprintln!("[review] Failed to update feedback impact, skipping reload");
+        warn!("[review] Failed to update feedback impact, skipping reload");
     }
 
     if let (Ok(_), Some(review_id)) = (result, review_id) {
@@ -652,7 +653,7 @@ pub fn update_feedback_title(app: &mut LaReviewApp, feedback_id: String, title: 
     if result.is_err()
         && let Some(ref _review_id) = review_id
     {
-        eprintln!("[review] Failed to update feedback title, skipping reload");
+        warn!("[review] Failed to update feedback title, skipping reload");
     }
 
     if let (Ok(_), Some(review_id)) = (result, review_id) {
@@ -671,7 +672,7 @@ pub fn delete_feedback(app: &mut LaReviewApp, feedback_id: String) {
     if result.is_err()
         && let Some(ref _review_id) = review_id
     {
-        eprintln!("[review] Failed to delete feedback, skipping reload");
+        warn!("[review] Failed to delete feedback, skipping reload");
     }
 
     if let (Ok(_), Some(review_id)) = (&result, review_id) {
@@ -690,7 +691,7 @@ pub fn delete_comment(app: &mut LaReviewApp, comment_id: String) {
     if result.is_err()
         && let Some(ref _review_id) = review_id
     {
-        eprintln!("[review] Failed to delete comment, skipping reload");
+        warn!("[review] Failed to delete comment, skipping reload");
     }
 
     if let (Ok(_), Some(review_id)) = (&result, review_id) {

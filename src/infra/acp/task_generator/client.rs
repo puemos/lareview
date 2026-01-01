@@ -6,6 +6,7 @@ use agent_client_protocol::{
     ToolKind,
 };
 use async_trait::async_trait;
+use log::debug;
 use serde_json::json;
 use serde_json::value::RawValue;
 use std::collections::HashMap;
@@ -570,10 +571,7 @@ impl agent_client_protocol::Client for LaReviewClient {
         &self,
         notification: SessionNotification,
     ) -> agent_client_protocol::Result<()> {
-        // Debug log all updates when ACP_DEBUG is set
-        if std::env::var("ACP_DEBUG").is_ok() {
-            eprintln!("[acp] session update: {:?}", notification.update);
-        }
+        debug!(target: "acp", "session update: {:?}", notification.update);
 
         let update = notification.update.clone();
 
@@ -601,13 +599,11 @@ impl agent_client_protocol::Client for LaReviewClient {
                 // Important: No progress update for thoughts because they're not the final result
             }
             SessionUpdate::ToolCall(call) => {
-                // Debug log tool call details
-                if std::env::var("ACP_DEBUG").is_ok() {
-                    eprintln!(
-                        "[acp] tool call: title={:?}, raw_input={:?}, raw_output={:?}",
-                        call.title, call.raw_input, call.raw_output
-                    );
-                }
+                debug!(
+                    target: "acp",
+                    "tool call: title={:?}, raw_input={:?}, raw_output={:?}",
+                    call.title, call.raw_input, call.raw_output
+                );
 
                 let tool_name = Self::tool_name_from_title(&call.title)
                     .map(|value| value.to_string())
@@ -707,9 +703,7 @@ impl agent_client_protocol::Client for LaReviewClient {
 
                 if is_completed {
                     if is_finalize {
-                        if std::env::var("ACP_DEBUG").is_ok() {
-                            eprintln!("[acp] finalize_review completed via ToolCallUpdate");
-                        }
+                        debug!(target: "acp", "finalize_review completed via ToolCallUpdate");
                         self.mark_finalization_received();
                         if let Some(tx) = &self.progress {
                             let _ = tx.send(ProgressEvent::MetadataUpdated);
