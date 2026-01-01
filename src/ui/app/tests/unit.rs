@@ -186,12 +186,14 @@ fn test_timeline_merge_update_in_place_text() {
         if let SessionUpdate::AgentMessageChunk(chunk) = *boxed {
             if let ContentBlock::Text(text) = chunk.content {
                 assert_eq!(text.text, "Hello World");
+            } else {
+                unreachable!("wrong content block type")
             }
         } else {
-            panic!("wrong session update");
+            unreachable!("wrong session update type")
         }
     } else {
-        panic!("wrong timeline content");
+        unreachable!("wrong timeline content type")
     }
 }
 
@@ -222,13 +224,13 @@ fn test_timeline_merge_thought_chunk() {
             if let agent_client_protocol::ContentBlock::Text(text) = chunk.content {
                 assert_eq!(text.text, "Thinking... more");
             } else {
-                panic!("wrong content block");
+                unreachable!("wrong content block type")
             }
         } else {
-            panic!("wrong session update");
+            unreachable!("wrong session update type")
         }
     } else {
-        panic!("wrong timeline content");
+        unreachable!("wrong timeline content type")
     }
 }
 
@@ -259,13 +261,13 @@ fn test_timeline_merge_user_chunk() {
             if let agent_client_protocol::ContentBlock::Text(text) = chunk.content {
                 assert_eq!(text.text, "User says hello");
             } else {
-                panic!("wrong content block");
+                unreachable!("wrong content block type")
             }
         } else {
-            panic!("wrong session update");
+            unreachable!("wrong session update type")
         }
     } else {
-        panic!("wrong timeline content");
+        unreachable!("wrong timeline content type")
     }
 }
 
@@ -302,10 +304,10 @@ fn test_timeline_merge_plan() {
                 agent_client_protocol::PlanEntryStatus::Completed
             );
         } else {
-            panic!("wrong session update");
+            unreachable!("wrong session update type")
         }
     } else {
-        panic!("wrong timeline content");
+        unreachable!("wrong timeline content type")
     }
 }
 

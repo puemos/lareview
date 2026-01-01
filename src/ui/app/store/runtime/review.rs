@@ -603,6 +603,12 @@ pub fn update_feedback_status(app: &mut LaReviewApp, feedback_id: String, status
         result.clone(),
     )));
 
+    if result.is_err()
+        && let Some(ref _review_id) = review_id
+    {
+        eprintln!("[review] Failed to update feedback status, skipping reload");
+    }
+
     if let (Ok(_), Some(review_id)) = (result, review_id) {
         load_review_feedbacks(app, review_id);
     }
@@ -619,6 +625,12 @@ pub fn update_feedback_impact(app: &mut LaReviewApp, feedback_id: String, impact
     app.dispatch(Action::Async(AsyncAction::FeedbackCommentSaved(
         result.clone(),
     )));
+
+    if result.is_err()
+        && let Some(ref _review_id) = review_id
+    {
+        eprintln!("[review] Failed to update feedback impact, skipping reload");
+    }
 
     if let (Ok(_), Some(review_id)) = (result, review_id) {
         load_review_feedbacks(app, review_id);
@@ -637,6 +649,12 @@ pub fn update_feedback_title(app: &mut LaReviewApp, feedback_id: String, title: 
         result.clone(),
     )));
 
+    if result.is_err()
+        && let Some(ref _review_id) = review_id
+    {
+        eprintln!("[review] Failed to update feedback title, skipping reload");
+    }
+
     if let (Ok(_), Some(review_id)) = (result, review_id) {
         load_review_feedbacks(app, review_id);
     }
@@ -650,6 +668,12 @@ pub fn delete_feedback(app: &mut LaReviewApp, feedback_id: String) {
         .map(|_| ())
         .map_err(|e| format!("Failed to delete feedback: {e}"));
 
+    if result.is_err()
+        && let Some(ref _review_id) = review_id
+    {
+        eprintln!("[review] Failed to delete feedback, skipping reload");
+    }
+
     if let (Ok(_), Some(review_id)) = (&result, review_id) {
         load_review_feedbacks(app, review_id);
     }
@@ -662,6 +686,12 @@ pub fn delete_comment(app: &mut LaReviewApp, comment_id: String) {
         .delete(&comment_id)
         .map(|_| ())
         .map_err(|e| format!("Failed to delete comment: {e}"));
+
+    if result.is_err()
+        && let Some(ref _review_id) = review_id
+    {
+        eprintln!("[review] Failed to delete comment, skipping reload");
+    }
 
     if let (Ok(_), Some(review_id)) = (&result, review_id) {
         load_review_feedbacks(app, review_id);

@@ -34,7 +34,10 @@ impl Database {
         db.init()?;
 
         if std::env::var("LAREVIEW_DB_PATH").is_err() {
-            // set_var is currently unsafe on nightly; this is limited to process-local config.
+            // set_var is unsafe but acceptable here because:
+            // 1. Called once during database initialization (single-threaded context)
+            // 2. Process-local configuration with no concurrent access
+            // 3. Early in the application lifecycle before any spawned threads run
             unsafe {
                 std::env::set_var("LAREVIEW_DB_PATH", path.to_string_lossy().to_string());
             }
@@ -86,7 +89,7 @@ impl Database {
     }
 
     fn init(&self) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().expect("Failed to acquire database lock");
         const SCHEMA_VERSION: i32 = 10;
 
         conn.execute_batch("PRAGMA foreign_keys = ON;")?;

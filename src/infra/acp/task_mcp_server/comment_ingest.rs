@@ -10,6 +10,8 @@ use chrono::Utc;
 use serde_json::Value;
 use uuid::Uuid;
 
+const DEFAULT_TITLE_TRUNCATION_LENGTH: usize = 50;
+
 pub(super) fn save_agent_comment(config: &ServerConfig, args: Value) -> Result<String> {
     let file = args
         .get("file")
@@ -38,7 +40,7 @@ pub(super) fn save_agent_comment(config: &ServerConfig, args: Value) -> Result<S
             let end = body
                 .char_indices()
                 .map(|(i, _)| i)
-                .nth(50)
+                .nth(DEFAULT_TITLE_TRUNCATION_LENGTH)
                 .unwrap_or(body.len());
             body[..end].to_string()
         });

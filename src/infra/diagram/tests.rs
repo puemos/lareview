@@ -4,14 +4,14 @@ use serde_json::json;
 fn parse_sequence_json(value: serde_json::Value) -> SequenceDiagram {
     match parse_json(&value.to_string()).expect("JSON produces diagram") {
         Diagram::Sequence(seq) => seq,
-        other => panic!("Expected Sequence diagram, got {:?}", other),
+        _ => unreachable!("Expected Sequence diagram"),
     }
 }
 
 fn parse_flow_json(value: serde_json::Value) -> FlowDiagram {
     match parse_json(&value.to_string()).expect("JSON produces diagram") {
         Diagram::Flow(flow) => flow,
-        other => panic!("Expected Flow diagram, got {:?}", other),
+        _ => unreachable!("Expected Flow diagram"),
     }
 }
 
@@ -67,7 +67,7 @@ fn parse_json_auto_heals_prefixed_payload() {
     let diagram = parse_json(&payload).expect("auto-heal");
     match diagram {
         Diagram::Flow(flow) => assert_eq!(flow.nodes.len(), 1),
-        other => panic!("Expected Flow diagram, got {:?}", other),
+        _ => unreachable!("Expected Flow diagram"),
     }
 }
 
@@ -77,14 +77,14 @@ fn parse_json_auto_heals_common_json_mistakes() {
     let diagram = parse_json(trailing).expect("auto-heal trailing commas");
     match diagram {
         Diagram::Flow(flow) => assert_eq!(flow.nodes.len(), 1),
-        other => panic!("Expected Flow diagram, got {:?}", other),
+        _ => unreachable!("Expected Flow diagram"),
     }
 
     let single_quotes = "{'type':'flow','data':{'direction':'LR','nodes':[{'id':'a','label':'A','kind':'generic'}]}}";
     let diagram = parse_json(single_quotes).expect("auto-heal single quotes");
     match diagram {
         Diagram::Flow(flow) => assert_eq!(flow.nodes.len(), 1),
-        other => panic!("Expected Flow diagram, got {:?}", other),
+        _ => unreachable!("Expected Flow diagram"),
     }
 }
 
@@ -120,7 +120,7 @@ fn parse_json_auto_heals_missing_type_sequence_from_log() {
             assert_eq!(seq.actors.len(), 5);
             assert_eq!(seq.messages.len(), 3);
         }
-        other => panic!("Expected Sequence diagram, got {:?}", other),
+        _ => unreachable!("Expected Sequence diagram"),
     }
 
     let wrapped = format!(r#"{{"data": {data_only}}}"#);
@@ -130,7 +130,7 @@ fn parse_json_auto_heals_missing_type_sequence_from_log() {
             assert_eq!(seq.actors.len(), 5);
             assert_eq!(seq.messages.len(), 3);
         }
-        other => panic!("Expected Sequence diagram, got {:?}", other),
+        _ => unreachable!("Expected Sequence diagram"),
     }
 }
 
@@ -180,7 +180,7 @@ fn parse_json_auto_heals_fragment_shorthand_from_log() {
                 .count();
             assert_eq!(fragment_count, 2);
         }
-        other => panic!("Expected Sequence diagram, got {:?}", other),
+        _ => unreachable!("Expected Sequence diagram"),
     }
 }
 
@@ -391,7 +391,7 @@ fn sequence_json_alt_else_labels_render() {
     }));
     let fragment = match &seq.messages[0] {
         Message::Fragment { fragment } => fragment,
-        other => panic!("Expected Fragment message, got {:?}", other),
+        _ => unreachable!("Expected Fragment message"),
     };
     assert_eq!(fragment.kind, FragmentKind::Alt);
     assert_eq!(fragment.branches.len(), 2);

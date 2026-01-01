@@ -122,7 +122,7 @@ mod tests {
         let contents = toml::to_string_pretty(&config).unwrap();
         std::fs::write(&path, contents).unwrap();
 
-        // Test loading
+        // Test loading - unsafe but protected by ENV_MUTEX in test context
         unsafe {
             std::env::set_var("LAREVIEW_CONFIG_PATH", &path);
         }
@@ -152,6 +152,7 @@ mod tests {
         assert!(contents.contains("my-agent"));
         assert!(contents.contains("API_KEY"));
 
+        // Cleanup - unsafe but protected by ENV_MUTEX in test context
         unsafe {
             std::env::remove_var("LAREVIEW_CONFIG_PATH");
         }
@@ -161,6 +162,7 @@ mod tests {
     fn test_load_config_missing() {
         let _guard = ENV_MUTEX.lock().unwrap();
         let path = PathBuf::from("/non/existent/path/to/config.toml");
+        // Test loading missing config - unsafe but protected by ENV_MUTEX
         unsafe {
             std::env::set_var("LAREVIEW_CONFIG_PATH", &path);
         }

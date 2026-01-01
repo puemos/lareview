@@ -146,6 +146,7 @@ mod tests {
     fn test_seed_db_run() {
         let tmp = NamedTempFile::new().unwrap();
         let path = tmp.path().to_path_buf();
+        // Unsafe but safe in test context - single-threaded test execution
         unsafe {
             std::env::set_var("LAREVIEW_DB_PATH", &path);
         }

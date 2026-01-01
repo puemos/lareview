@@ -1,5 +1,7 @@
 use egui::{Color32, Painter, Pos2, Stroke, vec2};
 
+const PULSE_WAVE_EXPONENT: i32 = 12;
+
 #[derive(Debug, Clone)]
 pub struct ReticleParams {
     pub center: Pos2,
@@ -194,7 +196,7 @@ fn smooth_wave(time: f64, speed: f32) -> f32 {
 
 fn pulse_wave(time: f64, speed: f32) -> f32 {
     let t = ((time * speed as f64 * 2.0).cos() + 1.0) / 2.0;
-    (1.0 - (1.0 - t).powi(12)) as f32
+    (1.0 - (1.0 - t).powi(PULSE_WAVE_EXPONENT)) as f32
 }
 
 fn ease_in_out_wave(time: f64, speed: f32) -> f32 {

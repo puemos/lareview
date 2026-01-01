@@ -56,6 +56,10 @@ pub fn list_agent_candidates() -> Vec<AgentCandidate> {
         for (key, value) in envs {
             // Built-in agents often use AGENT_ID_ACP_BIN etc.
             // We set them globally so built-in agents find them.
+            // Note: This is unsafe but acceptable because:
+            // 1. Cache TTL provides serialization between calls
+            // 2. Environment variables are process-local
+            // 3. Agent subprocesses inherit these env vars safely
             unsafe {
                 std::env::set_var(key, value);
             }

@@ -225,7 +225,9 @@ mod tests {
 
         let mut harness = Harness::new(move |ctx| {
             egui::CentralPanel::default().show(ctx, |ui| {
-                let mut selected_guard = selected_clone.lock().unwrap();
+                let mut selected_guard = selected_clone
+                    .lock()
+                    .expect("repo_selector test: failed to lock");
                 repo_selector(ui, &mut selected_guard, &repos);
             });
         });
@@ -248,7 +250,9 @@ mod tests {
 
         let mut harness = Harness::new(move |ctx| {
             egui::CentralPanel::default().show(ctx, |ui| {
-                let mut selected_guard = selected_clone.lock().unwrap();
+                let mut selected_guard = selected_clone
+                    .lock()
+                    .expect("repo_selector test: failed to lock");
                 repo_selector(ui, &mut selected_guard, &repos);
             });
         });
@@ -261,6 +265,9 @@ mod tests {
         harness.get_by_label("Repo 1").click();
         harness.run_steps(1);
 
-        assert_eq!(*selected.lock().unwrap(), Some("repo-1".to_string()));
+        assert_eq!(
+            *selected.lock().expect("repo_selector test: failed to lock"),
+            Some("repo-1".to_string())
+        );
     }
 }

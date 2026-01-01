@@ -13,7 +13,10 @@ impl ReviewRepository {
     }
 
     pub fn save(&self, review: &Review) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("ReviewRepository: failed to acquire database lock");
         let source_json = serde_json::to_string(&review.source)?;
         conn.execute(
             r#"
@@ -35,7 +38,10 @@ impl ReviewRepository {
     }
 
     pub fn list_all(&self) -> Result<Vec<Review>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("ReviewRepository: failed to acquire database lock");
         let mut stmt = conn.prepare(
             "SELECT id, title, summary, source_json, active_run_id, created_at, updated_at FROM reviews ORDER BY updated_at DESC",
         )?;
@@ -61,7 +67,10 @@ impl ReviewRepository {
     }
 
     pub fn find_by_id(&self, id: &ReviewId) -> Result<Option<Review>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("ReviewRepository: failed to acquire database lock");
         let mut stmt = conn.prepare("SELECT id, title, summary, source_json, active_run_id, created_at, updated_at FROM reviews WHERE id = ?1")?;
         let mut rows = stmt.query_map([id], |row| {
             let source_json: String = row.get(3)?;
@@ -87,7 +96,10 @@ impl ReviewRepository {
     }
 
     pub fn set_active_run(&self, review_id: &ReviewId, run_id: &ReviewRunId) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("ReviewRepository: failed to acquire database lock");
         conn.execute(
             "UPDATE reviews SET active_run_id = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
             (run_id, review_id),
@@ -101,7 +113,10 @@ impl ReviewRepository {
         title: &str,
         summary: Option<&str>,
     ) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("ReviewRepository: failed to acquire database lock");
         conn.execute(
             "UPDATE reviews SET title = ?1, summary = ?2, updated_at = CURRENT_TIMESTAMP WHERE id = ?3",
             (title, summary, review_id),
@@ -110,7 +125,10 @@ impl ReviewRepository {
     }
 
     pub fn delete(&self, id: &ReviewId) -> Result<usize> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("ReviewRepository: failed to acquire database lock");
         let affected = conn.execute("DELETE FROM reviews WHERE id = ?1", [id])?;
         Ok(affected)
     }
