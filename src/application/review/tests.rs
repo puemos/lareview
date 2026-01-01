@@ -149,10 +149,9 @@ fn test_render_single_feedback() {
     let md = ReviewExporter::render_single_feedback_markdown(&feedback, &comments);
 
     assert!(md.contains("**Feedback:** Test Feedback"));
-    assert!(md.contains("**Severity:** 🔵 Nice_to_have")); // or 'Nice_to_have' depending on implementation capitalization logic
-    // Logic was: capitalize first char. nice_to_have -> Nice_to_have.
+    assert!(md.contains("**Severity:** 🔵 Nice_to_have"));
 
-    assert!(md.contains("**Agent Claude:**")); // agent:claude -> Agent Claude
+    assert!(md.contains("**Agent Claude:**"));
     assert!(md.contains("A comment"));
 }
 

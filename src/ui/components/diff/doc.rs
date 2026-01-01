@@ -54,7 +54,7 @@ impl DiffDoc {
 
     fn build_line_starts(text: &str) -> Vec<u32> {
         let mut starts = Vec::new();
-        starts.push(0); // First line starts at 0
+        starts.push(0);
 
         for (i, ch) in text.char_indices() {
             if ch == '\n' {

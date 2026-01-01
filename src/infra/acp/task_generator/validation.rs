@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 pub(super) fn validate_tasks_payload(
     tasks: &[ReviewTask],
-    _raw_payload: Option<&serde_json::Value>, // Keep for interface compatibility but don't use
+    _raw_payload: Option<&serde_json::Value>,
     diff_text: &str,
 ) -> Result<Vec<String>> {
     // Validate risk levels from the actual ReviewTask objects

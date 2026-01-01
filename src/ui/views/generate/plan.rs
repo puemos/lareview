@@ -17,7 +17,7 @@ pub(super) fn render_plan_panel(ui: &mut egui::Ui, plan: &Plan) {
         .inner_margin(egui::Margin::symmetric(
             spacing::SPACING_MD as i8,
             spacing::SPACING_SM as i8,
-        )) // 10,8 -> 12,8
+        ))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(
