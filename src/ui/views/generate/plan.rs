@@ -3,6 +3,7 @@ use crate::ui::theme::current_theme;
 use crate::ui::{icons, typography};
 use eframe::egui;
 
+use crate::ui::components::rotating_icon::rotating_icon;
 use crate::ui::spacing;
 
 pub(super) fn render_plan_panel(ui: &mut egui::Ui, plan: &Plan) {
@@ -45,7 +46,7 @@ pub(super) fn render_plan_panel(ui: &mut egui::Ui, plan: &Plan) {
             ui.separator();
             ui.add_space(spacing::SPACING_XS);
 
-            render_plan_entries(ui, plan, /*dense=*/ false);
+            render_plan_entries(ui, plan, false);
         });
 }
 
@@ -81,7 +82,7 @@ pub(super) fn render_plan_timeline_item(ui: &mut egui::Ui, plan: &Plan) {
         .show(ui, |ui| {
             ui.spacing_mut().item_spacing =
                 egui::vec2(spacing::SPACING_XS + 2.0, spacing::SPACING_XS + 2.0);
-            render_plan_entries(ui, plan, /*dense=*/ true);
+            render_plan_entries(ui, plan, true);
         });
 }
 
@@ -91,9 +92,13 @@ fn render_plan_entries(ui: &mut egui::Ui, plan: &Plan, dense: bool) {
         let (icon, color, _label) = plan_entry_style(status);
 
         ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
-            ui.spacing_mut().item_spacing = egui::vec2(spacing::SPACING_SM, 0.0); // 8.0, 0.0
+            ui.spacing_mut().item_spacing = egui::vec2(spacing::SPACING_SM, 0.0);
 
-            ui.label(typography::body(icon).size(14.0).color(color));
+            if status == PlanStatus::InProgress {
+                rotating_icon(ui, icon, color, 14.0);
+            } else {
+                ui.label(typography::body(icon).size(14.0).color(color));
+            }
 
             let text_color = match status {
                 PlanStatus::Completed => current_theme().text_muted,
@@ -119,11 +124,15 @@ fn render_plan_entries(ui: &mut egui::Ui, plan: &Plan, dense: bool) {
 
 fn plan_entry_style(status: PlanStatus) -> (&'static str, egui::Color32, &'static str) {
     match status {
-        PlanStatus::Completed => (icons::STATUS_DONE, current_theme().success, "done"),
-        PlanStatus::InProgress => (icons::STATUS_IN_PROGRESS, current_theme().accent, "doing"),
+        PlanStatus::Completed => (icons::STATUS_DONE, current_theme().status_done, "done"),
+        PlanStatus::InProgress => (
+            icons::STATUS_IN_PROGRESS,
+            current_theme().status_in_progress,
+            "doing",
+        ),
         PlanStatus::Pending => (
             icons::STATUS_IN_PROGRESS,
-            current_theme().text_muted,
+            current_theme().status_todo,
             "todo",
         ),
     }

@@ -10,6 +10,7 @@ pub mod markdown;
 pub mod pills;
 pub mod popup_selector;
 pub mod repo_selector;
+pub mod rotating_icon;
 
 pub mod status;
 pub mod task_status_chip;
