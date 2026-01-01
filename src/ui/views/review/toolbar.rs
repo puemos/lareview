@@ -44,14 +44,12 @@ pub(crate) fn render_header_selectors(
 
         let text_content = format!("{} {}", current_label, regular::CARET_UP_DOWN);
 
-        // 1. Calculate size
         let galley = ui.painter().layout_no_wrap(
             text_content.clone(),
             typography::body_font(16.0),
             theme.text_primary,
         );
 
-        // 2. Allocate
         let (rect, response) = ui.allocate_exact_size(galley.size(), egui::Sense::click());
         let response = response.on_hover_cursor(egui::CursorIcon::PointingHand);
 
@@ -59,11 +57,9 @@ pub(crate) fn render_header_selectors(
             egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &current_label)
         });
 
-        // 3. Draw
         if is_generating && !(response.hovered() || is_open) {
             let mut job = egui::text::LayoutJob::default();
             for (i, c) in text_content.chars().enumerate() {
-                // Delay each char to create movement
                 let offset = i as f64 * 0.05;
                 let char_color = crate::ui::animations::cyber::color_wave_advanced(
                     theme.text_primary,

@@ -23,7 +23,6 @@ pub fn repo_selector(
         let id = ui.make_persistent_id("repo_selector_popup");
         let is_open = egui::Popup::is_id_open(ui.ctx(), id);
 
-        // 1. Draw the "ComboBox" button manually
         let button_height = 28.0;
         let width = 180.0;
 
@@ -34,7 +33,6 @@ pub fn repo_selector(
             egui::Popup::toggle_id(ui.ctx(), id);
         }
 
-        // Draw button background / border
         let visuals = ui.style().visuals.clone();
         let bg_fill = if is_open {
             visuals.widgets.open.bg_fill
@@ -60,21 +58,18 @@ pub fn repo_selector(
             egui::StrokeKind::Middle,
         );
 
-        // Draw Content
         let content_rect = rect.shrink2(egui::vec2(8.0, 0.0));
         let ui_builder = egui::UiBuilder::new().max_rect(content_rect);
         ui.scope_builder(ui_builder, |ui| {
             ui.horizontal_centered(|ui| {
                 ui.add_space(2.0);
 
-                // Icon
                 ui.label(
                     typography::body(icons::VIEW_REPOS)
                         .size(16.0)
                         .color(current_theme().text_muted),
                 );
 
-                // Text
                 ui.add(
                     egui::Label::new(typography::body(selected_label).color(
                         if selected_repo_id.is_some() {
@@ -98,7 +93,6 @@ pub fn repo_selector(
             });
         });
 
-        // 2. Draw Popup
         egui::Popup::new(id, ui.ctx().clone(), rect, ui.layer_id())
             .open_memory(None)
             .show(|ui| {

@@ -12,8 +12,6 @@ type DiagramKey = u64;
 
 const SVG_RASTER_SIZE: u32 = 2048;
 
-// DiagramSvg removed - now using PixelsReady(egui::ColorImage)
-
 #[derive(Clone)]
 struct CachedTexture {
     handle: egui::TextureHandle,
@@ -61,7 +59,6 @@ lazy_static::lazy_static! {
 pub fn diagram_view(ui: &mut Ui, diagram: &Option<Arc<str>>, is_dark_mode: bool) -> bool {
     let mut go_to_settings = false;
 
-    // Generate stable ID for memory storage
     let memory_id = Id::new("d2_diagram_memory");
 
     let Some(diagram_code) = diagram else {
@@ -79,7 +76,6 @@ pub fn diagram_view(ui: &mut Ui, diagram: &Option<Arc<str>>, is_dark_mode: bool)
         return false;
     }
 
-    // Parse JSON -> Diagram -> D2
     let diagram_model = match parse_json(&trimmed_code) {
         Ok(d) => d,
         Err(e) => {

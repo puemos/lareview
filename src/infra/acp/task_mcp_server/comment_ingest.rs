@@ -69,11 +69,9 @@ pub(super) fn save_agent_comment(config: &ServerConfig, args: Value) -> Result<S
     let comment_repo = CommentRepository::new(conn.clone());
     let task_repo = TaskRepository::new(conn.clone());
 
-    // 1. Validate File and Line exist in Diff
     let diff_index = DiffIndex::new(&ctx.diff_text)?;
     validate_line_in_diff(&diff_index, file, line, side)?;
 
-    // 2. Link Task
     let final_task_id = if let Some(id) = input_task_id {
         // Verify provided task ID exists
         // We can't easily check if ID exists without a query, but let's assume if the agent
@@ -152,7 +150,6 @@ fn validate_line_in_diff(
     _line: u32,
     _side: FeedbackSide,
 ) -> Result<()> {
-    // 1. Check file exists
     diff_index
         .validate_file_exists(file)
         .map_err(|e| anyhow!(e.to_string()))?;
@@ -175,12 +172,10 @@ fn is_line_covered_by_task(
     line: u32,
     side: FeedbackSide,
 ) -> bool {
-    // 1. Check if file matches
     if !task.files.contains(&file.to_string()) {
         return false;
     }
 
-    // 2. Check if line is contained in diff_refs
     for diff_ref in &task.diff_refs {
         if diff_ref.file != file {
             continue;

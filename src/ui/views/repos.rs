@@ -22,11 +22,9 @@ impl LaReviewApp {
                     egui::vec2(ui.available_width(), TOP_HEADER_HEIGHT),
                     egui::Layout::left_to_right(egui::Align::Center),
                     |ui| {
-                        // A. Left Side: Context Selectors
                         ui.horizontal(|ui| ui.label(typography::h2("Linked Repositories")));
 
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            // C. Right Side: Actions
                             ui.add_space(spacing::SPACING_XS);
 
                             if pill_action_button(
@@ -74,7 +72,6 @@ impl LaReviewApp {
                     ))
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            // 1. Icon (Far Left)
                             ui.label(
                                 typography::body(icons::VIEW_REPOS)
                                     .size(16.0)
@@ -82,11 +79,9 @@ impl LaReviewApp {
                             );
                             ui.add_space(8.0);
 
-                            // 2. Content Column (Name, Subtitle)
                             ui.vertical(|ui| {
                                 ui.spacing_mut().item_spacing.y = 4.0;
 
-                                // Name
                                 ui.horizontal_centered(|ui| {
                                     ui.label(
                                         typography::body(&repo.name).color(theme.text_primary),
@@ -95,7 +90,6 @@ impl LaReviewApp {
 
                                     ui.label(typography::tiny(repo.path.to_string_lossy()));
                                 });
-                                // Subtitle (Path + Remotes)
                                 ui.horizontal(|ui| {
                                     if !repo.remotes.is_empty() {
                                         let remotes_str = repo.remotes.join(", ");
@@ -104,7 +98,6 @@ impl LaReviewApp {
                                 });
                             });
 
-                            // 3. Actions Column (Right Aligned)
                             ui.with_layout(
                                 egui::Layout::right_to_left(egui::Align::Center),
                                 |ui| {

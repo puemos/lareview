@@ -12,7 +12,6 @@ pub fn cyber_button(
     let theme = current_theme();
     let time = ui.input(|i| i.time);
 
-    // 1. Layout Specs
     let height = 28.0;
     let width = fixed_width.unwrap_or_else(|| ui.available_width());
     let (rect, response) = ui.allocate_exact_size(
@@ -43,7 +42,6 @@ pub fn cyber_button(
     let painter = ui.painter();
     let accent_color = color.unwrap_or(theme.brand);
 
-    // --- 2. BACKGROUND & ACCENT ---
     let bg_color = if is_generating {
         theme.bg_secondary.gamma_multiply(0.4)
     } else if enabled {
@@ -56,7 +54,6 @@ pub fn cyber_button(
 
     painter.rect_filled(rect, egui::CornerRadius::same(5), bg_color);
 
-    // Border
     let border_color = if enabled {
         theme.border.lerp_to_gamma(accent_color, hover_ratio)
     } else {
@@ -69,7 +66,6 @@ pub fn cyber_button(
         StrokeKind::Inside,
     );
 
-    // --- 3. CONTENT (ICON & TEXT) ---
     let content_color = if is_generating {
         theme.text_accent
     } else if enabled {

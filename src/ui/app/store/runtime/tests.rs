@@ -246,7 +246,6 @@ async fn test_create_feedback_comment_runtime() {
     let mut app = LaReviewApp::new_for_test();
     app.skip_runtime = false;
 
-    // 1. Create a review first
     let review = crate::domain::Review {
         id: "rev1".into(),
         title: "T".into(),
@@ -260,7 +259,6 @@ async fn test_create_feedback_comment_runtime() {
     };
     app.review_repo.save(&review).unwrap();
 
-    // 1.5 Create a run and a task
     let run = crate::domain::ReviewRun {
         id: "run1".into(),
         review_id: "rev1".into(),
@@ -288,7 +286,6 @@ async fn test_create_feedback_comment_runtime() {
     };
     app.task_repo.save(&task).unwrap();
 
-    // 2. Create a comment (new feedback)
     review::create_feedback_comment(
         &mut app,
         "rev1".into(),
@@ -308,7 +305,6 @@ async fn test_create_feedback_comment_runtime() {
     assert_eq!(feedbacks.len(), 1);
     let feedback_id = feedbacks[0].id.clone();
 
-    // 3. Add a reply to existing feedback
     review::create_feedback_comment(
         &mut app,
         "rev1".into(),

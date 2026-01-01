@@ -284,7 +284,6 @@ mod tests {
 
     #[test]
     fn test_schema_migration_v9_to_v10() {
-        // 1. Create a v9 database manually
         let conn = Connection::open_in_memory().unwrap();
 
         // Create legacy v9-style tables
@@ -374,11 +373,10 @@ mod tests {
         };
         let conn = db.connection();
 
-        // 2. Trigger migration to v10
-        // (In a real app this happens in init() called by open())
+        // Trigger migration to v10
         db.init().unwrap();
 
-        // 3. Verify data moved to feedback and columns renamed
+        // Verify data moved to feedback and columns renamed
         let guard = conn.lock().unwrap();
 
         // Check feedback table

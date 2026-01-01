@@ -11,7 +11,6 @@ pub(crate) fn render_timeline_pane(
     let mut action_out = None;
 
     ui.vertical(|ui| {
-        // 1. ACTIVITY Section Header
         egui::Frame::NONE
             .inner_margin(egui::Margin::symmetric(spacing::SPACING_SM as i8, 0))
             .show(ui, |ui| {
@@ -41,7 +40,6 @@ pub(crate) fn render_timeline_pane(
 
         ui.separator();
 
-        // 2. ACTIVITY Timeline (Scrollable Area)
         egui::Frame::NONE
             .inner_margin(egui::Margin::symmetric(spacing::SPACING_SM as i8, 0))
             .show(ui, |ui| {

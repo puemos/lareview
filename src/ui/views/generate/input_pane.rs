@@ -13,8 +13,6 @@ pub(crate) fn render_input_pane(
 ) -> Option<GenerateAction> {
     let mut action_out = None;
 
-    // 1. DETERMINE CONTENT SOURCE
-
     let (active_diff_text, is_from_github): (Arc<str>, bool) =
         if let Some(preview) = generate_preview {
             (preview.diff_text.clone(), true)

@@ -2,10 +2,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fmt;
 
-// =========================================================================
-// Error Handling
-// =========================================================================
-
 /// Library error types.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
@@ -55,10 +51,6 @@ impl std::error::Error for Error {}
 
 /// Convenience result alias.
 pub type Result<T> = std::result::Result<T, Error>;
-
-// =========================================================================
-// Core Types with Styling
-// =========================================================================
 
 /// Diagram variants.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -198,10 +190,6 @@ pub struct EdgeStyle {
     pub animated: bool,
 }
 
-// =========================================================================
-// Flow Diagram
-// =========================================================================
-
 /// Flow diagram with nodes and edges.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FlowDiagram {
@@ -319,10 +307,6 @@ pub struct Group {
     #[serde(default)]
     pub style: NodeStyle,
 }
-
-// =========================================================================
-// Sequence Diagram
-// =========================================================================
 
 /// Sequence diagram definition.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -457,10 +441,6 @@ pub enum FragmentKind {
     Critical,
 }
 
-// =========================================================================
-// State Diagram
-// =========================================================================
-
 /// Simple state diagram.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StateDiagram {
@@ -492,10 +472,6 @@ pub struct Transition {
     #[serde(default)]
     pub action: Option<String>,
 }
-
-// =========================================================================
-// Entity Diagram
-// =========================================================================
 
 /// Entity-relationship diagram.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -540,10 +516,6 @@ pub enum Cardinality {
     ManyToOne,
     ManyToMany,
 }
-
-// =========================================================================
-// Builder Pattern (Flow only for now)
-// =========================================================================
 
 /// Builder for flow diagrams.
 pub struct FlowDiagramBuilder {
@@ -671,10 +643,6 @@ impl FlowDiagramBuilder {
         Ok(diagram)
     }
 }
-
-// =========================================================================
-// Validation
-// =========================================================================
 
 impl FlowDiagram {
     /// Validate nodes, edges, and groups.

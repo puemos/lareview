@@ -52,9 +52,6 @@ pub fn list_agent_candidates() -> Vec<AgentCandidate> {
     }
 
     // Cache is expired or doesn't exist, rebuild it
-
-    // 1. Apply environment variables from config before discovery
-    // Note: This modifies the process environment, which built-in agents read.
     for envs in config.agent_envs.values() {
         for (key, value) in envs {
             // Built-in agents often use AGENT_ID_ACP_BIN etc.
@@ -72,7 +69,6 @@ pub fn list_agent_candidates() -> Vec<AgentCandidate> {
         .map(|agent| agent.candidate())
         .collect();
 
-    // 2. Apply path overrides for built-in agents
     for candidate in candidates.iter_mut() {
         if let Some(override_path) = config.agent_path_overrides.get(&candidate.id) {
             candidate.command = Some(override_path.clone());
@@ -80,7 +76,6 @@ pub fn list_agent_candidates() -> Vec<AgentCandidate> {
         }
     }
 
-    // 3. Add custom agents
     for custom in &config.custom_agents {
         let available = !custom.command.is_empty();
         candidates.push(AgentCandidate {

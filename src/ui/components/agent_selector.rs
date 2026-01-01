@@ -42,7 +42,6 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
         let id = ui.make_persistent_id("agent_selector_popup");
         let is_open = egui::Popup::is_id_open(ui.ctx(), id);
 
-        // 1. Draw the "ComboBox" button manually
         let button_height = 28.0;
         let width = 150.0;
 
@@ -55,7 +54,6 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
             egui::Popup::toggle_id(ui.ctx(), id);
         }
 
-        // Draw button background / border
         let visuals = ui.style().visuals.clone();
         let bg_fill = if is_open {
             visuals.widgets.open.bg_fill
@@ -65,7 +63,6 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
             visuals.widgets.inactive.bg_fill
         };
 
-        // Stroke
         let stroke = if is_open {
             visuals.widgets.open.bg_stroke
         } else if response.hovered() {
@@ -82,14 +79,11 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
             egui::StrokeKind::Middle,
         );
 
-        // Draw Content (Logo + Text + Chevron)
-        // Use less vertical shrinking to allow correct centering
         let content_rect = rect.shrink2(egui::vec2(6.0, 0.0));
         let ui_builder = egui::UiBuilder::new().max_rect(content_rect);
         ui.scope_builder(ui_builder, |ui| {
             ui.horizontal_centered(|ui| {
                 ui.add_space(2.0);
-                // Logo
                 if let Some(logo_path) = &selected_logo_path
                     && let Some(bytes) = load_logo_bytes(logo_path)
                 {
@@ -101,7 +95,6 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
                     ui.add_space(2.0);
                 }
 
-                // Text
                 ui.add(
                     egui::Label::new(
                         typography::body(selected_label).color(current_theme().text_primary),
@@ -109,7 +102,6 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
                     .selectable(false),
                 );
 
-                // Spacer
                 ui.allocate_ui_with_layout(
                     ui.available_size(),
                     egui::Layout::right_to_left(egui::Align::Center),
@@ -127,9 +119,8 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
             });
         });
 
-        // 2. Draw Popup using the new Popup::show API
         egui::Popup::new(id, ui.ctx().clone(), rect, ui.layer_id())
-            .open_memory(None) // Don't change state here, we handle it above with toggle_id
+            .open_memory(None)
             .show(|ui| {
                 egui::ScrollArea::vertical()
                     .max_height(300.0)

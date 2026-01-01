@@ -4,10 +4,7 @@ use super::super::command::Command;
 use crate::domain::{ReviewStatus, TaskId};
 use chrono::Utc;
 use std::collections::HashSet;
-use std::path::Path; // Keep Path as it's used
-// The user's diff suggested adding HashMap and removing Path, but Path is used.
-// The instruction was "remove unused HashSet import" which is not present.
-// I will keep Path and not add HashMap as it's not used.
+use std::path::Path;
 
 pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
     match action {
@@ -211,11 +208,9 @@ fn handle_navigate_to_feedback(
     state: &mut AppState,
     feedback: crate::domain::Feedback,
 ) -> Vec<Command> {
-    // 1. Select the task (this usually clears active_feedback, so we do it first)
     if let Some(task_id) = feedback.task_id.clone() {
         select_task(state, task_id.clone());
 
-        // 2. Set the active feedback context
         let file_path = feedback.anchor.as_ref().and_then(|a| a.file_path.clone());
         let line_number = feedback.anchor.as_ref().and_then(|a| a.line_number);
         let side = feedback.anchor.as_ref().and_then(|a| a.side);
@@ -232,7 +227,6 @@ fn handle_navigate_to_feedback(
         state.ui.active_feedback = None;
     }
 
-    // 3. Ensure we are on the Review view
     state.ui.current_view = AppView::Review;
 
     Vec::new()

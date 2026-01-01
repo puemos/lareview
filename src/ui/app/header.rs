@@ -163,7 +163,6 @@ impl LaReviewApp {
         let horizontal_padding = 10.0;
         let item_spacing = 6.0;
 
-        // Draw Icon
         let icon_galley =
             painter.layout_no_wrap(icon.to_string(), icon_font_id.clone(), text_color);
         let icon_size = icon_galley.size();
@@ -195,7 +194,6 @@ impl LaReviewApp {
             );
         }
 
-        // Draw Label
         let label_x = rect.min.x + horizontal_padding + icon_size.x + item_spacing;
         let label_pos = egui::pos2(label_x, rect.center().y);
 

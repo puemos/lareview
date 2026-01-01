@@ -77,7 +77,6 @@ impl LaReviewApp {
                     egui::vec2(ui.available_width(), TOP_HEADER_HEIGHT),
                     egui::Layout::left_to_right(egui::Align::Center),
                     |ui| {
-                        // A. Left Side: Context Selectors
                         let is_generating_this = self.state.session.is_generating
                             && self.state.ui.selected_review_id
                                 == self.state.session.generating_review_id;
@@ -92,9 +91,7 @@ impl LaReviewApp {
                             self.dispatch(Action::Review(action));
                         }
 
-                        // B. Spacer
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            // C. Right Side: Actions
                             ui.add_space(spacing::SPACING_XS);
 
                             // Delete Button
@@ -179,7 +176,6 @@ impl LaReviewApp {
                 );
             });
 
-        // Draw Full-Width Separator only if we have tasks or are generating
         let is_generating_this = self.state.session.is_generating
             && self.state.ui.selected_review_id == self.state.session.generating_review_id;
 
@@ -363,7 +359,6 @@ impl LaReviewApp {
             ui.memory_mut(|mem| mem.data.insert_temp(tree_width_id, new_width));
         }
 
-        // Draw Left Resize Visuals
         let hover_active = resize_response.hovered() || resize_response.dragged();
         if hover_active {
             ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);

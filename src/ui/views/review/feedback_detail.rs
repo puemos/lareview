@@ -140,7 +140,6 @@ impl LaReviewApp {
         ui.separator();
         ui.add_space(spacing::SPACING_XL);
 
-        // 3. Timeline & Input
         egui::Frame::NONE
             .inner_margin(egui::Margin {
                 left: spacing::SPACING_XL as i8,
@@ -161,7 +160,6 @@ impl LaReviewApp {
                         self.dispatch(Action::Review(action));
                     }
 
-                    // 4. Input Area
                     ui.add_space(spacing::SPACING_MD);
                     if let Some(action) = render_reply_composer(
                         ui,
@@ -172,7 +170,6 @@ impl LaReviewApp {
                         side,
                         &draft_key,
                     ) {
-                        // Clear drafts after sending
                         if matches!(action, ReviewAction::CreateFeedbackComment { .. }) {
                             with_ui_memory_mut(ui.ctx(), |mem| {
                                 mem.feedback_drafts.remove(&draft_key);

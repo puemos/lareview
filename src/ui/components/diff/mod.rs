@@ -7,7 +7,6 @@ mod doc;
 mod indexer;
 mod model;
 pub mod overlay;
-mod parse;
 mod render;
 
 pub use model::{DiffAction, LineContext};

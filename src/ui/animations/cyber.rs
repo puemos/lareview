@@ -56,7 +56,6 @@ pub fn paint_cyber_loader(
     brand_color: Color32,
     text_color: Color32,
 ) {
-    // 1. Rotating Reticle (Simple style from cyber_button)
     rotating_reticle(
         painter,
         ReticleParams {
@@ -70,7 +69,6 @@ pub fn paint_cyber_loader(
         },
     );
 
-    // 2. Status Text below
     let galley = painter.layout_no_wrap(
         label.to_uppercase(),
         egui::FontId::monospace(10.0),
@@ -173,7 +171,6 @@ fn lerp_color(c1: Color32, c2: Color32, t: f32) -> Color32 {
     let rgba1 = egui::Rgba::from(c1);
     let rgba2 = egui::Rgba::from(c2);
 
-    // Use egui's built-in lerp for smooth blending
     Color32::from(egui::Rgba::from_rgba_premultiplied(
         rgba1.r() + (rgba2.r() - rgba1.r()) * t,
         rgba1.g() + (rgba2.g() - rgba1.g()) * t,
@@ -191,7 +188,6 @@ fn linear_wave(time: f64, speed: f32) -> f32 {
 
 fn smooth_wave(time: f64, speed: f32) -> f32 {
     let t = ((time * speed as f64 * 2.0).cos() + 1.0) / 2.0;
-    // Smoothstep for extra smoothness
     let t = t * t * (3.0 - 2.0 * t);
     t as f32
 }
@@ -203,7 +199,6 @@ fn pulse_wave(time: f64, speed: f32) -> f32 {
 
 fn ease_in_out_wave(time: f64, speed: f32) -> f32 {
     let t = ((time * speed as f64 * 2.0).cos() + 1.0) / 2.0;
-    // Cubic easing
     let t = if t < 0.5 {
         4.0 * t * t * t
     } else {
@@ -225,7 +220,6 @@ fn bounce_wave(time: f64, speed: f32) -> f32 {
 fn elastic_wave(time: f64, speed: f32) -> f32 {
     let angle = time * speed as f64 * 2.0;
     let t = (angle.cos() + 1.0) / 2.0;
-    // Add a subtle elastic effect
     let elastic = (angle * 4.0).sin() * 0.1 * (1.0 - t).abs();
     (t + elastic).clamp(0.0, 1.0) as f32
 }
@@ -246,7 +240,6 @@ pub fn color_wave_multi(colors: &[Color32], time: f64, speed: f32) -> Color32 {
     let next_idx = (idx + 1) % colors.len();
     let t = (cycle - idx as f64) as f32;
 
-    // Smoothstep for smooth transitions
     let t = t * t * (3.0 - 2.0 * t);
     lerp_color(colors[idx], colors[next_idx], t)
 }
@@ -292,8 +285,6 @@ pub fn render_wave_text(
     let mut job = egui::text::LayoutJob::default();
 
     for (i, c) in text.chars().enumerate() {
-        // Delay each character by a fraction of the cycle
-        // 0.1 is a good spacing for most words
         let offset = i as f64 * 0.1;
 
         let char_color = color_wave_advanced(c1, c2, time - offset, speed, Easing::Pulse);

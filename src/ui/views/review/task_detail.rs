@@ -12,7 +12,6 @@ impl LaReviewApp {
         ui: &mut egui::Ui,
         task: &crate::domain::ReviewTask,
     ) {
-        // Safety: ensure enough width for margins
         let min_width = spacing::SPACING_XL * 2.0 + 10.0;
         if ui.available_width() < min_width {
             return;
@@ -43,12 +42,10 @@ impl LaReviewApp {
 
         ui.separator();
 
-        // 4. Content Area
         egui::ScrollArea::vertical()
             .id_salt(format!("detail_scroll_{}", task.id))
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                // Fetch active tab
                 let mut active_tab = ui
                     .ctx()
                     .data(|d| d.get_temp::<ReviewTab>(egui::Id::new(("active_tab", &task.id))))

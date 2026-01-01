@@ -28,9 +28,7 @@ pub(crate) fn render_agent_pane(
 
             ui.add_space(spacing::SPACING_XS);
 
-            // Integrated Control Panel
             ui.vertical(|ui| {
-                // 1. Configuration Row
                 ui.horizontal(|ui| {
                     let mut temp_agent = ctx.selected_agent.clone();
                     crate::ui::components::agent_selector::agent_selector(ui, &mut temp_agent);
@@ -48,7 +46,6 @@ pub(crate) fn render_agent_pane(
                         action_out = Some(GenerateAction::SelectRepo(temp_repo_id));
                     }
 
-                    // Run Button
                     if crate::ui::components::cyber_button::cyber_button(
                         ui,
                         "Run",
