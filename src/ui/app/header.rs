@@ -26,39 +26,18 @@ fn header_logo() -> Option<HeaderLogo> {
 impl LaReviewApp {
     pub(super) fn render_header(&mut self, ctx: &egui::Context) {
         let theme = theme::current_theme();
-        let header_height = 52.0;
+        let header_height = 36.0;
 
         egui::TopBottomPanel::top("header")
+            .frame(egui::Frame::default().fill(theme.bg_surface))
             .exact_height(header_height)
             .show(ctx, |ui| {
                 let rect = ui.available_rect_before_wrap();
 
-                // --- 1. LEFT: App Identity ---
+                // --- 1. LEFT: Empty space for balance ---
                 let left_rect =
                     egui::Rect::from_min_size(rect.min, egui::vec2(200.0, rect.height()));
-                ui.scope_builder(egui::UiBuilder::new().max_rect(left_rect), |ui| {
-                    ui.horizontal_centered(|ui| {
-                        ui.add_space(spacing::SPACING_SM);
-                        if let Some(logo) = header_logo() {
-                            let image = egui::Image::from_bytes(logo.uri, logo.bytes)
-                                .fit_to_exact_size(egui::vec2(16.0, 16.0))
-                                .corner_radius(4.0);
-                            ui.add(image);
-                        } else {
-                            ui.label(
-                                egui::RichText::new(icons::STATUS_IN_PROGRESS)
-                                    .size(22.0)
-                                    .color(theme.brand),
-                            );
-                        }
-                        ui.add_space(2.0);
-                        ui.label(
-                            typography::bold("LaReview")
-                                .size(14.0)
-                                .color(theme.text_primary),
-                        );
-                    });
-                });
+                ui.advance_cursor_after_rect(left_rect);
 
                 // --- 2. CENTER: Navigation Tabs ---
                 let tabs_data = [
@@ -105,8 +84,7 @@ impl LaReviewApp {
 
                 ui.put(center_rect, |ui: &mut egui::Ui| {
                     egui::Frame::default()
-                        .fill(theme.bg_secondary)
-                        .stroke(egui::Stroke::new(1.0, theme.border))
+                        .stroke(egui::Stroke::new(0.0, theme.border))
                         .corner_radius(egui::CornerRadius::same(6))
                         .inner_margin(egui::Margin::symmetric(6, 4))
                         .show(ui, |ui| {
@@ -119,6 +97,23 @@ impl LaReviewApp {
                             });
                         })
                         .response
+                });
+
+                // --- 3. RIGHT: App Identity ---
+                let right_rect = egui::Rect::from_min_size(
+                    egui::pos2(rect.max.x - 200.0, rect.min.y),
+                    egui::vec2(200.0, rect.height()),
+                );
+                ui.scope_builder(egui::UiBuilder::new().max_rect(right_rect), |ui| {
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.add_space(spacing::SPACING_SM);
+                        if let Some(logo) = header_logo() {
+                            let image = egui::Image::from_bytes(logo.uri, logo.bytes)
+                                .fit_to_exact_size(egui::vec2(16.0, 16.0))
+                                .corner_radius(4.0);
+                            ui.add(image);
+                        }
+                    });
                 });
             });
     }

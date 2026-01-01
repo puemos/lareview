@@ -81,7 +81,10 @@ fn main() -> Result<(), eframe::Error> {
 
     let mut viewport = egui::ViewportBuilder::default()
         .with_inner_size([1200.0, 800.0])
-        .with_title("LaReview");
+        .with_titlebar_shown(false)
+        .with_title("LaReview")
+        .with_fullsize_content_view(true)
+        .with_title_shown(false);
 
     if let Some(icon) = icon {
         viewport = viewport.with_icon(icon);
@@ -89,6 +92,7 @@ fn main() -> Result<(), eframe::Error> {
 
     let options = eframe::NativeOptions {
         viewport,
+
         ..Default::default()
     };
 

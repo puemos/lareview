@@ -5,7 +5,6 @@ use super::state::AppView;
 
 impl eframe::App for LaReviewApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        crate::ui::window::apply_rounded_corners(_frame);
         self.render(ctx);
     }
 }

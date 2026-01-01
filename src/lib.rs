@@ -5,7 +5,6 @@ pub mod domain;
 pub mod infra;
 pub mod prompts;
 pub mod ui;
-pub mod utils;
 
 use std::sync::OnceLock;
 
