@@ -18,7 +18,10 @@ impl FeedbackRepository {
     }
 
     pub fn save(&self, feedback: &Feedback) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("FeedbackRepository: failed to acquire database lock");
         let anchor = feedback.anchor.as_ref();
         let hunk_ref = anchor
             .and_then(|a| a.hunk_ref.as_ref())
@@ -56,7 +59,10 @@ impl FeedbackRepository {
     }
 
     pub fn update_status(&self, id: &str, status: ReviewStatus) -> Result<usize> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("FeedbackRepository: failed to acquire database lock");
         let updated = conn.execute(
             "UPDATE feedback SET status = ?2, updated_at = ?3 WHERE id = ?1",
             rusqlite::params![id, status.to_string(), Utc::now().to_rfc3339()],
@@ -65,7 +71,10 @@ impl FeedbackRepository {
     }
 
     pub fn update_impact(&self, id: &str, impact: FeedbackImpact) -> Result<usize> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("FeedbackRepository: failed to acquire database lock");
         let updated = conn.execute(
             "UPDATE feedback SET impact = ?2, updated_at = ?3 WHERE id = ?1",
             rusqlite::params![id, impact.to_string(), Utc::now().to_rfc3339()],
@@ -74,7 +83,10 @@ impl FeedbackRepository {
     }
 
     pub fn update_title(&self, id: &str, title: &str) -> Result<usize> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("FeedbackRepository: failed to acquire database lock");
         let updated = conn.execute(
             "UPDATE feedback SET title = ?2, updated_at = ?3 WHERE id = ?1",
             rusqlite::params![id, title, Utc::now().to_rfc3339()],
@@ -83,7 +95,10 @@ impl FeedbackRepository {
     }
 
     pub fn touch(&self, id: &str) -> Result<usize> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("FeedbackRepository: failed to acquire database lock");
         let updated = conn.execute(
             "UPDATE feedback SET updated_at = ?2 WHERE id = ?1",
             rusqlite::params![id, Utc::now().to_rfc3339()],
@@ -92,7 +107,10 @@ impl FeedbackRepository {
     }
 
     pub fn find_by_id(&self, id: &str) -> Result<Option<Feedback>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("FeedbackRepository: failed to acquire database lock");
         let mut stmt = conn.prepare(
             r#"
             SELECT id, review_id, task_id, title, status, impact,
@@ -112,7 +130,10 @@ impl FeedbackRepository {
     }
 
     pub fn find_by_review(&self, review_id: &str) -> Result<Vec<Feedback>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("FeedbackRepository: failed to acquire database lock");
         let mut stmt = conn.prepare(
             r#"
             SELECT id, review_id, task_id, title, status, impact,
@@ -129,7 +150,10 @@ impl FeedbackRepository {
     }
 
     pub fn delete_by_review(&self, review_id: &str) -> Result<usize> {
-        let mut conn = self.conn.lock().unwrap();
+        let mut conn = self
+            .conn
+            .lock()
+            .expect("FeedbackRepository: failed to acquire database lock");
         let tx = conn.transaction()?;
         let count = tx.execute("DELETE FROM feedback WHERE review_id = ?", [review_id])?;
         tx.commit()?;
@@ -137,7 +161,10 @@ impl FeedbackRepository {
     }
 
     pub fn delete(&self, id: &str) -> Result<usize> {
-        let mut conn = self.conn.lock().unwrap();
+        let mut conn = self
+            .conn
+            .lock()
+            .expect("FeedbackRepository: failed to acquire database lock");
         let tx = conn.transaction()?;
         let count = tx.execute("DELETE FROM feedback WHERE id = ?", [id])?;
         tx.commit()?;

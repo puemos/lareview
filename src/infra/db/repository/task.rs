@@ -16,7 +16,10 @@ impl TaskRepository {
     }
 
     pub fn save(&self, task: &ReviewTask) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("TaskRepository: failed to acquire database lock");
         let files_json = serde_json::to_string(&task.files)?;
         let stats_json = serde_json::to_string(&task.stats)?;
         let diff_refs_json = serde_json::to_string(&task.diff_refs)?;
@@ -47,7 +50,10 @@ impl TaskRepository {
     }
 
     pub fn update_status(&self, task_id: &TaskId, new_status: ReviewStatus) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("TaskRepository: failed to acquire database lock");
         let status_str = new_status.to_string();
         conn.execute(
             "UPDATE tasks SET status = ?1 WHERE id = ?2",
@@ -57,7 +63,10 @@ impl TaskRepository {
     }
 
     pub fn find_by_id(&self, task_id: &TaskId) -> Result<Option<ReviewTask>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("TaskRepository: failed to acquire database lock");
         let mut stmt = conn.prepare(
             "SELECT id, run_id, title, description, files, stats, insight, diff_refs, diagram, ai_generated, status, sub_flow FROM tasks WHERE id = ?1",
         )?;
@@ -99,7 +108,10 @@ impl TaskRepository {
         if task_ids.is_empty() {
             return Ok(0);
         }
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("TaskRepository: failed to acquire database lock");
         let placeholders = std::iter::repeat_n("?", task_ids.len())
             .collect::<Vec<_>>()
             .join(",");
@@ -109,7 +121,10 @@ impl TaskRepository {
     }
 
     pub fn find_all(&self) -> Result<Vec<ReviewTask>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("TaskRepository: failed to acquire database lock");
         let mut stmt = conn.prepare(
             "SELECT id, run_id, title, description, files, stats, insight, diff_refs, diagram, ai_generated, status, sub_flow FROM tasks",
         )?;
@@ -181,7 +196,10 @@ impl TaskRepository {
         if run_ids.is_empty() {
             return Ok(Vec::new());
         }
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("TaskRepository: failed to acquire database lock");
         let placeholders = std::iter::repeat_n("?", run_ids.len())
             .collect::<Vec<_>>()
             .join(",");
@@ -256,7 +274,10 @@ impl TaskRepository {
 
     #[allow(dead_code)] // Used by ACP modules; invoked indirectly.
     pub fn find_by_run(&self, run_id_filter: &ReviewRunId) -> Result<Vec<ReviewTask>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("TaskRepository: failed to acquire database lock");
         let mut stmt = conn.prepare(
             "SELECT id, run_id, title, description, files, stats, insight, diff_refs, diagram, ai_generated, status, sub_flow FROM tasks WHERE run_id = ?1",
         )?;

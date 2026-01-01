@@ -14,7 +14,10 @@ impl CommentRepository {
     }
 
     pub fn save(&self, comment: &Comment) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("CommentRepository: failed to acquire database lock");
         conn.execute(
             r#"
             INSERT OR REPLACE INTO comments (
@@ -35,7 +38,10 @@ impl CommentRepository {
     }
 
     pub fn list_for_feedback(&self, feedback_id: &str) -> Result<Vec<Comment>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("CommentRepository: failed to acquire database lock");
         let mut stmt = conn.prepare(
             r#"
             SELECT id, feedback_id, author, body, parent_id, created_at, updated_at
@@ -50,14 +56,20 @@ impl CommentRepository {
     }
 
     pub fn delete_by_feedback(&self, feedback_id: &str) -> Result<usize> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("CommentRepository: failed to acquire database lock");
         let affected =
             conn.execute("DELETE FROM comments WHERE feedback_id = ?1", [feedback_id])?;
         Ok(affected)
     }
 
     pub fn delete(&self, id: &str) -> Result<usize> {
-        let mut conn = self.conn.lock().unwrap();
+        let mut conn = self
+            .conn
+            .lock()
+            .expect("CommentRepository: failed to acquire database lock");
         let tx = conn.transaction()?;
         let count = tx.execute("DELETE FROM comments WHERE id = ?", [id])?;
         tx.commit()?;
@@ -65,7 +77,10 @@ impl CommentRepository {
     }
 
     pub fn touch(&self, id: &str) -> Result<usize> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("CommentRepository: failed to acquire database lock");
         let updated = conn.execute(
             "UPDATE comments SET updated_at = ?2 WHERE id = ?1",
             rusqlite::params![id, Utc::now().to_rfc3339()],

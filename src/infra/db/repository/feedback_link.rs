@@ -13,7 +13,10 @@ impl FeedbackLinkRepository {
     }
 
     pub fn save(&self, link: &FeedbackLink) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("FeedbackLinkRepository: failed to acquire database lock");
         conn.execute(
             r#"
             INSERT OR REPLACE INTO feedback_links (
@@ -33,7 +36,10 @@ impl FeedbackLinkRepository {
     }
 
     pub fn find_by_feedback(&self, feedback_id: &str) -> Result<Option<FeedbackLink>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("FeedbackLinkRepository: failed to acquire database lock");
         let mut stmt = conn.prepare(
             r#"
             SELECT id, feedback_id, provider, provider_feedback_id, provider_root_comment_id, last_synced_at

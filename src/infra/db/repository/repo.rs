@@ -12,7 +12,10 @@ impl RepoRepository {
     }
 
     pub fn save(&self, repo: &LinkedRepo) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("RepoRepository: failed to acquire database lock");
         conn.execute(
             "INSERT OR REPLACE INTO repos (id, name, path, created_at) VALUES (?1, ?2, ?3, ?4)",
             (
@@ -38,7 +41,10 @@ impl RepoRepository {
     }
 
     pub fn find_all(&self) -> Result<Vec<LinkedRepo>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("RepoRepository: failed to acquire database lock");
         let mut stmt = conn.prepare("SELECT id, name, path, created_at FROM repos")?;
         let rows = stmt.query_map([], |row| {
             Ok((
@@ -74,13 +80,19 @@ impl RepoRepository {
     }
 
     pub fn delete(&self, id: &str) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("RepoRepository: failed to acquire database lock");
         conn.execute("DELETE FROM repos WHERE id = ?1", [id])?;
         Ok(())
     }
 
     pub fn find_by_remote_url(&self, url_fragment: &str) -> Result<Option<LinkedRepo>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("RepoRepository: failed to acquire database lock");
         let mut stmt =
             conn.prepare("SELECT repo_id FROM repo_remotes WHERE url LIKE ?1 LIMIT 1")?;
 

@@ -13,7 +13,10 @@ impl ReviewRunRepository {
     }
 
     pub fn save(&self, run: &ReviewRun) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("ReviewRunRepository: failed to acquire database lock");
         conn.execute(
             r#"
             INSERT INTO review_runs (id, review_id, agent_id, input_ref, diff_text, diff_hash, created_at)
@@ -34,7 +37,10 @@ impl ReviewRunRepository {
     }
 
     pub fn find_by_id(&self, id: &ReviewRunId) -> Result<Option<ReviewRun>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("ReviewRunRepository: failed to acquire database lock");
         let mut stmt = conn.prepare(
             "SELECT id, review_id, agent_id, input_ref, diff_text, diff_hash, created_at FROM review_runs WHERE id = ?1",
         )?;
@@ -57,7 +63,10 @@ impl ReviewRunRepository {
     }
 
     pub fn find_by_review_id(&self, review_id: &ReviewId) -> Result<Vec<ReviewRun>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("ReviewRunRepository: failed to acquire database lock");
         let mut stmt = conn.prepare(
             "SELECT id, review_id, agent_id, input_ref, diff_text, diff_hash, created_at FROM review_runs WHERE review_id = ?1",
         )?;
@@ -76,13 +85,19 @@ impl ReviewRunRepository {
     }
 
     pub fn delete_by_review_id(&self, review_id: &ReviewId) -> Result<usize> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("ReviewRunRepository: failed to acquire database lock");
         let affected = conn.execute("DELETE FROM review_runs WHERE review_id = ?1", [review_id])?;
         Ok(affected)
     }
 
     pub fn list_all(&self) -> Result<Vec<ReviewRun>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .expect("ReviewRunRepository: failed to acquire database lock");
         let mut stmt = conn.prepare(
             "SELECT id, review_id, agent_id, input_ref, diff_text, diff_hash, created_at FROM review_runs ORDER BY created_at DESC",
         )?;
