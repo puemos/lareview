@@ -168,7 +168,7 @@ mod tests {
         let mut harness = Harness::new_ui(|ui| {
             render_plan_panel(ui, &plan);
         });
-        harness.run();
+        harness.run_steps(2);
 
         harness
             .get_all_by_role(egui::accesskit::Role::Label)

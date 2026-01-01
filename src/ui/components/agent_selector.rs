@@ -1,3 +1,6 @@
+use crate::ui::theme::current_theme;
+use crate::ui::typography;
+use crate::ui::{app::SelectedAgent, spacing::SPACING_MD};
 use eframe::egui;
 use egui_phosphor::regular;
 use once_cell::sync::Lazy;
@@ -5,11 +8,6 @@ use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
-
-use crate::ui::app::SelectedAgent;
-use crate::ui::spacing::SPACING_XS;
-use crate::ui::theme::current_theme;
-use crate::ui::typography;
 
 static LOGO_BYTES_CACHE: Lazy<Mutex<HashMap<String, Arc<[u8]>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
@@ -46,7 +44,7 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
 
         // 1. Draw the "ComboBox" button manually
         let button_height = 28.0;
-        let width = 200.0;
+        let width = 150.0;
 
         let (rect, response) =
             ui.allocate_exact_size(egui::vec2(width, button_height), egui::Sense::click());
@@ -100,7 +98,7 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
                         .fit_to_exact_size(egui::vec2(16.0, 16.0))
                         .corner_radius(2.0);
                     ui.add(image);
-                    ui.add_space(6.0);
+                    ui.add_space(2.0);
                 }
 
                 // Text
@@ -141,7 +139,7 @@ pub fn agent_selector(ui: &mut egui::Ui, selected_agent: &mut SelectedAgent) {
                         ui.spacing_mut().item_spacing = egui::vec2(item_spacing_x, 0.0);
 
                         let item_height = 24.0;
-                        let item_gap = SPACING_XS;
+                        let item_gap = SPACING_MD;
                         let row_height = item_height + item_gap;
                         let item_inset = item_gap * 0.5;
                         let selected_bg = current_theme().brand.gamma_multiply(0.25);

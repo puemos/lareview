@@ -26,10 +26,10 @@ fn header_logo() -> Option<HeaderLogo> {
 impl LaReviewApp {
     pub(super) fn render_header(&mut self, ctx: &egui::Context) {
         let theme = theme::current_theme();
-        let header_height = 36.0;
+        let header_height = 42.0;
 
         egui::TopBottomPanel::top("header")
-            .frame(egui::Frame::default().fill(theme.bg_surface))
+            .frame(egui::Frame::default().fill(theme.bg_primary.gamma_multiply(1.2)))
             .exact_height(header_height)
             .show(ctx, |ui| {
                 let rect = ui.available_rect_before_wrap();

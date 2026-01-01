@@ -23,7 +23,7 @@ async fn test_generate_input_flow() {
     }
     harness.run();
 
-    let gen_btn = harness.get_by_label("Run Agent");
+    let gen_btn = harness.get_by_label("Run");
     gen_btn.click();
 
     {
@@ -58,7 +58,7 @@ async fn test_generate_valid_diff_pasting() {
     }
     harness.run();
 
-    let run_btn = harness.get_by_label("Run Agent");
+    let run_btn = harness.get_by_label("Run");
     assert!(!format!("{:?}", run_btn).contains("disabled: true"));
 }
 
@@ -82,7 +82,7 @@ async fn test_generate_invalid_diff_pasting() {
     }
     harness.run();
 
-    let run_btn = harness.get_by_label("Run Agent");
+    let run_btn = harness.get_by_label("Run");
     assert!(format!("{:?}", run_btn).contains("disabled: true"));
 }
 
@@ -116,7 +116,7 @@ async fn test_generate_valid_pr_pasting() {
     }
     harness.run();
 
-    let run_btn = harness.get_by_label("Run Agent");
+    let run_btn = harness.get_by_label("Run");
     assert!(!format!("{:?}", run_btn).contains("disabled: true"));
 }
 

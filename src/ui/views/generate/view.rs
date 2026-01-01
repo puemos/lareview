@@ -1,8 +1,5 @@
 use crate::ui::app::{Action, GenerateAction, LaReviewApp};
-use crate::ui::components::cyber_button::cyber_button;
-use crate::ui::components::pills::pill_action_button;
-use crate::ui::icons;
-use crate::ui::spacing::{self, TOP_HEADER_HEIGHT};
+use crate::ui::spacing;
 use crate::ui::theme::current_theme;
 use crate::ui::typography;
 use eframe::egui;
@@ -19,76 +16,6 @@ impl LaReviewApp {
         let theme = current_theme();
 
         ui.vertical(|ui| {
-            // --- Header Section ---
-            egui::Frame::NONE
-                .inner_margin(egui::Margin::symmetric(spacing::SPACING_XL as i8, 0))
-                .show(ui, |ui| {
-                    ui.set_min_height(TOP_HEADER_HEIGHT);
-                    ui.allocate_ui_with_layout(
-                        egui::vec2(ui.available_width(), TOP_HEADER_HEIGHT),
-                        egui::Layout::left_to_right(egui::Align::Center),
-                        |ui| {
-                            // A. Left Side
-                            ui.horizontal(|ui| ui.label(typography::h2("Generate Review")));
-
-                            ui.with_layout(
-                                egui::Layout::right_to_left(egui::Align::Center),
-                                |ui| {
-                                    // C. Right Side: Actions
-                                    ui.add_space(spacing::SPACING_XS);
-
-                                    let is_generating = self.state.session.is_generating;
-
-                                    // 1. Run Button (Cyber style)
-                                    let has_content =
-                                        !self.state.session.diff_text.trim().is_empty()
-                                            || self.state.session.generate_preview.is_some();
-                                    let run_enabled = has_content
-                                        && !is_generating
-                                        && !self.state.session.is_preview_fetching;
-
-                                    if cyber_button(
-                                        ui,
-                                        "Run Agent",
-                                        run_enabled,
-                                        is_generating,
-                                        None,
-                                        Some(120.0),
-                                    )
-                                    .clicked()
-                                        && run_enabled
-                                    {
-                                        self.dispatch(Action::Generate(
-                                            GenerateAction::RunRequested,
-                                        ));
-                                    }
-
-                                    // 2. Stop/Clear Button (Simple Pill)
-                                    let (label, icon) = if is_generating {
-                                        ("Stop", icons::ACTION_STOP)
-                                    } else {
-                                        ("Clear", egui_phosphor::regular::ARROWS_COUNTER_CLOCKWISE)
-                                    };
-
-                                    if pill_action_button(
-                                        ui,
-                                        icon,
-                                        label,
-                                        has_content,
-                                        theme.destructive,
-                                    )
-                                    .clicked()
-                                    {
-                                        self.dispatch(Action::Generate(GenerateAction::Reset));
-                                    }
-                                },
-                            );
-                        },
-                    );
-                });
-
-            ui.separator();
-
             let content_rect = ui.available_rect_before_wrap();
 
             // --- Resizable Panes Setup ---
@@ -191,18 +118,92 @@ impl LaReviewApp {
                             });
                     }
 
+                    ui.add_space(spacing::SPACING_MD);
+
+                    egui::Frame::NONE
+                        .inner_margin(egui::Margin::symmetric(
+                            spacing::SPACING_MD as i8,
+                            spacing::SPACING_ZERO as i8,
+                        ))
+                        .show(ui, |ui| {
+                            let is_generating = self.state.session.is_generating;
+                            let has_content = !self.state.session.diff_text.trim().is_empty()
+                                || self.state.session.generate_preview.is_some();
+
+                            ui.allocate_ui_with_layout(
+                                egui::vec2(ui.available_width(), 0.0),
+                                egui::Layout::left_to_right(egui::Align::Center),
+                                |ui| {
+                                    // Label on the left
+                                    ui.label(typography::h2("Review Agent"));
+
+                                    // Add expanding space to push buttons to the right
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Center),
+                                        |ui| {
+                                            // Clear/Stop Button (rightmost)
+                                            let label =
+                                                if is_generating { "Stop" } else { "Clear" };
+
+                                            ui.scope(|ui| {
+                                                if has_content {
+                                                    ui.style_mut()
+                                                        .visuals
+                                                        .widgets
+                                                        .hovered
+                                                        .fg_stroke
+                                                        .color = theme.destructive;
+                                                    ui.style_mut()
+                                                        .visuals
+                                                        .widgets
+                                                        .hovered
+                                                        .weak_bg_fill = theme.bg_secondary;
+                                                }
+
+                                                if ui
+                                                    .add_enabled(
+                                                        has_content,
+                                                        egui::Button::new(
+                                                            egui::RichText::new(label)
+                                                                .size(12.0)
+                                                                .color(theme.destructive),
+                                                        )
+                                                        .frame(false),
+                                                    )
+                                                    .on_hover_cursor(egui::CursorIcon::PointingHand)
+                                                    .clicked()
+                                                {
+                                                    self.dispatch(Action::Generate(
+                                                        GenerateAction::Reset,
+                                                    ));
+                                                }
+                                            });
+                                        },
+                                    );
+                                },
+                            );
+                        });
+
+                    let is_generating = self.state.session.is_generating;
+                    let has_content = !self.state.session.diff_text.trim().is_empty()
+                        || self.state.session.generate_preview.is_some();
+                    let run_enabled =
+                        has_content && !is_generating && !self.state.session.is_preview_fetching;
+
                     let ctx = AgentPaneContext {
                         selected_agent: &self.state.session.selected_agent,
                         selected_repo_id: self.state.ui.selected_repo_id.as_ref(),
                         linked_repos: &self.state.domain.linked_repos,
                         latest_plan: self.state.session.latest_plan.as_ref(),
+                        is_generating,
+                        run_enabled,
                     };
 
                     if let Some(action) = render_agent_pane(ui, ctx, &theme) {
                         self.dispatch(Action::Generate(action));
                     }
 
-                    ui.add_space(spacing::SPACING_SM);
+                    ui.add_space(spacing::SPACING_MD);
 
                     if let Some(action) =
                         render_timeline_pane(ui, &self.state.session.agent_timeline, &theme)

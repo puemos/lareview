@@ -9,6 +9,8 @@ pub(crate) struct AgentPaneContext<'a> {
     pub selected_repo_id: Option<&'a String>,
     pub linked_repos: &'a [LinkedRepo],
     pub latest_plan: Option<&'a Plan>,
+    pub is_generating: bool,
+    pub run_enabled: bool,
 }
 
 pub(crate) fn render_agent_pane(
@@ -36,8 +38,6 @@ pub(crate) fn render_agent_pane(
                         action_out = Some(GenerateAction::SelectAgent(temp_agent));
                     }
 
-                    ui.add_space(spacing::SPACING_SM);
-
                     let mut temp_repo_id = ctx.selected_repo_id.cloned();
                     crate::ui::components::repo_selector::repo_selector(
                         ui,
@@ -46,6 +46,21 @@ pub(crate) fn render_agent_pane(
                     );
                     if temp_repo_id.as_ref() != ctx.selected_repo_id {
                         action_out = Some(GenerateAction::SelectRepo(temp_repo_id));
+                    }
+
+                    // Run Button
+                    if crate::ui::components::cyber_button::cyber_button(
+                        ui,
+                        "Run",
+                        ctx.run_enabled,
+                        ctx.is_generating,
+                        None,
+                        None,
+                    )
+                    .clicked()
+                        && ctx.run_enabled
+                    {
+                        action_out = Some(GenerateAction::RunRequested);
                     }
                 });
             });

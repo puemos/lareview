@@ -1,6 +1,6 @@
 use crate::domain::LinkedRepo;
 use crate::ui::icons;
-use crate::ui::spacing::SPACING_XS;
+use crate::ui::spacing::SPACING_MD;
 use crate::ui::theme::current_theme;
 use crate::ui::typography;
 use eframe::egui;
@@ -17,7 +17,7 @@ pub fn repo_selector(
 
     let selected_label = selected_repo
         .map(|r| r.name.clone())
-        .unwrap_or_else(|| "No Repo Context".to_string());
+        .unwrap_or_else(|| "Without Repo".to_string());
 
     ui.push_id("repo_selector_combo", |ui| {
         let id = ui.make_persistent_id("repo_selector_popup");
@@ -25,7 +25,7 @@ pub fn repo_selector(
 
         // 1. Draw the "ComboBox" button manually
         let button_height = 28.0;
-        let width = 200.0;
+        let width = 180.0;
 
         let (rect, response) =
             ui.allocate_exact_size(egui::vec2(width, button_height), egui::Sense::click());
@@ -73,7 +73,6 @@ pub fn repo_selector(
                         .size(16.0)
                         .color(current_theme().text_muted),
                 );
-                ui.add_space(6.0);
 
                 // Text
                 ui.add(
@@ -84,7 +83,8 @@ pub fn repo_selector(
                             current_theme().text_disabled
                         },
                     ))
-                    .selectable(false),
+                    .selectable(false)
+                    .truncate(),
                 );
 
                 // Chevron
@@ -110,7 +110,7 @@ pub fn repo_selector(
                         ui.spacing_mut().item_spacing = egui::vec2(item_spacing_x, 0.0);
 
                         let item_height = 24.0;
-                        let item_gap = SPACING_XS;
+                        let item_gap = SPACING_MD;
                         let row_height = item_height + item_gap;
                         let item_inset = item_gap * 0.5;
                         let selected_bg = current_theme().brand.gamma_multiply(0.25);
@@ -146,8 +146,7 @@ pub fn repo_selector(
                         ui.scope_builder(none_ui, |ui| {
                             ui.style_mut().interaction.selectable_labels = false;
                             ui.horizontal_centered(|ui| {
-                                let label =
-                                    typography::body("No Repository Context").color(none_text);
+                                let label = typography::body("Without Repo").color(none_text);
                                 ui.add(egui::Label::new(label).selectable(false));
                             });
                         });
@@ -238,7 +237,7 @@ mod tests {
         });
 
         harness.run_steps(1);
-        harness.get_by_label("No Repo Context");
+        harness.get_by_label("Without Repo");
     }
 
     #[test]
@@ -261,7 +260,7 @@ mod tests {
         });
 
         harness.run_steps(1);
-        harness.get_by_label("No Repo Context").click();
+        harness.get_by_label("Without Repo").click();
         harness.run_steps(1);
 
         // Popup is open, should see "Repo 1"
