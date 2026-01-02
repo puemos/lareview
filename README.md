@@ -17,7 +17,7 @@
   <a href="https://www.rust-lang.org"><img alt="Rust" src="https://img.shields.io/badge/rust-nightly-orange?style=flat-square" /></a>
 </p>
 
-[![LaReview hero screenshot](assets/screenshots/review.webp)](assets/screenshots/review.webp)
+[![LaReview hero screenshot](assets/screenshots/review-changes.webp)](assets/screenshots/review-changes.webp)
 
 ---
 
@@ -34,7 +34,7 @@ LaReview is designed for a local-first, secure, and focused review experience.
 | Screenshot | Feature |
 | :-- | :-- |
 | <img src="assets/screenshots/generate.webp" width="400" alt="Plan Generation View" /> | **AI-Powered Plan Generation**<br>Input a GitHub PR reference (e.g., `owner/repo#123`) or paste a raw diff. LaReview uses your local ACP agent to analyze the changes and generate a structured review plan based on the author's intent. |
-| <img src="assets/screenshots/review.webp" width="400" alt="Structured Review Tree" /> | **Structured Task Tree & Notes**<br>Navigate the review as a hierarchical tree. Mark tasks as **To Do**, **In Progress**, or **Done**. Attach contextual notes to specific tasks or lines of code to keep track of your thoughts. |
+| <img src="assets/screenshots/review-changes.webp" width="400" alt="Structured Review Tree" /> | **Structured Task Tree & Notes**<br>Navigate the review as a hierarchical tree. Mark tasks as **To Do**, **In Progress**, or **Done**. Attach contextual notes to specific tasks or lines of code to keep track of your thoughts. |
 | <img src="assets/screenshots/review-changes.webp" width="400" alt="Task-focused Diff" /> | **Task-Focused Diffs**<br>Stop context switching. When you select a task, the diff viewer only shows the specific hunks relevant to completing that task, isolating the noise. |
 | <img src="assets/screenshots/review-feedback-item.webp" width="400" alt="Feedback Items" /> | **Agent-Generated Feedback**<br>The AI agent doesn't just plan; it actively identifies issues. It can autonomously create feedback items (nitpicks, blocking issues, or suggestions) anchored to specific lines of code, helping you catch bugs before they merge. |
 | <img src="assets/screenshots/repos.webp" width="400" alt="Linked Repositories" /> | **Local Repository Context**<br>Link your local Git repositories to LaReview. This gives the AI agent full access to search your codebase and list files, providing maximum context for more accurate and insightful reviews. |
