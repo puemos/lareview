@@ -34,6 +34,21 @@ impl LaReviewApp {
             .show(ctx, |ui| {
                 let rect = ui.available_rect_before_wrap();
 
+                // Handle double-click to maximize/restore using interact
+                let title_bar_rect = rect;
+                let title_bar_response = ui.interact(
+                    title_bar_rect,
+                    egui::Id::new("title_bar"),
+                    egui::Sense::click_and_drag(),
+                );
+
+                // Double-click to maximize/restore
+                if title_bar_response.double_clicked() {
+                    let is_maximized = ui.input(|i| i.viewport().maximized).unwrap_or(false);
+                    ui.ctx()
+                        .send_viewport_cmd(egui::ViewportCommand::Maximized(!is_maximized));
+                }
+
                 // --- 1. LEFT: Empty space for balance ---
                 let left_rect =
                     egui::Rect::from_min_size(rect.min, egui::vec2(200.0, rect.height()));
