@@ -14,10 +14,60 @@
   ::-webkit-scrollbar-thumb {
     background: #1a1a1a;
   }
+
+  .skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: #1A1A1A;
+    color: #EBE6DE;
+    padding: 8px 16px;
+    z-index: 100;
+    transition: top 0.3s;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .skip-link:focus {
+    top: 0;
+    outline: none;
+  }
+
+  :focus-visible {
+    outline: 3px solid #1A1A1A;
+    outline-offset: 2px;
+  }
+
+  a:focus-visible,
+  button:focus-visible {
+    outline-offset: 4px;
+  }
+
+  .text-velura-gray {
+    color: #4A4A4A;
+  }
 }
 
 @layer utilities {
   .border-theme {
     border-color: #1a1a1a;
+  }
+
+  #features,
+  #how-it-works {
+    content-visibility: auto;
+    contain-intrinsic-size: 1px 1000px;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 }

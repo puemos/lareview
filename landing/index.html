@@ -11,8 +11,62 @@
             href="./assets/logo/favicon.svg"
         />
 
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <meta name="description" content="LaReview transforms code diffs into AI-powered review checklists. Open source tool supporting Claude, OpenCode, Gemini, and more. Free forever.">
+        <meta name="robots" content="index, follow">
+        <link rel="canonical" href="https://lareview.dev/">
+        <meta name="theme-color" content="#EBE6DE">
+
+        <!-- Open Graph -->
+        <meta property="og:title" content="LaReview: AI-Powered Code Review Checklist Tool">
+        <meta property="og:description" content="Stop doom-scrolling through diffs. LaReview uses your local AI agent to generate structured review plans. Free & open source.">
+        <meta property="og:type" content="website">
+        <meta property="og:url" content="https://lareview.dev/">
+        <meta property="og:image" content="./assets/og-image.png">
+        <meta property="og:site_name" content="LaReview">
+
+        <!-- Twitter -->
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:site" content="@puemos">
+        <meta name="twitter:title" content="LaReview: It's good for your code reviews">
+        <meta name="twitter:description" content="Turn diffs into structured review checklists with local-first AI. Supports Claude, OpenCode, Gemini, and more.">
+        <meta name="twitter:image" content="./assets/og-image.png">
+
+        <!-- Structured Data -->
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          "name": "LaReview",
+          "applicationCategory": "DeveloperApplication",
+          "operatingSystem": "macOS, Linux, Windows",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          },
+          "description": "AI-powered code review tool that transforms diffs into structured review checklists using local coding agents.",
+          "featureList": [
+            "AI-powered planning",
+            "Task-focused diffs",
+            "Agent feedback",
+            "Local context",
+            "GitHub sync",
+            "CLI support",
+            "Export to Markdown"
+          ],
+          "author": {
+            "@type": "Person",
+            "name": "puemos",
+            "url": "https://github.com/puemos"
+          },
+          "url": "https://lareview.dev",
+          "downloadUrl": "https://github.com/puemos/lareview/releases",
+          "programmingLanguage": ["Rust", "TypeScript"]
+        }
+        </script>
+
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link
             href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;700&display=swap"
             rel="stylesheet"
@@ -24,19 +78,24 @@
     <body
         class="bg-velura-bg text-velura-dark font-sans selection:bg-velura-dark selection:text-velura-bg overflow-x-hidden"
     >
+        <a href="#main-content" class="skip-link">Skip to main content</a>
+
         <nav
+            aria-label="Main navigation"
             class="flex justify-between items-center px-6 py-4 border-b border-theme sticky top-0 bg-velura-bg z-50"
         >
-            <div class="flex items-center gap-2">
-                <img
-                    src="./assets/logo/512.png"
-                    alt="LaReview logo"
-                    class="h-5 w-5"
-                />
-                <span class="font-display font-bold text-lg tracking-tight"
-                    >LaReview</span
-                >
-            </div>
+            <a href="/" aria-label="LaReview Home">
+                <div class="flex items-center gap-2">
+                    <img
+                        src="./assets/logo/512.png"
+                        alt="LaReview logo"
+                        class="h-5 w-5"
+                    />
+                    <span class="font-display font-bold text-lg tracking-tight"
+                        >LaReview</span
+                    >
+                </div>
+            </a>
             <div class="hidden md:flex gap-8 text-sm font-medium tracking-wide">
                 <a
                     href="#features"
@@ -57,13 +116,15 @@
             <a
                 href="https://github.com/puemos/lareview"
                 target="_blank"
+                rel="noopener noreferrer"
+                aria-label="View LaReview source code on GitHub (opens in new tab)"
                 class="flex items-center gap-1 text-sm font-bold hover:underline underline-offset-4"
             >
                 GITHUB <i class="ph-bold ph-arrow-up-right"></i>
             </a>
         </nav>
 
-        <header class="w-full">
+        <main id="main-content">
             <div class="border-b border-theme pt-12 pb-2 px-8 md:px-5">
                 <h1
                     class="font-display text-[14vw] md:text-[13vw] leading-[0.85] tracking-tighter text-velura-dark"
@@ -96,6 +157,7 @@
                         <div class="flex flex-wrap gap-4">
                             <a
                                 href="#download"
+                                aria-label="Download LaReview for free"
                                 class="flex items-center hover:-translate-y-1 transition-transform gap-2 bg-velura-dark text-velura-bg px-8 py-4 text-sm font-bold tracking-widest border border-transparent"
                             >
                                 <i class="ph-bold ph-download-simple"></i>
@@ -103,6 +165,9 @@
                             </a>
                             <a
                                 href="https://github.com/puemos/lareview"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label="View LaReview source code on GitHub (opens in new tab)"
                                 class="flex items-center hover:-translate-y-1 transition-transform gap-2 bg-transparent text-velura-dark px-8 py-4 text-sm font-bold tracking-widest border border-theme"
                             >
                                 <i class="ph-bold ph-github-logo"></i> Source
@@ -126,10 +191,10 @@
                         loop
                         muted
                         playsinline
-                        controls
                         preload="metadata"
                         poster="./assets/screenshots/review.webp"
                         class="w-full object-cover"
+                        aria-label="LaReview demo video showing the code review workflow"
                     >
                         <source
                             src="./assets/video/demo.mp4"
@@ -150,13 +215,16 @@
                 >
                     <span
                         class="text-xs font-mono tracking-widest uppercase opacity-70 whitespace-nowrap pt-1"
-                        >Supported Agents</span
-                    >
+                        aria-hidden="true"
+                    >Supported Agents</span>
+                    <span class="sr-only">Supported AI Coding Agents</span>
 
                     <div
                         class="flex flex-wrap justify-center md:justify-start gap-8 items-center"
+                        role="list"
+                        aria-label="Supported AI coding agents"
                     >
-                        <div class="flex flex-row items-center gap-2 group">
+                        <div class="flex flex-row items-center gap-2 group" role="listitem">
                             <div class="">
                                 <img
                                     src="./assets/icons/claude.svg"
@@ -172,7 +240,7 @@
                             >
                         </div>
 
-                        <div class="flex flex-row items-center gap-2 group">
+                        <div class="flex flex-row items-center gap-2 group" role="listitem">
                             <div class="">
                                 <img
                                     src="./assets/icons/codex.svg"
@@ -188,7 +256,7 @@
                             >
                         </div>
 
-                        <div class="flex flex-row items-center gap-2 group">
+                        <div class="flex flex-row items-center gap-2 group" role="listitem">
                             <div class="">
                                 <img
                                     src="./assets/icons/gemini.svg"
@@ -204,7 +272,7 @@
                             >
                         </div>
 
-                        <div class="flex flex-row items-center gap-2 group">
+                        <div class="flex flex-row items-center gap-2 group" role="listitem">
                             <div class="">
                                 <img
                                     src="./assets/icons/kimi.svg"
@@ -220,7 +288,7 @@
                             >
                         </div>
 
-                        <div class="flex flex-row items-center gap-2 group">
+                        <div class="flex flex-row items-center gap-2 group" role="listitem">
                             <div class="">
                                 <img
                                     src="./assets/icons/mistral.svg"
@@ -236,7 +304,7 @@
                             >
                         </div>
 
-                        <div class="flex flex-row items-center gap-2 group">
+                        <div class="flex flex-row items-center gap-2 group" role="listitem">
                             <div class="">
                                 <img
                                     src="./assets/icons/opencode.svg"
@@ -252,7 +320,7 @@
                             >
                         </div>
 
-                        <div class="flex flex-row items-center gap-2 group">
+                        <div class="flex flex-row items-center gap-2 group" role="listitem">
                             <div class="">
                                 <img
                                     src="./assets/icons/qwen.svg"
@@ -272,7 +340,9 @@
             </div>
         </div>
 
-        <section id="features" class="w-full">
+
+        <section id="features" aria-labelledby="features-heading" class="w-full">
+            <h2 id="features-heading" class="sr-only">Features</h2>
             <div class="grid grid-cols-1">
                 <div
                     class="border-b border-theme p-8 md:p-12 flex flex-col items-center text-center"
@@ -296,7 +366,7 @@
                     >
                         <img
                             src="./assets/screenshots/generate.webp"
-                            alt="Plan Generation"
+                            alt="LaReview's AI planning interface showing a generated review checklist"
                             class="w-full"
                             loading="lazy"
                             decoding="async"
@@ -326,7 +396,7 @@
                     <div class="mt-8 border border-theme p-2 bg-stone-200">
                         <img
                             src="./assets/screenshots/review-changes.webp"
-                            alt="Diff View"
+                            alt="Task-focused diff viewer isolating relevant code hunks for step-by-step review"
                             class="w-full"
                             loading="lazy"
                             decoding="async"
@@ -354,7 +424,7 @@
                     <div class="mt-8 border border-theme p-2 bg-stone-200">
                         <img
                             src="./assets/screenshots/review-feedback-item.webp"
-                            alt="Feedback"
+                            alt="AI feedback threads anchored to specific lines of code for contextual review"
                             class="w-full"
                             loading="lazy"
                             decoding="async"
@@ -382,7 +452,7 @@
                     <div class="mt-8 border border-theme p-2 bg-stone-200">
                         <img
                             src="./assets/screenshots/repos.webp"
-                            alt="Repos"
+                            alt="Repository linking interface providing local context for deeper code insights"
                             class="w-full"
                             loading="lazy"
                             decoding="async"
@@ -409,7 +479,7 @@
                     <div class="mt-8 border border-theme p-2 bg-stone-200">
                         <img
                             src="./assets/screenshots/export-github.webp"
-                            alt="GitHub Sync"
+                            alt="GitHub PR review submission with auto-generated summary and feedback threads"
                             class="w-full"
                             loading="lazy"
                             decoding="async"
@@ -496,7 +566,7 @@
                     <div class="mt-8 border border-theme p-2 bg-stone-200">
                         <img
                             src="./assets/screenshots/export-markdown.webp"
-                            alt="Export"
+                            alt="Markdown export preview with diagrams, code insights, and structured review summary"
                             class="w-full"
                             loading="lazy"
                             decoding="async"
@@ -508,6 +578,7 @@
 
         <section
             id="how-it-works"
+            aria-labelledby="workflow-heading"
             class="py-20 px-4 md:px-8 border-b border-theme"
         >
             <div class="max-w-4xl mx-auto">
@@ -579,6 +650,7 @@
 
         <section
             id="download"
+            aria-label="Download LaReview"
             class="relative py-32 px-4 text-center border-b border-theme bg-[#E5E0D8]"
         >
             <div>
@@ -595,12 +667,14 @@
                     <a
                         href="https://github.com/puemos/lareview/releases"
                         class="flex items-center hover:-translate-y-1 transition-transform justify-center gap-2 bg-velura-dark text-velura-bg px-10 py-5 text-sm font-bold tracking-widest border border-transparent"
+                        aria-label="Download LaReview for macOS (Apple Silicon and Intel)"
                     >
                         <i class="ph-bold ph-apple-logo text-lg"></i> macOS App
                     </a>
                     <a
                         href="https://github.com/puemos/lareview/releases"
                         class="flex items-center hover:-translate-y-1 transition-transform justify-center gap-2 bg-transparent text-velura-dark px-10 py-5 text-sm font-bold tracking-widest border border-theme"
+                        aria-label="Download LaReview for Linux and Windows"
                     >
                         <i class="ph-bold ph-linux-logo text-lg"></i>
                         <i class="ph-bold ph-windows-logo text-lg"></i> Linux /
@@ -616,6 +690,8 @@
         </section>
 
         <footer
+            role="contentinfo"
+            aria-label="Site footer"
             class="py-12 px-8 flex flex-col md:flex-row justify-between items-end gap-8"
         >
             <div>
@@ -653,5 +729,6 @@
                 </p>
             </div>
         </footer>
+    </main>
     </body>
 </html>
