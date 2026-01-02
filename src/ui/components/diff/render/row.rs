@@ -56,13 +56,6 @@ pub fn render_unified_row(
         line_num_bg = active_color;
     }
 
-    struct TextOverlay {
-        pos: egui::Pos2,
-        width: f32,
-        job: LayoutJob,
-    }
-
-    let mut text_overlay: Option<TextOverlay> = None;
     let main_response = egui::Frame::NONE
         .fill(bg_color)
         .show(ui, |ui| {
@@ -138,7 +131,19 @@ pub fn render_unified_row(
                             line.content.clone()
                         };
 
-                        if let Some(segments) = &line.inline_segments {
+                        if let Some(tokens) = &line.syntax_tokens {
+                            for token in tokens {
+                                job.append(
+                                    &token.text,
+                                    0.0,
+                                    TextFormat {
+                                        font_id: FontId::monospace(DIFF_FONT_SIZE),
+                                        color: token.color,
+                                        ..Default::default()
+                                    },
+                                );
+                            }
+                        } else if let Some(segments) = &line.inline_segments {
                             let highlight_bg = match line.change_type {
                                 ChangeType::Delete => theme.destructive.gamma_multiply(0.4),
                                 ChangeType::Insert => theme.success.gamma_multiply(0.4),
@@ -159,12 +164,7 @@ pub fn render_unified_row(
 
                         let label =
                             egui::Label::new(job.clone()).wrap_mode(egui::TextWrapMode::Wrap);
-                        let response = ui.add(label);
-                        text_overlay = Some(TextOverlay {
-                            pos: response.rect.min,
-                            width: response.rect.width(),
-                            job,
-                        });
+                        let _response = ui.add(label);
                     });
             });
         })
@@ -287,33 +287,6 @@ pub fn render_unified_row(
                 )
                 .on_hover_cursor(egui::CursorIcon::Default);
             });
-    }
-
-    let show_jump_hint = is_line_hovered && is_modifier_pressed && line_number_for_action.is_some();
-    if show_jump_hint {
-        let tint_color = match line.change_type {
-            ChangeType::Equal => theme.brand,
-            ChangeType::Delete | ChangeType::Insert => theme.text_primary,
-        };
-        if let Some(overlay) = &text_overlay {
-            let mut job = overlay.job.clone();
-            job.wrap.max_width = overlay.width;
-            for (idx, section) in job.sections.iter_mut().enumerate() {
-                if idx >= 2 {
-                    section.format.color = tint_color;
-                }
-            }
-            let galley = ui.painter().layout_job(job);
-            ui.painter().add(egui::Shape::Text(egui::epaint::TextShape {
-                pos: overlay.pos,
-                galley,
-                underline: egui::Stroke::NONE,
-                override_text_color: Some(tint_color),
-                angle: 0.0,
-                fallback_color: tint_color,
-                opacity_factor: 1.0,
-            }));
-        }
     }
 
     if let Some(pos) = pointer_pos {

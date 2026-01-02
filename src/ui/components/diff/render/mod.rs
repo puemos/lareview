@@ -3,8 +3,11 @@ pub mod row;
 pub mod types;
 pub mod utils;
 
-use super::DiffAction;
 use super::model::{ChangeType, DiffViewState, LineContext};
+use super::{
+    DiffAction,
+    syntax::{SyntaxHighlightCache, highlight_line_with_cache},
+};
 use crate::ui::components::diff::indexer::get_change_type_from_line;
 use crate::ui::theme;
 use eframe::egui;
@@ -161,16 +164,22 @@ pub fn render_diff_editor_with_options(
     let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 2.0;
 
     let cache_id = ui.id().with("line_cache");
-    let mut cache = if diff_changed {
-        LineCache::new(2000)
+    let mut cache: LineCache = if diff_changed {
+        LineCache::new(500)
     } else {
         ui.ctx()
             .memory_mut(|mem| mem.data.get_temp::<LineCache>(cache_id))
-            .unwrap_or_else(|| LineCache::new(2000))
+            .unwrap_or_else(|| LineCache::new(500))
     };
 
-    let overscan_before = 200;
-    let overscan_after = 400;
+    let syntax_cache_id = ui.id().with("syntax_cache");
+    let syntax_cache: SyntaxHighlightCache = ui
+        .ctx()
+        .memory_mut(|mem| mem.data.get_temp(syntax_cache_id))
+        .unwrap_or_default();
+
+    let overscan_before = 50;
+    let overscan_after = 50;
 
     egui::ScrollArea::vertical()
         .id_salt("diff_scroll")
@@ -187,13 +196,15 @@ pub fn render_diff_editor_with_options(
                     get_row_type(&doc, &view_state.collapsed, idx)
                 {
                     let cache_key = LineCacheKey { file_idx, line_idx };
-                    if !cache.cache.contains_key(&cache_key) {
+                    if cache.get(&cache_key).is_none() {
                         let line_str = doc.line_str(line_idx);
                         let change_type = get_change_type_from_line(line_str);
                         let (old_line_num, new_line_num) =
                             extract_line_numbers(&doc, file_idx, line_idx);
 
                         let mut inline_segments = None;
+                        let syntax_tokens = None;
+
                         if !matches!(change_type, ChangeType::Equal) {
                             let segments =
                                 compute_inline_diff_if_appropriate(line_str, &change_type);
@@ -206,6 +217,7 @@ pub fn render_diff_editor_with_options(
                             content: line_str.to_string(),
                             change_type,
                             inline_segments,
+                            syntax_tokens,
                         };
                         cache.insert(cache_key, cached_info);
                     } else if let Some(cached) = cache.get(&cache_key)
@@ -222,6 +234,7 @@ pub fn render_diff_editor_with_options(
                             content: cached.content.clone(),
                             change_type: cached.change_type,
                             inline_segments: Some(segments),
+                            syntax_tokens: cached.syntax_tokens.clone(),
                         };
                         cache.insert(cache_key, updated_cached_info);
                     }
@@ -243,12 +256,57 @@ pub fn render_diff_editor_with_options(
                         RowType::DiffLine { file_idx, line_idx } => {
                             let cache_key = LineCacheKey { file_idx, line_idx };
                             let diff_line_info = if let Some(cached) = cache.get(&cache_key) {
+                                let cached_old_line_num = cached.old_line_num;
+                                let cached_new_line_num = cached.new_line_num;
+                                let cached_content = cached.content.clone();
+                                let cached_change_type = cached.change_type;
+                                let cached_inline_segments = cached.inline_segments.clone();
+                                let mut syntax_tokens = cached.syntax_tokens.clone();
+
+                                if syntax_tokens.is_none() {
+                                    let file = &doc.files[file_idx];
+                                    let file_path = if file.new_path != "/dev/null" {
+                                        strip_git_prefix(&file.new_path)
+                                    } else {
+                                        strip_git_prefix(&file.old_path)
+                                    };
+
+                                    if let Some(lang) =
+                                        crate::ui::components::diff::syntax::detect_language(
+                                            &file_path,
+                                        )
+                                    {
+                                        let line_content = utils::strip_diff_prefix(
+                                            &cached_content,
+                                            &cached_change_type,
+                                        );
+                                        let tokens = highlight_line_with_cache(
+                                            &line_content,
+                                            &lang,
+                                            &syntax_cache,
+                                            theme.text_primary,
+                                        );
+                                        syntax_tokens = Some(tokens.to_vec());
+
+                                        let updated_cached_info = CachedLineInfo {
+                                            old_line_num: cached_old_line_num,
+                                            new_line_num: cached_new_line_num,
+                                            content: cached_content.clone(),
+                                            change_type: cached_change_type,
+                                            inline_segments: cached_inline_segments.clone(),
+                                            syntax_tokens: syntax_tokens.clone(),
+                                        };
+                                        cache.insert(cache_key.clone(), updated_cached_info);
+                                    }
+                                }
+
                                 DiffLineInfo {
-                                    old_line_num: cached.old_line_num,
-                                    new_line_num: cached.new_line_num,
-                                    content: cached.content.clone(),
-                                    change_type: cached.change_type,
-                                    inline_segments: cached.inline_segments.clone(),
+                                    old_line_num: cached_old_line_num,
+                                    new_line_num: cached_new_line_num,
+                                    content: cached_content,
+                                    change_type: cached_change_type,
+                                    inline_segments: cached_inline_segments,
+                                    syntax_tokens,
                                 }
                             } else {
                                 let line_str = doc.line_str(line_idx);
@@ -263,6 +321,7 @@ pub fn render_diff_editor_with_options(
                                     content: line_str.to_string(),
                                     change_type,
                                     inline_segments: Some(segments),
+                                    syntax_tokens: None,
                                 }
                             };
 
@@ -306,6 +365,8 @@ pub fn render_diff_editor_with_options(
 
     ui.ctx()
         .memory_mut(|mem| mem.data.insert_temp(cache_id, cache));
+    ui.ctx()
+        .memory_mut(|mem| mem.data.insert_temp(syntax_cache_id, syntax_cache));
     ui.ctx()
         .memory_mut(|mem| mem.data.insert_persisted(state_id, view_state));
 

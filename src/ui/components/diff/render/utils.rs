@@ -113,3 +113,11 @@ pub fn paint_inline_text_job(
         job.append(text, 0.0, fmt);
     }
 }
+
+pub fn strip_diff_prefix(content: &str, change_type: &ChangeType) -> String {
+    match change_type {
+        ChangeType::Equal => content.to_string(),
+        ChangeType::Delete => content.trim_start_matches('-').to_string(),
+        ChangeType::Insert => content.trim_start_matches('+').to_string(),
+    }
+}

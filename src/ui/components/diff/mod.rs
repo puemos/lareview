@@ -8,6 +8,7 @@ mod indexer;
 mod model;
 pub mod overlay;
 mod render;
+pub mod syntax;
 
 pub use model::{DiffAction, LineContext};
 pub use render::{

@@ -1,5 +1,7 @@
 use super::super::model::ChangeType;
-use std::collections::HashMap;
+use super::super::syntax::SyntaxToken;
+use lru::LruCache;
+use std::num::NonZeroUsize;
 
 #[derive(Debug, Clone)]
 pub enum RowType {
@@ -20,33 +22,23 @@ pub struct CachedLineInfo {
     pub content: String,
     pub change_type: ChangeType,
     pub inline_segments: Option<Vec<(String, bool)>>,
+    pub syntax_tokens: Option<Vec<SyntaxToken>>,
 }
 
 #[derive(Debug, Clone)]
-pub struct LineCache {
-    pub cache: HashMap<LineCacheKey, CachedLineInfo>,
-    pub max_size: usize,
-}
+pub struct LineCache(LruCache<LineCacheKey, CachedLineInfo>);
 
 impl LineCache {
     pub fn new(max_size: usize) -> Self {
-        Self {
-            cache: HashMap::new(),
-            max_size,
-        }
+        Self(LruCache::new(NonZeroUsize::new(max_size).unwrap()))
     }
 
-    pub fn get(&self, key: &LineCacheKey) -> Option<&CachedLineInfo> {
-        self.cache.get(key)
+    pub fn get(&mut self, key: &LineCacheKey) -> Option<&CachedLineInfo> {
+        self.0.get(key)
     }
 
     pub fn insert(&mut self, key: LineCacheKey, value: CachedLineInfo) {
-        if self.cache.len() >= self.max_size
-            && let Some(first_key) = self.cache.keys().next().cloned()
-        {
-            self.cache.remove(&first_key);
-        }
-        self.cache.insert(key, value);
+        self.0.put(key, value);
     }
 }
 
@@ -56,4 +48,5 @@ pub struct DiffLineInfo {
     pub content: String,
     pub change_type: ChangeType,
     pub inline_segments: Option<Vec<(String, bool)>>,
+    pub syntax_tokens: Option<Vec<SyntaxToken>>,
 }
