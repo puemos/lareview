@@ -39,7 +39,10 @@ LaReview is designed for a local-first, secure, and focused review experience.
 | <img src="assets/screenshots/review-feedback-item.webp" width="400" alt="Feedback Items"> | **Agent-Generated Feedback**<br>The AI agent doesn't just plan; it actively identifies issues. It can autonomously create feedback items (nitpicks, blocking issues, or suggestions) anchored to specific lines of code, helping you catch bugs before they merge. |
 | <img src="assets/screenshots/repos.webp" width="400" alt="Linked Repositories">           | **Local Repository Context**<br>Link your local Git repositories to LaReview. This gives the AI agent full access to search your codebase and list files, providing maximum context for more accurate and insightful reviews.                                      |
 | <img src="assets/screenshots/review-diagram.webp" width="400" alt="Diagram Viewer">       | **Visual Diagram View**<br>Visualize the structure and flow of changes with automatically generated diagrams, helping you understand complex refactors faster. (Requires D2).                                                                                      |
-| <img src="assets/screenshots/settings.webp" width="400" alt="Settings View">              | **Export & Local-First**<br>No third-party servers. Review state is stored in a local SQLite DB. Export your summary as Markdown. PR data is fetched securely via your own GitHub CLI (`gh`), and planning is handled by your local ACP agent.                     |
+| <img src="assets/screenshots/settings.webp" width="400" alt="Settings View">              | **Agent Settings**<br>Configure per-agent executables, environment variables, and custom ACP agents.                                                                                                              |
+| <img src="assets/screenshots/export-github.webp" width="400" alt="GitHub Sync">         | **GitHub Sync**<br>Submit your review feedback directly to GitHub PRs with automatic summary generation.                                                                                                           |
+| <img src="assets/screenshots/export-markdown.webp" width="400" alt="Export & Share">     | **Export & Share**<br>Export your review summary to Markdown with diagrams and code insights. Copy to clipboard or save to file.                                                                                                          |
+| <img src="assets/screenshots/generate.webp" width="400" alt="CLI Support">              | **CLI Support**<br>Launch reviews from the terminal: `lareview`, `lareview pr owner/repo#123`, `git diff | lareview`, or `lareview --agent claude`.                                                                                           |
 
 ## How it works
 
@@ -240,11 +243,17 @@ Link local Git repositories to give the AI agent deep context. Once linked, the 
 
 ![REPOS view](assets/screenshots/repos.webp)
 
+### SETTINGS
+
+Configure agent executables, environment variables, and custom ACP agents in the Settings view.
+
+![SETTINGS view](assets/screenshots/settings.webp)
+
 ### EXPORT
 
 Generate a Markdown summary of your review, including stats, metadata, task details, and diagrams. You can preview and edit the Markdown before saving it to a file.
 
-![EXPORT preview](assets/screenshots/export.webp)
+![EXPORT preview](assets/screenshots/export-markdown.webp)
 
 ## Design goals
 

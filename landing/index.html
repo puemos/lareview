@@ -96,14 +96,14 @@
                         <div class="flex flex-wrap gap-4">
                             <a
                                 href="#download"
-                                class="flex items-center hover:-translate-y-1 transition-transform gap-2 bg-velura-dark text-velura-bg px-8 py-4 text-sm font-bold uppercase tracking-widest border border-transparent"
+                                class="flex items-center hover:-translate-y-1 transition-transform gap-2 bg-velura-dark text-velura-bg px-8 py-4 text-sm font-bold tracking-widest border border-transparent"
                             >
                                 <i class="ph-bold ph-download-simple"></i>
                                 Download <i>(It's Free)</i>
                             </a>
                             <a
                                 href="https://github.com/puemos/lareview"
-                                class="flex items-center hover:-translate-y-1 transition-transform gap-2 bg-transparent text-velura-dark px-8 py-4 text-sm font-bold uppercase tracking-widest border border-theme"
+                                class="flex items-center hover:-translate-y-1 transition-transform gap-2 bg-transparent text-velura-dark px-8 py-4 text-sm font-bold tracking-widest border border-theme"
                             >
                                 <i class="ph-bold ph-github-logo"></i> Source
                             </a>
@@ -113,9 +113,8 @@
                     <div
                         class="mt-12 lg:mt-1 text-xs font-mono text-velura-gray flex flex-col gap-2"
                     >
-                        <p class="flex items-center gap-2">STATUS: ALPHA</p>
                         <p>LICENSE: MIT / APACHE 2.0</p>
-                        <p>BUILT WITH RUST</p>
+                        <p>BUILT WITH <i>FUN</i></p>
                     </div>
                 </div>
 
@@ -138,12 +137,6 @@
                         />
                         Your browser does not support the video tag.
                     </video>
-
-                    <div
-                        class="absolute bottom-4 right-4 text-xs font-mono bg-velura-bg px-2 py-1 border border-theme flex items-center gap-2 z-10"
-                    >
-                        <i class="ph-fill ph-play-circle"></i> DEMO PREVIEW
-                    </div>
                 </div>
             </div>
         </header>
@@ -280,9 +273,9 @@
         </div>
 
         <section id="features" class="w-full">
-            <div class="grid grid-cols-1 md:grid-cols-2">
+            <div class="grid grid-cols-1">
                 <div
-                    class="border-b border-r-0 md:border-r border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                    class="border-b border-theme p-8 md:p-12 flex flex-col items-center text-center"
                 >
                     <div class="mb-auto">
                         <span
@@ -292,13 +285,15 @@
                         <h3 class="text-2xl font-bold uppercase mb-2">
                             AI-Powered Planning
                         </h3>
-                        <p class="text-velura-gray">
+                        <p class="text-velura-gray max-w-lg mx-auto min-h-12">
                             Input a PR reference or paste a raw diff. LaReview
-                            uses your local ACP agent to analyze intent and
+                            uses your coding agent to analyze intent and
                             generate a structured review plan.
                         </p>
                     </div>
-                    <div class="mt-8 border border-theme p-2 bg-stone-200">
+                    <div
+                        class="mt-8 border border-theme p-2 bg-stone-200 w-full max-w-xl"
+                    >
                         <img
                             src="./assets/screenshots/generate.webp"
                             alt="Plan Generation"
@@ -308,9 +303,11 @@
                         />
                     </div>
                 </div>
+            </div>
 
+            <div class="grid grid-cols-1 md:grid-cols-2">
                 <div
-                    class="border-b border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                    class="border-b border-r-0 md:border-r border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
                 >
                     <div class="mb-auto">
                         <span
@@ -320,7 +317,7 @@
                         <h3 class="text-2xl font-bold uppercase mb-2">
                             Task-Focused Diffs
                         </h3>
-                        <p class="text-velura-gray">
+                        <p class="text-velura-gray min-h-12">
                             Stop context switching. Select a task, and the
                             viewer isolates only the relevant hunks of code.
                             Review step-by-step.
@@ -338,7 +335,7 @@
                 </div>
 
                 <div
-                    class="border-b border-r-0 md:border-r border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                    class="border-b border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
                 >
                     <div class="mb-auto">
                         <span
@@ -348,7 +345,7 @@
                         <h3 class="text-2xl font-bold uppercase mb-2">
                             Agent Feedback
                         </h3>
-                        <p class="text-velura-gray">
+                        <p class="text-velura-gray min-h-12">
                             The AI proactively identifies bugs and style issues,
                             creating feedback threads anchored to specific lines
                             of code automatically.
@@ -356,8 +353,36 @@
                     </div>
                     <div class="mt-8 border border-theme p-2 bg-stone-200">
                         <img
-                            src="./assets/screenshots/review-discussion-item.webp"
+                            src="./assets/screenshots/review-feedback-item.webp"
                             alt="Feedback"
+                            class="w-full"
+                            loading="lazy"
+                            decoding="async"
+                        />
+                    </div>
+                </div>
+
+                <div
+                    class="border-b border-r-0 md:border-r border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                >
+                    <div class="mb-auto">
+                        <span
+                            class="block text-5xl font-display font-light mb-4"
+                            >04</span
+                        >
+                        <h3 class="text-2xl font-bold uppercase mb-2">
+                            Local Context
+                        </h3>
+                        <p class="text-velura-gray min-h-12">
+                            Link local Git repos to give the agent full access
+                            to search your codebase, providing deeper insights
+                            than a simple diff review.
+                        </p>
+                    </div>
+                    <div class="mt-8 border border-theme p-2 bg-stone-200">
+                        <img
+                            src="./assets/screenshots/repos.webp"
+                            alt="Repos"
                             class="w-full"
                             loading="lazy"
                             decoding="async"
@@ -371,21 +396,107 @@
                     <div class="mb-auto">
                         <span
                             class="block text-5xl font-display font-light mb-4"
-                            >04</span
+                            >05</span
                         >
                         <h3 class="text-2xl font-bold uppercase mb-2">
-                            Local Context
+                            GitHub Sync
                         </h3>
-                        <p class="text-velura-gray">
-                            Link local Git repos to give the agent full access
-                            to search your codebase, providing deeper insights
-                            than a simple diff review.
+                        <p class="text-velura-gray min-h-12">
+                            Submit your review feedback directly to GitHub PRs
+                            with automatic summary generation.
                         </p>
                     </div>
                     <div class="mt-8 border border-theme p-2 bg-stone-200">
                         <img
-                            src="./assets/screenshots/repos.webp"
-                            alt="Repos"
+                            src="./assets/screenshots/export-github.webp"
+                            alt="GitHub Sync"
+                            class="w-full"
+                            loading="lazy"
+                            decoding="async"
+                        />
+                    </div>
+                </div>
+
+                <div
+                    class="border-b border-r-0 md:border-r border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                >
+                    <div class="mb-auto">
+                        <span
+                            class="block text-5xl font-display font-light mb-4"
+                            >06</span
+                        >
+                        <h3 class="text-2xl font-bold uppercase mb-2">
+                            CLI Support
+                        </h3>
+                        <p class="text-velura-gray mb-4 min-h-12">
+                            Launch reviews directly from your terminal. Load PRs
+                            or pipe a git diff
+                        </p>
+                        <div class="mt-8 border border-theme p-2 bg-stone-200">
+                            <div
+                                class="font-mono text-base bg-[#1B1D2E] text-velura-bg p-4 rounded-sm w-full aspect-video"
+                            >
+                                <div class="flex space-x-1">
+                                    <span class="opacity-50">$</span>
+                                    <span class="text-green-500">lareview</span>
+                                </div>
+                                <div class="flex space-x-1">
+                                    <span class="opacity-50">$</span>
+                                    <span
+                                        ><span class="text-green-500"
+                                            >lareview</span
+                                        >
+                                        pr
+                                        <span class="text-red-300"
+                                            >owner/repo#123</span
+                                        ></span
+                                    >
+                                </div>
+                                <div class="flex space-x-1">
+                                    <span class="opacity-50">$</span>
+                                    <span
+                                        ><span class="text-green-500">git</span>
+                                        diff |
+                                        <span class="text-green-500"
+                                            >lareview</span
+                                        ></span
+                                    >
+                                </div>
+                                <div class="flex space-x-1">
+                                    <span class="opacity-50">$</span>
+                                    <span
+                                        ><span class="text-green-500"
+                                            >lareview</span
+                                        >
+                                        --agent claude</span
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    class="border-b border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                >
+                    <div class="mb-auto">
+                        <span
+                            class="block text-5xl font-display font-light mb-4"
+                            >07</span
+                        >
+                        <h3 class="text-2xl font-bold uppercase mb-2">
+                            Export & Share
+                        </h3>
+                        <p class="text-velura-gray">
+                            Export your review summary to Markdown with diagrams
+                            and code insights. Copy to clipboard or save to
+                            file.
+                        </p>
+                    </div>
+                    <div class="mt-8 border border-theme p-2 bg-stone-200">
+                        <img
+                            src="./assets/screenshots/export-markdown.webp"
+                            alt="Export"
                             class="w-full"
                             loading="lazy"
                             decoding="async"
@@ -444,8 +555,8 @@
                         </span>
                         <h4 class="text-xl font-bold">Generate</h4>
                         <p class="text-sm text-velura-gray">
-                            Your chosen ACP agent analyzes intent and builds a
-                            task tree.
+                            Your chosen coding agent (opencode, claude code,
+                            codex, etc.) analyzes intent and builds a task tree.
                         </p>
                     </div>
 
@@ -483,22 +594,23 @@
                 <div class="flex flex-col md:flex-row justify-center gap-4">
                     <a
                         href="https://github.com/puemos/lareview/releases"
-                        class="flex items-center hover:-translate-y-1 transition-transform justify-center gap-2 bg-velura-dark text-velura-bg px-10 py-5 text-sm font-bold uppercase tracking-widest border border-transparent"
+                        class="flex items-center hover:-translate-y-1 transition-transform justify-center gap-2 bg-velura-dark text-velura-bg px-10 py-5 text-sm font-bold tracking-widest border border-transparent"
                     >
                         <i class="ph-bold ph-apple-logo text-lg"></i> macOS App
                     </a>
                     <a
                         href="https://github.com/puemos/lareview/releases"
-                        class="flex items-center hover:-translate-y-1 transition-transform justify-center gap-2 bg-transparent text-velura-dark px-10 py-5 text-sm font-bold uppercase tracking-widest border border-theme"
+                        class="flex items-center hover:-translate-y-1 transition-transform justify-center gap-2 bg-transparent text-velura-dark px-10 py-5 text-sm font-bold tracking-widest border border-theme"
                     >
                         <i class="ph-bold ph-linux-logo text-lg"></i>
                         <i class="ph-bold ph-windows-logo text-lg"></i> Linux /
                         Windows
                     </a>
                 </div>
-
-                <div class="mt-8 font-mono text-xs text-velura-gray">
-                    Requires GitHub CLI &amp; ACP Agent
+                <div class="mt-4 font-mono text-xs text-velura-gray">
+                    CLI: <code>lareview</code>,
+                    <code>lareview pr owner/repo#123</code>,
+                    <code>git diff | lareview</code>
                 </div>
             </div>
         </section>
@@ -537,7 +649,7 @@
             <div class="text-right">
                 <p class="text-xs font-mono text-velura-gray uppercase">
                     &copy; 2025 LaReview. Open Source.<br />
-                    Designed with local-first principles.
+                    Designed with fun-first principles.
                 </p>
             </div>
         </footer>
