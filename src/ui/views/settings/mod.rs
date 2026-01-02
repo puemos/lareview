@@ -1,4 +1,5 @@
 pub mod agents;
+pub mod cli;
 pub mod d2;
 pub mod editor;
 pub mod github;
@@ -32,6 +33,9 @@ impl LaReviewApp {
         ui.separator();
 
         self.ui_settings_github(ui);
+        ui.separator();
+
+        self.ui_settings_cli(ui);
         ui.separator();
 
         self.ui_settings_d2(ui);

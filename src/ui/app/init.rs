@@ -108,6 +108,13 @@ impl LaReviewApp {
     }
 
     pub fn new_egui(cc: &eframe::CreationContext<'_>) -> Self {
+        Self::new_egui_with_pending(cc, None)
+    }
+
+    pub fn new_egui_with_pending(
+        cc: &eframe::CreationContext<'_>,
+        pending_path: Option<String>,
+    ) -> Self {
         Self::setup_fonts(&cc.egui_ctx);
         egui_extras::install_image_loaders(&cc.egui_ctx);
 
@@ -126,6 +133,33 @@ impl LaReviewApp {
             },
             ..Default::default()
         };
+
+        // Load pending review from CLI if provided
+        let pending_review = pending_path
+            .as_ref()
+            .and_then(|_| crate::infra::cli::pending::load_pending_review().ok())
+            .flatten();
+
+        if let Some(pending) = &pending_review {
+            // Pre-fill diff text
+            state.session.diff_text = pending.diff.clone();
+
+            // Pre-select agent if specified
+            if let Some(ref agent_id) = pending.agent {
+                state.session.selected_agent =
+                    crate::ui::app::state::SelectedAgent::new(agent_id.clone());
+            }
+
+            // Store pending review for linking repo later
+            state.domain.pending_review = Some(crate::ui::app::state::PendingReviewState {
+                diff: pending.diff.clone(),
+                repo_root: pending.repo_root.clone(),
+                agent: pending.agent.clone(),
+                auto_generate: pending.auto_generate,
+                source: pending.source.clone(),
+                created_at: pending.created_at,
+            });
+        }
 
         if let Err(ref e) = db_res {
             state.ui.fatal_error = Some(format!("Failed to open database: {e}"));

@@ -127,6 +127,17 @@ pub struct DomainState {
     pub feedback_comments: HashMap<String, Vec<crate::domain::Comment>>,
     pub feedback_links: HashMap<String, crate::domain::FeedbackLink>,
     pub linked_repos: Vec<crate::domain::LinkedRepo>,
+    pub pending_review: Option<PendingReviewState>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PendingReviewState {
+    pub diff: String,
+    pub repo_root: Option<std::path::PathBuf>,
+    pub agent: Option<String>,
+    pub auto_generate: bool,
+    pub source: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Default)]
@@ -283,6 +294,9 @@ pub struct UiState {
     pub agent_envs: std::collections::HashMap<String, std::collections::HashMap<String, String>>,
     pub show_export_options_menu: bool,
     pub pending_clipboard_copy: Option<String>,
+    pub cli_install_output: String,
+    pub is_cli_installing: bool,
+    pub cli_install_success: bool,
 }
 
 #[derive(Clone, Default, Debug, PartialEq)]

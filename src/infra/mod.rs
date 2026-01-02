@@ -4,6 +4,7 @@
 
 pub mod acp;
 pub mod app_config;
+pub mod cli;
 pub mod db;
 pub mod diagram;
 pub mod diff;

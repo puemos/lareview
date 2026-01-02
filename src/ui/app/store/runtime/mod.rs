@@ -111,5 +111,6 @@ pub fn run(app: &mut LaReviewApp, command: Command) {
             file_path,
             line_number,
         } => editor::open_in_editor(editor_id, file_path, line_number),
+        Command::InstallCli => settings::install_cli(app),
     }
 }

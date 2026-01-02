@@ -15,6 +15,31 @@ impl LaReviewApp {
 
         let theme = current_theme();
 
+        // Handle pending review from CLI
+        if let Some(pending) = self.state.domain.pending_review.take() {
+            // Link the repo if provided
+            if let Some(ref repo_root) = pending.repo_root {
+                // Check if repo is already linked
+                let linked_repo = self
+                    .state
+                    .domain
+                    .linked_repos
+                    .iter()
+                    .find(|r| r.path == *repo_root)
+                    .cloned();
+
+                if let Some(ref repo) = linked_repo {
+                    // Select this repo as context
+                    self.state.ui.selected_repo_id = Some(repo.id.clone());
+                } else {
+                    // Link the repo and select it
+                    if let Ok(repo) = self.link_repo_sync(repo_root.clone()) {
+                        self.state.ui.selected_repo_id = Some(repo.id.clone());
+                    }
+                }
+            }
+        }
+
         ui.vertical(|ui| {
             let content_rect = ui.available_rect_before_wrap();
 

@@ -136,6 +136,7 @@ pub enum SettingsAction {
     DismissRequirements,
     SetPreferredEditor(String),
     ClearPreferredEditor,
+    InstallCli,
     // Agent settings
     UpdateAgentPath(String, String), // agent_id, path
     AddCustomAgent(crate::infra::app_config::CustomAgentConfig),
@@ -161,6 +162,7 @@ pub enum AsyncAction {
     ReviewDeleted(Result<(), String>),
     D2InstallOutput(String),
     D2InstallComplete,
+    CliInstallComplete(Result<(), String>),
     ExportPreviewGenerated(Result<crate::application::review::export::ExportResult, String>),
     ExportFinished(Result<(), String>),
     ReposLoaded(Result<Vec<crate::domain::LinkedRepo>, String>),

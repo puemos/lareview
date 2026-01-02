@@ -170,5 +170,14 @@ pub fn reduce(
             ui.preferred_editor_id = config.preferred_editor_id;
             Vec::new()
         }
+        SettingsAction::InstallCli => {
+            if ui.is_cli_installing {
+                return Vec::new();
+            }
+            ui.is_cli_installing = true;
+            ui.cli_install_output.clear();
+            ui.cli_install_success = false;
+            vec![Command::InstallCli]
+        }
     }
 }

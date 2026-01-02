@@ -1,5 +1,6 @@
 //! Root egui app struct.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use tokio::sync::mpsc;
@@ -43,4 +44,77 @@ pub struct LaReviewApp {
     pub agent_cancel_token: Option<tokio_util::sync::CancellationToken>,
 
     pub skip_runtime: bool,
+}
+
+impl LaReviewApp {
+    fn create_linked_repo(path: PathBuf) -> crate::domain::LinkedRepo {
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        let remotes = crate::infra::vcs::git::extract_git_remotes(&path);
+
+        crate::domain::LinkedRepo {
+            id: uuid::Uuid::new_v4().to_string(),
+            name,
+            path,
+            remotes,
+            created_at: chrono::Utc::now().to_rfc3339(),
+        }
+    }
+
+    /// Link a repository asynchronously - used for background linking
+    pub fn link_repo(&mut self, path: PathBuf) -> Result<(), String> {
+        if self
+            .state
+            .domain
+            .linked_repos
+            .iter()
+            .any(|r| r.path == path)
+        {
+            return Ok(());
+        }
+
+        let repo = Self::create_linked_repo(path);
+
+        let repo_repo = self.repo_repo.clone();
+        let action_tx = self.action_tx.clone();
+
+        tokio::spawn(async move {
+            if let Err(e) = repo_repo.save(&repo) {
+                eprintln!("Failed to save linked repo: {e}");
+                return;
+            }
+
+            let _ = action_tx
+                .send(crate::ui::app::Action::Async(
+                    crate::ui::app::AsyncAction::RepoSaved(Ok(repo)),
+                ))
+                .await;
+        });
+
+        Ok(())
+    }
+
+    /// Link a repository synchronously - used for CLI handoff
+    pub fn link_repo_sync(&mut self, path: PathBuf) -> Result<crate::domain::LinkedRepo, String> {
+        if let Some(existing) = self
+            .state
+            .domain
+            .linked_repos
+            .iter()
+            .find(|r| r.path == path)
+        {
+            return Ok(existing.clone());
+        }
+
+        let repo = Self::create_linked_repo(path);
+
+        let rt = crate::runtime();
+        rt.block_on(async {
+            self.repo_repo.save(&repo).map_err(|e| e.to_string())?;
+            Ok(repo)
+        })
+    }
 }

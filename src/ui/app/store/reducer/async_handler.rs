@@ -142,6 +142,23 @@ pub fn reduce(state: &mut AppState, action: AsyncAction) -> Vec<Command> {
             state.ui.is_d2_installing = false;
             Vec::new()
         }
+        AsyncAction::CliInstallComplete(result) => {
+            state.ui.is_cli_installing = false;
+            match result {
+                Ok(_) => {
+                    state.ui.cli_install_success = true;
+                    state
+                        .ui
+                        .cli_install_output
+                        .push_str("Installation successful! Open a new terminal to use lareview.");
+                }
+                Err(err) => {
+                    state.ui.cli_install_output.push_str("Error: ");
+                    state.ui.cli_install_output.push_str(&err);
+                }
+            }
+            Vec::new()
+        }
         AsyncAction::FeedbackPushed(result) => {
             state.ui.push_feedback_pending = None;
             match result {

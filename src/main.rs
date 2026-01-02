@@ -20,6 +20,14 @@ fn main() -> Result<(), eframe::Error> {
     // Usage: RUST_LOG=debug cargo run  (or RUST_LOG=acp=debug for ACP only)
     let _ = env_logger::try_init();
 
+    // Check for --open-pending flag (CLI-to-GUI handoff)
+    let pending_review_path = if let Some(idx) = args.iter().position(|arg| arg == "--open-pending")
+    {
+        args.get(idx + 1).cloned()
+    } else {
+        None
+    };
+
     // Check if we're running as an MCP server
     // Also check for MCP-related environment variables that may indicate MCP mode
     let is_mcp_server = args.contains(&"--task-mcp-server".to_string())
@@ -104,7 +112,11 @@ fn main() -> Result<(), eframe::Error> {
         options,
         Box::new(|cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
-            Ok(Box::new(ui::app::LaReviewApp::new_egui(cc)))
+            // Pass pending review path for CLI-to-GUI handoff
+            Ok(Box::new(ui::app::LaReviewApp::new_egui_with_pending(
+                cc,
+                pending_review_path,
+            )))
         }),
     )
 }

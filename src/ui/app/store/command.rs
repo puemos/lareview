@@ -119,4 +119,5 @@ pub enum Command {
         file_path: std::path::PathBuf,
         line_number: usize,
     },
+    InstallCli,
 }

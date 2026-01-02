@@ -12,6 +12,9 @@ categories = ["development-tools", "gui"]
 default-run = "lareview"
 
 [dependencies]
+atty = "0.2"
+clap = { version = "4.4", features = ["derive"] }
+dirs = "5"
 egui = "0.33.2"
 eframe = "0.33.2"
 egui_extras = { version = "0.33.2", features = ["svg", "image", "svg_text"] }
@@ -69,6 +72,13 @@ objc = "0.2"
 
 windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_UI_WindowsAndMessaging"] }
 
+[[bin]]
+name = "lareview"
+path = "src/bin/lareview_cli.rs"
+
+[[bin]]
+name = "lareview-gui"
+path = "src/main.rs"
 
 
 [dev-dependencies]

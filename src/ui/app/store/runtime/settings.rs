@@ -184,3 +184,144 @@ pub fn save_app_config_full(
         eprintln!("[config] Failed to save config: {err}");
     }
 }
+
+pub fn install_cli(app: &mut LaReviewApp) {
+    let action_tx = app.action_tx.clone();
+    let cli_install_tx = std::sync::Arc::new(tokio::sync::Mutex::new(String::new()));
+
+    crate::spawn(async move {
+        let result = install_cli_async(cli_install_tx.clone()).await;
+
+        let _ = action_tx
+            .send(Action::Async(AsyncAction::CliInstallComplete(result)))
+            .await;
+    });
+}
+
+async fn install_cli_async(
+    output: std::sync::Arc<tokio::sync::Mutex<String>>,
+) -> Result<(), String> {
+    use tokio::io::AsyncBufReadExt;
+
+    let cli_path = std::env::current_exe()
+        .map(|exe_path| {
+            exe_path
+                .parent()
+                .map(|parent| parent.join("lareview"))
+                .unwrap_or_default()
+        })
+        .unwrap_or_default();
+
+    if !cli_path.exists() {
+        return Err(format!(
+            "CLI binary not found. Searched: {}",
+            cli_path.display()
+        ));
+    }
+
+    let shell_path = std::env::var("SHELL").unwrap_or_default();
+    let shell_name = std::path::Path::new(&shell_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("sh");
+
+    let cli_dir = cli_path
+        .parent()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "/Applications/LaReview.app/Contents/MacOS".to_string());
+
+    let install_cmd = if cfg!(target_os = "macos") {
+        match shell_name {
+            "zsh" => {
+                format!(
+                    r#"if ! grep -q 'export PATH="$PATH:{0}"' ~/.zshrc 2>/dev/null; then
+    echo 'export PATH="$PATH:{0}"' >> ~/.zshrc
+    echo "Added {0} to ~/.zshrc"
+else
+    echo "PATH already configured in ~/.zshrc"
+fi
+echo "Open a new terminal or run: source ~/.zshrc""#,
+                    cli_dir
+                )
+            }
+            "bash" => {
+                format!(
+                    r#"if ! grep -q 'export PATH="$PATH:{0}"' ~/.bashrc 2>/dev/null; then
+    echo 'export PATH="$PATH:{0}"' >> ~/.bashrc
+    echo "Added {0} to ~/.bashrc"
+else
+    echo "PATH already configured in ~/.bashrc"
+fi
+echo "Open a new terminal or run: source ~/.bashrc""#,
+                    cli_dir
+                )
+            }
+            _ => {
+                format!(
+                    r#"echo 'export PATH="$PATH:{0}"' >> ~/{1}rc
+echo "Added {0} to ~/{1}rc"
+echo "Open a new terminal or run: source ~/{1}rc""#,
+                    cli_dir, shell_name
+                )
+            }
+        }
+    } else {
+        String::from("echo 'CLI is available. Open a new terminal to use lareview.'")
+    };
+
+    let (cmd, flag) = if shell_name == "zsh" {
+        ("zsh", "-c")
+    } else {
+        ("bash", "-c")
+    };
+
+    let mut child = tokio::process::Command::new(cmd)
+        .arg(flag)
+        .arg(&install_cmd)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn install command: {e}"))?;
+
+    let stdout = child.stdout.take().unwrap();
+    let stderr = child.stderr.take().unwrap();
+    let mut stdout_reader = tokio::io::BufReader::new(stdout).lines();
+    let mut stderr_reader = tokio::io::BufReader::new(stderr).lines();
+
+    loop {
+        tokio::select! {
+            line = stdout_reader.next_line() => {
+                match line {
+                    Ok(Some(line)) => {
+                        let mut output = output.lock().await;
+                        output.push_str(&line);
+                        output.push('\n');
+                    }
+                    _ => break,
+                }
+            }
+            line = stderr_reader.next_line() => {
+                match line {
+                    Ok(Some(line)) => {
+                        let mut output = output.lock().await;
+                        output.push_str("Error: ");
+                        output.push_str(&line);
+                        output.push('\n');
+                    }
+                    _ => break,
+                }
+            }
+        }
+    }
+
+    let status = child
+        .wait()
+        .await
+        .map_err(|e| format!("Install command failed: {e}"))?;
+
+    if !status.success() {
+        return Err("Installation command failed".to_string());
+    }
+
+    Ok(())
+}

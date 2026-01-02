@@ -57,11 +57,15 @@ jobs:
 
       - name: Build
         shell: bash
-        run: cargo build --release --target ${{ matrix.target }}
+        run: |
+          cargo build --release --target ${{ matrix.target }} --bin lareview-gui
+          cargo build --release --target ${{ matrix.target }} --bin lareview
 
       - name: Strip (Unix)
         if: runner.os != 'Windows'
-        run: strip "target/${{ matrix.target }}/release/lareview"
+        run: |
+          strip "target/${{ matrix.target }}/release/lareview-gui"
+          strip "target/${{ matrix.target }}/release/lareview"
 
       - name: Import macOS signing certificate
         if: runner.os == 'macOS'
@@ -84,16 +88,19 @@ jobs:
           BUNDLE_ID="io.github.puemos.lareview"
           APP_BUNDLE="${APP_NAME}.app"
 
-          BIN_SRC="target/${{ matrix.target }}/release/lareview"
+          GUI_SRC="target/${{ matrix.target }}/release/lareview-gui"
+          CLI_SRC="target/${{ matrix.target }}/release/lareview"
           APP_DIR="target/${{ matrix.target }}/release/${APP_BUNDLE}"
-          BIN_DST="${APP_DIR}/Contents/MacOS/${APP_NAME}"
+          GUI_DST="${APP_DIR}/Contents/MacOS/${APP_NAME}"
+          CLI_DST="${APP_DIR}/Contents/MacOS/lareview"
           RES_DIR="${APP_DIR}/Contents/Resources"
 
           rm -rf "${APP_DIR}"
-          mkdir -p "$(dirname "${BIN_DST}")" "${RES_DIR}"
+          mkdir -p "$(dirname "${GUI_DST}")" "$(dirname "${CLI_DST}")" "${RES_DIR}"
 
-          cp "${BIN_SRC}" "${BIN_DST}"
-          chmod +x "${BIN_DST}"
+          cp "${GUI_SRC}" "${GUI_DST}"
+          cp "${CLI_SRC}" "${CLI_DST}"
+          chmod +x "${GUI_DST}" "${CLI_DST}"
 
           VERSION="${GITHUB_REF#refs/tags/v}"
 
@@ -173,6 +180,10 @@ jobs:
 
           codesign --force --options runtime --timestamp \
             --sign "$MACOS_IDENTITY" \
+            "$APP_BUNDLE/Contents/MacOS/lareview"
+
+          codesign --force --options runtime --timestamp \
+            --sign "$MACOS_IDENTITY" \
             "$APP_BUNDLE"
 
           codesign -vvv --deep --strict "$APP_BUNDLE"
@@ -216,14 +227,14 @@ jobs:
         shell: bash
         run: |
           cd "target/${{ matrix.target }}/release"
-          tar czf "../../../${{ matrix.artifact_name }}" lareview
+          tar czf "../../../${{ matrix.artifact_name }}" lareview-gui lareview
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           cd "target/${{ matrix.target }}/release"
-          Compress-Archive -Path lareview.exe -DestinationPath ..\..\..\${{ matrix.artifact_name }}
+          Compress-Archive -Path lareview-gui.exe,lareview.exe -DestinationPath ..\..\..\${{ matrix.artifact_name }}
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1
