@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.17] - 2026-01-02
+
+### Added
+
+- **Terminal Workflow CLI**: New `lareview` CLI binary for launching the GUI with pre-loaded diffs:
+  - `lareview main feature` - compare branches
+  - `lareview pr owner/repo#123` - review GitHub PRs
+  - `lareview --status` - review uncommitted changes
+  - `git diff | lareview --stdin` - pipe diff to GUI
+- **Syntax Highlighting**: New syntect-based syntax highlighting for diff viewer with LRU caching
+- **CLI Settings View**: New settings page showing CLI installation status and usage examples
+- **Domain Errors**: New `domain/error.rs` with typed errors (ReviewError, TaskError, FeedbackError, etc.)
+- **Structured Logging**: Environment variable support via `RUST_LOG` (e.g., `RUST_LOG=debug cargo run`)
+- **Double-Click Window**: Double-click header to maximize/restore window
+
+### Changed
+
+- **UI**: Frameless window with native vibrancy and full-size content view
+- **Landing**: Refreshed landing page with new screenshots and feature descriptions
+- **Diff Viewer**: Reduced cache size (2000→500 lines) and overscan (200→50) for faster rendering
+- **Repo Linking**: Async and sync repo linking for CLI handoff support
+- **Logging**: Switched to structured logging with RUST_LOG support
+
+### Removed
+
+- **Utils**: Removed `utils/os.rs` and `window.rs` (simplified window handling)
+
 ## [0.0.16] - 2026-01-01
 
 ### Added
