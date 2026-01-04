@@ -289,6 +289,40 @@ fn flow_json_complex_example() {
 }
 
 #[test]
+fn flow_groups_render_correct_d2_syntax() {
+    let flow = parse_flow_json(json!({
+        "type": "flow",
+        "data": {
+            "direction": "LR",
+            "nodes": [
+                { "id": "client", "label": "Client", "kind": "user" },
+                { "id": "api", "label": "API", "kind": "service" },
+                { "id": "db", "label": "Database", "kind": "database" }
+            ],
+            "edges": [
+                { "from": "client", "to": "api", "label": "request" },
+                { "from": "api", "to": "db", "label": "query" }
+            ],
+            "groups": [
+                { "id": "backend", "label": "Backend Services", "members": ["api", "db"] },
+                { "id": "frontend", "members": ["client"] }
+            ]
+        }
+    }));
+
+    let d2 = D2Renderer.render(&Diagram::Flow(flow)).unwrap();
+    println!("D2 output:\n{}", d2);
+
+    assert!(d2.contains("backend: \"Backend Services\" {"));
+    assert!(d2.contains("  api: { shape: rectangle; label: \"API\""));
+    assert!(d2.contains("  db: { shape: cylinder; label: \"Database\""));
+    assert!(d2.contains("frontend: {"));
+    assert!(d2.contains("  client: { shape: person; label: \"Client\""));
+    assert!(d2.contains("backend.api -> backend.db: \"query\""));
+    assert!(d2.contains("frontend.client -> backend.api: \"request\""));
+}
+
+#[test]
 fn flow_json_unknown_kind_falls_back() {
     let flow = parse_flow_json(json!({
         "type": "flow",
