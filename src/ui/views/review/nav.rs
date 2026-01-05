@@ -5,7 +5,7 @@ use crate::domain::ReviewTask;
 use crate::ui::app::ReviewAction;
 use crate::ui::components::list_item::ListItem;
 use crate::ui::theme::Theme;
-use crate::ui::{spacing, typography};
+use crate::ui::{icons, spacing, typography};
 use eframe::egui;
 
 /// Renders the logic for the Left Panel (Navigation)
@@ -15,6 +15,7 @@ pub(crate) fn render_navigation_tree(
     selected_task_id: Option<&String>,
     _is_generating: bool,
     theme: &Theme,
+    unassigned_feedback_count: usize,
 ) -> Option<ReviewAction> {
     let sub_flows = sub_flows_in_display_order(tasks_by_sub_flow);
 
@@ -100,6 +101,39 @@ pub(crate) fn render_navigation_tree(
                     }
                 }
             });
+    }
+
+    // Unassigned feedback section
+    if unassigned_feedback_count > 0 {
+        ui.add_space(spacing::SPACING_SM);
+
+        let is_selected = selected_task_id.is_none() && matches!(action_out, None);
+
+        let unassigned_title = format!(
+            "{} Unassigned ({})",
+            icons::TAB_FEEDBACK,
+            unassigned_feedback_count
+        );
+        let title_text = typography::body(unassigned_title)
+            .size(13.0)
+            .color(if is_selected {
+                theme.text_primary
+            } else {
+                theme.text_secondary
+            });
+
+        let subtitle = typography::body("Feedback outside tasks")
+            .size(11.0)
+            .color(theme.text_muted);
+
+        ListItem::new(title_text)
+            .status_icon(icons::TAB_FEEDBACK, theme.accent)
+            .subtitle(subtitle)
+            .selected(is_selected)
+            .action(|| {
+                action_out = Some(ReviewAction::NavigateToUnassignedFeedback);
+            })
+            .show_with_bg(ui, theme);
     }
 
     action_out

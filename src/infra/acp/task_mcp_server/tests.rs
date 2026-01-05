@@ -66,19 +66,7 @@ async fn test_return_task_tool_writes_file() {
                 ]
             }
         },
-        "diff_refs": [
-            {
-                "file": "src/a.rs",
-                "hunks": [
-                    {
-                        "old_start": 1,
-                        "old_lines": 1,
-                        "new_start": 1,
-                        "new_lines": 1
-                    }
-                ]
-            }
-        ]
+        "hunk_ids": ["src/a.rs#H1"]
     });
     let res = tool
         .handle(
@@ -164,19 +152,7 @@ async fn test_return_task_tool_persists_to_db() {
                 ]
             }
         },
-        "diff_refs": [
-            {
-                "file": "src/a.rs",
-                "hunks": [
-                    {
-                        "old_start": 1,
-                        "old_lines": 1,
-                        "new_start": 1,
-                        "new_lines": 1
-                    }
-                ]
-            }
-        ]
+        "hunk_ids": ["src/a.rs#H1"]
     });
 
     let _ = tool
@@ -323,19 +299,7 @@ async fn test_multiple_tasks_and_finalize_persists_correctly() {
                 ]
             }
         },
-        "diff_refs": [
-            {
-                "file": "src/a.rs",
-                "hunks": [
-                    {
-                        "old_start": 1,
-                        "old_lines": 1,
-                        "new_start": 1,
-                        "new_lines": 1
-                    }
-                ]
-            }
-        ]
+        "hunk_ids": ["src/a.rs#H1"]
     });
 
     let _ = return_task_tool
@@ -366,19 +330,7 @@ async fn test_multiple_tasks_and_finalize_persists_correctly() {
                 ]
             }
         },
-        "diff_refs": [
-            {
-                "file": "src/a.rs",
-                "hunks": [
-                    {
-                        "old_start": 1,
-                        "old_lines": 1,
-                        "new_start": 1,
-                        "new_lines": 1
-                    }
-                ]
-            }
-        ]
+        "hunk_ids": ["src/a.rs#H1"]
     });
 
     let _ = return_task_tool
@@ -632,7 +584,7 @@ async fn test_save_agent_comment() {
     });
 
     let feedback_id =
-        crate::infra::acp::task_mcp_server::comment_ingest::save_agent_comment(&config, args)
+        crate::infra::acp::task_mcp_server::feedback_ingest::save_agent_comment(&config, args)
             .unwrap();
     assert!(!feedback_id.is_empty());
 
@@ -691,16 +643,17 @@ async fn test_save_agent_comment_no_task() {
         "side": "new"
     });
 
-    // Should fail because no task covers this line
+    // Should succeed - feedback outside tasks is now allowed (saved as unassigned)
     let result =
-        crate::infra::acp::task_mcp_server::comment_ingest::save_agent_comment(&config, args);
-    assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("does not fall within the scope of any generated task")
-    );
+        crate::infra::acp::task_mcp_server::feedback_ingest::save_agent_comment(&config, args);
+    assert!(result.is_ok());
+
+    let feedback_id = result.unwrap();
+    let db = crate::infra::db::Database::open_at(db_path).unwrap();
+    let feedback_repo = crate::infra::db::FeedbackRepository::new(db.connection());
+    let feedback = feedback_repo.find_by_id(&feedback_id).unwrap().unwrap();
+    // task_id should be None since no task covers this line
+    assert!(feedback.task_id.is_none());
 
     unsafe {
         std::env::remove_var("LAREVIEW_DB_PATH");

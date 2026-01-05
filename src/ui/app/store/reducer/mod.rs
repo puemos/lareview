@@ -655,7 +655,7 @@ mod tests {
             ui: UiState {
                 active_feedback: Some(crate::ui::app::FeedbackContext {
                     feedback_id: None,
-                    task_id: "t1".into(),
+                    task_id: Some("t1".into()),
                     file_path: None,
                     line_number: None,
                     side: None,

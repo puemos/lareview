@@ -59,8 +59,10 @@ impl LaReviewClient {
     fn parse_return_payload_from_str(payload: &str) -> Option<serde_json::Value> {
         let parsed = serde_json::from_str::<serde_json::Value>(payload).ok()?;
         for candidate in Self::payload_candidates(&parsed) {
-            // Accept single task payload if it has id and diff_refs (and likely title)
-            if candidate.get("id").is_some() && candidate.get("diff_refs").is_some() {
+            // Accept single task payload if it has id and hunk_ids or diff_refs (and likely title)
+            if candidate.get("id").is_some()
+                && (candidate.get("hunk_ids").is_some() || candidate.get("diff_refs").is_some())
+            {
                 return Some(candidate);
             }
             // Accept finalize payload if it has title
@@ -463,8 +465,10 @@ impl agent_client_protocol::Client for LaReviewClient {
                 matches!(tool_kind, Some(ToolKind::Other))
                     && Self::parse_return_payload_from_str(&tool_title)
                         .map(|value| {
-                            // Check if it's a single task (has id and diff_refs) or finalize review (has title)
-                            (value.get("id").is_some() && value.get("diff_refs").is_some())
+                            // Check if it's a single task (has id and hunk_ids or diff_refs) or finalize review (has title)
+                            (value.get("id").is_some()
+                                && (value.get("hunk_ids").is_some()
+                                    || value.get("diff_refs").is_some()))
                                 || value.get("title").is_some()
                         })
                         .unwrap_or(false)
@@ -786,7 +790,7 @@ mod tests {
     fn test_parse_return_payload_from_str() {
         let payload = json!({
             "id": "T1",
-            "diff_refs": []
+            "hunk_ids": []
         })
         .to_string();
         let res = LaReviewClient::parse_return_payload_from_str(&payload).unwrap();
@@ -881,7 +885,7 @@ mod tests {
                 }
             },
             "stats": { "risk": "LOW", "tags": [] },
-            "diff_refs": []
+            "hunk_ids": []
         });
 
         assert!(client.append_single_task_from_value(task_json));

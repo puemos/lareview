@@ -339,6 +339,12 @@ impl LaReviewApp {
                                 self.state.ui.selected_task_id.as_ref(),
                                 is_generating_this,
                                 &theme,
+                                self.state
+                                    .domain
+                                    .feedbacks
+                                    .iter()
+                                    .filter(|f| f.task_id.is_none())
+                                    .count(),
                             ) {
                                 self.dispatch(Action::Review(action));
                             }

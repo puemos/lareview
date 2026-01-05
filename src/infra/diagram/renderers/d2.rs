@@ -30,42 +30,56 @@ fn render_flow_d2(flow: &FlowDiagram) -> Result<String> {
     };
     writeln!(&mut out, "direction: {direction}").map_err(render_err)?;
 
-    for node in &flow.nodes {
-        write!(
-            &mut out,
-            "{}: {{ shape: {}; label: \"{}\"",
-            node.id,
-            d2_shape_for_node(node.kind),
-            escape_d2(&node.label)
-        )
-        .map_err(render_err)?;
-
-        if let Some(color) = &node.style.color {
-            write!(&mut out, "; style.fill: \"{}\"", color.hex).map_err(render_err)?;
-        }
-        if let Some(tooltip) = &node.tooltip {
-            write!(&mut out, "; tooltip: \"{}\"", escape_d2(tooltip)).map_err(render_err)?;
-        }
-        writeln!(&mut out, " }}").map_err(render_err)?;
-    }
+    let node_to_group: std::collections::HashMap<String, String> = flow
+        .groups
+        .iter()
+        .flat_map(|g| g.members.iter().map(|m| (m.clone(), g.id.clone())))
+        .collect();
 
     for group in &flow.groups {
-        writeln!(
-            &mut out,
-            "{}: {{ label: \"{}\"",
-            group.id,
-            escape_d2(group.label.as_deref().unwrap_or(&group.id))
-        )
-        .map_err(render_err)?;
+        let label = group.label.as_deref().unwrap_or(&group.id);
+        writeln!(&mut out, "{}: {{", group.id).map_err(render_err)?;
+        writeln!(&mut out, "  label: \"{}\"", escape_d2(label)).map_err(render_err)?;
         for member in &group.members {
-            writeln!(&mut out, "  {member}").map_err(render_err)?;
+            let node = flow.nodes.iter().find(|n| &n.id == member);
+            if let Some(n) = node {
+                writeln!(
+                    &mut out,
+                    "  {}: {{ shape: {}; label: \"{}\" }}",
+                    n.id,
+                    d2_shape_for_node(n.kind),
+                    escape_d2(&n.label)
+                )
+                .map_err(render_err)?;
+            }
         }
         writeln!(&mut out, "}}").map_err(render_err)?;
     }
 
+    for node in &flow.nodes {
+        if !node_to_group.contains_key(&node.id) {
+            writeln!(
+                &mut out,
+                "{}: {{ shape: {}; label: \"{}\" }}",
+                node.id,
+                d2_shape_for_node(node.kind),
+                escape_d2(&node.label)
+            )
+            .map_err(render_err)?;
+        }
+    }
+
     for edge in &flow.edges {
         let arrow = if edge.dashed { "--" } else { "-" };
-        write!(&mut out, "{} {}> {}", edge.from, arrow, edge.to).map_err(render_err)?;
+        let from = node_to_group
+            .get(&edge.from)
+            .map(|g| format!("{}.{}", g, edge.from))
+            .unwrap_or_else(|| edge.from.clone());
+        let to = node_to_group
+            .get(&edge.to)
+            .map(|g| format!("{}.{}", g, edge.to))
+            .unwrap_or_else(|| edge.to.clone());
+        write!(&mut out, "{} {}> {}", from, arrow, to).map_err(render_err)?;
         if let Some(label) = &edge.label {
             write!(&mut out, ": \"{}\"", escape_d2(label)).map_err(render_err)?;
         }

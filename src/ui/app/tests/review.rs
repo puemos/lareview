@@ -205,7 +205,7 @@ async fn test_feedback_reply_flow() {
         let mut app_lock = app.lock().unwrap();
         app_lock.state.ui.active_feedback = Some(crate::ui::app::FeedbackContext {
             feedback_id: Some("thread_1".to_string()),
-            task_id: "task_1".to_string(),
+            task_id: Some("task_1".to_string()),
             file_path: None,
             line_number: None,
             side: None,

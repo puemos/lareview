@@ -83,6 +83,7 @@ pub enum ReviewAction {
         side: Option<crate::domain::FeedbackSide>,
     },
     NavigateToFeedback(crate::domain::Feedback),
+    NavigateToUnassignedFeedback,
     CloseFeedback,
     OpenFullDiff(FullDiffView),
     CloseFullDiff,

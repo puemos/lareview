@@ -1,7 +1,8 @@
-use crate::domain::ReviewTask;
+use crate::domain::{Feedback, ReviewTask};
 use crate::ui::app::{Action, LaReviewApp, ReviewAction};
 use crate::ui::components::pills::pill_action_button;
 use crate::ui::theme::Theme;
+use crate::ui::views::review::feedback_detail::FeedbackDetailView;
 use crate::ui::{icons, spacing, typography};
 use eframe::egui;
 
@@ -11,6 +12,7 @@ pub(super) enum RightPaneState {
     ReadyNoSelection,
     NoTasks,
     AllDone,
+    UnassignedFeedback,
 }
 
 impl LaReviewApp {
@@ -24,7 +26,20 @@ impl LaReviewApp {
         next_open_id: Option<String>,
     ) {
         let theme = crate::ui::theme::current_theme();
-        let state = if self.state.ui.selected_task_id.is_some() {
+
+        // Determine if we're viewing unassigned feedback
+        // Show unassigned view if no task selected AND there are unassigned feedbacks
+        let has_unassigned = self
+            .state
+            .domain
+            .feedbacks
+            .iter()
+            .any(|f| f.task_id.is_none());
+        let viewing_unassigned = self.state.ui.selected_task_id.is_none() && has_unassigned;
+
+        let state = if viewing_unassigned {
+            RightPaneState::UnassignedFeedback
+        } else if self.state.ui.selected_task_id.is_some() {
             // Validate selection still exists
             if all_tasks
                 .iter()
@@ -65,8 +80,109 @@ impl LaReviewApp {
                     self.dispatch(action);
                 }
             }
+            RightPaneState::UnassignedFeedback => {
+                let unassigned_feedbacks: Vec<Feedback> = self
+                    .state
+                    .domain
+                    .feedbacks
+                    .iter()
+                    .filter(|f| f.task_id.is_none())
+                    .cloned()
+                    .collect();
+                let active_feedback_id = self
+                    .state
+                    .ui
+                    .active_feedback
+                    .as_ref()
+                    .and_then(|f| f.feedback_id.clone());
+                render_unassigned_feedback(
+                    ui,
+                    &unassigned_feedbacks,
+                    active_feedback_id.as_ref(),
+                    self,
+                );
+            }
         }
     }
+}
+
+fn render_unassigned_feedback(
+    ui: &mut egui::Ui,
+    feedbacks: &[Feedback],
+    active_feedback_id: Option<&String>,
+    app: &mut LaReviewApp,
+) -> Option<ReviewAction> {
+    let theme = crate::ui::theme::current_theme();
+
+    // Check if we have an active unassigned feedback to show detail
+    let show_detail = active_feedback_id
+        .and_then(|fid| feedbacks.iter().find(|f| &f.id == fid))
+        .is_some();
+
+    egui::Frame::NONE
+        .inner_margin(spacing::SPACING_XL)
+        .show(ui, |ui| {
+            ui.vertical(|ui| {
+                ui.add_space(spacing::SPACING_MD);
+
+                if show_detail {
+                    // Show back button and feedback detail
+                    ui.horizontal(|ui| {
+                        if ui.link("← Back to Unassigned").clicked() {
+                            app.dispatch(Action::Review(
+                                ReviewAction::NavigateToUnassignedFeedback,
+                            ));
+                        }
+                    });
+                    ui.add_space(spacing::SPACING_MD);
+
+                    // Render the feedback detail
+                    if let Some(feedback_id) = active_feedback_id {
+                        if let Some(feedback) = feedbacks.iter().find(|f| &f.id == feedback_id) {
+                            let view = FeedbackDetailView {
+                                task_id: String::new(), // Empty for unassigned
+                                feedback_id: Some(feedback.id.clone()),
+                                file_path: feedback
+                                    .anchor
+                                    .as_ref()
+                                    .and_then(|a| a.file_path.clone()),
+                                line_number: feedback.anchor.as_ref().and_then(|a| a.line_number),
+                                side: feedback.anchor.as_ref().and_then(|a| a.side),
+                            };
+                            app.render_feedback_detail(ui, &view);
+                        }
+                    }
+                } else {
+                    // Show the list header
+                    ui.label(typography::h1("Unassigned Feedback"));
+                    ui.add_space(spacing::SPACING_SM);
+                    ui.label(
+                        typography::body("Feedback that falls outside any generated task")
+                            .color(theme.text_muted),
+                    );
+                    ui.add_space(spacing::SPACING_LG);
+
+                    // Render feedback list for unassigned feedbacks
+                    let active_id_str = active_feedback_id.as_ref().map(|s| s.as_str());
+                    if let Some(_action) =
+                        crate::ui::views::review::feedback_list::render_feedback_list(
+                            ui,
+                            feedbacks,
+                            active_id_str,
+                            false,
+                            &std::collections::HashSet::new(),
+                            false,
+                            &theme,
+                        )
+                    {
+                        // Return the action to be dispatched by the caller
+                        // For now, just ignore it since we can't dispatch from here
+                    }
+                }
+            });
+        });
+
+    None
 }
 
 pub(crate) fn render_all_done_state(ui: &mut egui::Ui, theme: &Theme) {

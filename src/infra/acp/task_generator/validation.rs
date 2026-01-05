@@ -1,14 +1,14 @@
-use crate::domain::ReviewTask;
+use crate::domain::{DiffRef, HunkRef, ReviewTask};
 use crate::infra::diff::index::DiffIndex;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
+use serde_json::Value;
 use std::collections::HashSet;
 
 pub(super) fn validate_tasks_payload(
     tasks: &[ReviewTask],
-    _raw_payload: Option<&serde_json::Value>,
+    raw_payload: Option<&serde_json::Value>,
     diff_text: &str,
 ) -> Result<Vec<String>> {
-    // Validate risk levels from the actual ReviewTask objects
     for (idx, task) in tasks.iter().enumerate() {
         let risk_str = match task.stats.risk {
             crate::domain::RiskLevel::Low => "LOW",
@@ -16,7 +16,7 @@ pub(super) fn validate_tasks_payload(
             crate::domain::RiskLevel::High => "HIGH",
         };
         match risk_str {
-            "LOW" | "MEDIUM" | "HIGH" => {} // Valid risk level
+            "LOW" | "MEDIUM" | "HIGH" => {}
             other => anyhow::bail!("Task {idx} has invalid stats.risk '{other}'"),
         }
 
@@ -32,9 +32,41 @@ pub(super) fn validate_tasks_payload(
         }
     }
 
-    // Validate diff_refs point to valid hunks in the canonical diff
     let diff_index = DiffIndex::new(diff_text)?;
-    let warnings = Vec::new();
+    let mut warnings = Vec::new();
+
+    if let Some(payload) = raw_payload {
+        if let Some(tasks_array) = payload.get("tasks").and_then(|t| t.as_array()) {
+            for (task_idx, task_val) in tasks_array.iter().enumerate() {
+                if let Some(hunk_ids_val) = task_val.get("hunk_ids") {
+                    if let Some(hunk_ids_array) = hunk_ids_val.as_array() {
+                        let task_id_str = task_val
+                            .get("id")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| format!("task_{}", task_idx));
+
+                        warnings.push(format!(
+                            "Task {} uses new hunk_ids format. Converting to diff_refs automatically.",
+                            task_id_str
+                        ));
+
+                        let diff_refs = convert_hunk_ids_to_diff_refs(
+                            &diff_index,
+                            hunk_ids_array,
+                            &task_id_str,
+                        )?;
+                        warnings.push(format!(
+                            "Task {}: converted {} hunk_ids to {} diff_refs",
+                            task_id_str,
+                            hunk_ids_array.len(),
+                            diff_refs.len()
+                        ));
+                    }
+                }
+            }
+        }
+    }
 
     for task in tasks {
         for diff_ref in &task.diff_refs {
@@ -66,13 +98,19 @@ pub(super) fn validate_tasks_payload(
                     if let Some(diff_index_err) =
                         err.downcast_ref::<crate::infra::diff::index::DiffIndexError>()
                     {
+                        let nearest = diff_index_err.nearest();
+                        let nearest_new_start = nearest.map(|(_, n)| n).unwrap_or(0);
                         anyhow::bail!(
-                            "Task {} references invalid hunk in {} at old_start={}, new_start={}. Nearest hunk: {:?}. Copy coordinates from the hunk manifest.",
+                            "Task {} references invalid hunk in {} at old_start={}, new_start={}.\n\n\
+                             **To fix:**\n\
+                             - Copy hunk IDs from the manifest (e.g., 'src/auth.rs#H3')\n\
+                             - Or use the new 'hunk_ids' field instead of diff_refs\n\n\
+                             **Nearest hunk:** new_start={}",
                             task.id,
                             diff_ref.file,
                             hunk_ref.old_start,
                             hunk_ref.new_start,
-                            diff_index_err.nearest()
+                            nearest_new_start
                         );
                     } else {
                         anyhow::bail!(
@@ -107,4 +145,73 @@ pub(super) fn validate_tasks_payload(
     }
 
     Ok(warnings)
+}
+
+fn convert_hunk_ids_to_diff_refs(
+    diff_index: &DiffIndex,
+    hunk_ids: &[Value],
+    task_id: &str,
+) -> Result<Vec<DiffRef>> {
+    let mut hunks_by_file: std::collections::HashMap<String, Vec<HunkRef>> =
+        std::collections::HashMap::new();
+
+    for hunk_id_val in hunk_ids {
+        let hunk_id = hunk_id_val.as_str().ok_or_else(|| {
+            anyhow!(
+                "Task {}: hunk_ids must contain strings, got: {}",
+                task_id,
+                hunk_id_val
+            )
+        })?;
+
+        let coords = diff_index.get_hunk_coords(hunk_id).ok_or_else(|| {
+            let suggestions = list_hunk_suggestions(diff_index, hunk_id);
+            anyhow!(
+                "Task {} references invalid hunk_id '{}'.\n\n{}\n\n\
+                     **Valid format:** 'path/to/file#H1' (e.g., 'src/auth.rs#H3')",
+                task_id,
+                hunk_id,
+                suggestions
+            )
+        })?;
+
+        let (file_path, _) = diff_index
+            .parse_hunk_id(hunk_id)
+            .ok_or_else(|| anyhow!("Invalid hunk_id format: {}", hunk_id))?;
+
+        hunks_by_file.entry(file_path).or_default().push(coords);
+    }
+
+    let mut diff_refs: Vec<DiffRef> = hunks_by_file
+        .into_iter()
+        .map(|(file, hunks)| DiffRef { file, hunks })
+        .collect();
+
+    diff_refs.sort_by(|a, b| a.file.cmp(&b.file));
+    Ok(diff_refs)
+}
+
+fn list_hunk_suggestions(diff_index: &DiffIndex, attempted: &str) -> String {
+    let (partial_path, _) = attempted.rsplit_once('#').unwrap_or((attempted, ""));
+
+    let mut suggestions = Vec::new();
+
+    for file_path in diff_index.get_all_file_paths() {
+        if file_path.contains(partial_path) || partial_path.is_empty() {
+            let hunk_ids = diff_index.get_hunk_ids_for_file(&file_path);
+            for hunk_id in hunk_ids.iter().take(5) {
+                suggestions.push(format!("  - {}", hunk_id));
+            }
+            if hunk_ids.len() > 5 {
+                suggestions.push(format!("  ... and {} more", hunk_ids.len() - 5));
+            }
+            break;
+        }
+    }
+
+    if suggestions.is_empty() {
+        "No matching files found. Use the exact file path from the hunk manifest.".to_string()
+    } else {
+        format!("Did you mean one of these?\n{}", suggestions.join("\n"))
+    }
 }

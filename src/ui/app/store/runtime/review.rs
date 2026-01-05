@@ -464,6 +464,11 @@ pub fn update_task_status(
 
 pub fn delete_review(app: &mut LaReviewApp, review_id: ReviewId) {
     let result = (|| -> Result<(), String> {
+        // Delete all feedback for this review (including unassigned feedback)
+        app.feedback_repo
+            .delete_by_review(&review_id)
+            .map_err(|e| format!("Failed to delete feedback: {e}"))?;
+
         let runs = app
             .run_repo
             .find_by_review_id(&review_id)

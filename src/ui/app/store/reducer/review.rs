@@ -9,6 +9,7 @@ use std::path::Path;
 pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
     match action {
         ReviewAction::NavigateToFeedback(feedback) => handle_navigate_to_feedback(state, feedback),
+        ReviewAction::NavigateToUnassignedFeedback => handle_navigate_to_unassigned_feedback(state),
         ReviewAction::RefreshFromDb { reason } => vec![Command::RefreshReviewData { reason }],
         ReviewAction::RefreshGitHubReview => handle_refresh_github_review(state),
         ReviewAction::SelectReview { review_id } => handle_select_review(state, review_id),
@@ -63,7 +64,7 @@ pub fn reduce(state: &mut AppState, action: ReviewAction) -> Vec<Command> {
         } => {
             state.ui.active_feedback = Some(crate::ui::app::FeedbackContext {
                 feedback_id,
-                task_id,
+                task_id: Some(task_id),
                 file_path,
                 line_number,
                 side,
@@ -217,16 +218,35 @@ fn handle_navigate_to_feedback(
 
         state.ui.active_feedback = Some(crate::ui::app::FeedbackContext {
             feedback_id: Some(feedback.id),
-            task_id,
+            task_id: Some(task_id),
             file_path,
             line_number,
             side,
         });
     } else {
         state.ui.selected_task_id = None;
-        state.ui.active_feedback = None;
+        // Keep feedback active but without a task
+        let file_path = feedback.anchor.as_ref().and_then(|a| a.file_path.clone());
+        let line_number = feedback.anchor.as_ref().and_then(|a| a.line_number);
+        let side = feedback.anchor.as_ref().and_then(|a| a.side);
+
+        state.ui.active_feedback = Some(crate::ui::app::FeedbackContext {
+            feedback_id: Some(feedback.id),
+            task_id: None,
+            file_path,
+            line_number,
+            side,
+        });
     }
 
+    state.ui.current_view = AppView::Review;
+
+    Vec::new()
+}
+
+fn handle_navigate_to_unassigned_feedback(state: &mut AppState) -> Vec<Command> {
+    state.ui.selected_task_id = None;
+    state.ui.active_feedback = None;
     state.ui.current_view = AppView::Review;
 
     Vec::new()
