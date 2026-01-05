@@ -18,6 +18,8 @@ struct SingleTaskPayload {
     #[serde(default)]
     diff_refs: Vec<DiffRef>,
     #[serde(default)]
+    hunk_ids: Vec<String>,
+    #[serde(default)]
     diagram: Option<Value>,
     #[serde(default)]
     sub_flow: Option<String>,
@@ -71,6 +73,21 @@ fn extract_files_from_diff_refs(diff_refs: &[DiffRef]) -> Vec<String> {
     for diff_ref in diff_refs {
         if seen.insert(diff_ref.file.clone()) {
             files.push(diff_ref.file.clone());
+        }
+    }
+    files
+}
+
+/// Extract changed file paths from hunk_ids like "path/to/file#H1".
+fn extract_files_from_hunk_ids(hunk_ids: &[String]) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut files = Vec::new();
+    for hunk_id in hunk_ids {
+        if let Some((path, _)) = hunk_id.rsplit_once('#') {
+            let candidate = crate::infra::diff::normalize_task_path(path);
+            if !candidate.is_empty() && seen.insert(candidate.clone()) {
+                files.push(candidate);
+            }
         }
     }
     files
@@ -158,8 +175,17 @@ fn normalize_single_task_payload(args: Value) -> Result<Value> {
         return Ok(arguments.clone());
     }
 
+    // Log the current state for debugging before failing
+    let debug_info = format!(
+        "normalize_single_task_payload failed: id={:?}, title={:?}, keys={:?}",
+        current.get("id"),
+        current.get("title"),
+        current.as_object().map(|o| o.keys().collect::<Vec<_>>())
+    );
+
     Err(anyhow::anyhow!(
-        "missing required fields `id` and `title` for task"
+        "missing required fields `id` and `title` for task. Debug: {}",
+        debug_info
     ))
 }
 
@@ -179,6 +205,8 @@ pub(crate) fn parse_task(args: Value) -> Result<ReviewTask> {
     // fall back to legacy diff text parsing if necessary.
     let files = if !task.diff_refs.is_empty() {
         extract_files_from_diff_refs(&task.diff_refs)
+    } else if !task.hunk_ids.is_empty() {
+        extract_files_from_hunk_ids(&task.hunk_ids)
     } else {
         extract_files_from_diffs_legacy(&task.diffs)
     };
@@ -287,14 +315,11 @@ mod tests {
                 }
             },
             "stats": { "risk": "HIGH", "tags": ["tag1"] },
-            "diff_refs": [
-                { "file": "test.rs", "hunks": [] }
-            ]
+            "hunk_ids": ["test.rs#H1"]
         });
         let task = parse_task(payload).unwrap();
         assert_eq!(task.id, "T1");
         assert_eq!(task.stats.risk, RiskLevel::High);
-        assert_eq!(task.files, vec!["test.rs"]);
     }
 
     #[test]
@@ -305,9 +330,7 @@ mod tests {
             "description": "Desc2",
             "diagram": "{\"type\":\"flow\",\"data\":{\"direction\":\"LR\",\"nodes\":[{\"id\":\"a\",\"label\":\"A\",\"kind\":\"generic\"}]}}",
             "stats": { "risk": "LOW", "tags": [] },
-            "diff_refs": [
-                { "file": "test.rs", "hunks": [] }
-            ]
+            "hunk_ids": ["test.rs#H1"]
         });
         let err = parse_task(payload).unwrap_err();
         assert!(

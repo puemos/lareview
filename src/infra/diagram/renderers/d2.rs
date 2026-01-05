@@ -44,30 +44,19 @@ fn render_flow_d2(flow: &FlowDiagram) -> Result<String> {
 
     for group in &flow.groups {
         let label = group.label.as_deref().unwrap_or(&group.id);
-        if label == group.id {
-            writeln!(&mut out, "{}: {{", group.id).map_err(render_err)?;
-        } else {
-            writeln!(&mut out, "{}: \"{}\" {{", group.id, escape_d2(label)).map_err(render_err)?;
-        }
+        writeln!(&mut out, "{}: {{", group.id).map_err(render_err)?;
+        writeln!(&mut out, "  label: \"{}\"", escape_d2(label)).map_err(render_err)?;
         for member in &group.members {
             let node = flow.nodes.iter().find(|n| &n.id == member);
             if let Some(n) = node {
                 writeln!(
                     &mut out,
-                    "  {}: {{ shape: {}; label: \"{}\"",
+                    "  {}: {{ shape: {}; label: \"{}\" }}",
                     n.id,
                     d2_shape_for_node(n.kind),
                     escape_d2(&n.label)
                 )
                 .map_err(render_err)?;
-                if let Some(color) = &n.style.color {
-                    write!(&mut out, "; style.fill: \"{}\"", color.hex).map_err(render_err)?;
-                }
-                if let Some(tooltip) = &n.tooltip {
-                    write!(&mut out, "; tooltip: \"{}\"", escape_d2(tooltip))
-                        .map_err(render_err)?;
-                }
-                writeln!(&mut out, " }}").map_err(render_err)?;
             }
         }
         writeln!(&mut out, "}}").map_err(render_err)?;
@@ -77,19 +66,40 @@ fn render_flow_d2(flow: &FlowDiagram) -> Result<String> {
         if !node_to_group.contains_key(&node.id) {
             writeln!(
                 &mut out,
-                "{}: {{ shape: {}; label: \"{}\"",
+                "{}: {{ shape: {}; label: \"{}\" }}",
                 node.id,
                 d2_shape_for_node(node.kind),
                 escape_d2(&node.label)
             )
             .map_err(render_err)?;
-            if let Some(color) = &node.style.color {
-                write!(&mut out, "; style.fill: \"{}\"", color.hex).map_err(render_err)?;
+        }
+    }
+        for member in &group.members {
+            let node = flow.nodes.iter().find(|n| &n.id == member);
+            if let Some(n) = node {
+                writeln!(
+                    &mut out,
+                    "  {}: {{ shape: {}; label: \"{}\" }}",
+                    n.id,
+                    d2_shape_for_node(n.kind),
+                    escape_d2(&n.label)
+                )
+                .map_err(render_err)?;
             }
-            if let Some(tooltip) = &node.tooltip {
-                write!(&mut out, "; tooltip: \"{}\"", escape_d2(tooltip)).map_err(render_err)?;
-            }
-            writeln!(&mut out, " }}").map_err(render_err)?;
+        }
+        writeln!(&mut out, "}}").map_err(render_err)?;
+    }
+
+    for node in &flow.nodes {
+        if !node_to_group.contains_key(&node.id) {
+            writeln!(
+                &mut out,
+                "{}: {{ shape: {}; label: \"{}\" }}",
+                node.id,
+                d2_shape_for_node(node.kind),
+                escape_d2(&node.label)
+            )
+            .map_err(render_err)?;
         }
     }
 
@@ -115,24 +125,16 @@ fn render_flow_d2(flow: &FlowDiagram) -> Result<String> {
 
 fn render_sequence_d2(seq: &SequenceDiagram) -> Result<String> {
     let mut out = String::new();
-    writeln!(&mut out, "Flow: {{").map_err(render_err)?;
-    writeln!(&mut out, "  shape: sequence_diagram").map_err(render_err)?;
+    writeln!(&mut out, "shape: sequence_diagram").map_err(render_err)?;
 
     for actor in &seq.actors {
-        writeln!(
-            &mut out,
-            "  {}: {{ label: \"{}\" }}",
-            actor.id,
-            escape_d2(&actor.label)
-        )
-        .map_err(render_err)?;
+        writeln!(&mut out, "{}", actor.id).map_err(render_err)?;
     }
 
     for msg in &seq.messages {
-        render_sequence_msg_d2(&mut out, msg, 2)?;
+        render_sequence_msg_d2(&mut out, msg, 0)?;
     }
 
-    writeln!(&mut out, "}}").map_err(render_err)?;
     Ok(out)
 }
 
@@ -193,42 +195,47 @@ fn render_sequence_msg_d2(out: &mut String, msg: &Message, indent: usize) -> Res
             }
         },
         Message::Fragment { fragment } => {
-            let title = fragment
-                .branches
-                .first()
-                .and_then(|branch| branch.label.as_deref())
-                .or(fragment.label.as_deref())
-                .unwrap_or(fragment_title(fragment.kind));
-            writeln!(
-                out,
-                r#"{pad}{kw} "{title}""#,
-                pad = pad,
-                kw = fragment_keyword(fragment.kind),
-                title = escape_d2(title)
-            )
-            .map_err(render_err)?;
+            let kw = fragment_keyword(fragment.kind);
+            writeln!(out, "{pad}{}: {{", kw).map_err(render_err)?;
             for (i, branch) in fragment.branches.iter().enumerate() {
+                let branch_pad = " ".repeat(indent + 2);
                 if i > 0 {
                     let branch_kw = fragment_branch_keyword(fragment.kind);
                     if let Some(label) = branch.label.as_deref() {
                         writeln!(
                             out,
-                            r#"{pad}{branch_kw} "{label}""#,
+                            r#"{pad}{branch_kw} "{label}": {{"#,
                             pad = pad,
                             branch_kw = branch_kw,
                             label = escape_d2(label)
                         )
                         .map_err(render_err)?;
                     } else {
-                        writeln!(out, "{pad}{branch_kw}", pad = pad, branch_kw = branch_kw)
-                            .map_err(render_err)?;
+                        writeln!(
+                            out,
+                            "{pad}{branch_kw}: {{",
+                            pad = pad,
+                            branch_kw = branch_kw
+                        )
+                        .map_err(render_err)?;
                     }
+                } else if let Some(label) = branch.label.as_deref() {
+                    writeln!(
+                        out,
+                        r#"{branch_pad}{label}: {{"#,
+                        branch_pad = branch_pad,
+                        label = escape_d2(label)
+                    )
+                    .map_err(render_err)?;
+                } else {
+                    writeln!(out, "{}: {{", fragment_title(fragment.kind)).map_err(render_err)?;
                 }
                 for m in &branch.messages {
-                    render_sequence_msg_d2(out, m, indent + 2)?;
+                    render_sequence_msg_d2(out, m, indent + 4)?;
                 }
+                writeln!(out, "{}}}", branch_pad).map_err(render_err)?;
             }
-            writeln!(out, "{pad}end", pad = pad).map_err(render_err)?;
+            writeln!(out, "{}}}", pad).map_err(render_err)?;
         }
         Message::Activate { actor } => {
             writeln!(out, "{pad}activate {actor}", pad = pad, actor = actor).map_err(render_err)?;

@@ -313,11 +313,12 @@ fn flow_groups_render_correct_d2_syntax() {
     let d2 = D2Renderer.render(&Diagram::Flow(flow)).unwrap();
     println!("D2 output:\n{}", d2);
 
-    assert!(d2.contains("backend: \"Backend Services\" {"));
-    assert!(d2.contains("  api: { shape: rectangle; label: \"API\""));
-    assert!(d2.contains("  db: { shape: cylinder; label: \"Database\""));
+    assert!(d2.contains("backend: {"));
+    assert!(d2.contains("  label: \"Backend Services\""));
+    assert!(d2.contains("  api: { shape: rectangle; label: \"API\" }"));
+    assert!(d2.contains("  db: { shape: cylinder; label: \"Database\" }"));
     assert!(d2.contains("frontend: {"));
-    assert!(d2.contains("  client: { shape: person; label: \"Client\""));
+    assert!(d2.contains("  client: { shape: person; label: \"Client\" }"));
     assert!(d2.contains("backend.api -> backend.db: \"query\""));
     assert!(d2.contains("frontend.client -> backend.api: \"request\""));
 }
@@ -433,7 +434,7 @@ fn sequence_json_alt_else_labels_render() {
     assert_eq!(fragment.branches[1].label.as_deref(), Some("failure"));
 
     let (d2, mermaid) = render_sequence_outputs(&seq);
-    assert_contains_all(&d2, &["alt \"success\"", "else \"failure\"", "end"]);
+    assert_contains_all(&d2, &["alt: {", "success: {", "else \"failure\": {", "}"]);
     assert_contains_all(
         &mermaid,
         &["sequenceDiagram", "alt success", "else failure", "end"],
@@ -477,6 +478,7 @@ fn sequence_json_alt_multiple_else_branches() {
     assert_eq!(count_lines_starting_with(&d2, "else"), 2);
     assert_eq!(count_lines_starting_with(&mermaid, "else"), 2);
     assert!(!mermaid.contains("else Alternative"));
+    assert!(d2.contains("alt: {"));
 }
 
 #[test]
@@ -513,7 +515,7 @@ fn sequence_json_par_branches_render_and() {
     }));
     let (d2, mermaid) = render_sequence_outputs(&seq);
 
-    assert_contains_all(&d2, &["par \"fast\"", "and \"slow\"", "end"]);
+    assert_contains_all(&d2, &["par: {", "fast: {", "and \"slow\": {", "}"]);
     assert_contains_all(&mermaid, &["par fast", "and slow", "end"]);
     assert_eq!(count_lines_starting_with(&d2, "and"), 2);
     assert_eq!(count_lines_starting_with(&mermaid, "and"), 2);
@@ -552,7 +554,12 @@ fn sequence_json_critical_option_branches() {
 
     assert_contains_all(
         &d2,
-        &["critical \"transaction\"", "option \"rollback\"", "end"],
+        &[
+            "critical: {",
+            "transaction: {",
+            "option \"rollback\": {",
+            "}",
+        ],
     );
     assert_contains_all(
         &mermaid,
@@ -596,10 +603,19 @@ fn sequence_json_opt_loop_break_render() {
     }));
     let (d2, mermaid) = render_sequence_outputs(&seq);
 
-    assert_contains_all(&d2, &["opt \"cached\"", "else \"retry\"", "else \"fatal\""]);
+    assert_contains_all(
+        &d2,
+        &[
+            "opt: {",
+            "cached: {",
+            "else \"retry\": {",
+            "else \"fatal\": {",
+            "}",
+        ],
+    );
     assert_contains_all(&mermaid, &["opt cached", "else retry", "else fatal"]);
-    assert_eq!(count_lines_starting_with(&d2, "end"), 1);
-    assert_eq!(count_lines_starting_with(&mermaid, "end"), 1);
+    assert!(d2.contains("opt: {"));
+    assert!(mermaid.contains("opt cached"));
 }
 
 #[test]

@@ -106,7 +106,7 @@ impl std::fmt::Display for SelectedAgent {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FeedbackContext {
     pub feedback_id: Option<String>,
-    pub task_id: String,
+    pub task_id: Option<String>,
     pub file_path: Option<String>,
     pub line_number: Option<u32>,
     pub side: Option<crate::domain::FeedbackSide>,
@@ -363,5 +363,13 @@ impl AppState {
         }
 
         grouped
+    }
+
+    pub fn unassigned_feedbacks(&self) -> Vec<&crate::domain::Feedback> {
+        self.domain
+            .feedbacks
+            .iter()
+            .filter(|f| f.task_id.is_none())
+            .collect()
     }
 }

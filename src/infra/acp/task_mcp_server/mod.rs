@@ -4,8 +4,8 @@
 //! It also supports legacy bulk tools for backward compatibility.
 //! The server runs over stdio so the ACP agent can launch it as an MCP server.
 
-mod comment_ingest;
 mod config;
+mod feedback_ingest;
 mod logging;
 mod parsing;
 mod persistence;

@@ -1,15 +1,40 @@
 use super::config::ServerConfig;
+use super::logging::log_to_file;
 use super::parsing::parse_task;
 use super::run_context::RunContext;
-use crate::domain::ReviewTask;
+use crate::domain::{DiffRef, HunkRef, ReviewTask};
 use crate::infra::db::{Database, ReviewRepository, TaskRepository};
 use crate::infra::diff::index::DiffIndex;
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use chrono::Utc;
 use serde_json::Value;
+use std::collections::HashMap;
 
 /// Validate raw hunk objects before parsing so we fail fast on malformed payloads.
-fn validate_raw_task_hunks(raw_task: &Value) -> Result<()> {
+fn validate_raw_task_hunks(raw_task: &Value, diff_index: &DiffIndex) -> Result<()> {
+    // Validate hunk_ids format if present and validate they exist
+    if let Some(hunk_ids) = raw_task.get("hunk_ids").and_then(|v| v.as_array()) {
+        for hunk_id in hunk_ids {
+            let hunk_id_str = hunk_id.as_str().ok_or_else(|| {
+                anyhow::anyhow!("hunk_ids must contain strings, got: {}", hunk_id)
+            })?;
+            if !hunk_id_str.contains('#') {
+                anyhow::bail!(
+                    "hunk_id '{}' must contain '#' separator. Format: 'path/to/file#H1'",
+                    hunk_id_str
+                );
+            }
+            // Validate hunk exists in diff index
+            if diff_index.get_hunk_coords(hunk_id_str).is_none() {
+                anyhow::bail!(
+                    "hunk_id '{}' does not exist in the diff manifest. Check the hunk manifest above for valid hunk IDs (format: 'path/to/file#H1').",
+                    hunk_id_str
+                );
+            }
+        }
+    }
+
+    // Validate diff_refs format if present (legacy support)
     let diff_refs = match raw_task.get("diff_refs").and_then(|v| v.as_array()) {
         Some(diff_refs) => diff_refs,
         None => return Ok(()),
@@ -42,10 +67,13 @@ fn validate_raw_task_hunks(raw_task: &Value) -> Result<()> {
     Ok(())
 }
 
-fn validate_task_diff_refs(task: &ReviewTask, diff_index: &DiffIndex) -> Result<()> {
+fn validate_task_references(task: &ReviewTask, diff_index: &DiffIndex) -> Result<()> {
     if task.diff_refs.is_empty() {
         anyhow::bail!(
-            "Task {} missing diff_refs. Use hunk_manifest_json to populate diff_refs.",
+            "Task {} is missing diff references. The task must have either:\n\
+             - diff_refs: [file path and hunk coordinates], OR\n\
+             - hunk_ids: ['path/to/file#H1'] referencing hunks from the manifest.\n\
+             If sending hunk_ids, they will be automatically converted to diff_refs.",
             task.id
         );
     }
@@ -86,6 +114,34 @@ fn validate_task_diff_refs(task: &ReviewTask, diff_index: &DiffIndex) -> Result<
     Ok(())
 }
 
+fn convert_hunk_ids_to_diff_refs(
+    diff_index: &DiffIndex,
+    hunk_ids: &[String],
+    task_id: &str,
+) -> Result<Vec<DiffRef>> {
+    let mut hunks_by_file: HashMap<String, Vec<HunkRef>> = HashMap::new();
+
+    for hunk_id in hunk_ids {
+        let coords = diff_index
+            .get_hunk_coords(hunk_id)
+            .ok_or_else(|| anyhow!("Task {} references invalid hunk_id '{}'.", task_id, hunk_id))?;
+
+        let (file_path, _) = diff_index
+            .parse_hunk_id(hunk_id)
+            .ok_or_else(|| anyhow!("Invalid hunk_id format: {}", hunk_id))?;
+
+        hunks_by_file.entry(file_path).or_default().push(coords);
+    }
+
+    let mut diff_refs: Vec<DiffRef> = hunks_by_file
+        .into_iter()
+        .map(|(file, hunks)| DiffRef { file, hunks })
+        .collect();
+
+    diff_refs.sort_by(|a, b| a.file.cmp(&b.file));
+    Ok(diff_refs)
+}
+
 fn validate_task_diagram(task: &ReviewTask) -> Result<()> {
     let has_diagram = task
         .diagram
@@ -116,10 +172,23 @@ pub(super) fn open_database(config: &ServerConfig) -> Result<Database> {
 
 pub(super) fn save_task(config: &ServerConfig, raw_task: Value) -> Result<ReviewTask> {
     let ctx = load_run_context(config);
+    let diff_index = DiffIndex::new(&ctx.diff_text)?;
+
+    // Log raw task for debugging
+    let raw_task_str = raw_task.to_string();
+    let raw_task_preview = if raw_task_str.len() > 200 {
+        format!("{}... (truncated)", &raw_task_str[..200])
+    } else {
+        raw_task_str
+    };
+    log_to_file(
+        config,
+        &format!("save_task received raw_task: {}", raw_task_preview),
+    );
 
     // Verify the structural integrity of hunk data before proceeding with
     // database operations. This prevents storing malformed or incomplete tasks.
-    validate_raw_task_hunks(&raw_task)?;
+    validate_raw_task_hunks(&raw_task, &diff_index)?;
 
     let db = open_database(config)?;
     let conn = db.connection();
@@ -171,11 +240,39 @@ pub(super) fn save_task(config: &ServerConfig, raw_task: Value) -> Result<Review
         .save(&review_run)
         .with_context(|| format!("save review run {}", ctx.run_id))?;
 
+    // Convert hunk_ids to diff_refs if present and diff_refs is empty
+    let raw_task = if raw_task.get("hunk_ids").is_some() && raw_task.get("diff_refs").is_none() {
+        let diff_index = DiffIndex::new(&ctx.diff_text)?;
+        let hunk_ids: Option<Vec<String>> = raw_task
+            .get("hunk_ids")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            });
+
+        if let Some(hunk_ids) = hunk_ids {
+            if !hunk_ids.is_empty() {
+                let diff_refs = convert_hunk_ids_to_diff_refs(&diff_index, &hunk_ids, "task")?;
+                let mut updated = raw_task;
+                updated["diff_refs"] = serde_json::to_value(&diff_refs)?;
+                updated
+            } else {
+                raw_task
+            }
+        } else {
+            raw_task
+        }
+    } else {
+        raw_task
+    };
+
     let mut task = parse_task(raw_task.clone())?;
     task.run_id = ctx.run_id.clone();
 
     let diff_index = DiffIndex::new(&ctx.diff_text)?;
-    validate_task_diff_refs(&task, &diff_index)?;
+    validate_task_references(&task, &diff_index)?;
     validate_task_diagram(&task)?;
 
     // Always set files from the provided diff_refs
@@ -303,16 +400,47 @@ mod tests {
 
     #[test]
     fn test_validate_raw_task_hunks_invalid() {
+        let diff = r#"diff --git a/src/main.rs b/src/main.rs
+index 1234567..89abcdef 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -1,3 +1,4 @@
+ fn main() {
++    println!("hello");
+     println!("world");
+ }
+"#;
+        let diff_index = DiffIndex::new(diff).unwrap();
+
+        // Valid hunk_id that exists in the diff (uses original path with /)
+        let raw = json!({
+            "hunk_ids": ["src/main.rs#H1"]
+        });
+        assert!(validate_raw_task_hunks(&raw, &diff_index).is_ok());
+
+        // Invalid format (no #)
+        let raw = json!({
+            "hunk_ids": ["invalid"]
+        });
+        assert!(validate_raw_task_hunks(&raw, &diff_index).is_err());
+
+        // Non-existent hunk
+        let raw = json!({
+            "hunk_ids": ["src/main.rs#H99"]
+        });
+        assert!(validate_raw_task_hunks(&raw, &diff_index).is_err());
+
+        // Invalid diff_refs structure
         let raw = json!({
             "diff_refs": [
                 { "file": "a.rs", "hunks": [ { "old_start": 1 } ] }
             ]
         });
-        assert!(validate_raw_task_hunks(&raw).is_err());
+        assert!(validate_raw_task_hunks(&raw, &diff_index).is_err());
     }
 
     #[test]
-    fn test_validate_task_diff_refs_prefixes() {
+    fn test_validate_task_references_prefixes() {
         let diff_index = DiffIndex::new("").unwrap();
         let mut task = ReviewTask {
             id: "t1".into(),
@@ -332,9 +460,9 @@ mod tests {
             sub_flow: None,
         };
         // Should bail because of a/ prefix
-        assert!(validate_task_diff_refs(&task, &diff_index).is_err());
+        assert!(validate_task_references(&task, &diff_index).is_err());
 
         task.diff_refs[0].file = "b/b.rs".into();
-        assert!(validate_task_diff_refs(&task, &diff_index).is_err());
+        assert!(validate_task_references(&task, &diff_index).is_err());
     }
 }

@@ -96,12 +96,12 @@ mod policy_tests {
         let run = sample_run(diff);
         let prompt = crate::infra::acp::task_generator::prompt::build_prompt(&run, None).unwrap();
         assert!(prompt.contains("You do NOT have repository access."));
-        assert!(
-            prompt.contains("Use `return_task` to submit each task individually during analysis")
-        );
-        assert!(
-            prompt.contains("Use `finalize_review` to submit the final review title and summary")
-        );
+        assert!(prompt.contains(
+            "Use `lareview-tasks_return_task` to submit each task individually during analysis"
+        ));
+        assert!(prompt.contains(
+            "Use `lareview-tasks_finalize_review` to submit the final review title and summary"
+        ));
         assert!(!prompt.contains("You have READ-ONLY access"));
     }
 
@@ -194,7 +194,7 @@ mod policy_tests {
                 "title": "Test Task",
                 "description": "Test task description",
                 "stats": { "risk": "LOW", "tags": ["test"] },
-                "diff_refs": []
+                "hunk_ids": []
             }));
         let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
         let options = vec![agent_client_protocol::PermissionOption::new(
@@ -234,7 +234,7 @@ mod policy_tests {
                     "title": "Wrapped Task",
                     "description": "Test task description",
                     "stats": { "risk": "LOW", "tags": ["test"] },
-                    "diff_refs": []
+                    "hunk_ids": []
                 }
             }));
         let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);

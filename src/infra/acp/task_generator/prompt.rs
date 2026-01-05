@@ -12,15 +12,11 @@ pub(super) fn build_prompt(
     let has_repo_access = repo_root.is_some();
     let source_json = serde_json::to_string(&run.source).unwrap_or_default();
 
-    // Generate a hunk manifest to help agents accurately reference hunks
-    let (hunk_manifest, hunk_manifest_json) =
-        match crate::infra::diff::index::DiffIndex::new(&run.diff_text) {
-            Ok(index) => (
-                index.generate_hunk_manifest(),
-                index.generate_hunk_manifest_json(),
-            ),
-            Err(_) => (String::new(), String::new()),
-        };
+    // Generate unified manifest for agents (replaces all previous manifest formats)
+    let unified_manifest = match crate::infra::diff::index::DiffIndex::new(&run.diff_text) {
+        Ok(index) => index.generate_unified_manifest(),
+        Err(_) => String::new(),
+    };
 
     prompts::render(
         "generate_tasks",
@@ -29,8 +25,7 @@ pub(super) fn build_prompt(
             "source_json": source_json,
             "initial_title": run.initial_title,
             "diff": run.diff_text,
-            "hunk_manifest": hunk_manifest,
-            "hunk_manifest_json": hunk_manifest_json,
+            "unified_manifest": unified_manifest,
             "has_repo_access": has_repo_access,
             "repo_root": repo_root.map(|p| p.display().to_string()),
             "repo_access_note": if has_repo_access { "read-only" } else { "none" }
@@ -73,15 +68,7 @@ pub(super) fn build_client_capabilities(has_repo_access: bool) -> ClientCapabili
                         "insight": "string",
                         "diagram": "object (required diagram JSON)",
                         "sub_flow": "string (optional grouping)",
-                        "diff_refs": [{
-                            "file": "string",
-                            "hunks": [{
-                                "old_start": "number",
-                                "old_lines": "number",
-                                "new_start": "number",
-                                "new_lines": "number"
-                            }]
-                        }]
+                        "hunk_ids": ["string (e.g., 'src/main.rs#H1')"]
                     }
                 }),
             ),

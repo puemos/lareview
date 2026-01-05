@@ -1,5 +1,5 @@
-use super::comment_ingest::save_agent_comment;
 use super::config::ServerConfig;
+use super::feedback_ingest::save_agent_comment;
 use super::logging::log_to_file;
 use super::task_ingest::{save_task, update_review_metadata};
 use grep::{
@@ -239,7 +239,21 @@ pub(super) fn create_add_feedback_tool(config: Arc<ServerConfig>) -> impl ToolHa
     })
     .with_description(
         "Add a specific, inline feedback on a file line. Use this for targeted feedback (nitpicks, questions, suggestions) \
-         that doesn't warrant a full task. Requires file, line, body. Optional title, impact, task_id.",
+         that doesn't warrant a full task.\n\n\
+         **Preferred format (use this):**\n\
+         - hunk_id: 'path/to/file#H1' (copy from hunk manifest)\n\
+         - line_content: EXACTLY ONE LINE from the hunk manifest (e.g., '+    readonly playlistId: string | undefined,')\n\
+         - body: The comment content (Markdown supported)\n\
+         - Optional: title, impact, task_id\n\n\
+         **Legacy format:**\n\
+         - file: Path to the file relative to repo root\n\
+         - line: Line number where the comment applies\n\
+         - side: 'old' or 'new' (default: new)\n\n\
+         **Examples (CORRECT):**\n\
+         { \"hunk_id\": \"src/entities/job.ts#H1\", \"line_content\": \"+    readonly playlistId: string | undefined,\", \"body\": \"Consider adding a default value.\" }\n\
+         { \"hunk_id\": \"src/controllers/storage.ts#H2\", \"line_content\": \"  action$.pipe(\", \"body\": \"Nice use of rxjs operators!\" }\n\n\
+         **Examples (INCORRECT - will fail):**\n\
+         { \"hunk_id\": \"src/job.ts#H1\", \"line_content\": \"export class Job {\\n  constructor(\\n    readonly id: string,\", ... } (multi-line)",
     )
     .with_schema(add_feedback_schema())
 }
@@ -648,37 +662,12 @@ fn single_task_schema() -> Value {
                     }
                 },
                 "required": ["risk", "tags"],
-                "description": "Risk and tags for this task. Additions, deletions, and files are computed from diff_refs."
+                "description": "Risk and tags for this task. Additions, deletions, and files are computed from hunk_ids."
             },
-            "diff_refs": {
+            "hunk_ids": {
                 "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "file": {
-                            "type": "string",
-                            "description": "File path in the diff (no a/ or b/ prefixes)"
-                        },
-                        "hunks": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "old_start": {"type": "integer"},
-                                    "old_lines": {"type": "integer"},
-                                    "new_start": {"type": "integer"},
-                                    "new_lines": {"type": "integer"}
-                                },
-                                "required": ["old_start", "old_lines", "new_start", "new_lines"],
-                                "description": "Hunk coordinates: (old_start, old_lines, new_start, new_lines)"
-                            },
-                            "description": "Hunk references: numeric coordinates, or empty array to select all hunks in the file"
-                        }
-                    },
-                    "required": ["file", "hunks"],
-                    "description": "Reference to specific hunks in the diff."
-                },
-                "description": "Array of references to specific hunks in the canonical diff. Each ref points to a specific file and range of lines."
+                "items": { "type": "string" },
+                "description": "Array of hunk IDs referencing specific code sections. Format: 'path/to/file#H1' (e.g., 'src/auth.rs#H3'). Copy these directly from the hunk manifest above."
             },
             "sub_flow": {
                 "type": "string",
@@ -689,7 +678,7 @@ fn single_task_schema() -> Value {
                 "description": "REQUIRED: diagram JSON object describing the flow, sequence, architecture, or data model. Must be valid JSON matching the diagram schema (type/data/messages)."
             }
         },
-        "required": ["id", "title", "description", "stats", "diff_refs", "diagram"]
+        "required": ["id", "title", "description", "stats", "hunk_ids", "diagram"]
     })
 }
 
@@ -785,13 +774,21 @@ fn add_feedback_schema() -> Value {
     json!({
         "type": "object",
         "properties": {
+            "hunk_id": {
+                "type": "string",
+                "description": "The hunk ID from the manifest (e.g., 'src/auth.rs#H1'). Preferred over file+line."
+            },
+            "line_content": {
+                "type": "string",
+                "description": "The EXACT line content to comment on. MUST be a single line only - copy exactly from hunk manifest including whitespace. Do NOT include code blocks or multiple lines."
+            },
             "file": {
                 "type": "string",
-                "description": "Path to the file relative to repo root."
+                "description": "Path to the file relative to repo root. (Legacy format - prefer hunk_id)."
             },
             "line": {
                 "type": "integer",
-                "description": "Line number where the comment applies."
+                "description": "Line number where the comment applies. (Legacy format - prefer hunk_id + line_content)."
             },
             "side": {
                 "type": "string",
@@ -816,7 +813,7 @@ fn add_feedback_schema() -> Value {
                 "description": "Optional: Link this comment to a specific task ID."
             }
         },
-        "required": ["file", "line", "body"]
+        "required": ["body"]
     })
 }
 
