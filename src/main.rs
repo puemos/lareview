@@ -91,10 +91,10 @@ fn main() -> Result<(), eframe::Error> {
         .and_then(|bytes| eframe::icon_data::from_png_bytes(bytes).ok());
 
     let mut viewport = egui::ViewportBuilder::default()
-        .with_inner_size([1200.0, 800.0])
+        .with_inner_size([1400.0, 787.5])
         .with_titlebar_shown(false)
         .with_title("LaReview")
-        .with_fullsize_content_view(true)
+        .with_fullsize_content_view(false)
         .with_title_shown(false);
 
     if let Some(icon) = icon {
