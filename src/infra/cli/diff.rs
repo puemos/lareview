@@ -1,7 +1,7 @@
 //! Diff acquisition from various sources.
 
 use anyhow::{Context, Result};
-use std::io::Read;
+use std::io::{IsTerminal, Read};
 use std::process::Command;
 
 /// Source of diff input
@@ -70,7 +70,7 @@ pub fn parse_pr_ref(pr_ref: &str) -> Result<(String, String, u32)> {
 /// Try to read diff from stdin (non-destructive check)
 /// Returns Some(diff) if stdin has content, None otherwise
 pub fn try_read_stdin_diff() -> Result<Option<String>> {
-    if atty::is(atty::Stream::Stdin) {
+    if std::io::stdin().is_terminal() {
         return Ok(None);
     }
 
