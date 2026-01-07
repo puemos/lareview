@@ -6,6 +6,7 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use log::{error, info};
+#[cfg(feature = "dev-tools")]
 use std::process::{Command, Stdio};
 
 use lareview::infra;
@@ -395,6 +396,9 @@ fn run_gui(initial_req: Option<DiffRequest>, initial_pending: Option<PendingDiff
             lareview::commands::clear_pending_diff,
             lareview::commands::get_diff_request,
             lareview::commands::acquire_diff_from_request,
+            lareview::commands::push_github_review,
+            lareview::commands::export_review_markdown,
+            lareview::commands::push_github_feedback,
         ])
         .run(tauri::generate_context!())
         .map_err(|e| anyhow::anyhow!("{}", e))

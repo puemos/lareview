@@ -217,6 +217,7 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks }) => 
       </div>
       <div className="flex-1 overflow-hidden">
         <DiffEditor
+          key={path}
           height="100%"
           language={language}
           theme="lareview-dark"

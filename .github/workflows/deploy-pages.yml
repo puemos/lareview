@@ -33,7 +33,7 @@ jobs:
           version: "9"
 
       - name: Install landing dependencies
-        working-directory: _landing
+        working-directory: landing
         run: pnpm install --no-frozen-lockfile
 
       - name: Build landing site

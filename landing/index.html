@@ -11,14 +11,14 @@
             href="./assets/logo/favicon.svg"
         />
 
-        <meta name="description" content="LaReview transforms code diffs into AI-powered review checklists. Open source tool supporting Claude, OpenCode, Gemini, and more. Free forever.">
+        <meta name="description" content="LaReview transforms code diffs into simple to follow review checklists. Open source tool supporting Claude, OpenCode, Gemini, and more. Free forever.">
         <meta name="robots" content="index, follow">
         <link rel="canonical" href="https://lareview.dev/">
         <meta name="theme-color" content="#EBE6DE">
 
         <!-- Open Graph -->
-        <meta property="og:title" content="LaReview: AI-Powered Code Review Checklist Tool">
-        <meta property="og:description" content="Stop doom-scrolling through diffs. LaReview uses your local AI agent to generate structured review plans. Free & open source.">
+        <meta property="og:title" content="LaReview: Do Better Code Reviews">
+        <meta property="og:description" content="Stop doom-scrolling through diffs. LaReview uses your local AI agent to generate structured review tasks. Free & open source.">
         <meta property="og:type" content="website">
         <meta property="og:url" content="https://lareview.dev/">
         <meta property="og:image" content="./assets/og-image.png">
@@ -28,7 +28,7 @@
         <meta name="twitter:card" content="summary_large_image">
         <meta name="twitter:site" content="@puemos">
         <meta name="twitter:title" content="LaReview: It's good for your code reviews">
-        <meta name="twitter:description" content="Turn diffs into structured review checklists with local-first AI. Supports Claude, OpenCode, Gemini, and more.">
+        <meta name="twitter:description" content="Turn diffs into structured review tasks with local-first AI. Supports Claude, OpenCode, Gemini, and more.">
         <meta name="twitter:image" content="./assets/og-image.png">
 
         <!-- Structured Data -->
@@ -38,13 +38,13 @@
           "@type": "SoftwareApplication",
           "name": "LaReview",
           "applicationCategory": "DeveloperApplication",
-          "operatingSystem": "macOS, Linux, Windows",
+          "operatingSystem": "macOS, Linux",
           "offers": {
             "@type": "Offer",
             "price": "0",
             "priceCurrency": "USD"
           },
-          "description": "AI-powered code review tool that transforms diffs into structured review checklists using local coding agents.",
+          "description": "Code review tool that transforms diffs into structured review tasks using local coding agents.",
           "featureList": [
             "AI-powered planning",
             "Task-focused diffs",
@@ -133,9 +133,9 @@
                 </h1>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-12 border-b border-theme">
+            <div class="flex flex-col lg:flex-row lg:items-stretch border-b border-theme">
                 <div
-                    class="lg:col-span-5 border-r-0 lg:border-r border-theme p-8 flex flex-col justify-between relative"
+                    class="lg:w-[41.666667%] border-r-0 lg:border-r border-theme p-8 flex flex-col justify-between relative"
                 >
                     <div>
                         <h2
@@ -184,24 +184,26 @@
                 </div>
 
                 <div
-                    class="lg:col-span-7 relative bg-neutral-200 overflow-hidden"
+                    class="lg:w-[58.333333%] relative overflow-hidden flex items-center justify-center"
                 >
-                    <video
-                        autoplay
-                        loop
-                        muted
-                        playsinline
-                        preload="metadata"
-                        poster="./assets/screenshots/review.webp"
-                        class="w-full object-cover"
-                        aria-label="LaReview demo video showing the code review workflow"
-                    >
-                        <source
-                            src="./assets/video/demo.mp4"
-                            type="video/mp4"
-                        />
-                        Your browser does not support the video tag.
-                    </video>
+                    <div class="w-full aspect-video bg-neutral-200 overflow-hidden">
+                        <video
+                            autoplay
+                            loop
+                            muted
+                            playsinline
+                            preload="metadata"
+                            poster="./assets/screenshots/review.webp"
+                            class="w-full h-full object-cover"
+                            aria-label="LaReview demo video showing the code review workflow"
+                        >
+                            <source
+                                src="./assets/video/demo.mp4"
+                                type="video/mp4"
+                            />
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
                 </div>
             </div>
         </header>
@@ -367,7 +369,7 @@
                         <img
                             src="./assets/screenshots/generate.webp"
                             alt="LaReview's AI planning interface showing a generated review checklist"
-                            class="w-full"
+                            class="w-full cursor-zoom-in lightbox-trigger"
                             loading="lazy"
                             decoding="async"
                         />
@@ -397,7 +399,7 @@
                         <img
                             src="./assets/screenshots/review-changes.webp"
                             alt="Task-focused diff viewer isolating relevant code hunks for step-by-step review"
-                            class="w-full"
+                            class="w-full cursor-zoom-in lightbox-trigger"
                             loading="lazy"
                             decoding="async"
                         />
@@ -425,9 +427,7 @@
                         <img
                             src="./assets/screenshots/review-feedback-item.webp"
                             alt="AI feedback threads anchored to specific lines of code for contextual review"
-                            class="w-full"
-                            loading="lazy"
-                            decoding="async"
+                            class="w-full cursor-zoom-in lightbox-trigger"
                         />
                     </div>
                 </div>
@@ -453,7 +453,7 @@
                         <img
                             src="./assets/screenshots/repos.webp"
                             alt="Repository linking interface providing local context for deeper code insights"
-                            class="w-full"
+                            class="w-full cursor-zoom-in lightbox-trigger"
                             loading="lazy"
                             decoding="async"
                         />
@@ -480,7 +480,7 @@
                         <img
                             src="./assets/screenshots/export-github.webp"
                             alt="GitHub PR review submission with auto-generated summary and feedback threads"
-                            class="w-full"
+                            class="w-full cursor-zoom-in lightbox-trigger"
                             loading="lazy"
                             decoding="async"
                         />
@@ -565,9 +565,9 @@
                     </div>
                     <div class="mt-8 border border-theme p-2 bg-stone-200">
                         <img
-                            src="./assets/screenshots/export-markdown.webp"
+                            src="./assets/screenshots/export-github.webp"
                             alt="Markdown export preview with diagrams, code insights, and structured review summary"
-                            class="w-full"
+                            class="w-full cursor-zoom-in lightbox-trigger"
                             loading="lazy"
                             decoding="async"
                         />
@@ -674,11 +674,11 @@
                     <a
                         href="https://github.com/puemos/lareview/releases"
                         class="flex items-center hover:-translate-y-1 transition-transform justify-center gap-2 bg-transparent text-velura-dark px-10 py-5 text-sm font-bold tracking-widest border border-theme"
-                        aria-label="Download LaReview for Linux and Windows"
+                        aria-label="Download LaReview for macOS and Linux"
                     >
-                        <i class="ph-bold ph-linux-logo text-lg"></i>
-                        <i class="ph-bold ph-windows-logo text-lg"></i> Linux /
-                        Windows
+                        <i class="ph-bold ph-apple-logo text-lg"></i>
+                        <i class="ph-bold ph-linux-logo text-lg"></i> macOS /
+                        Linux
                     </a>
                 </div>
                 <div class="mt-4 font-mono text-xs text-velura-gray">
@@ -692,7 +692,7 @@
         <footer
             role="contentinfo"
             aria-label="Site footer"
-            class="py-12 px-8 flex flex-col md:flex-row justify-between items-end gap-8"
+            class="py-12 px-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-8"
         >
             <div>
                 <div class="flex items-center gap-2 mb-4">
@@ -701,7 +701,7 @@
                         alt="LaReview logo"
                         class="h-7 w-7"
                     />
-                    <h3 class="font-display text-2xl font-bold">LaReview</h3>
+                    <h3 class="hidden md:block font-display text-2xl font-bold">LaReview</h3>
                 </div>
                 <div class="flex flex-col gap-2 text-sm text-velura-gray">
                     <a
@@ -722,7 +722,7 @@
                 </div>
             </div>
 
-            <div class="text-right">
+            <div class="text-left md:text-right">
                 <p class="text-xs font-mono text-velura-gray uppercase">
                     &copy; 2025 LaReview. Open Source.<br />
                     Designed with fun-first principles.
@@ -730,5 +730,67 @@
             </div>
         </footer>
     </main>
+
+    <!-- Lightbox -->
+    <div id="lightbox" class="fixed inset-0 z-[100] hidden bg-black/90 cursor-zoom-out p-4 md:p-10 flex items-center justify-center opacity-0 transition-opacity duration-300" aria-hidden="true">
+        <img id="lightbox-img" src="" alt="Enlarged screenshot" class="max-w-full max-h-full w-auto h-auto object-contain shadow-2xl rounded-sm transform scale-95 transition-transform duration-300 select-none">
+        <button id="lightbox-close" class="absolute top-4 right-4 text-white hover:text-gray-300 focus:outline-none p-2" aria-label="Close lightbox">
+            <i class="ph-bold ph-x text-3xl"></i>
+        </button>
+    </div>
+
+    <script>
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = document.getElementById('lightbox-img');
+        const closeBtn = document.getElementById('lightbox-close');
+        // Select all elements with the 'lightbox-trigger' class
+        // This ensures distinct handling and future-proofing
+        const triggers = document.querySelectorAll('.lightbox-trigger');
+
+        function openLightbox(src) {
+            lightboxImg.src = src;
+            lightbox.classList.remove('hidden');
+            // Small delay to allow display:block to apply before opacity transition
+            setTimeout(() => {
+                lightbox.classList.remove('opacity-0');
+                lightboxImg.classList.remove('scale-95');
+                lightboxImg.classList.add('scale-100');
+            }, 10);
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeLightbox() {
+            lightbox.classList.add('opacity-0');
+            lightboxImg.classList.remove('scale-100');
+            lightboxImg.classList.add('scale-95');
+            setTimeout(() => {
+                lightbox.classList.add('hidden');
+                lightboxImg.src = '';
+            }, 300);
+            document.body.style.overflow = '';
+        }
+
+        triggers.forEach(trigger => {
+            trigger.addEventListener('click', (e) => {
+                e.preventDefault(); // Prevent any default link behavior if applicable
+                openLightbox(e.currentTarget.src);
+            });
+        });
+
+        closeBtn.addEventListener('click', closeLightbox);
+
+        lightbox.addEventListener('click', (e) => {
+            if (e.target !== lightboxImg) {
+                closeLightbox();
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !lightbox.classList.contains('hidden')) {
+                closeLightbox();
+            }
+        });
+    </script>
+
     </body>
 </html>

@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "build": "pnpm run build:css && pnpm run build:dist",
+    "serve": "pnpx serve ./dist",
     "build:css": "mkdir -p ./styles && tailwindcss -c ./tailwind.config.js -i ./landing.css -o ./styles/landing.css --minify",
     "build:dist": "rm -rf ./dist && mkdir -p ./dist/styles && cp ./index.html ./dist/index.html && cp -R ../assets ./dist/assets && cp ./styles/landing.css ./dist/styles/landing.css",
     "dev": "pnpm run dev:dist && concurrently -k -n \"css,copy\" \"tailwindcss -c ./tailwind.config.js -i ./landing.css -o ./dist/styles/landing.css --watch\" \"chokidar './index.html' '../assets/**/*' -c 'pnpm run dev:dist'\"",
