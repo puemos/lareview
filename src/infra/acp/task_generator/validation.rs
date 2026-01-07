@@ -35,35 +35,32 @@ pub(super) fn validate_tasks_payload(
     let diff_index = DiffIndex::new(diff_text)?;
     let mut warnings = Vec::new();
 
-    if let Some(payload) = raw_payload {
-        if let Some(tasks_array) = payload.get("tasks").and_then(|t| t.as_array()) {
-            for (task_idx, task_val) in tasks_array.iter().enumerate() {
-                if let Some(hunk_ids_val) = task_val.get("hunk_ids") {
-                    if let Some(hunk_ids_array) = hunk_ids_val.as_array() {
-                        let task_id_str = task_val
-                            .get("id")
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string())
-                            .unwrap_or_else(|| format!("task_{}", task_idx));
+    if let Some(payload) = raw_payload
+        && let Some(tasks_array) = payload.get("tasks").and_then(|t| t.as_array())
+    {
+        for (task_idx, task_val) in tasks_array.iter().enumerate() {
+            if let Some(hunk_ids_val) = task_val.get("hunk_ids")
+                && let Some(hunk_ids_array) = hunk_ids_val.as_array()
+            {
+                let task_id_str = task_val
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| format!("task_{}", task_idx));
 
-                        warnings.push(format!(
-                            "Task {} uses new hunk_ids format. Converting to diff_refs automatically.",
-                            task_id_str
-                        ));
+                warnings.push(format!(
+                    "Task {} uses new hunk_ids format. Converting to diff_refs automatically.",
+                    task_id_str
+                ));
 
-                        let diff_refs = convert_hunk_ids_to_diff_refs(
-                            &diff_index,
-                            hunk_ids_array,
-                            &task_id_str,
-                        )?;
-                        warnings.push(format!(
-                            "Task {}: converted {} hunk_ids to {} diff_refs",
-                            task_id_str,
-                            hunk_ids_array.len(),
-                            diff_refs.len()
-                        ));
-                    }
-                }
+                let diff_refs =
+                    convert_hunk_ids_to_diff_refs(&diff_index, hunk_ids_array, &task_id_str)?;
+                warnings.push(format!(
+                    "Task {}: converted {} hunk_ids to {} diff_refs",
+                    task_id_str,
+                    hunk_ids_array.len(),
+                    diff_refs.len()
+                ));
             }
         }
     }

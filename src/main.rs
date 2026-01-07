@@ -1,122 +1,401 @@
-#![allow(unexpected_cfgs)]
-//! Main entry point for the LaReview application
-//! Initializes the egui application framework and sets up the Tokio runtime.
+#![cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
 
-use eframe::egui;
-use lareview::{self, assets, infra, ui};
+use anyhow::{Context, Result};
+use clap::{Parser, Subcommand};
+use log::{error, info};
+use std::process::{Command, Stdio};
 
-/// Main entry point for the LaReview application
-/// Sets up the Tokio runtime and initializes the egui UI framework
-fn main() -> Result<(), eframe::Error> {
-    let args: Vec<String> = std::env::args().collect();
-    if args.iter().any(|arg| arg == "--printenv") {
-        infra::shell::print_env_for_capture();
-        return Ok(());
+use lareview::infra;
+use lareview::infra::cli::diff::{self, read_stdin_diff};
+use lareview::infra::cli::repo::detect_git_repo;
+use lareview::state::{AppState, DiffRequest, PendingDiff};
+use tauri::{Emitter, Manager};
+
+#[derive(Parser, Debug)]
+#[command(name = "lareview")]
+#[command(author = "LaReview Team")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
+#[command(about = "LaReview - Better Code Reviews", long_about = None)]
+struct Args {
+    /// Agent to use for review (claude, codex, qwen, etc.)
+    #[arg(short, long)]
+    agent: Option<String>,
+
+    /// Branch, tag, or commit to diff from
+    #[arg()]
+    from: Option<String>,
+
+    /// Branch, tag, or commit to diff to (requires --from)
+    #[arg()]
+    to: Option<String>,
+
+    /// PR reference (owner/repo#number or URL)
+    #[arg(short, long)]
+    pr: Option<String>,
+
+    /// Review uncommitted changes
+    #[arg(long)]
+    status: bool,
+
+    /// Open with pre-loaded diff from stdin
+    #[arg(long)]
+    stdin: bool,
+
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// Open the GUI (default behavior)
+    Gui,
+
+    /// Review changes between branches/tags/commits
+    Diff {
+        /// Source ref
+        #[arg(index = 1)]
+        from: String,
+        /// Target ref
+        #[arg(index = 2)]
+        to: String,
+    },
+
+    /// Review a GitHub PR
+    Pr {
+        /// PR reference (owner/repo#number or URL)
+        #[arg(index = 1)]
+        pr_ref: String,
+    },
+
+    /// Review uncommitted changes
+    Status,
+
+    /// Review git stash entries
+    Stash {
+        /// Stash index (default: 0, latest)
+        #[arg(default_value = "0")]
+        index: usize,
+    },
+
+    /// Reset the database (maintenance command)
+    #[command(name = "db-reset")]
+    DbReset,
+
+    /// Seed the database with test data (maintenance command)
+    #[command(name = "db-seed")]
+    DbSeed,
+}
+
+use std::io::Write;
+
+fn debug_log(msg: &str) {
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/tmp/lareview_debug.log")
+    {
+        let _ = writeln!(file, "[{}] {}", chrono::Utc::now().to_rfc3339(), msg);
     }
+}
 
-    infra::shell::init_process_path();
-
-    // Initialize logging early - respects RUST_LOG environment variable
-    // Usage: RUST_LOG=debug cargo run  (or RUST_LOG=acp=debug for ACP only)
+fn main() -> Result<()> {
+    debug_log("Application starting");
+    let _ = fix_path_env::fix();
     let _ = env_logger::try_init();
 
-    // Check for --open-pending flag (CLI-to-GUI handoff)
-    let pending_review_path = if let Some(idx) = args.iter().position(|arg| arg == "--open-pending")
-    {
-        args.get(idx + 1).cloned()
-    } else {
-        None
-    };
+    let args: Vec<String> = std::env::args().collect();
+    debug_log(&format!("Raw args: {:?}", args));
 
-    // Check if we're running as an MCP server
-    // Also check for MCP-related environment variables that may indicate MCP mode
     let is_mcp_server = args.contains(&"--task-mcp-server".to_string())
         || std::env::var("MCP_TRANSPORT").is_ok()
         || std::env::var("MCP_SERVER_NAME").is_ok();
 
     if is_mcp_server {
-        // Initialize the global Tokio runtime for MCP mode
-        let rt = match tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-        {
-            Ok(rt) => rt,
-            Err(e) => {
-                eprintln!("Failed to create Tokio runtime: {e:?}");
-                std::process::exit(1);
-            }
-        };
-
-        if let Err(e) = lareview::set_runtime(rt) {
-            eprintln!("Runtime already initialized: {e:?}");
-            std::process::exit(1);
-        }
-
-        // Enter the runtime context and run the MCP server
-        let _guard = lareview::enter_runtime();
-
-        // Run the MCP server instead of the UI
+        info!("Starting MCP task server...");
         lareview::block_on(async {
             if let Err(e) = infra::acp::run_task_mcp_server().await {
-                eprintln!("MCP server error: {e}");
+                error!("MCP server error: {e}");
                 std::process::exit(1);
             }
         });
-
         return Ok(());
     }
 
-    // Initialize the global Tokio runtime for UI mode
-    let rt = match tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-    {
-        Ok(rt) => rt,
-        Err(e) => {
-            eprintln!("Failed to create Tokio runtime: {e:?}");
-            std::process::exit(1);
+    // Try parsing args for this instance (primary launch or CLI tool)
+    match Args::try_parse() {
+        Ok(parsed_args) => {
+            debug_log(&format!(
+                "Parsed initial args command: {:?}",
+                parsed_args.command
+            ));
+
+            // Process CLI args into data structures, WITHOUT touching DB/AppState yet.
+            let (initial_req, initial_pending) = process_cli_args(&parsed_args)?;
+
+            // Run GUI. We pass the initial data.
+            // AppState will be created INSIDE run_gui setup, ensuring Second Instance never touches DB.
+            run_gui(initial_req, initial_pending)
         }
-    };
+        Err(e) => {
+            debug_log(&format!("Arg parse error: {}", e));
+            e.print().expect("failed to print help");
+            Ok(())
+        }
+    }
+}
 
-    if let Err(e) = lareview::set_runtime(rt) {
-        eprintln!("Runtime already initialized: {e:?}");
-        std::process::exit(1);
+fn process_cli_args(args: &Args) -> Result<(Option<DiffRequest>, Option<PendingDiff>)> {
+    debug_log("process_cli_args called");
+    let mut diff_req = None;
+    let mut pending = None;
+
+    if let Some(cmd) = &args.command {
+        debug_log(&format!("Processing command: {:?}", cmd));
+        match cmd {
+            Commands::Gui => {}
+            Commands::Diff { from, to } => {
+                debug_log(&format!("Diff command: {} .. {}", from, to));
+                diff_req = Some(DiffRequest {
+                    from: from.clone(),
+                    to: to.clone(),
+                    agent: args.agent.clone(),
+                    source: format!("git diff {}..{}", from, to),
+                });
+            }
+            Commands::Pr { pr_ref } => {
+                debug_log(&format!("PR command: {}", pr_ref));
+                let (owner, repo, number) = diff::parse_pr_ref(pr_ref)?;
+                debug_log(&format!("Parsed PR: {}/{}#{}", owner, repo, number));
+                diff_req = Some(DiffRequest {
+                    from: format!("{}/{}/pull/{}", owner, repo, number),
+                    to: String::new(),
+                    agent: args.agent.clone(),
+                    source: format!("PR {}", pr_ref),
+                });
+            }
+            Commands::Status => {
+                diff_req = Some(DiffRequest {
+                    from: String::new(),
+                    to: String::new(),
+                    agent: args.agent.clone(),
+                    source: "uncommitted changes".to_string(),
+                });
+            }
+            Commands::Stash { index } => {
+                let diff = diff::get_stash_diff(*index)?;
+                pending = Some(PendingDiff {
+                    diff,
+                    repo_root: detect_git_repo(),
+                    agent: args.agent.clone(),
+                    source: format!("stash@{{{}}}", index),
+                    created_at: chrono::Utc::now(),
+                });
+            }
+            #[cfg(feature = "dev-tools")]
+            Commands::DbReset => {
+                let status = Command::new("cargo")
+                    .args(["run", "--bin", "reset_db", "--features", "dev-tools"])
+                    .stdin(Stdio::inherit())
+                    .stdout(Stdio::inherit())
+                    .stderr(Stdio::inherit())
+                    .spawn()
+                    .context("Failed to spawn reset_db")?
+                    .wait()
+                    .context("reset_db exited with error")?;
+                if !status.success() {
+                    anyhow::bail!("reset_db exited with non-zero status: {}", status);
+                }
+            }
+            #[cfg(feature = "dev-tools")]
+            Commands::DbSeed => {
+                let status = Command::new("cargo")
+                    .args(["run", "--bin", "seed_db", "--features", "dev-tools"])
+                    .stdin(Stdio::inherit())
+                    .stdout(Stdio::inherit())
+                    .stderr(Stdio::inherit())
+                    .spawn()
+                    .context("Failed to spawn seed_db")?
+                    .wait()
+                    .context("seed_db exited with error")?;
+                if !status.success() {
+                    anyhow::bail!("seed_db exited with non-zero status: {}", status);
+                }
+            }
+            #[cfg(not(feature = "dev-tools"))]
+            Commands::DbReset => {
+                anyhow::bail!(
+                    "db-reset requires --features dev-tools. Run: cargo run --bin reset_db --features dev-tools"
+                );
+            }
+            #[cfg(not(feature = "dev-tools"))]
+            Commands::DbSeed => {
+                anyhow::bail!(
+                    "db-seed requires --features dev-tools. Run: cargo run --bin seed_db --features dev-tools"
+                );
+            }
+        }
+    } else if let Some(pr_ref) = &args.pr {
+        let (owner, repo, number) = diff::parse_pr_ref(pr_ref)?;
+        diff_req = Some(DiffRequest {
+            from: format!("{}/{}/pull/{}", owner, repo, number),
+            to: String::new(),
+            agent: args.agent.clone(),
+            source: format!("PR {}", pr_ref),
+        });
+    } else if args.status {
+        diff_req = Some(DiffRequest {
+            from: String::new(),
+            to: String::new(),
+            agent: args.agent.clone(),
+            source: "uncommitted changes".to_string(),
+        });
+    } else if let (Some(from), Some(to)) = (&args.from, &args.to) {
+        diff_req = Some(DiffRequest {
+            from: from.clone(),
+            to: to.clone(),
+            agent: args.agent.clone(),
+            source: format!("git diff {}..{}", from, to),
+        });
+    } else if let Some(from) = &args.from {
+        diff_req = Some(DiffRequest {
+            from: from.clone(),
+            to: "HEAD".to_string(),
+            agent: args.agent.clone(),
+            source: format!("git diff {}..HEAD", from),
+        });
+    } else if args.stdin {
+        let diff = read_stdin_diff().context("Failed to read diff from stdin")?;
+        if diff.trim().is_empty() {
+            anyhow::bail!("Error: No diff provided via stdin");
+        }
+        pending = Some(PendingDiff {
+            diff,
+            repo_root: detect_git_repo(),
+            agent: args.agent.clone(),
+            source: "stdin".to_string(),
+            created_at: chrono::Utc::now(),
+        });
     }
 
-    // Enter the runtime context
-    let _guard = lareview::enter_runtime();
+    Ok((diff_req, pending))
+}
 
-    // Load the app icon
-    let icon = crate::assets::get_content("assets/logo/512-mac.png")
-        .and_then(|bytes| eframe::icon_data::from_png_bytes(bytes).ok());
+fn run_gui(initial_req: Option<DiffRequest>, initial_pending: Option<PendingDiff>) -> Result<()> {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            debug_log(&format!(
+                "Single Instance Callback triggered! Argv: {:?}",
+                argv
+            ));
 
-    let mut viewport = egui::ViewportBuilder::default()
-        .with_inner_size([1400.0, 787.5])
-        .with_titlebar_shown(false)
-        .with_title("LaReview")
-        .with_fullsize_content_view(false)
-        .with_title_shown(false);
+            match Args::try_parse_from(&argv) {
+                Ok(args) => {
+                    debug_log(&format!(
+                        "Successfully parsed second instance args: {:?}",
+                        args.command
+                    ));
+                    // We process args again, here inside the Primary instance.
+                    match process_cli_args(&args) {
+                        Ok((req, pending)) => {
+                            let state = app.state::<AppState>();
 
-    if let Some(icon) = icon {
-        viewport = viewport.with_icon(icon);
-    }
+                            if let Some(r) = req {
+                                debug_log("Updating diff_request from callback");
+                                *state.diff_request.lock().unwrap() = Some(r);
+                            }
+                            if let Some(p) = pending {
+                                debug_log("Updating pending_diff from callback");
+                                *state.pending_diff.lock().unwrap() = Some(p);
+                            }
 
-    let options = eframe::NativeOptions {
-        viewport,
+                            if let Some(window) = app.get_webview_window("main") {
+                                debug_log("Focusing main window and emitting diff-ready");
+                                let _ = window.set_focus();
+                                let _ = window.emit("lareview:diff-ready", ());
+                            } else {
+                                debug_log("Main window not found!");
+                            }
+                        }
+                        Err(e) => {
+                            debug_log(&format!(
+                                "Failed to handle CLI args from second instance: {}",
+                                e
+                            ));
+                            error!("Failed to handle CLI args from second instance: {}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    debug_log(&format!("Failed to parse args from second instance: {}", e));
+                    error!("Failed to parse args from second instance: {}", e);
+                }
+            }
+        }))
+        .setup(move |app| {
+            // Initialize AppState HERE (only for Primary instance)
+            debug_log("Initializing AppState (Primary Instance)...");
+            let app_state = AppState::new();
 
-        ..Default::default()
-    };
+            // Apply initial args
+            if let Some(r) = initial_req {
+                *app_state.diff_request.lock().unwrap() = Some(r);
+            }
+            if let Some(p) = initial_pending {
+                *app_state.pending_diff.lock().unwrap() = Some(p);
+            }
 
-    eframe::run_native(
-        "LaReview",
-        options,
-        Box::new(|cc| {
-            egui_extras::install_image_loaders(&cc.egui_ctx);
-            // Pass pending review path for CLI-to-GUI handoff
-            Ok(Box::new(ui::app::LaReviewApp::new_egui_with_pending(
-                cc,
-                pending_review_path,
-            )))
-        }),
-    )
+            app.manage(app_state);
+            debug_log("AppState initialized and managed.");
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            lareview::commands::get_app_version,
+            lareview::commands::get_cli_status,
+            lareview::commands::install_cli,
+            lareview::commands::get_pending_reviews,
+            lareview::commands::get_all_reviews,
+            lareview::commands::get_review_runs,
+            lareview::commands::get_linked_repos,
+            lareview::commands::parse_diff,
+            lareview::commands::get_file_content,
+            lareview::commands::generate_review,
+            lareview::commands::load_tasks,
+            lareview::commands::update_task_status,
+            lareview::commands::save_feedback,
+            lareview::commands::get_feedback_by_review,
+            lareview::commands::get_feedback_diff_snippet,
+            lareview::commands::get_feedback_comments,
+            lareview::commands::add_comment,
+            lareview::commands::update_feedback_status,
+            lareview::commands::update_feedback_impact,
+            lareview::commands::delete_feedback,
+            lareview::commands::export_review,
+            lareview::commands::fetch_github_pr,
+            lareview::commands::get_agents,
+            lareview::commands::update_agent_config,
+            lareview::commands::get_github_token,
+            lareview::commands::set_github_token,
+            lareview::commands::get_github_status,
+            lareview::commands::link_repo,
+            lareview::commands::unlink_repo,
+            lareview::commands::delete_review,
+            lareview::commands::get_available_editors,
+            lareview::commands::get_editor_config,
+            lareview::commands::update_editor_config,
+            lareview::commands::open_in_editor,
+            lareview::commands::get_cli_status,
+            lareview::commands::install_cli,
+            lareview::commands::get_pending_review_from_state,
+            lareview::commands::copy_to_clipboard,
+            lareview::commands::open_url,
+            lareview::commands::clear_pending_diff,
+            lareview::commands::get_diff_request,
+            lareview::commands::acquire_diff_from_request,
+        ])
+        .run(tauri::generate_context!())
+        .map_err(|e| anyhow::anyhow!("{}", e))
 }

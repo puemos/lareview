@@ -113,7 +113,7 @@ The CLI launches the GUI in the background and passes your diff/repo info seamle
 4. To use from terminal, add to PATH (or use the **CLI Installation** button in Settings):
    ```bash
    echo 'export PATH="$PATH:/Applications/LaReview.app/Contents/MacOS"' >> ~/.zshrc
-   ```
+    ```
 
 #### Linux
 
@@ -126,11 +126,6 @@ The CLI launches the GUI in the background and passes your diff/repo info seamle
     chmod +x ./lareview
     mv ./lareview /usr/local/bin/lareview
     ```
-
-#### Windows
-
-1.  Download the `lareview-windows.zip` file and unzip it.
-2.  Place the `lareview.exe` file in a directory that is included in your system's `PATH` environment variable.
 
 ### Option B: One-click CLI installation
 
@@ -204,7 +199,6 @@ index 123..456 100644
 LaReview stores review state locally.
 
 - macOS DB: `~/Library/Application Support/LaReview/db.sqlite`
-- Windows DB: `%APPDATA%\LaReview\db.sqlite` or `%LOCALAPPDATA%\puemos\LaReview\db.sqlite`
 - Linux DB: `$XDG_DATA_HOME/lareview/db.sqlite` or `~/.local/share/lareview/db.sqlite`
 - Override DB path:
 
@@ -227,8 +221,8 @@ Wipe local state:
 - Toolchain: nightly Rust with `rustfmt` and `clippy` components (edition 2024; see `rust-toolchain.toml`)
 - Run the app: `cargo run`
 - Reset/seed sample data:
-  - `cargo run --bin reset_db`
-  - `cargo run --bin seed_db`
+  - `cargo run --bin reset_db --features dev-tools`
+  - `cargo run --bin seed_db --features dev-tools`
 
 - Checks:
   - `cargo fmt -- --check`

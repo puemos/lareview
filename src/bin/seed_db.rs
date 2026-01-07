@@ -1,3 +1,4 @@
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::fs;
 
@@ -54,6 +55,8 @@ const SEED_TASKS_JSON: &str = include_str!("../../test_data/seed/tasks.json");
 const SEED_DIFF_TEXT: &str = include_str!("../../test_data/seed/calcom_audit.diff");
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize logging - respects RUST_LOG environment variable
+    let _ = env_logger::try_init();
     run()
 }
 
@@ -71,7 +74,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         fs::create_dir_all(parent)?;
     }
 
-    println!("Connecting to database at: {}", db_path.display());
+    info!("Connecting to database at: {}", db_path.display());
 
     let db = lareview::infra::db::Database::open_at(db_path.clone())?;
     let conn = db.connection();
@@ -91,14 +94,14 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         "INSERT OR REPLACE INTO reviews (id, title, summary, source_json, active_run_id, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         (&review.id, &review.title, &review.summary, &review.source_json, &review.active_run_id, &review.created_at, &review.updated_at),
     )?;
-    println!("Inserted Review: {}", review.title);
+    info!("Inserted Review: {}", review.title);
 
     // Insert Review Run
     conn.execute(
         "INSERT OR REPLACE INTO review_runs (id, review_id, agent_id, input_ref, diff_text, diff_hash, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         (&review_run.id, &review_run.review_id, &review_run.agent_id, &review_run.input_ref, &review_run.diff_text, &review_run.diff_hash, &review_run.created_at),
     )?;
-    println!("Inserted Review Run for review: {}", review.title);
+    info!("Inserted Review Run for review: {}", review.title);
 
     // Insert all tasks
     for mut task in tasks {
@@ -120,16 +123,16 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 &task.sub_flow,
             ),
         )?;
-        println!(
+        info!(
             "Inserted task: {} (Sub-flow: {})",
             task.title,
             task.sub_flow.as_deref().unwrap_or("None")
         );
     }
 
-    println!("\nSample data successfully added to database!");
-    println!("Database location: {}", db_path.display());
-    println!(
+    info!("Sample data successfully added to database!");
+    info!("Database location: {}", db_path.display());
+    info!(
         "Run the application with `cargo run` to see the intent-centric layout against this booking audit PR."
     );
 

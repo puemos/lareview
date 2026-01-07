@@ -1,0 +1,200 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/typography';
+
+@font-face {
+  font-family: 'Geist';
+  src: url('../assets/fonts/Geist.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('../assets/fonts/Geist-Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('../assets/fonts/Geist-Italic.ttf') format('truetype');
+  font-weight: normal;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'GeistMono';
+  src: url('../assets/fonts/GeistMono.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@theme {
+  --font-sans: 'Geist', 'Inter', sans-serif;
+  --font-mono: 'GeistMono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-display: 'Geist', 'Inter', sans-serif;
+
+  --color-bg-primary: #1e1e2e;
+  --color-bg-secondary: #181825;
+  --color-bg-tertiary: #313244;
+  --color-bg-surface: #181825;
+
+  --color-text-primary: #e6e9ef;
+  --color-text-secondary: #bac2de;
+  --color-text-tertiary: #a6adc8;
+  --color-text-inverse: #ffffff;
+  --color-text-disabled: #7f849c;
+
+  --color-border: #45475a;
+  --color-border-default: #45475a;
+  --color-border-secondary: #313244;
+
+  --color-brand: #cba6f7;
+  --color-brand-fg: #1e1e2e;
+
+  --color-accent: #89b4fa;
+  --color-accent-fg: #1e1e2e;
+
+  --color-status-todo: #a6adc8;
+  --color-status-in_progress: #f9e2af;
+  --color-status-done: #a6e3a1;
+  --color-status-ignored: #f38ba8;
+
+  --color-impact-nitpick: #89b4fa;
+  --color-impact-nice_to_have: #f9e2af;
+  --color-impact-blocking: #f38ba8;
+
+  --color-risk-low: #89b4fa;
+  --color-risk-medium: #f9e2af;
+  --color-risk-high: #f38ba8;
+
+  --color-gray-750: #313244;
+  --color-gray-850: #181825;
+  --color-gray-900: #1e1e2e;
+  --color-gray-950: #11111b;
+
+  --color-blue-400: #89b4fa;
+  --color-blue-500: #89b4fa;
+  --color-blue-600: #74c7ec;
+
+  --color-green-400: #a6e3a1;
+  --color-green-500: #a6e3a1;
+  --color-green-600: #94e2d5;
+
+  --color-red-400: #f38ba8;
+  --color-red-500: #f38ba8;
+  --color-red-600: #eba0ac;
+
+  --shadow-custom: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.15);
+
+  --animate-fade-in: fadeIn 0.2s ease-out;
+  --animate-slide-in: slideIn 0.3s ease-out;
+
+  @keyframes fadeIn {
+    0% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideIn {
+    0% {
+      transform: translateY(10px);
+      opacity: 0;
+    }
+    100% {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: #1e1e2e;
+  color: #e6e9ef;
+  font-family:
+    'Geist',
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    'Open Sans',
+    'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  height: 100vh;
+  width: 100vw;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #313244;
+  border-radius: 5px;
+  border: 2px solid #1e1e2e;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover,
+:hover::-webkit-scrollbar-thumb {
+  background-color: #45475a;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #3f444f;
+}
+
+::selection {
+  background-color: rgba(59, 130, 246, 0.3);
+  color: white;
+}
+
+.diff-added {
+  background-color: rgba(46, 160, 67, 0.15);
+}
+
+.diff-removed {
+  background-color: rgba(248, 81, 73, 0.15);
+}
+
+.diff-modified {
+  background-color: rgba(187, 128, 9, 0.15);
+}
+
+.status-added {
+  @apply border border-green-600/30 bg-green-600/20 text-green-400;
+}
+
+.status-modified {
+  @apply border border-yellow-600/30 bg-yellow-600/20 text-yellow-400;
+}
+
+.status-deleted {
+  @apply border border-red-600/30 bg-red-600/20 text-red-400;
+}
+
+.status-renamed {
+  @apply border border-blue-600/30 bg-blue-600/20 text-blue-400;
+}

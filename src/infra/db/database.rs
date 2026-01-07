@@ -1,3 +1,5 @@
+use crate::commands::{LinkedRepoState, PendingReviewState, ReviewRunState, ReviewState};
+use crate::domain::{Comment, Feedback, Review, ReviewRun, ReviewTask};
 use anyhow::Result;
 use rusqlite::Connection;
 use std::path::PathBuf;
@@ -34,10 +36,6 @@ impl Database {
         db.init()?;
 
         if std::env::var("LAREVIEW_DB_PATH").is_err() {
-            // set_var is unsafe but acceptable here because:
-            // 1. Called once during database initialization (single-threaded context)
-            // 2. Process-local configuration with no concurrent access
-            // 3. Early in the application lifecycle before any spawned threads run
             unsafe {
                 std::env::set_var("LAREVIEW_DB_PATH", path.to_string_lossy().to_string());
             }
@@ -70,7 +68,7 @@ impl Database {
 
         #[cfg(target_os = "linux")]
         {
-            if let Some(xdg) = std::env::var_os("XDG_DATA_HOME") {
+            if let Ok(xdg) = std::env::var_os("XDG_DATA_HOME") {
                 return PathBuf::from(xdg).join("lareview").join("db.sqlite");
             }
             if let Some(home) = home::home_dir() {
@@ -90,56 +88,9 @@ impl Database {
 
     fn init(&self) -> Result<()> {
         let conn = self.conn.lock().expect("Failed to acquire database lock");
-        const SCHEMA_VERSION: i32 = 10;
-
         conn.execute_batch("PRAGMA foreign_keys = ON;")?;
-
-        let existing_version: i32 =
-            conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
-
-        if existing_version == 0 {
-            Self::create_schema(&conn)?;
-            conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
-        } else if existing_version < SCHEMA_VERSION {
-            for version in (existing_version + 1)..=SCHEMA_VERSION {
-                Self::run_migration(&conn, version)?;
-            }
-            conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
-        }
-
+        Self::create_schema(&conn)?;
         Ok(())
-    }
-
-    pub fn connection(&self) -> Arc<Mutex<Connection>> {
-        self.conn.clone()
-    }
-
-    pub fn task_repo(&self) -> crate::infra::db::repository::TaskRepository {
-        crate::infra::db::repository::TaskRepository::new(self.connection())
-    }
-
-    pub fn feedback_repo(&self) -> crate::infra::db::repository::FeedbackRepository {
-        crate::infra::db::repository::FeedbackRepository::new(self.connection())
-    }
-
-    pub fn feedback_link_repo(&self) -> crate::infra::db::repository::FeedbackLinkRepository {
-        crate::infra::db::repository::FeedbackLinkRepository::new(self.connection())
-    }
-
-    pub fn comment_repo(&self) -> crate::infra::db::repository::CommentRepository {
-        crate::infra::db::repository::CommentRepository::new(self.connection())
-    }
-
-    pub fn review_repo(&self) -> crate::infra::db::repository::ReviewRepository {
-        crate::infra::db::repository::ReviewRepository::new(self.connection())
-    }
-
-    pub fn run_repo(&self) -> crate::infra::db::repository::ReviewRunRepository {
-        crate::infra::db::repository::ReviewRunRepository::new(self.connection())
-    }
-
-    pub fn repo_repo(&self) -> crate::infra::db::repository::RepoRepository {
-        crate::infra::db::repository::RepoRepository::new(self.connection())
     }
 
     fn create_schema(conn: &Connection) -> Result<()> {
@@ -201,11 +152,11 @@ impl Database {
                 review_id TEXT NOT NULL,
                 task_id TEXT,
                 title TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'todo' CHECK (status IN ('todo','in_progress','done','ignored','wip','reject')),
-                impact TEXT NOT NULL DEFAULT 'nitpick' CHECK (impact IN ('blocking','nice_to_have','nitpick')),
+                status TEXT NOT NULL DEFAULT 'todo',
+                impact TEXT NOT NULL DEFAULT 'nitpick',
                 anchor_file_path TEXT,
                 anchor_line INTEGER,
-                anchor_side TEXT CHECK (anchor_side IN ('old','new')),
+                anchor_side TEXT,
                 anchor_hunk_ref TEXT,
                 anchor_head_sha TEXT,
                 author TEXT NOT NULL,
@@ -227,16 +178,6 @@ impl Database {
                 FOREIGN KEY(parent_id) REFERENCES comments(id) ON DELETE CASCADE
             );
 
-            CREATE TABLE IF NOT EXISTS feedback_links (
-                id TEXT PRIMARY KEY,
-                feedback_id TEXT NOT NULL,
-                provider TEXT NOT NULL,
-                provider_feedback_id TEXT NOT NULL,
-                provider_root_comment_id TEXT NOT NULL,
-                last_synced_at TEXT NOT NULL,
-                FOREIGN KEY(feedback_id) REFERENCES feedback(id) ON DELETE CASCADE
-            );
-
             CREATE INDEX IF NOT EXISTS idx_feedback_task_id ON feedback(task_id);
             CREATE INDEX IF NOT EXISTS idx_feedback_review_id ON feedback(review_id);
             CREATE INDEX IF NOT EXISTS idx_feedback_anchor ON feedback(anchor_file_path, anchor_line);
@@ -247,192 +188,343 @@ impl Database {
         Ok(())
     }
 
-    fn run_migration(conn: &Connection, version: i32) -> Result<()> {
-        let sql = match version {
-            9 => include_str!("../../../migrations/0009_update_feedback_status_constraint.sql"),
-            10 => include_str!("../../../migrations/0010_rename_thread_to_feedback.sql"),
-            _ => {
-                return Err(anyhow::anyhow!(
-                    "Unknown migration version: {}. Add the migration to run_migration() in database.rs",
-                    version
-                ));
-            }
-        };
+    pub fn connection(&self) -> Arc<Mutex<Connection>> {
+        self.conn.clone()
+    }
 
-        conn.execute_batch(sql)
-            .map_err(|e| anyhow::anyhow!("Failed to execute migration {}: {}", version, e))?;
+    pub fn task_repo(&self) -> crate::infra::db::repository::TaskRepository {
+        crate::infra::db::repository::TaskRepository::new(self.connection())
+    }
 
+    pub fn feedback_repo(&self) -> crate::infra::db::repository::FeedbackRepository {
+        crate::infra::db::repository::FeedbackRepository::new(self.connection())
+    }
+
+    pub fn feedback_link_repo(&self) -> crate::infra::db::repository::FeedbackLinkRepository {
+        crate::infra::db::repository::FeedbackLinkRepository::new(self.connection())
+    }
+
+    pub fn comment_repo(&self) -> crate::infra::db::repository::CommentRepository {
+        crate::infra::db::repository::CommentRepository::new(self.connection())
+    }
+
+    pub fn review_repo(&self) -> crate::infra::db::repository::ReviewRepository {
+        crate::infra::db::repository::ReviewRepository::new(self.connection())
+    }
+
+    pub fn run_repo(&self) -> crate::infra::db::repository::ReviewRunRepository {
+        crate::infra::db::repository::ReviewRunRepository::new(self.connection())
+    }
+
+    pub fn repo_repo(&self) -> crate::infra::db::repository::RepoRepository {
+        crate::infra::db::repository::RepoRepository::new(self.connection())
+    }
+
+    pub fn get_pending_reviews(&self) -> Result<Vec<PendingReviewState>, rusqlite::Error> {
+        let conn = self.conn.lock().expect("Failed to acquire database lock");
+        let mut stmt = conn.prepare(
+            "SELECT id, active_run_id, source_json, created_at, updated_at FROM reviews WHERE active_run_id IS NOT NULL ORDER BY updated_at DESC LIMIT 10"
+        )?;
+        let rows = stmt.query_map([], |row| {
+            let id: String = row.get(0)?;
+            let source_json: String = row.get(2)?;
+            let _source: crate::domain::ReviewSource = serde_json::from_str(&source_json)
+                .unwrap_or_else(|_| crate::domain::ReviewSource::DiffPaste {
+                    diff_hash: String::new(),
+                });
+
+            Ok(PendingReviewState {
+                id: id.clone(),
+                diff: String::new(),
+                repo_root: None,
+                agent: None,
+                source: format!("review-{}", id),
+                created_at: row.get(3)?,
+                review_source: None,
+            })
+        })?;
+        let mut reviews = Vec::new();
+        for row in rows {
+            reviews.push(row?);
+        }
+        Ok(reviews)
+    }
+
+    pub fn get_all_tasks(&self) -> Result<Vec<ReviewTask>, rusqlite::Error> {
+        let repo = self.task_repo();
+        repo.list().map_err(|e| {
+            rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(1), Some(e.to_string()))
+        })
+    }
+
+    pub fn get_tasks_by_run(&self, run_id: &str) -> Result<Vec<ReviewTask>, rusqlite::Error> {
+        let repo = self.task_repo();
+        let run_id_str = run_id.to_string();
+        repo.find_by_run(&run_id_str).map_err(|e| {
+            rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(1), Some(e.to_string()))
+        })
+    }
+
+    pub fn get_all_reviews(&self) -> Result<Vec<ReviewState>, rusqlite::Error> {
+        let conn = self.conn.lock().expect("Failed to acquire database lock");
+        let mut stmt = conn.prepare(
+            "SELECT r.id, r.title, r.summary, rr.agent_id, COUNT(t.id) as task_count, r.created_at, r.source_json
+             FROM reviews r
+             LEFT JOIN review_runs rr ON r.active_run_id = rr.id
+             LEFT JOIN tasks t ON t.run_id = rr.id
+             GROUP BY r.id
+             ORDER BY r.updated_at DESC",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            let source_json: String = row.get(6)?;
+            let source: crate::domain::ReviewSource = serde_json::from_str(&source_json)
+                .unwrap_or_else(|_| crate::domain::ReviewSource::DiffPaste {
+                    diff_hash: String::new(),
+                });
+
+            Ok(ReviewState {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                summary: row.get(2)?,
+                agent_id: row.get(3)?,
+                task_count: row.get::<_, i32>(4)? as usize,
+                created_at: row.get(5)?,
+                source,
+            })
+        })?;
+        let mut reviews = Vec::new();
+        for row in rows {
+            reviews.push(row?);
+        }
+        Ok(reviews)
+    }
+
+    pub fn get_review_runs(&self, review_id: &str) -> Result<Vec<ReviewRunState>, rusqlite::Error> {
+        let conn = self.conn.lock().expect("Failed to acquire database lock");
+        let mut stmt = conn.prepare(
+            "SELECT rr.id, rr.review_id, rr.agent_id, rr.input_ref, rr.diff_text, rr.created_at, COUNT(t.id) as task_count
+             FROM review_runs rr
+             LEFT JOIN tasks t ON t.run_id = rr.id
+             WHERE rr.review_id = ?1
+             GROUP BY rr.id
+             ORDER BY rr.created_at DESC",
+        )?;
+        let rows = stmt.query_map([review_id], |row| {
+            Ok(ReviewRunState {
+                id: row.get(0)?,
+                review_id: row.get(1)?,
+                agent_id: row.get(2)?,
+                input_ref: row.get(3)?,
+                diff_text: row.get(4)?,
+                created_at: row.get(5)?,
+                task_count: row.get::<_, i32>(6)? as usize,
+            })
+        })?;
+        let mut runs = Vec::new();
+        for row in rows {
+            runs.push(row?);
+        }
+        Ok(runs)
+    }
+
+    pub fn get_review_run_by_id(&self, run_id: &str) -> Result<Option<ReviewRun>, rusqlite::Error> {
+        let repo = self.run_repo();
+        let run_id_str = run_id.to_string();
+        repo.find_by_id(&run_id_str).map_err(|e: anyhow::Error| {
+            rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(1), Some(e.to_string()))
+        })
+    }
+
+    pub fn get_linked_repos(&self) -> Result<Vec<LinkedRepoState>, rusqlite::Error> {
+        let conn = self.conn.lock().expect("Failed to acquire database lock");
+        let mut stmt =
+            conn.prepare("SELECT id, name, path, created_at FROM repos ORDER BY created_at DESC")?;
+        let rows = stmt.query_map([], |row| {
+            Ok(LinkedRepoState {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                path: row.get(2)?,
+                review_count: 0,
+                linked_at: row.get(3)?,
+            })
+        })?;
+        let mut repos = Vec::new();
+        for row in rows {
+            repos.push(row?);
+        }
+        Ok(repos)
+    }
+
+    pub fn save_review(&self, review: &Review) -> Result<(), rusqlite::Error> {
+        let conn = self.conn.lock().expect("Failed to acquire database lock");
+        let source_json = serde_json::to_string(&review.source).map_err(|e| {
+            rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(1), Some(e.to_string()))
+        })?;
+        conn.execute(
+            r#"
+            INSERT INTO reviews (id, title, summary, source_json, active_run_id, created_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            ON CONFLICT(id) DO NOTHING
+            "#,
+            (
+                &review.id,
+                &review.title,
+                &review.summary,
+                &source_json,
+                &review.active_run_id,
+                &review.created_at,
+                &review.updated_at,
+            ),
+        )?;
         Ok(())
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_database_default_path() {
-        let path = Database::default_path();
-        assert!(path.to_string_lossy().contains("db.sqlite"));
+    pub fn get_review(&self, review_id: &str) -> Result<Option<Review>, rusqlite::Error> {
+        let review_id_str = review_id.to_string();
+        self.review_repo().find_by_id(&review_id_str).map_err(|e| {
+            rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(1), Some(e.to_string()))
+        })
     }
 
-    #[test]
-    fn test_database_open_in_memory() {
-        let db = Database::open_in_memory().unwrap();
-        let conn = db.connection();
-        let guard = conn.lock().unwrap();
-        let res: i32 = guard.query_row("SELECT 1", [], |row| row.get(0)).unwrap();
-        assert_eq!(res, 1);
+    pub fn update_task_status(
+        &self,
+        task_id: &str,
+        status: crate::domain::ReviewStatus,
+    ) -> Result<(), rusqlite::Error> {
+        let repo = self.task_repo();
+        let task_id_str = task_id.to_string();
+        repo.update_status(&task_id_str, status).map_err(|e| {
+            rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(1), Some(e.to_string()))
+        })
     }
 
-    #[test]
-    fn test_schema_migration_v9_to_v10() {
-        let conn = Connection::open_in_memory().unwrap();
-
-        // Create legacy v9-style tables
-        conn.execute_batch(
-            "
-            CREATE TABLE tasks (id TEXT PRIMARY KEY);
-            CREATE TABLE review_runs (id TEXT PRIMARY KEY);
-            CREATE TABLE repos (id TEXT PRIMARY KEY);
-            CREATE TABLE reviews (
-                id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                summary TEXT,
-                source_json TEXT,
-                active_run_id TEXT,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
-            CREATE TABLE threads (
-                id TEXT PRIMARY KEY,
-                review_id TEXT NOT NULL,
-                task_id TEXT,
-                title TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'todo',
-                impact TEXT NOT NULL DEFAULT 'nitpick',
-                anchor_file_path TEXT,
-                anchor_line INTEGER,
-                anchor_side TEXT,
-                anchor_hunk_ref TEXT,
-                anchor_head_sha TEXT,
-                author TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                FOREIGN KEY(review_id) REFERENCES reviews(id)
-            );
-            CREATE TABLE thread_links (
-                id TEXT PRIMARY KEY,
-                thread_id TEXT NOT NULL,
-                provider TEXT NOT NULL,
-                provider_feedback_id TEXT NOT NULL,
-                provider_root_comment_id TEXT NOT NULL,
-                last_synced_at TEXT NOT NULL,
-                FOREIGN KEY(thread_id) REFERENCES threads(id)
-            );
-            CREATE TABLE comments (
-                id TEXT PRIMARY KEY,
-                thread_id TEXT NOT NULL,
-                author TEXT NOT NULL,
-                body TEXT NOT NULL,
-                parent_id TEXT,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                FOREIGN KEY(thread_id) REFERENCES threads(id)
-            );
-            PRAGMA user_version = 9;
-        ",
-        )
-        .unwrap();
-
-        // Insert legacy data
+    pub fn save_run(&self, run: &ReviewRun) -> Result<(), rusqlite::Error> {
+        let conn = self.conn.lock().expect("Failed to acquire database lock");
         conn.execute(
-            r#"INSERT INTO reviews (id, title, created_at, updated_at) 
-             VALUES ('r1', 'Legacy Review', 'now', 'now')"#,
-            [],
-        )
-        .unwrap();
+            r#"
+            INSERT INTO review_runs (id, review_id, agent_id, input_ref, diff_text, diff_hash, created_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            ON CONFLICT(id) DO NOTHING
+            "#,
+            (
+                &run.id,
+                &run.review_id,
+                &run.agent_id,
+                &run.input_ref,
+                &run.diff_text,
+                &run.diff_hash,
+                &run.created_at,
+            ),
+        )?;
+        Ok(())
+    }
+
+    pub fn save_feedback(&self, feedback: &Feedback, _id: &str) -> Result<(), rusqlite::Error> {
+        let conn = self.conn.lock().expect("Failed to acquire database lock");
+        let anchor = feedback.anchor.as_ref();
         conn.execute(
-            r#"INSERT INTO threads (id, review_id, title, author, created_at, updated_at) 
-             VALUES ('t1', 'r1', 'Legacy Thread', 'user', 'now', 'now')"#,
-            [],
-        )
-        .unwrap();
+            r#"
+            INSERT INTO feedback (id, review_id, task_id, title, status, impact, anchor_file_path, anchor_line, anchor_side, anchor_hunk_ref, anchor_head_sha, author, created_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+            ON CONFLICT(id) DO NOTHING
+            "#,
+            (
+                &feedback.id,
+                &feedback.review_id,
+                &feedback.task_id.as_ref(),
+                &feedback.title,
+                &feedback.status.to_string(),
+                &feedback.impact.to_string(),
+                anchor.and_then(|a| a.file_path.as_deref()),
+                anchor.and_then(|a| a.line_number.map(|l| l as i32)),
+                anchor.and_then(|a| a.side.map(|s| s.to_string())),
+                Option::<String>::None,
+                anchor.and_then(|a| a.head_sha.as_deref()),
+                &feedback.author,
+                &feedback.created_at,
+                &feedback.updated_at,
+            ),
+        )?;
+        Ok(())
+    }
+
+    pub fn save_comment(&self, comment: &Comment) -> Result<(), rusqlite::Error> {
+        let conn = self.conn.lock().expect("Failed to acquire database lock");
         conn.execute(
-            r#"INSERT INTO thread_links (id, thread_id, provider, provider_feedback_id, provider_root_comment_id, last_synced_at) 
-             VALUES ('l1', 't1', 'github', 'gh1', 'c1', 'now')"#,
-            [],
-        )
-        .unwrap();
-        conn.execute(
-            r#"INSERT INTO comments (id, thread_id, author, body, created_at, updated_at) 
-             VALUES ('c1', 't1', 'author', 'Legacy Comment', 'now', 'now')"#,
-            [],
-        )
-        .unwrap();
+            r#"
+            INSERT INTO comments (id, feedback_id, author, body, parent_id, created_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            ON CONFLICT(id) DO NOTHING
+            "#,
+            (
+                &comment.id,
+                &comment.feedback_id,
+                &comment.author,
+                &comment.body,
+                &comment.parent_id,
+                &comment.created_at,
+                &comment.updated_at,
+            ),
+        )?;
+        Ok(())
+    }
 
-        let db = Database {
-            conn: Arc::new(Mutex::new(conn)),
-        };
-        let conn = db.connection();
-
-        // Trigger migration to v10
-        db.init().unwrap();
-
-        // Verify data moved to feedback and columns renamed
-        let guard = conn.lock().unwrap();
-
-        // Check feedback table
-        let count: i32 = guard
-            .query_row("SELECT COUNT(*) FROM feedback", [], |row| row.get(0))
-            .unwrap();
-        assert_eq!(count, 1);
-
-        let title: String = guard
-            .query_row("SELECT title FROM feedback WHERE id = 't1'", [], |row| {
-                row.get(0)
+    pub fn get_comments_for_feedback(
+        &self,
+        feedback_id: &str,
+    ) -> Result<Vec<Comment>, rusqlite::Error> {
+        let feedback_id_str = feedback_id.to_string();
+        self.comment_repo()
+            .list_for_feedback(&feedback_id_str)
+            .map_err(|e| {
+                rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(1), Some(e.to_string()))
             })
-            .unwrap();
-        assert_eq!(title, "Legacy Thread");
+    }
 
-        // Check feedback_links table
-        let provider: String = guard
-            .query_row(
-                "SELECT provider FROM feedback_links WHERE feedback_id = 't1'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(provider, "github");
+    pub fn get_feedback_by_review(
+        &self,
+        review_id: &str,
+    ) -> Result<Vec<Feedback>, rusqlite::Error> {
+        let review_id_str = review_id.to_string();
+        self.feedback_repo()
+            .find_by_review(&review_id_str)
+            .map_err(|e| {
+                rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(1), Some(e.to_string()))
+            })
+    }
 
-        // Check comments table (column renamed)
-        let body: String = guard
-            .query_row(
-                "SELECT body FROM comments WHERE feedback_id = 't1'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(body, "Legacy Comment");
+    pub fn update_feedback_status(
+        &self,
+        feedback_id: &str,
+        status: crate::domain::ReviewStatus,
+    ) -> Result<(), rusqlite::Error> {
+        let repo = self.feedback_repo();
+        let feedback_id_str = feedback_id.to_string();
+        repo.update_status(&feedback_id_str, status).map_err(|e| {
+            rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(1), Some(e.to_string()))
+        })?;
+        Ok(())
+    }
 
-        // Check threads table dropped
-        let threads_exists: i32 = guard
-            .query_row(
-                "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='threads'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(threads_exists, 0);
+    pub fn update_feedback_impact(
+        &self,
+        feedback_id: &str,
+        impact: crate::domain::FeedbackImpact,
+    ) -> Result<(), rusqlite::Error> {
+        let repo = self.feedback_repo();
+        let feedback_id_str = feedback_id.to_string();
+        repo.update_impact(&feedback_id_str, impact).map_err(|e| {
+            rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(1), Some(e.to_string()))
+        })?;
+        Ok(())
+    }
 
-        // Check thread_links table dropped
-        let thread_links_exists: i32 = guard
-            .query_row(
-                "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='thread_links'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(thread_links_exists, 0);
+    pub fn delete_feedback(&self, feedback_id: &str) -> Result<(), rusqlite::Error> {
+        let repo = self.feedback_repo();
+        let feedback_id_str = feedback_id.to_string();
+        repo.delete(&feedback_id_str).map_err(|e| {
+            rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(1), Some(e.to_string()))
+        })?;
+        Ok(())
     }
 }

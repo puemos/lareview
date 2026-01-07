@@ -4,33 +4,35 @@ This file provides a comprehensive overview of the `lareview` project, intended 
 
 ## Project Overview
 
-`lareview` is a desktop application for code review, built with Rust. It provides a graphical user interface to review code changes (diffs), generate review tasks, and add notes. The application appears to leverage an external AI agent for parts of the review process, communicating via the Agent Client Protocol (ACP).
+`lareview` is a desktop application for code review, built with Rust. It provides a graphical user interface to review code changes (diffs), generate review tasks, and add notes. The application uses an external AI agent for parts of the review process, communicating via the Agent Client Protocol (ACP).
 
 ### Key Technologies
 
 - **Language:** [Rust](https://www.rust-lang.org/) (2024 Edition)
-- **GUI Framework:** [`egui`](https://github.com/emilk/egui) and [`eframe`](https://github.com/emilk/egui/tree/master/crates/eframe) for immediate mode GUI.
+- **GUI Framework:** [Tauri](https://tauri.app/) for desktop app shell with [React](https://react.dev/) + [Tailwind CSS](https://tailwindcss.com/) frontend
 - **Asynchronous Runtime:** [`tokio`](https://tokio.rs/) for managing asynchronous operations.
 - **Database:** [`rusqlite`](https://github.com/rusqlite/rusqlite) for local data storage (SQLite).
 - **Diff/Patch Handling:** [`unidiff`](https://crates.io/crates/unidiff) and [`similar`](https://crates.io/crates/similar) for processing code differences.
 - **Templating:** [`handlebars`](https://crates.io/crates/handlebars) for text templating, likely for generating prompts or reports.
-- **Agent Communication:** `pmcp` and `agent-client-protocol` for interacting with an AI agent.
+- **Agent Communication:** `agent-client-protocol` for interacting with an AI agent.
+- **Diagramming:** [D2](https://d2lang.com/) for architecture diagrams.
 
 ### Architecture
 
 The project follows a modular structure:
 
-- `src/main.rs`: The application entry point. It initializes the `tokio` runtime and the `eframe` GUI application.
-- `src/ui/app.rs`: Contains the core application logic and state management (`LaReviewApp`, `AppState`). It defines the main UI structure and handles events.
-- `src/ui/views/`: Implements the different screens of the application, such as the `generate_view` and `review_view`. The `review_view` now includes a tree-based navigation system.
-- `src/data/`: Manages data persistence. It includes a `db.rs` for SQLite connection handling and repositories (`TaskRepository`, `NoteRepository`, etc.) for data access.
-- `src/domain/`: Defines the core data structures (structs) used throughout the application, like `PullRequest`, `ReviewTask`, and `Note`. The `ReviewTask` struct now includes a `sub_flow` field.
-- `src/acp/`: Contains logic for the Agent Client Protocol, suggesting communication with an external agent for tasks like generating reviews.
+- `src/main.rs`: The application entry point for the Tauri backend.
+- `src/commands/mod.rs`: Tauri commands (Rust) that the frontend calls via IPC.
+- `src/ui/` (deprecated): Old egui UI code being phased out.
+- `frontend/`: New React + TypeScript frontend built with Vite.
+- `src/domain core data structures (/`: Defines thestructs) used throughout the application, like `ReviewTask`, `Review`, `Feedback`.
+- `src/infra/acp/`: Contains logic for the Agent Client Protocol, suggesting communication with an external agent for tasks like generating reviews.
+- `src/infra/db/`: Database layer with SQLite persistence.
 - `src/prompts/`: Includes `handlebars` templates, likely used to generate prompts for the AI agent.
 
 ## UI Views
 
-LaReview has two main views:
+LaReview has a Tauri-based desktop shell with two main views:
 
 - **GENERATE:** This view allows the user to paste a diff, select an AI agent, and generate a review plan.
 - **REVIEW:** This view displays the review plan in a tree-based navigation system. The user can navigate through the plan, view task details, and add notes.
@@ -68,15 +70,21 @@ cargo clippy --all-targets --all-features -- -D warnings
 To execute the test suite:
 
 ```bash
-cargo test --verbose
+cargo test
 ```
 
 ### Building the Application
 
-To compile the application:
+To compile the Rust backend:
 
 ```bash
 cargo build
+```
+
+To build the frontend:
+
+```bash
+cd frontend && pnpm build
 ```
 
 ### Running the Application
@@ -84,7 +92,13 @@ cargo build
 To build and run the application in development mode:
 
 ```bash
-cargo run
+cargo tauri dev
+```
+
+Or run frontend dev server separately:
+
+```bash
+cd frontend && pnpm dev
 ```
 
 ### Database Management Scripts
@@ -94,13 +108,13 @@ The project includes utility scripts for database management:
 1. **Seed Database** - Populate the database with sample data:
 
 ```bash
-cargo run --bin seed_db
+cargo run --bin seed_db --features dev-tools
 ```
 
 2. **Reset Database** - Clear all data from the database:
 
 ```bash
-cargo run --bin reset_db
+cargo run --bin reset_db --features dev-tools
 ```
 
 ## Development Conventions
@@ -108,7 +122,7 @@ cargo run --bin reset_db
 - **Formatting:** The project uses `rustfmt` for consistent code formatting.
 - **Linting:** `clippy` is used with a strict warning policy (`-D warnings`), meaning all warnings are treated as errors in the CI pipeline.
 - **Testing:** Unit and integration tests are run with `cargo test`.
-- **Dependencies:** The project uses a specific nightly toolchain (`nightly-2025-12-06`), as defined in `rust-toolchain.toml`.
+- **Dependencies:** The project uses a specific nightly toolchain as defined in `rust-toolchain.toml`.
 
 ## New Release Process
 

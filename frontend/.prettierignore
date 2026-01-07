@@ -1,0 +1,12 @@
+dist/
+node_modules/
+.git/
+*.svg
+*.md
+*.ico
+*.png
+*.jpg
+*.webp
+*.ttf
+*.woff
+*.woff2

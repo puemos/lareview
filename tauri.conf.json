@@ -1,0 +1,128 @@
+{
+  "$schema": "https://schema.tauri.app/config/2.0.0",
+  "productName": "LaReview",
+  "version": "0.0.17",
+  "identifier": "dev.lareview",
+  "build": {
+    "beforeDevCommand": {
+      "script": "pnpm run dev",
+      "cwd": "frontend"
+    },
+    "beforeBuildCommand": {
+      "script": "pnpm run build",
+      "cwd": "frontend"
+    },
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "frontend/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "LaReview",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "plugins": {
+    "cli": {
+      "description": "LaReview - Better Code Reviews",
+      "args": [
+        {
+          "name": "agent",
+          "short": "a",
+          "takesValue": true,
+          "description": "Agent to use for review"
+        },
+        {
+          "name": "from",
+          "takesValue": true,
+          "description": "Source branch/tag/commit (use with --to or as positional)"
+        },
+        {
+          "name": "to",
+          "takesValue": true,
+          "description": "Target branch/tag/commit (requires --from)"
+        },
+        {
+          "name": "pr",
+          "short": "p",
+          "takesValue": true,
+          "description": "PR reference (owner/repo#number or URL)"
+        },
+        {
+          "name": "status",
+          "description": "Review uncommitted changes"
+        },
+        {
+          "name": "stdin",
+          "description": "Read diff from stdin"
+        },
+        {
+          "name": "open-pending",
+          "takesValue": true,
+          "description": "Open pending review from file path (internal use)"
+        }
+      ],
+      "subcommands": {
+        "diff": {
+          "description": "Review changes between branches/tags/commits",
+          "args": [
+            {
+              "name": "from",
+              "required": true,
+              "takesValue": true,
+              "description": "Source branch/tag/commit"
+            },
+            {
+              "name": "to",
+              "required": true,
+              "takesValue": true,
+              "description": "Target branch/tag/commit"
+            }
+          ]
+        },
+        "pr": {
+          "description": "Review a GitHub PR",
+          "args": [
+            {
+              "name": "pr_ref",
+              "required": true,
+              "takesValue": true,
+              "description": "PR reference (owner/repo#number or owner/repo/pull/number)"
+            }
+          ]
+        },
+        "status": {
+          "description": "Review uncommitted changes"
+        },
+        "gui": {
+          "description": "Open the GUI"
+        },
+        "db-reset": {
+          "description": "Reset the database (requires dev-tools feature)"
+        },
+        "db-seed": {
+          "description": "Seed the database with test data (requires dev-tools feature)"
+        }
+      }
+    },
+    "deep-link": {
+      "desktop": {
+        "schemes": ["lareview"]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["assets/logo/512-mac.png"]
+  }
+}

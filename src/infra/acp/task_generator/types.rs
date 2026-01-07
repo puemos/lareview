@@ -1,5 +1,4 @@
 use crate::infra::acp::task_mcp_server::RunContext;
-use agent_client_protocol::SessionUpdate;
 use std::path::PathBuf;
 
 /// Input parameters for task generation.
@@ -38,14 +37,32 @@ pub struct GenerateTasksResult {
 /// Different types of progress updates that can be streamed from the agent.
 #[derive(Debug, Clone)]
 pub enum ProgressEvent {
-    /// Raw ACP session update, streamed to the UI.
-    Update(Box<SessionUpdate>),
+    /// Delta for agent message text (only new characters since last update).
+    MessageDelta { id: String, delta: String },
+    /// Delta for agent thought text (only new characters since last update).
+    ThoughtDelta { id: String, delta: String },
+    /// Tool call started (phase 1 of two-phase update).
+    ToolCallStarted {
+        tool_call_id: String,
+        title: String,
+        kind: String,
+    },
+    /// Tool call completed with full data (phase 2 of two-phase update).
+    ToolCallComplete {
+        tool_call_id: String,
+        status: String,
+        title: String,
+        raw_input: Option<serde_json::Value>,
+        raw_output: Option<serde_json::Value>,
+    },
+    /// Plan update (sent as complete object).
+    Plan(agent_client_protocol::Plan),
     /// Local log output from the ACP worker/process.
     LocalLog(String),
     /// Signal that the agent has finished its work (received finalize_review).
     Finalized,
     /// A new task is being generated.
-    TaskStarted(String),
+    TaskStarted(String, String),
     /// A new task has been successfully persisted by the MCP server.
     TaskAdded(String),
     /// A new comment has been successfully persisted by the MCP server.

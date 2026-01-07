@@ -39,16 +39,22 @@ impl ReadCheck {
     }
 }
 
+type PendingToolCallValue = (String, String, Option<serde_json::Value>);
+type PendingToolCallMap = HashMap<String, PendingToolCallValue>;
+
 /// Client implementation for receiving agent callbacks.
 pub(super) struct LaReviewClient {
     pub(super) messages: Arc<Mutex<Vec<String>>>,
     pub(super) thoughts: Arc<Mutex<Vec<String>>>,
-    pub(super) tasks: Arc<Mutex<Vec<ReviewTask>>>, // Changed to accumulate tasks
-    pub(super) finalization_received: Arc<Mutex<bool>>, // Track if finalize_review was called
+    pub(super) tasks: Arc<Mutex<Vec<ReviewTask>>>,
+    pub(super) finalization_received: Arc<Mutex<bool>>,
     pub(super) raw_tasks_payload: Arc<Mutex<Option<serde_json::Value>>>,
     tool_call_names: Arc<Mutex<HashMap<String, String>>>,
+    pending_tool_calls: Arc<Mutex<PendingToolCallMap>>,
     last_message_id: Arc<Mutex<Option<String>>>,
     last_thought_id: Arc<Mutex<Option<String>>>,
+    /// Track last sent byte length per message/thought ID for delta computation
+    last_sent_lengths: Arc<Mutex<HashMap<String, usize>>>,
     progress: Option<tokio::sync::mpsc::UnboundedSender<ProgressEvent>>,
     run_id: String,
     has_repo_access: bool,
@@ -170,12 +176,14 @@ impl LaReviewClient {
         Self {
             messages: Arc::new(Mutex::new(Vec::new())),
             thoughts: Arc::new(Mutex::new(Vec::new())),
-            tasks: Arc::new(Mutex::new(Vec::new())), // Changed to accumulate tasks
-            finalization_received: Arc::new(Mutex::new(false)), // Track if finalize_review was called
+            tasks: Arc::new(Mutex::new(Vec::new())),
+            finalization_received: Arc::new(Mutex::new(false)),
             raw_tasks_payload: Arc::new(Mutex::new(None)),
             tool_call_names: Arc::new(Mutex::new(HashMap::new())),
+            pending_tool_calls: Arc::new(Mutex::new(HashMap::new())),
             last_message_id: Arc::new(Mutex::new(None)),
             last_thought_id: Arc::new(Mutex::new(None)),
+            last_sent_lengths: Arc::new(Mutex::new(HashMap::new())),
             progress,
             run_id: run_id.into(),
             has_repo_access,
@@ -582,25 +590,71 @@ impl agent_client_protocol::Client for LaReviewClient {
         match &update {
             SessionUpdate::AgentMessageChunk(chunk) => {
                 if let ContentBlock::Text(text) = &chunk.content {
-                    let _ = self.append_streamed_content(
+                    let (full_text, _is_new) = self.append_streamed_content(
                         &self.messages,
                         &self.last_message_id,
                         chunk.meta.as_ref(),
                         &text.text,
                     );
+
+                    // Compute delta: get the message ID and compare to last sent length
+                    let msg_id = Self::extract_chunk_id(chunk.meta.as_ref())
+                        .unwrap_or_else(|| "default_msg".to_string());
+
+                    let delta = {
+                        let mut lengths = self.last_sent_lengths.lock().unwrap();
+                        let last_len = *lengths.get(&msg_id).unwrap_or(&0);
+                        let delta = if full_text.len() > last_len {
+                            full_text[last_len..].to_string()
+                        } else {
+                            String::new()
+                        };
+                        lengths.insert(msg_id.clone(), full_text.len());
+                        delta
+                    };
+
+                    if !delta.is_empty()
+                        && let Some(tx) = &self.progress
+                    {
+                        let _ = tx.send(ProgressEvent::MessageDelta { id: msg_id, delta });
+                    }
                 }
-                // Important: No progress update for messages because they're not the final result
             }
             SessionUpdate::AgentThoughtChunk(chunk) => {
                 if let ContentBlock::Text(text) = &chunk.content {
-                    let _ = self.append_streamed_content(
+                    let (full_text, _is_new) = self.append_streamed_content(
                         &self.thoughts,
                         &self.last_thought_id,
                         chunk.meta.as_ref(),
                         &text.text,
                     );
+
+                    // Compute delta for thoughts
+                    let thought_id = Self::extract_chunk_id(chunk.meta.as_ref())
+                        .unwrap_or_else(|| "default_thought".to_string());
+
+                    let delta = {
+                        let mut lengths = self.last_sent_lengths.lock().unwrap();
+                        let key = format!("thought_{}", thought_id);
+                        let last_len = *lengths.get(&key).unwrap_or(&0);
+                        let delta = if full_text.len() > last_len {
+                            full_text[last_len..].to_string()
+                        } else {
+                            String::new()
+                        };
+                        lengths.insert(key, full_text.len());
+                        delta
+                    };
+
+                    if !delta.is_empty()
+                        && let Some(tx) = &self.progress
+                    {
+                        let _ = tx.send(ProgressEvent::ThoughtDelta {
+                            id: thought_id,
+                            delta,
+                        });
+                    }
                 }
-                // Important: No progress update for thoughts because they're not the final result
             }
             SessionUpdate::ToolCall(call) => {
                 debug!(
@@ -609,6 +663,7 @@ impl agent_client_protocol::Client for LaReviewClient {
                     call.title, call.raw_input, call.raw_output
                 );
 
+                let tool_call_id = call.tool_call_id.to_string();
                 let tool_name = Self::tool_name_from_title(&call.title)
                     .map(|value| value.to_string())
                     .or_else(|| {
@@ -626,6 +681,26 @@ impl agent_client_protocol::Client for LaReviewClient {
                 let is_finalize_tool = matches!(tool_name.as_deref(), Some("finalize_review"))
                     || call.title.contains("finalize_review");
 
+                // Get tool kind as string
+                let kind = format!("{:?}", call.kind).to_lowercase();
+
+                // Emit ToolCallStarted (phase 1)
+                if let Some(tx) = &self.progress {
+                    let _ = tx.send(ProgressEvent::ToolCallStarted {
+                        tool_call_id: tool_call_id.clone(),
+                        title: call.title.clone(),
+                        kind: kind.clone(),
+                    });
+                }
+
+                // Store pending tool call for later completion
+                if let Ok(mut pending) = self.pending_tool_calls.lock() {
+                    pending.insert(
+                        tool_call_id,
+                        (call.title.clone(), kind, call.raw_input.clone()),
+                    );
+                }
+
                 if is_return_task_tool {
                     let task_id = call
                         .raw_input
@@ -633,10 +708,17 @@ impl agent_client_protocol::Client for LaReviewClient {
                         .and_then(|v| v.get("id").and_then(|id| id.as_str()))
                         .map(|s| s.to_string());
 
+                    let title = call
+                        .raw_input
+                        .as_ref()
+                        .and_then(|v| v.get("title").and_then(|t| t.as_str()))
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| "New Task".to_string());
+
                     if let Some(id) = task_id
                         && let Some(tx) = &self.progress
                     {
-                        let _ = tx.send(ProgressEvent::TaskStarted(id));
+                        let _ = tx.send(ProgressEvent::TaskStarted(id, title));
                     }
 
                     // Handle streaming return_task
@@ -706,6 +788,30 @@ impl agent_client_protocol::Client for LaReviewClient {
                     || tool_id.contains("add_feedback");
 
                 if is_completed {
+                    // Emit ToolCallComplete (phase 2) - get stored data and merge with update
+                    let pending_data = self
+                        .pending_tool_calls
+                        .lock()
+                        .ok()
+                        .and_then(|mut p| p.remove(tool_id));
+
+                    let (title, _kind, stored_input) =
+                        pending_data.unwrap_or_else(|| (String::new(), String::new(), None));
+
+                    let final_title = update.fields.title.clone().unwrap_or(title);
+                    let final_input = update.fields.raw_input.clone().or(stored_input);
+                    let final_output = update.fields.raw_output.clone();
+
+                    if let Some(tx) = &self.progress {
+                        let _ = tx.send(ProgressEvent::ToolCallComplete {
+                            tool_call_id: tool_id.to_string(),
+                            status: "completed".to_string(),
+                            title: final_title.clone(),
+                            raw_input: final_input.clone(),
+                            raw_output: final_output.clone(),
+                        });
+                    }
+
                     if is_finalize {
                         debug!(target: "acp", "finalize_review completed via ToolCallUpdate");
                         self.mark_finalization_received();
@@ -713,16 +819,12 @@ impl agent_client_protocol::Client for LaReviewClient {
                             let _ = tx.send(ProgressEvent::MetadataUpdated);
                         }
                     } else if is_return_task {
-                        let task_id = update
-                            .fields
-                            .raw_input
+                        let task_id = final_input
                             .as_ref()
                             .and_then(|v| v.get("id").and_then(|id| id.as_str()))
                             .map(|s| s.to_string())
                             .or_else(|| {
-                                update
-                                    .fields
-                                    .raw_output
+                                final_output
                                     .as_ref()
                                     .and_then(|v| v.get("task_id").and_then(|id| id.as_str()))
                                     .map(|s| s.to_string())
@@ -734,18 +836,42 @@ impl agent_client_protocol::Client for LaReviewClient {
                     } else if is_add_feedback && let Some(tx) = &self.progress {
                         let _ = tx.send(ProgressEvent::CommentAdded);
                     }
+                } else if is_failed {
+                    // Emit ToolCallComplete with failed status
+                    let pending_data = self
+                        .pending_tool_calls
+                        .lock()
+                        .ok()
+                        .and_then(|mut p| p.remove(tool_id));
+
+                    let (title, _kind, stored_input) =
+                        pending_data.unwrap_or_else(|| (String::new(), String::new(), None));
+
+                    if let Some(tx) = &self.progress {
+                        let _ = tx.send(ProgressEvent::ToolCallComplete {
+                            tool_call_id: tool_id.to_string(),
+                            status: "failed".to_string(),
+                            title: update.fields.title.clone().unwrap_or(title),
+                            raw_input: update.fields.raw_input.clone().or(stored_input),
+                            raw_output: update.fields.raw_output.clone(),
+                        });
+                    }
                 }
 
                 if is_completed || is_failed {
                     self.clear_tool_call_name(&update.tool_call_id);
                 }
             }
+            SessionUpdate::Plan(plan) => {
+                // Forward plan updates using the new Plan variant
+                if let Some(tx) = &self.progress {
+                    let _ = tx.send(ProgressEvent::Plan(plan.clone()));
+                }
+            }
             _ => {}
         }
 
-        if let Some(tx) = &self.progress {
-            let _ = tx.send(ProgressEvent::Update(Box::new(update)));
-        }
+        // Removed: No longer send catch-all Update events
         Ok(())
     }
 
@@ -871,19 +997,7 @@ mod tests {
             "id": "T1",
             "title": "Title",
             "description": "Desc",
-            "diagram": {
-                "type": "flow",
-                "data": {
-                    "direction": "LR",
-                    "nodes": [
-                        { "id": "x", "label": "X", "kind": "generic" },
-                        { "id": "y", "label": "Y", "kind": "generic" }
-                    ],
-                    "edges": [
-                        { "from": "x", "to": "y", "label": "rel" }
-                    ]
-                }
-            },
+            "diagram": "flow LR x[label=X kind=generic] y[label=Y kind=generic] x --> y[label=rel]",
             "stats": { "risk": "LOW", "tags": [] },
             "hunk_ids": []
         });

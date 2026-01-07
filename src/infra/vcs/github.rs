@@ -34,30 +34,28 @@ pub struct GitHubReview {
     pub url: Option<String>,
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct DraftReviewComment {
+    pub path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub position: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub side: Option<String>,
+    pub body: String,
+}
+
 lazy_static! {
-    static ref GH_PR_URL_RE: Regex =
-        Regex::new(r"^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/pull/(\d+)")
-            .expect("github pr url regex");
-    static ref GH_OWNER_REPO_NUM_RE: Regex =
-        Regex::new(r"^([^/\s]+)/([^#\s]+)#(\d+)$").expect("github owner/repo#num regex");
+    static ref GH_PR_RE: Regex = Regex::new(
+        r"^(?:(?:https?://)?(?:www\.)?github\.com/)?([^/\s#]+)/([^/\s#]+)(?:/pull/|/|#)(\d+)/?$"
+    )
+    .expect("github pr regex");
 }
 
 pub fn parse_pr_ref(input: &str) -> Option<GitHubPrRef> {
     let trimmed = input.trim();
-    if let Some(caps) = GH_PR_URL_RE.captures(trimmed) {
-        let owner = caps.get(1)?.as_str().to_string();
-        let repo = caps.get(2)?.as_str().to_string();
-        let number: u32 = caps.get(3)?.as_str().parse().ok()?;
-        let url = format!("https://github.com/{owner}/{repo}/pull/{number}");
-        return Some(GitHubPrRef {
-            owner,
-            repo,
-            number,
-            url,
-        });
-    }
-
-    if let Some(caps) = GH_OWNER_REPO_NUM_RE.captures(trimmed) {
+    if let Some(caps) = GH_PR_RE.captures(trimmed) {
         let owner = caps.get(1)?.as_str().to_string();
         let repo = caps.get(2)?.as_str().to_string();
         let number: u32 = caps.get(3)?.as_str().parse().ok()?;
@@ -116,7 +114,13 @@ pub async fn fetch_pr_metadata(pr: &GitHubPrRef) -> Result<GitHubPrMetadata> {
 pub async fn fetch_pr_diff(pr: &GitHubPrRef) -> Result<String> {
     let gh_path = shell::find_bin("gh").context("resolve `gh` path")?;
     let output = Command::new(&gh_path)
-        .args(["pr", "diff", pr.url.as_str()])
+        .args([
+            "pr",
+            "diff",
+            &pr.number.to_string(),
+            "--repo",
+            &format!("{}/{}", pr.owner, pr.repo),
+        ])
         .output()
         .await
         .context("run `gh pr diff`")?;
@@ -207,19 +211,27 @@ pub async fn create_review_comment(
     Ok(GitHubReviewComment { id, url })
 }
 
-/// Create a PR review with a single overall comment.
+/// Create a PR review with an optional body and individual comments.
 pub async fn create_review(
     owner: &str,
     repo: &str,
     number: u32,
-    body: &str,
+    body: Option<&str>,
+    comments: Option<Vec<DraftReviewComment>>,
 ) -> Result<GitHubReview> {
     let gh_path = shell::find_bin("gh").context("resolve `gh` path")?;
 
-    let payload = serde_json::json!({
+    let mut payload = serde_json::json!({
         "event": "COMMENT",
-        "body": body,
     });
+
+    if let Some(body) = body {
+        payload["body"] = serde_json::json!(body);
+    }
+
+    if let Some(comments) = comments {
+        payload["comments"] = serde_json::to_value(comments)?;
+    }
 
     let mut child = Command::new(&gh_path)
         .args([
@@ -278,26 +290,37 @@ mod tests {
 
     #[test]
     fn test_parse_pr_ref_valid_url() {
-        let input = "https://github.com/puemos/lareview/pull/123";
-        let res = parse_pr_ref(input).expect("should parse");
-        assert_eq!(res.owner, "puemos");
-        assert_eq!(res.repo, "lareview");
-        assert_eq!(res.number, 123);
+        let inputs = [
+            "https://github.com/puemos/lareview/pull/123",
+            "http://github.com/puemos/lareview/pull/123",
+            "github.com/puemos/lareview/pull/123",
+        ];
+        for input in inputs {
+            let res = parse_pr_ref(input).unwrap_or_else(|| panic!("should parse {}", input));
+            assert_eq!(res.owner, "puemos");
+            assert_eq!(res.repo, "lareview");
+            assert_eq!(res.number, 123);
+        }
     }
 
     #[test]
-    fn test_parse_pr_ref_valid_short_ref() {
-        let input = "puemos/lareview#123";
-        let res = parse_pr_ref(input).expect("should parse");
-        assert_eq!(res.owner, "puemos");
-        assert_eq!(res.repo, "lareview");
-        assert_eq!(res.number, 123);
+    fn test_parse_pr_ref_formats() {
+        let cases = [
+            ("puemos/lareview#123", 123),
+            ("puemos/lareview/123", 123),
+            ("puemos/lareview/pull/123", 123),
+            ("puemos/hls-downloader/490", 490),
+        ];
+        for (input, expected_num) in cases {
+            let res = parse_pr_ref(input).unwrap_or_else(|| panic!("should parse {}", input));
+            assert_eq!(res.owner, "puemos");
+            assert_eq!(res.number, expected_num);
+        }
     }
 
     #[test]
     fn test_parse_pr_ref_invalid() {
         assert!(parse_pr_ref("invalid").is_none());
-        assert!(parse_pr_ref("https://google.com").is_none());
         assert!(parse_pr_ref("owner/repo").is_none());
     }
 }

@@ -7,6 +7,7 @@ use agent_client_protocol::{
 };
 use anyhow::{Context as _, Result};
 use futures::future::LocalBoxFuture;
+use log::debug;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
@@ -19,13 +20,13 @@ use tokio::task::LocalSet;
 
 use super::{GenerateTasksInput, GenerateTasksResult, ProgressEvent};
 
-fn push_log(logs: &Arc<Mutex<Vec<String>>>, message: impl Into<String>, debug: bool) {
+fn push_log(logs: &Arc<Mutex<Vec<String>>>, message: impl Into<String>, debug_mode: bool) {
     let msg = message.into();
     if let Ok(mut guard) = logs.lock() {
         guard.push(msg.clone());
     }
-    if debug {
-        eprintln!("[acp] {msg}");
+    if debug_mode {
+        debug!(target: "acp", "{}", msg);
     }
 }
 

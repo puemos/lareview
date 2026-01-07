@@ -53,19 +53,8 @@ async fn test_return_task_tool_writes_file() {
         "id": "x",
         "title": "test",
         "description": "test task",
-        "stats": { "risk": "LOW", "tags": ["test"] },
-        "diagram": {
-            "type": "sequence",
-            "data": {
-                "actors": [
-                    { "id": "reviewer", "label": "Reviewer", "kind": "user" },
-                    { "id": "code", "label": "Code", "kind": "service" }
-                ],
-                "messages": [
-                    { "type": "call", "data": { "from": "reviewer", "to": "code", "label": "review" } }
-                ]
-            }
-        },
+        "stats": { "risk": "low", "tags": ["test"] },
+        "diagram": "flow LR x[label=X kind=generic] y[label=Y kind=generic] x --> y[label=rel]",
         "hunk_ids": ["src/a.rs#H1"]
     });
     let res = tool
@@ -139,19 +128,8 @@ async fn test_return_task_tool_persists_to_db() {
         "id": "task-123",
         "title": "DB Task",
         "description": "persist me",
-        "stats": { "risk": "HIGH", "tags": ["database"] },
-        "diagram": {
-            "type": "sequence",
-            "data": {
-                "actors": [
-                    { "id": "reviewer", "label": "Reviewer", "kind": "user" },
-                    { "id": "db", "label": "DB", "kind": "database" }
-                ],
-                "messages": [
-                    { "type": "call", "data": { "from": "reviewer", "to": "db", "label": "check" } }
-                ]
-            }
-        },
+        "stats": { "risk": "high", "tags": ["database"] },
+        "diagram": "flow LR x[label=X kind=generic] y[label=Y kind=generic] x --> y[label=rel]",
         "hunk_ids": ["src/a.rs#H1"]
     });
 
@@ -286,19 +264,8 @@ async fn test_multiple_tasks_and_finalize_persists_correctly() {
         "id": "task-1",
         "title": "First Task",
         "description": "First task description",
-        "stats": { "risk": "LOW", "tags": ["one"] },
-        "diagram": {
-            "type": "sequence",
-            "data": {
-                "actors": [
-                    { "id": "reviewer", "label": "Reviewer", "kind": "user" },
-                    { "id": "code", "label": "Code", "kind": "service" }
-                ],
-                "messages": [
-                    { "type": "call", "data": { "from": "reviewer", "to": "code", "label": "review" } }
-                ]
-            }
-        },
+        "stats": { "risk": "low", "tags": ["one"] },
+        "diagram": "{\"type\":\"sequence\",\"data\":{\"actors\":[{\"id\":\"reviewer\",\"label\":\"Reviewer\",\"kind\":\"user\"},{\"id\":\"code\",\"label\":\"Code\",\"kind\":\"service\"}],\"messages\":[{\"type\":\"call\",\"data\":{\"from\":\"reviewer\",\"to\":\"code\",\"label\":\"review\"}}]}}",
         "hunk_ids": ["src/a.rs#H1"]
     });
 
@@ -317,19 +284,8 @@ async fn test_multiple_tasks_and_finalize_persists_correctly() {
         "id": "task-2",
         "title": "Second Task",
         "description": "Second task description",
-        "stats": { "risk": "MEDIUM", "tags": ["two"] },
-        "diagram": {
-            "type": "sequence",
-            "data": {
-                "actors": [
-                    { "id": "reviewer", "label": "Reviewer", "kind": "user" },
-                    { "id": "code", "label": "Code", "kind": "service" }
-                ],
-                "messages": [
-                    { "type": "call", "data": { "from": "reviewer", "to": "code", "label": "verify" } }
-                ]
-            }
-        },
+        "stats": { "risk": "medium", "tags": ["two"] },
+        "diagram": "flow LR a[label=A kind=generic] b[label=B kind=generic] a --> b[label=edge]",
         "hunk_ids": ["src/a.rs#H1"]
     });
 

@@ -6,12 +6,12 @@ LaReview follows a layered architecture to keep core concepts stable and keep IO
 
 ### `src/domain/` (pure)
 
-- Core types and invariants: entities/value objects like `ReviewTask`, `Review`, `ReviewRun`, `ReviewStatus`, `RiskLevel`, `Thread`, `Comment`.
+- Core types and invariants: entities/value objects like `ReviewTask`, `Review`, `ReviewRun`, `ReviewStatus`, `RiskLevel`, `Feedback`, `Comment`.
 - `ReviewSource`: Distinguishes between manual diff pastes and GitHub Pull Requests.
 - `Review` and `ReviewRun`: Separation between a review entity and its specific generation attempts.
-- `Thread` and `Comment`: Feedback items associated with tasks or specific lines of code.
+- `Feedback` and `Comment`: Feedback items associated with tasks or specific lines of code.
 - `Plan` and `PlanEntry`: AI-generated roadmap for the review process.
-- No dependencies on `egui`, `rusqlite`, `tokio`, filesystem, or network.
+- No dependencies on `tauri`, `rusqlite`, `tokio`, filesystem, or network.
 - Prefer putting intrinsic logic on the types themselves (e.g., `RiskLevel::rank()`, `ReviewStatus::is_closed()`).
 
 ### `src/application/` (use-cases + policies)
@@ -23,74 +23,66 @@ LaReview follows a layered architecture to keep core concepts stable and keep IO
 ### `src/infra/` (adapters + IO)
 
 - Integrations with the outside world.
-- SQLite persistence (`src/infra/db/`), ACP integration (`src/infra/acp/`), and external-format parsing (`src/infra/diff.rs`).
+- SQLite persistence (`src/infra/db/`), ACP integration (`src/infra/acp/`), and diff parsing (`src/infra/diff/`).
 - `src/infra/github/`: GitHub API integration for fetching PRs and syncing comments.
 - `src/infra/d2/`: D2 diagramming tool integration for generating architecture diagrams.
-- `src/infra/git/` and `src/infra/brew/`: Local tool integrations for git operations and dependency management.
+- `src/infra/vcs/`: Git operations (local remotes, diff parsing).
+- `src/infra/cli/`: CLI commands for `lareview` binary.
 - Keep parsing/normalization of external formats here unless it becomes a first-class domain concept.
 
-### `src/ui/` (presentation)
+### `frontend/` (presentation - React + TypeScript)
 
-- `egui`/`eframe` UI.
-- `src/ui/components/`: reusable UI widgets (buttons, pills, badges). Avoid business logic here.
-- `src/ui/views/`: screens. Keep views thin; lean on `application/` for policies and `infra/` for integrations.
+- React UI built with Vite, Tailwind CSS, and Tauri for native desktop capabilities.
+- `src/components/`: reusable UI components.
+- `src/hooks/`: custom React hooks for Tauri IPC and state management.
+- `src/store/`: Zustand store for frontend state.
 - Views include: `Generate`, `Review`, `Repos` (for managing linked repositories), and `Settings`.
+- Communicates with Rust backend via Tauri commands.
 
-## UI store (reducers + commands)
+### `src/commands/` (Tauri IPC bridge)
 
-UI logic goes through a reducer-style store in `src/ui/app/store/` so state is deterministic and testable:
-
-- **Action** (`action.rs`): user intent or external event (Navigation, Generate, Review, Settings, Async).
-- **Reducer** (`reducer.rs`): pure-ish state transitions that mutate `AppState` and emit **Command** values for side effects.
-- **Command runtime** (`runtime.rs`): executes side effects (DB, ACP, GitHub, D2, filesystem), then dispatches follow-up `AsyncAction`s.
-- **Dispatch entrypoint** (`mod.rs`): `LaReviewApp::dispatch` runs the reducer, then feeds commands to the runtime.
-
-Flow highlights:
-
-- Generate: `RunRequested` validates diff input, flips `is_generating`, clears the timeline, and emits `StartGeneration`. Supports both manual diffs and GitHub PRs.
-- Review: Centralized selection of reviews, runs, and tasks. Manages feedback threads and comments.
-- Settings: Manages tool requirements (like D2), GitHub authentication status, and agent/path overrides.
+- Tauri commands that the React frontend invokes.
+- Handles serialization/deserialization between frontend and backend.
+- Example: `generate_review`, `parse_diff`, `export_review`.
 
 ## State Management
 
-LaReview uses a hybrid state management approach to balance architectural purity with UI responsiveness:
+### Backend State (`AppState`)
 
-### `AppState` (Global, Reducer-Managed)
+- **Location**: `src/state/mod.rs`.
+- **Scope**: Domain state (linked repos, configurations) and database connection.
+- **Update Pattern**: Initialized once at app startup, accessed via Tauri State in commands.
 
-- **Location**: `src/ui/app/state.rs`.
-- **Scope**: Domain state (linked repos, configurations) and significant UI state (view navigation, active selections).
-- **Update Pattern**: Mutated exclusively via **Reducers** in response to **Actions**.
-- **Usage**: Use for anything that:
-  - Needs to be initialized from or persisted to disk (e.g., `has_seen_requirements`).
-  - Triggers asynchronous operations or commands (e.g., `is_generating`).
-  - Requires coordinated updates across multiple components or views.
+### Frontend State (Zustand)
 
-### `UiMemory` (Local, Transient)
+- **Location**: `frontend/src/store/index.ts`.
+- **Scope**: UI state, selected review/run/task, feedback list, progress messages.
+- **Update Pattern**: Mutated via Zustand actions, persisted to backend via Tauri commands.
 
-- **Location**: `src/ui/app/ui_memory.rs`.
-- **Scope**: Ephemeral UI state stored in `egui`'s temporary memory.
-- **Update Pattern**: Mutated directly by UI components via `with_ui_memory_mut`.
-- **Usage**: Use for **purely visual state** that doesn't affect the reducer flow:
-  - Form drafts (e.g., custom agent fields before saving).
-  - Transient UI toggles (e.g., sidebar widths, menu visibility).
-  - Performance-motivated caching (e.g., `cached_diffs`).
-  - It survives frame updates but _not_ app restarts.
+## Tauri IPC Flow
 
-Add new UI behaviors by introducing an `Action` variant, handling it in `reducer.rs` (with tests there), and emitting a `Command` that the runtime can execute.
+1. Frontend calls Tauri command (e.g., `invoke('generate_review', {...})`).
+2. Command in `src/commands/mod.rs` executes business logic.
+3. Command accesses `AppState` for database operations.
+4. Command may spawn async tasks for ACP agent communication.
+5. Progress events streamed back via Tauri Channel.
+6. Frontend receives events and updates Zustand store.
 
 ## Dependency rules (intent)
 
 - `domain` depends on nothing internal.
 - `application` depends on `domain`.
 - `infra` depends on `domain`.
-- `ui` depends on `application`, `domain`, and `infra`.
+- `commands` depends on `domain` and `infra`.
+- `frontend` depends on `commands` (via Tauri invoke) and manages its own state.
 
-If you’re unsure where something goes:
+If you're unsure where something goes:
 
 - **Is it a core concept/invariant?** → `domain`
 - **Is it a product policy/use-case?** → `application`
 - **Is it IO/parsing/external integration?** → `infra`
-- **Is it a widget/layout/rendering?** → `ui`
+- **Is it a widget/layout/rendering in the frontend?** → `frontend`
+- **Is it bridging frontend to backend?** → `commands`
 
 ## Current structure map
 
@@ -98,16 +90,11 @@ If you’re unsure where something goes:
 - MCP task server: `src/infra/acp/task_mcp_server/`
   - **Tools**: `return_task`, `finalize_review`, `add_comment` (for targeted line feedback), `repo_search`, and `repo_list_files`.
 - Local persistence (SQLite): `src/infra/db/`
-- SQLite repositories: `src/infra/db/repository/` (task/review/thread/comment)
-- GitHub Integration: `src/infra/github.rs`
-- Diagram Generation (D2): `src/infra/d2.rs`
-- Diff parsing/normalization: `src/infra/diff.rs`
-- Review display ordering: `src/application/review/ordering.rs`
-- Review Export: `src/application/review/export.rs`
-- Diff UI component: `src/ui/components/diff/` (model/parse/render)
-- App shell + store: `src/ui/app/` (init/header/polling/overlay/update + `store/`)
-- Store plumbing (actions/reducer/commands/runtime): `src/ui/app/store/`
-- Generate screen (UI): `src/ui/views/generate/`
-- Review screen (UI): `src/ui/views/review/`
-- Repos screen (UI): `src/ui/views/repos.rs`
-- Settings screen (UI): `src/ui/views/settings.rs`
+- SQLite repositories: `src/infra/db/repository/` (task/review/feedback/comment)
+- GitHub Integration: `src/infra/vcs/github.rs`
+- Diagram Generation (D2): `src/infra/diagram.rs`
+- Diff parsing/normalization: `src/infra/diff/`
+- Review display ordering: `src/domain/review/ordering.rs`
+- Review Export: `src/commands/mod.rs` (markdown export)
+- Tauri commands (IPC bridge): `src/commands/mod.rs`
+- Frontend (React): `frontend/src/` (components, hooks, store, views)

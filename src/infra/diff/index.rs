@@ -15,6 +15,8 @@ use serde_json;
 
 use std::fmt;
 
+pub type LineRange = (u32, u32);
+
 /// Errors that can occur when working with DiffIndex
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DiffIndexError {
@@ -133,25 +135,25 @@ impl DiffIndexError {
 
 /// A hunk with its coordinates and potentially an ID
 #[derive(Debug, Clone)]
-struct IndexedHunk {
-    hunk: Hunk,
+pub struct IndexedHunk {
+    pub hunk: Hunk,
     /// The coordinates of the hunk (old_start, new_start)
-    coords: (u32, u32),
+    pub coords: (u32, u32),
 }
 
 /// An index for a single file within a larger diff.
 #[derive(Debug, Clone)]
-struct FileIndex {
+pub struct FileIndex {
     /// A map from (old_start, new_start) to the indexed hunk.
-    hunks: HashMap<(u32, u32), IndexedHunk>,
+    pub hunks: HashMap<(u32, u32), IndexedHunk>,
     /// A list of all available hunks in order.
-    all_hunks: Vec<IndexedHunk>,
+    pub all_hunks: Vec<IndexedHunk>,
 }
 
 /// An index for a unified diff, allowing for efficient queries.
 #[derive(Debug, Clone)]
 pub struct DiffIndex {
-    files: HashMap<String, FileIndex>,
+    pub files: HashMap<String, FileIndex>,
 }
 
 impl DiffIndex {
@@ -182,32 +184,54 @@ impl DiffIndex {
             }
 
             let mut hunks = HashMap::new();
-            let mut hunks_by_id = HashMap::new();
             let mut all_hunks = Vec::new();
-
-            // Convert file path to a safe identifier format for use in IDs
-            let safe_file_path = file_path.replace("/", "_").replace("-", "_");
-            for (hunk_idx, hunk) in file.hunks().iter().enumerate() {
+            for hunk in file.hunks() {
                 let coords = (hunk.source_start as u32, hunk.target_start as u32);
-
-                // Create a hunk ID that's descriptive based on file and sequential index
-                // Format: file_path#Hn where n is the sequential hunk number in the file (1-indexed)
-                let hunk_id = format!("{}#H{}", safe_file_path, hunk_idx);
-
                 let indexed_hunk = IndexedHunk {
                     hunk: hunk.clone(),
                     coords,
                 };
-
                 hunks.insert(coords, indexed_hunk.clone());
-                hunks_by_id.insert(hunk_id, indexed_hunk.clone());
                 all_hunks.push(indexed_hunk);
             }
-
             files.insert(file_path.to_string(), FileIndex { hunks, all_hunks });
         }
 
-        Ok(Self { files })
+        Ok(DiffIndex { files })
+    }
+
+    /// Finds the hunk containing a specific line number.
+    pub fn find_hunk_at_line(
+        &self,
+        file_path: &str,
+        line_number: u32,
+        side: FeedbackSide,
+    ) -> Option<&IndexedHunk> {
+        let file_index = self.files.get(file_path)?;
+        for indexed_hunk in &file_index.all_hunks {
+            let coords = indexed_hunk.coords;
+            let hunk = &indexed_hunk.hunk;
+            match side {
+                FeedbackSide::Old => {
+                    let old_end = coords.0 + hunk.source_length.saturating_sub(1) as u32;
+                    if line_number >= coords.0 && line_number <= old_end {
+                        return Some(indexed_hunk);
+                    }
+                }
+                FeedbackSide::New => {
+                    let new_end = coords.1 + hunk.target_length.saturating_sub(1) as u32;
+                    if line_number >= coords.1 && line_number <= new_end {
+                        return Some(indexed_hunk);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Renders a single hunk as a unified diff string.
+    pub fn render_hunk_unified(hunk: &unidiff::Hunk, _coords: (u32, u32)) -> String {
+        hunk.to_string()
     }
 
     /// Calculates the total number of additions and deletions for a set of `DiffRef`s.
@@ -442,19 +466,17 @@ impl DiffIndex {
     /// Parse hunk_id (e.g., "src/auth.rs#H3") into file path and 1-based hunk index.
     /// Returns (file_path, hunk_index) where hunk_index is 1-based.
     pub fn parse_hunk_id(&self, hunk_id: &str) -> Option<(String, usize)> {
-        if let Some((file_path, suffix)) = hunk_id.rsplit_once('#') {
-            if let Some(h_num) = suffix.strip_prefix('H') {
-                if let Ok(hunk_idx) = h_num.parse::<usize>() {
-                    if hunk_idx > 0 {
-                        return Some((file_path.to_string(), hunk_idx));
-                    }
-                }
-            }
+        if let Some((file_path, suffix)) = hunk_id.rsplit_once('#')
+            && let Some(h_num) = suffix.strip_prefix('H')
+            && let Ok(hunk_idx) = h_num.parse::<usize>()
+            && hunk_idx > 0
+        {
+            return Some((file_path.to_string(), hunk_idx));
         }
         None
     }
 
-    fn walk_hunk_lines<F>(hunk: &unidiff::Hunk, coords: (u32, u32), mut f: F)
+    pub fn walk_hunk_lines<F>(hunk: &unidiff::Hunk, coords: (u32, u32), mut f: F)
     where
         F: FnMut(usize, &unidiff::Line, Option<u32>, Option<u32>),
     {
@@ -547,6 +569,89 @@ impl DiffIndex {
         found
     }
 
+    /// Find line by line ID within a hunk (e.g., "L3" for the 3rd line).
+    /// This is the simplest and most reliable way to reference lines.
+    /// Line IDs are 1-based (L1, L2, L3...).
+    pub fn find_line_by_id(&self, hunk_id: &str, line_id: &str) -> Option<LineLocation> {
+        let (file_path, hunk_idx) = self.parse_hunk_id(hunk_id)?;
+        let file_index = self.files.get(&file_path)?;
+        let indexed_hunk = file_index.all_hunks.get(hunk_idx - 1)?;
+        let hunk = &indexed_hunk.hunk;
+        let coords = indexed_hunk.coords;
+
+        // Parse line ID (e.g., "L3" -> 3, or just "3" -> 3)
+        let line_id_trimmed = line_id.trim();
+        let line_idx: usize = if let Some(num_str) = line_id_trimmed.strip_prefix('L') {
+            num_str.parse().ok()?
+        } else if let Some(num_str) = line_id_trimmed.strip_prefix('l') {
+            num_str.parse().ok()?
+        } else {
+            line_id_trimmed.parse().ok()?
+        };
+
+        // Line IDs are 1-based, so L1 = index 0
+        if line_idx == 0 {
+            return None;
+        }
+        let target_pos = line_idx - 1;
+
+        let mut found = None;
+        Self::walk_hunk_lines(hunk, coords, |pos, line, old_num, new_num| {
+            if pos == target_pos {
+                found = Some(LineLocation {
+                    position_in_hunk: pos,
+                    old_line_number: old_num,
+                    new_line_number: new_num,
+                    is_addition: line.line_type.as_str() == unidiff::LINE_TYPE_ADDED,
+                    is_deletion: line.line_type.as_str() == unidiff::LINE_TYPE_REMOVED,
+                });
+            }
+        });
+
+        found
+    }
+
+    /// Find the position in the overall diff for a given line in the new file.
+    /// This position is used by GitHub for review comments.
+    pub fn find_position_in_diff(
+        &self,
+        file_path: &str,
+        line_number: u32,
+        side: FeedbackSide,
+    ) -> Option<usize> {
+        let file_index = self.files.get(file_path)?;
+        let mut current_pos = 0;
+
+        for indexed_hunk in &file_index.all_hunks {
+            // Each hunk starts with a header line (@@) which is position 1 relative to the first hunk
+            current_pos += 1;
+            let header_pos = current_pos;
+
+            let hunk = &indexed_hunk.hunk;
+            let coords = indexed_hunk.coords;
+
+            let mut found_pos = None;
+            Self::walk_hunk_lines(hunk, coords, |pos, _line, old_num, new_num| {
+                let match_num = match side {
+                    FeedbackSide::Old => old_num,
+                    FeedbackSide::New => new_num,
+                };
+                if match_num == Some(line_number) {
+                    found_pos = Some(header_pos + pos + 1);
+                }
+            });
+
+            if let Some(pos) = found_pos {
+                return Some(pos);
+            }
+
+            // Advance current_pos by the number of lines in this hunk
+            current_pos += hunk.lines().len();
+        }
+
+        None
+    }
+
     /// Find line by exact content within a hunk.
     /// Returns (line_number_in_file, position_in_hunk_lines_array).
     pub fn find_line_by_content(&self, hunk_id: &str, content: &str) -> Option<(u32, usize)> {
@@ -574,13 +679,14 @@ impl DiffIndex {
 
     /// Generate a unified, agent-friendly manifest with copy-paste ready content.
     /// This is the ONLY manifest needed - consolidates all previous formats.
+    /// Now includes line IDs (L1, L2, etc.) for easy feedback targeting.
     pub fn generate_unified_manifest(&self) -> String {
         let mut result = String::new();
 
-        result.push_str("# Unified Diff Manifest (Copy-Paste Ready)\n\n");
+        result.push_str("# Unified Diff Manifest\n\n");
         result.push_str("## How to Use\n\n");
-        result.push_str("**For tasks:** Use `hunk_ids` with the IDs below.\n");
-        result.push_str("**For feedback:** Use `hunk_id` + copy the exact line content.\n\n");
+        result.push_str("**For tasks:** Use `hunk_ids` array with IDs like `\"src/file.rs#H1\"`\n");
+        result.push_str("**For feedback:** Use `hunk_id` + `line_id` (e.g., `\"L3\"`)\n\n");
 
         let mut sorted_files: Vec<_> = self.files.keys().cloned().collect();
         sorted_files.sort();
@@ -611,25 +717,27 @@ impl DiffIndex {
                 let old_end = coords.0 + hunk.source_length.saturating_sub(1) as u32;
                 let new_end = coords.1 + hunk.target_length.saturating_sub(1) as u32;
 
-                result.push_str(&format!("### {}\n", hunk_id));
+                result.push_str(&format!("## {}\n", hunk_id));
                 result.push_str(&format!(
-                    "- Old lines: {}-{} ({})\n",
-                    coords.0, old_end, hunk.source_length
+                    "Old: {}-{} | New: {}-{}\n",
+                    coords.0, old_end, coords.1, new_end
                 ));
-                result.push_str(&format!(
-                    "- New lines: {}-{} ({})\n",
-                    coords.1, new_end, hunk.target_length
-                ));
-                result.push_str("```diff\n");
+                result.push_str("```\n");
 
-                for line in hunk.lines().iter() {
+                for (line_idx, line) in hunk.lines().iter().enumerate() {
                     let display_line = line.value.trim_end();
                     let prefix = match line.line_type.as_str() {
                         unidiff::LINE_TYPE_ADDED => "+",
                         unidiff::LINE_TYPE_REMOVED => "-",
                         _ => " ",
                     };
-                    result.push_str(&format!("{}{}\n", prefix, display_line));
+                    // Line IDs are 1-based (L1, L2, L3...)
+                    result.push_str(&format!(
+                        "{} L{:<2} | {}\n",
+                        prefix,
+                        line_idx + 1,
+                        display_line
+                    ));
                 }
                 result.push_str("```\n\n");
             }
@@ -809,7 +917,7 @@ impl DiffIndex {
     }
 
     /// Get hunk ranges for a file (for error messages).
-    pub fn get_hunk_ranges(&self, file_path: &str) -> (Vec<(u32, u32)>, Vec<(u32, u32)>) {
+    pub fn get_hunk_ranges(&self, file_path: &str) -> (Vec<LineRange>, Vec<LineRange>) {
         let file_index = match self.files.get(file_path) {
             Some(f) => f,
             None => return (Vec::new(), Vec::new()),
@@ -836,6 +944,30 @@ impl DiffIndex {
             .collect();
 
         (old_ranges, new_ranges)
+    }
+
+    /// Get the formatted content of a hunk given its coordinates.
+    pub fn get_hunk_content_by_coords(
+        &self,
+        file_path: &str,
+        old_start: u32,
+        new_start: u32,
+    ) -> Option<String> {
+        let file_index = self.files.get(file_path)?;
+        let indexed_hunk = file_index.hunks.get(&(old_start, new_start))?;
+        let hunk = &indexed_hunk.hunk;
+
+        let mut content = String::new();
+        for line in hunk.lines() {
+            let prefix = match line.line_type.as_str() {
+                unidiff::LINE_TYPE_ADDED => "+",
+                unidiff::LINE_TYPE_REMOVED => "-",
+                _ => " ",
+            };
+            content.push_str(&format!("{}{}\n", prefix, line.value.trim_end()));
+        }
+
+        Some(content)
     }
 }
 
@@ -1064,12 +1196,12 @@ index 0000000..abcdefg
         let manifest = index.generate_unified_manifest();
 
         assert!(manifest.contains("# src/main.rs"));
-        assert!(manifest.contains("### src/main.rs#H1"));
-        assert!(manifest.contains("Old lines:"));
-        assert!(manifest.contains("New lines:"));
-        assert!(manifest.contains("```diff"));
-        assert!(manifest.contains("+"));
-        assert!(manifest.contains("-"));
+        assert!(manifest.contains("## src/main.rs#H1"));
+        // New format includes line IDs (L1, L2, etc.)
+        assert!(manifest.contains("L1"));
+        // Old/New line ranges are now on same line
+        assert!(manifest.contains("Old:"));
+        assert!(manifest.contains("New:"));
     }
 
     #[test]
@@ -1320,5 +1452,27 @@ another context
             .find_line_by_content_with_numbers("test.rs#H1", "added line")
             .unwrap();
         assert_eq!(line.new_line_number, Some(2));
+    }
+
+    #[test]
+    fn test_find_line_by_id() {
+        let index = DiffIndex::new(TEST_DIFF).unwrap();
+
+        // L1 should be the first line in the hunk
+        let line = index.find_line_by_id("src/main.rs#H1", "L1").unwrap();
+        assert_eq!(line.position_in_hunk, 0);
+
+        // Should work with lowercase 'l'
+        let line = index.find_line_by_id("src/main.rs#H1", "l1").unwrap();
+        assert_eq!(line.position_in_hunk, 0);
+
+        // Should work with just the number
+        let line = index.find_line_by_id("src/main.rs#H1", "2").unwrap();
+        assert_eq!(line.position_in_hunk, 1);
+
+        // Invalid line ID should return None
+        assert!(index.find_line_by_id("src/main.rs#H1", "L999").is_none());
+        assert!(index.find_line_by_id("src/main.rs#H1", "L0").is_none());
+        assert!(index.find_line_by_id("nonexistent#H1", "L1").is_none());
     }
 }

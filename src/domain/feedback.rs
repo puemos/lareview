@@ -50,6 +50,15 @@ pub enum FeedbackSide {
     New,
 }
 
+impl fmt::Display for FeedbackSide {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Old => write!(f, "old"),
+            Self::New => write!(f, "new"),
+        }
+    }
+}
+
 /// Optional anchor tying feedback to a file/line/hunk
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct FeedbackAnchor {

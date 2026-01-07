@@ -276,3 +276,84 @@ fn test_review_repository() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_review_cascading_deletion() -> anyhow::Result<()> {
+    let db = Database::open_in_memory()?;
+    let conn = db.connection();
+    let review_repo = ReviewRepository::new(conn.clone());
+    let run_repo = ReviewRunRepository::new(conn.clone());
+    let task_repo = TaskRepository::new(conn.clone());
+    let feedback_repo = FeedbackRepository::new(conn.clone());
+
+    let review_id = "rev-1".to_string();
+    let run_id = "run-1".to_string();
+    let task_id = "task-1".to_string();
+
+    review_repo.save(&Review {
+        id: review_id.clone(),
+        title: "Title".into(),
+        summary: None,
+        source: ReviewSource::DiffPaste {
+            diff_hash: "h".into(),
+        },
+        active_run_id: Some(run_id.clone()),
+        created_at: "now".into(),
+        updated_at: "now".into(),
+    })?;
+
+    run_repo.save(&ReviewRun {
+        id: run_id.clone(),
+        review_id: review_id.clone(),
+        agent_id: "agent".into(),
+        input_ref: "input".into(),
+        diff_text: "diff".into(),
+        diff_hash: "h".into(),
+        created_at: "now".into(),
+    })?;
+
+    task_repo.save(&crate::domain::ReviewTask {
+        id: task_id.clone(),
+        run_id: run_id.clone(),
+        title: "Task".into(),
+        description: "Desc".into(),
+        files: vec![],
+        stats: TaskStats::default(),
+        diff_refs: vec![],
+        insight: None,
+        diagram: None,
+        ai_generated: false,
+        status: ReviewStatus::Todo,
+        sub_flow: None,
+    })?;
+
+    feedback_repo.save(&Feedback {
+        id: "f-1".into(),
+        review_id: review_id.clone(),
+        task_id: Some(task_id.clone()),
+        title: "Feedback".into(),
+        status: ReviewStatus::Todo,
+        impact: FeedbackImpact::Nitpick,
+        anchor: None,
+        author: "me".into(),
+        created_at: "now".into(),
+        updated_at: "now".into(),
+    })?;
+
+    // Verify they exist
+    assert!(review_repo.find_by_id(&review_id)?.is_some());
+    assert_eq!(run_repo.find_by_review_id(&review_id)?.len(), 1);
+    assert_eq!(task_repo.find_by_run(&run_id)?.len(), 1);
+    assert_eq!(feedback_repo.find_by_review(&review_id)?.len(), 1);
+
+    // Delete review
+    review_repo.delete(&review_id)?;
+
+    // Verify everything is gone
+    assert!(review_repo.find_by_id(&review_id)?.is_none());
+    assert_eq!(run_repo.find_by_review_id(&review_id)?.len(), 0);
+    assert_eq!(task_repo.find_by_run(&run_id)?.len(), 0);
+    assert_eq!(feedback_repo.find_by_review(&review_id)?.len(), 0);
+
+    Ok(())
+}

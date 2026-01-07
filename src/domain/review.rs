@@ -36,6 +36,7 @@ pub enum ReviewSource {
         diff_hash: String,
     },
     /// Review is derived from a GitHub pull request fetched locally via `gh`.
+    #[serde(rename = "github_pr", alias = "git_hub_pr")]
     GitHubPr {
         /// GitHub owner (organization or user)
         owner: String,
@@ -53,6 +54,22 @@ pub enum ReviewSource {
         #[serde(default)]
         base_sha: Option<String>,
     },
+}
+
+impl ReviewSource {
+    pub fn url(&self) -> Option<String> {
+        match self {
+            ReviewSource::DiffPaste { .. } => None,
+            ReviewSource::GitHubPr { url, .. } => url.clone(),
+        }
+    }
+
+    pub fn head_sha(&self) -> Option<String> {
+        match self {
+            ReviewSource::DiffPaste { .. } => None,
+            ReviewSource::GitHubPr { head_sha, .. } => head_sha.clone(),
+        }
+    }
 }
 
 /// A single generation run for a review (diff + agent output).

@@ -1,5 +1,6 @@
 //! Diff acquisition from various sources.
 
+use crate::infra::shell;
 use anyhow::{Context, Result};
 use std::io::{IsTerminal, Read};
 use std::process::Command;
@@ -25,46 +26,10 @@ pub enum DiffSource {
 
 /// Parse a PR reference into components
 pub fn parse_pr_ref(pr_ref: &str) -> Result<(String, String, u32)> {
-    // Match patterns:
-    // - https://github.com/owner/repo/pull/123
-    // - https://github.com/owner/repo/pull/123/
-    // - owner/repo#123
-    // - owner/repo/pull/123
-
-    if let Some(caps) = regex::Regex::new(r"github\.com[/:]([^/]+)/([^/]+)/pull/(\d+)")
-        .unwrap()
-        .captures(pr_ref)
-    {
-        let owner = caps.get(1).unwrap().as_str().to_string();
-        let repo = caps.get(2).unwrap().as_str().to_string();
-        let number: u32 = caps
-            .get(3)
-            .unwrap()
-            .as_str()
-            .parse()
-            .context("Invalid PR number")?;
-        return Ok((owner, repo, number));
-    }
-
-    if let Some(caps) = regex::Regex::new(r"^([^/]+)/([^#]+)#(\d+)$")
-        .unwrap()
-        .captures(pr_ref)
-    {
-        let owner = caps.get(1).unwrap().as_str().to_string();
-        let repo = caps.get(2).unwrap().as_str().to_string();
-        let number: u32 = caps
-            .get(3)
-            .unwrap()
-            .as_str()
-            .parse()
-            .context("Invalid PR number")?;
-        return Ok((owner, repo, number));
-    }
-
-    anyhow::bail!(
-        "Invalid PR reference: {}\n\nValid formats:\n  - owner/repo#123\n  - https://github.com/owner/repo/pull/123",
-        pr_ref
-    )
+    let res = crate::infra::vcs::github::parse_pr_ref(pr_ref).context(
+        "Invalid PR reference. Expected owner/repo#number, owner/repo/number, or GitHub URL.",
+    )?;
+    Ok((res.owner, res.repo, res.number))
 }
 
 /// Try to read diff from stdin (non-destructive check)
@@ -97,7 +62,8 @@ pub fn acquire_diff(source: DiffSource) -> Result<String> {
         DiffSource::Stdin(diff) => Ok(diff),
 
         DiffSource::GitDiff { from, to } => {
-            let output = Command::new("git")
+            let git_path = shell::find_bin("git").context("Could not find 'git' executable")?;
+            let output = Command::new(git_path)
                 .args(["diff", &from, &to])
                 .output()
                 .context("Failed to run git diff")?;
@@ -134,10 +100,15 @@ pub fn acquire_diff(source: DiffSource) -> Result<String> {
             repo,
             number,
         } => {
-            let pr_ref = format!("{}/{}/PR{}", owner, repo, number);
-
-            let output = Command::new("gh")
-                .args(["pr", "diff", &pr_ref])
+            let gh_path = shell::find_bin("gh").context("Could not find 'gh' executable")?;
+            let output = Command::new(gh_path)
+                .args([
+                    "pr",
+                    "diff",
+                    &number.to_string(),
+                    "--repo",
+                    &format!("{}/{}", owner, repo),
+                ])
                 .output()
                 .context("Failed to fetch PR via gh CLI")?;
 
@@ -168,7 +139,8 @@ pub fn acquire_diff(source: DiffSource) -> Result<String> {
         }
 
         DiffSource::GitStatus => {
-            let output = Command::new("git")
+            let git_path = shell::find_bin("git").context("Could not find 'git' executable")?;
+            let output = Command::new(git_path)
                 .args(["diff"])
                 .output()
                 .context("Failed to run git diff")?;
@@ -191,7 +163,8 @@ pub fn acquire_diff(source: DiffSource) -> Result<String> {
 
 /// Acquire diff from git stash
 pub fn get_stash_diff(stash_index: usize) -> Result<String> {
-    let output = Command::new("git")
+    let git_path = shell::find_bin("git").context("Could not find 'git' executable")?;
+    let output = Command::new(git_path)
         .args(["stash", "show", "-p", &format!("stash@{{{}}}", stash_index)])
         .output()
         .context("Failed to run git stash show")?;

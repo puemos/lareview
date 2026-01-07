@@ -10,236 +10,78 @@ permissions:
 
 jobs:
   release:
-    name: Release ${{ matrix.platform_name }}
-    runs-on: ${{ matrix.os }}
+    name: Release ${{ matrix.platform }}
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            platform_name: macOS-ARM64
-            artifact_name: lareview-macos-aarch64.zip
-
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            platform_name: macOS-Intel
-            artifact_name: lareview-macos-x86_64.zip
-
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            platform_name: Linux-x64
-            artifact_name: lareview-linux-x86_64.tar.gz
-
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            platform_name: Windows-x64
-            artifact_name: lareview-windows-x86_64.zip
+          - platform: "macos-latest"
+            args: "--target aarch64-apple-darwin"
+          - platform: "macos-latest"
+            args: "--target x86_64-apple-darwin"
+          - platform: "ubuntu-22.04"
+            args: ""
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install Linux dependencies
-        if: runner.os == 'Linux'
+        if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libxdo-dev \
+            libssl-dev
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2025-12-06
-          targets: ${{ matrix.target }}
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
 
-      - name: Build
-        shell: bash
-        run: |
-          cargo build --release --target ${{ matrix.target }} --bin lareview-gui
-          cargo build --release --target ${{ matrix.target }} --bin lareview
+      - name: Install frontend dependencies
+        run: pnpm install
+        working-directory: frontend
 
-      - name: Strip (Unix)
-        if: runner.os != 'Windows'
-        run: |
-          strip "target/${{ matrix.target }}/release/lareview-gui"
-          strip "target/${{ matrix.target }}/release/lareview"
-
-      - name: Import macOS signing certificate
-        if: runner.os == 'macOS'
+      - name: Build with Tauri action
+        uses: tauri-apps/tauri-action@v0
         env:
-          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
-          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
-        run: |
-          echo "$MACOS_CERTIFICATE" | base64 -d > cert.p12
-          security create-keychain -p "$MACOS_CERTIFICATE_PWD" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "$MACOS_CERTIFICATE_PWD" build.keychain
-          security import cert.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple: -s -k "$MACOS_CERTIFICATE_PWD" build.keychain
-
-      - name: Create macOS .app bundle
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          APP_NAME="LaReview"
-          BUNDLE_ID="io.github.puemos.lareview"
-          APP_BUNDLE="${APP_NAME}.app"
-
-          GUI_SRC="target/${{ matrix.target }}/release/lareview-gui"
-          CLI_SRC="target/${{ matrix.target }}/release/lareview"
-          APP_DIR="target/${{ matrix.target }}/release/${APP_BUNDLE}"
-          GUI_DST="${APP_DIR}/Contents/MacOS/${APP_NAME}"
-          CLI_DST="${APP_DIR}/Contents/MacOS/lareview"
-          RES_DIR="${APP_DIR}/Contents/Resources"
-
-          rm -rf "${APP_DIR}"
-          mkdir -p "$(dirname "${GUI_DST}")" "$(dirname "${CLI_DST}")" "${RES_DIR}"
-
-          cp "${GUI_SRC}" "${GUI_DST}"
-          cp "${CLI_SRC}" "${CLI_DST}"
-          chmod +x "${GUI_DST}" "${CLI_DST}"
-
-          VERSION="${GITHUB_REF#refs/tags/v}"
-
-          cat > "${APP_DIR}/Contents/Info.plist" << EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>CFBundleDevelopmentRegion</key>
-            <string>en</string>
-
-            <key>CFBundleDisplayName</key>
-            <string>${APP_NAME}</string>
-
-            <key>CFBundleExecutable</key>
-            <string>${APP_NAME}</string>
-
-            <key>CFBundleIdentifier</key>
-            <string>${BUNDLE_ID}</string>
-
-            <key>CFBundleInfoDictionaryVersion</key>
-            <string>6.0</string>
-
-            <key>CFBundleName</key>
-            <string>${APP_NAME}</string>
-
-            <key>CFBundlePackageType</key>
-            <string>APPL</string>
-
-            <key>CFBundleShortVersionString</key>
-            <string>${VERSION}</string>
-
-            <key>CFBundleVersion</key>
-            <string>${VERSION}</string>
-
-            <key>LSMinimumSystemVersion</key>
-            <string>10.15</string>
-
-            <key>NSHighResolutionCapable</key>
-            <true/>
-
-            <key>CFBundleIconFile</key>
-            <string>${APP_NAME}</string>
-          </dict>
-          </plist>
-          EOF
-
-          ICON_PNG="assets/logo/512-mac.png"
-          ICONSET="$(mktemp -d)/${APP_NAME}.iconset"
-          mkdir -p "${ICONSET}"
-
-          sips -z 16 16     "${ICON_PNG}" --out "${ICONSET}/icon_16x16.png"
-          sips -z 32 32     "${ICON_PNG}" --out "${ICONSET}/icon_16x16@2x.png"
-          sips -z 32 32     "${ICON_PNG}" --out "${ICONSET}/icon_32x32.png"
-          sips -z 64 64     "${ICON_PNG}" --out "${ICONSET}/icon_32x32@2x.png"
-          sips -z 128 128   "${ICON_PNG}" --out "${ICONSET}/icon_128x128.png"
-          sips -z 256 256   "${ICON_PNG}" --out "${ICONSET}/icon_128x128@2x.png"
-          sips -z 256 256   "${ICON_PNG}" --out "${ICONSET}/icon_256x256.png"
-          sips -z 512 512   "${ICON_PNG}" --out "${ICONSET}/icon_256x256@2x.png"
-          sips -z 512 512   "${ICON_PNG}" --out "${ICONSET}/icon_512x512.png"
-          cp "${ICON_PNG}" "${ICONSET}/icon_512x512@2x.png"
-
-          iconutil -c icns "${ICONSET}" -o "${RES_DIR}/${APP_NAME}.icns"
-
-      - name: Codesign .app (macOS)
-        if: runner.os == 'macOS'
-        env:
-          MACOS_IDENTITY: ${{ secrets.MACOS_IDENTITY }}
-        shell: bash
-        run: |
-          APP_NAME="LaReview"
-          APP_BUNDLE="target/${{ matrix.target }}/release/${APP_NAME}.app"
-
-          codesign --force --options runtime --timestamp \
-            --sign "$MACOS_IDENTITY" \
-            "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
-
-          codesign --force --options runtime --timestamp \
-            --sign "$MACOS_IDENTITY" \
-            "$APP_BUNDLE/Contents/MacOS/lareview"
-
-          codesign --force --options runtime --timestamp \
-            --sign "$MACOS_IDENTITY" \
-            "$APP_BUNDLE"
-
-          codesign -vvv --deep --strict "$APP_BUNDLE"
-
-      - name: Notarize and staple (macOS)
-        if: runner.os == 'macOS'
-        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # macOS code signing
+          APPLE_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.MACOS_IDENTITY }}
+          # macOS notarization
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        shell: bash
-        run: |
-          cd "target/${{ matrix.target }}/release"
-          APP_NAME="LaReview"
-          APP_BUNDLE="${APP_NAME}.app"
-
-          ditto -c -k --keepParent "$APP_BUNDLE" "notarize.zip"
-          xcrun notarytool submit "notarize.zip" \
-            --apple-id "$APPLE_ID" \
-            --password "$APPLE_PASSWORD" \
-            --team-id "$APPLE_TEAM_ID" \
-            --wait
-          xcrun stapler staple "$APP_BUNDLE"
-          rm "notarize.zip"
-
-      - name: Package (macOS)
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          cd "target/${{ matrix.target }}/release"
-          ditto -c -k --keepParent "LaReview.app" "../../../${{ matrix.artifact_name }}"
-
-      - name: Checksum (macOS)
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          shasum -a 256 "${{ matrix.artifact_name }}" | awk '{print $1}' > "${{ matrix.artifact_name }}.sha256"
-
-      - name: Package (Linux)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          cd "target/${{ matrix.target }}/release"
-          tar czf "../../../${{ matrix.artifact_name }}" lareview-gui lareview
-
-      - name: Package (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          cd "target/${{ matrix.target }}/release"
-          Compress-Archive -Path lareview-gui.exe,lareview.exe -DestinationPath ..\..\..\${{ matrix.artifact_name }}
-
-      - name: Upload Release Asset
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: |
-            ${{ matrix.artifact_name }}
-            ${{ matrix.artifact_name }}.sha256
+          projectPath: .
+          tagName: v__VERSION__
+          releaseName: "LaReview v__VERSION__"
+          releaseBody: "See the assets to download and install this version."
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}

@@ -7,3 +7,7 @@ pub fn hash64(text: &str) -> u64 {
     hasher.write(text.as_bytes());
     hasher.finish()
 }
+
+pub fn hash_diff(text: &str) -> String {
+    format!("{:x}", hash64(text))
+}

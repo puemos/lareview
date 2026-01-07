@@ -4,5 +4,4 @@
 //! repository detection, and pending review serialization.
 
 pub mod diff;
-pub mod pending;
 pub mod repo;

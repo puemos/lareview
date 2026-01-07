@@ -102,7 +102,7 @@ pub(super) fn create_return_task_tool(config: Arc<ServerConfig>) -> impl ToolHan
         "Submit a single code review task for a pull request. Call this repeatedly to submit each task individually. \
          Each task must include: id, title, description, stats (risk, tags), and diff_refs. \
          The server computes files and line additions/deletions from the provided diff_refs using the canonical diff. \
-         Optionally include sub_flow (grouping name). Diagram JSON is required.",
+         Optionally include sub_flow (grouping name). Diagram is required.",
     )
     .with_schema(single_task_schema())
 }
@@ -238,22 +238,17 @@ pub(super) fn create_add_feedback_tool(config: Arc<ServerConfig>) -> impl ToolHa
         })
     })
     .with_description(
-        "Add a specific, inline feedback on a file line. Use this for targeted feedback (nitpicks, questions, suggestions) \
-         that doesn't warrant a full task.\n\n\
-         **Preferred format (use this):**\n\
-         - hunk_id: 'path/to/file#H1' (copy from hunk manifest)\n\
-         - line_content: EXACTLY ONE LINE from the hunk manifest (e.g., '+    readonly playlistId: string | undefined,')\n\
-         - body: The comment content (Markdown supported)\n\
-         - Optional: title, impact, task_id\n\n\
-         **Legacy format:**\n\
-         - file: Path to the file relative to repo root\n\
-         - line: Line number where the comment applies\n\
-         - side: 'old' or 'new' (default: new)\n\n\
-         **Examples (CORRECT):**\n\
-         { \"hunk_id\": \"src/entities/job.ts#H1\", \"line_content\": \"+    readonly playlistId: string | undefined,\", \"body\": \"Consider adding a default value.\" }\n\
-         { \"hunk_id\": \"src/controllers/storage.ts#H2\", \"line_content\": \"  action$.pipe(\", \"body\": \"Nice use of rxjs operators!\" }\n\n\
-         **Examples (INCORRECT - will fail):**\n\
-         { \"hunk_id\": \"src/job.ts#H1\", \"line_content\": \"export class Job {\\n  constructor(\\n    readonly id: string,\", ... } (multi-line)",
+        "Add inline feedback on a specific line in the diff.\n\n\
+         **Preferred format (simple, always works):**\n\
+         ```json\n\
+         {\n\
+           \"hunk_id\": \"src/auth.rs#H1\",\n\
+           \"line_id\": \"L3\",\n\
+           \"body\": \"Your comment here\"\n\
+         }\n\
+         ```\n\n\
+         Copy the `hunk_id` from the manifest header, and `line_id` (L1, L2, etc.) from the line listing.\n\n\
+         **Optional fields:** title, impact (nitpick|blocking|nice_to_have), side (old|new), task_id",
     )
     .with_schema(add_feedback_schema())
 }
@@ -674,8 +669,8 @@ fn single_task_schema() -> Value {
                 "description": "Optional logical grouping name for this task. Use when multiple tasks belong to the same larger feature or concern (e.g., 'authentication-flow', 'data-migration', 'payment-processing'). Helps organize related tasks."
             },
             "diagram": {
-                "type": "object",
-                "description": "REQUIRED: diagram JSON object describing the flow, sequence, architecture, or data model. Must be valid JSON matching the diagram schema (type/data/messages)."
+                "type": "string",
+                "description": "REQUIRED: diagram string describing the flow, sequence, architecture, or data model. Must be valid Mermaid syntax."
             }
         },
         "required": ["id", "title", "description", "stats", "hunk_ids", "diagram"]
@@ -776,11 +771,15 @@ fn add_feedback_schema() -> Value {
         "properties": {
             "hunk_id": {
                 "type": "string",
-                "description": "The hunk ID from the manifest (e.g., 'src/auth.rs#H1'). Preferred over file+line."
+                "description": "The hunk ID from the manifest (e.g., 'src/auth.rs#H1'). Required for both line_id and line_content methods."
+            },
+            "line_id": {
+                "type": "string",
+                "description": "PREFERRED: The line ID from the manifest (e.g., 'L3'). Copy directly from the manifest - no string matching needed."
             },
             "line_content": {
                 "type": "string",
-                "description": "The EXACT line content to comment on. MUST be a single line only - copy exactly from hunk manifest including whitespace. Do NOT include code blocks or multiple lines."
+                "description": "LEGACY: The exact line content to comment on. Only use if line_id is not available."
             },
             "file": {
                 "type": "string",
@@ -788,7 +787,7 @@ fn add_feedback_schema() -> Value {
             },
             "line": {
                 "type": "integer",
-                "description": "Line number where the comment applies. (Legacy format - prefer hunk_id + line_content)."
+                "description": "Line number where the comment applies. (Legacy format - prefer hunk_id + line_id)."
             },
             "side": {
                 "type": "string",

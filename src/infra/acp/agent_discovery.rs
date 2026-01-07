@@ -29,6 +29,11 @@ struct AgentCache {
 }
 
 impl AgentCache {}
+/// Invalidate the agent cache to force a re-discovery on the next call
+pub fn invalidate_agent_cache() {
+    let mut cache_guard = AGENT_CACHE.lock().unwrap();
+    *cache_guard = None;
+}
 
 static AGENT_CACHE: Mutex<Option<AgentCache>> = Mutex::new(None);
 

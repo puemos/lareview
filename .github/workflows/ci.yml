@@ -6,20 +6,38 @@ on:
   pull_request:
     branches: ["main"]
 
+# Cancel outdated runs on PRs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+# Security: minimal permissions
+permissions:
+  contents: read
+
 jobs:
-  build:
+  check:
+    name: Check & Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev
-
-      - name: Install D2
-        run: curl -fsSL https://d2lang.com/install.sh | sh -s --
-
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libxdo-dev \
+            libssl-dev
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@master
@@ -30,17 +48,111 @@ jobs:
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
         with:
-          cache-directories: |
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            ~/.cargo/git
-            target
+          workspaces: ". -> target"
 
       - name: Check formatting
         run: cargo fmt -- --check
 
-      - name: Lint
+      - name: Lint (default features)
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Lint (all features including dev-tools)
         run: cargo clippy --all-targets --all-features -- -D warnings
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    needs: check
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libxdo-dev \
+            libssl-dev
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2025-12-06
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
 
       - name: Run tests
         run: cargo test --verbose
+
+      - name: Run tests (all features)
+        run: cargo test --verbose --all-features
+
+  build:
+    name: Build Check
+    runs-on: ubuntu-latest
+    needs: check
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libxdo-dev \
+            libssl-dev
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2025-12-06
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+
+      - name: Install frontend dependencies
+        run: pnpm install
+        working-directory: frontend
+
+      - name: Build frontend
+        run: pnpm build
+        working-directory: frontend
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Verify dev binaries are NOT built
+        run: |
+          echo "Checking that dev-tools binaries are not built without feature flag..."
+          if [ -f target/release/seed_db ] || [ -f target/release/reset_db ]; then
+            echo "ERROR: Dev binaries were built without dev-tools feature!"
+            exit 1
+          fi
+          echo "OK: Dev binaries correctly excluded from release build"

@@ -1,5 +1,4 @@
 use crate::domain::{DiffRef, ReviewStatus, ReviewTask, RiskLevel, TaskStats};
-use crate::infra::diagram::parse_json;
 use anyhow::Result;
 use serde::Deserialize;
 use serde_json::Value;
@@ -20,7 +19,7 @@ struct SingleTaskPayload {
     #[serde(default)]
     hunk_ids: Vec<String>,
     #[serde(default)]
-    diagram: Option<Value>,
+    diagram: Option<String>,
     #[serde(default)]
     sub_flow: Option<String>,
     #[serde(default)]
@@ -189,6 +188,29 @@ fn normalize_single_task_payload(args: Value) -> Result<Value> {
     ))
 }
 
+/// Utility to clean and unescape strings that might be double-encoded by the agent.
+///
+/// If a string is quoted and looks like a JSON string, we attempt to parse it as such
+/// to resolve escaped characters like `\n` or `\"`.
+fn clean_task_string(s: &str) -> String {
+    let mut current = s.trim().to_string();
+
+    // Recursively unquote if it looks like a JSON-encoded string literal.
+    // This handles cases where the agent double or triple encodes the string.
+    let mut iterations = 0;
+    while current.starts_with('"') && current.ends_with('"') && current.len() >= 2 && iterations < 5
+    {
+        if let Ok(Value::String(decoded)) = serde_json::from_str::<Value>(&current) {
+            current = decoded.trim().to_string();
+            iterations += 1;
+        } else {
+            break;
+        }
+    }
+
+    current
+}
+
 use std::sync::Arc;
 
 pub(crate) fn parse_task(args: Value) -> Result<ReviewTask> {
@@ -224,18 +246,11 @@ pub(crate) fn parse_task(args: Value) -> Result<ReviewTask> {
         count_line_changes_legacy(&task.diffs)
     };
 
-    let diagram = normalize_diagram_value(task.diagram)?;
-
-    // Validate JSON by parsing, surface clear error
-    if let Some(ref d) = diagram {
-        parse_json(d).map_err(|e| anyhow::anyhow!(format!("Invalid diagram JSON: {e}")))?;
-    }
-
     Ok(ReviewTask {
         id: task.id,
         run_id: String::new(), // set in persistence
-        title: task.title,
-        description: task.description,
+        title: clean_task_string(&task.title),
+        description: clean_task_string(&task.description),
         files,
         stats: TaskStats {
             additions,
@@ -244,38 +259,44 @@ pub(crate) fn parse_task(args: Value) -> Result<ReviewTask> {
             tags: stats.tags,
         },
         diff_refs: task.diff_refs,
-        insight: task.insight.map(Arc::from),
-        diagram,
+        insight: task.insight.map(|s| Arc::from(clean_task_string(&s))),
+        diagram: task.diagram.map(|s| Arc::from(clean_task_string(&s))),
         ai_generated: true,
         status: ReviewStatus::Todo,
-        sub_flow: task.sub_flow,
+        sub_flow: task.sub_flow.map(|s| clean_task_string(&s)),
     })
-}
-
-fn normalize_diagram_value(value: Option<Value>) -> Result<Option<Arc<str>>> {
-    let Some(value) = value else {
-        return Ok(None);
-    };
-
-    if value.is_null() {
-        return Ok(None);
-    }
-
-    if value.is_string() {
-        anyhow::bail!("diagram must be a JSON object, not a string");
-    }
-
-    if !value.is_object() {
-        anyhow::bail!("diagram must be a JSON object with type/data");
-    }
-
-    Ok(Some(Arc::from(value.to_string())))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn test_clean_task_string() {
+        assert_eq!(clean_task_string("simple"), "simple");
+        assert_eq!(clean_task_string("\"quoted string\""), "quoted string");
+        assert_eq!(
+            clean_task_string("\"title with \\\"quotes\\\"\""),
+            "title with \"quotes\""
+        );
+    }
+
+    #[test]
+    fn test_parse_task_escaped_diagram() {
+        let payload = json!({
+            "id": "T1",
+            "title": "Title",
+            "description": "Desc",
+            "diagram": "flowchart TD\n    A[Epic Controllers] --> B[Use Cases]",
+            "hunk_ids": ["test.rs#H1"]
+        });
+        let task = parse_task(payload).unwrap();
+        assert_eq!(
+            task.diagram.unwrap().as_ref(),
+            "flowchart TD\n    A[Epic Controllers] --> B[Use Cases]"
+        );
+    }
 
     #[test]
     fn test_extract_files_from_diffs_legacy() {
@@ -301,42 +322,13 @@ mod tests {
             "id": "T1",
             "title": "Title",
             "description": "Desc",
-            "diagram": {
-                "type": "flow",
-                "data": {
-                    "direction": "LR",
-                    "nodes": [
-                        { "id": "a", "label": "A", "kind": "generic" },
-                        { "id": "b", "label": "B", "kind": "generic" }
-                    ],
-                    "edges": [
-                        { "from": "a", "to": "b", "label": "edge" }
-                    ]
-                }
-            },
+            "diagram": "flow LR a[label=A kind=generic] b[label=B kind=generic] a --> b[label=edge]",
             "stats": { "risk": "HIGH", "tags": ["tag1"] },
             "hunk_ids": ["test.rs#H1"]
         });
         let task = parse_task(payload).unwrap();
         assert_eq!(task.id, "T1");
         assert_eq!(task.stats.risk, RiskLevel::High);
-    }
-
-    #[test]
-    fn test_parse_task_rejects_diagram_string() {
-        let payload = json!({
-            "id": "T2",
-            "title": "Title2",
-            "description": "Desc2",
-            "diagram": "{\"type\":\"flow\",\"data\":{\"direction\":\"LR\",\"nodes\":[{\"id\":\"a\",\"label\":\"A\",\"kind\":\"generic\"}]}}",
-            "stats": { "risk": "LOW", "tags": [] },
-            "hunk_ids": ["test.rs#H1"]
-        });
-        let err = parse_task(payload).unwrap_err();
-        assert!(
-            err.to_string().contains("diagram must be a JSON object"),
-            "unexpected error: {err}"
-        );
     }
 
     #[test]

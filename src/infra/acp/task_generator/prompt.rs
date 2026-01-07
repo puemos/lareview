@@ -66,7 +66,7 @@ pub(super) fn build_client_capabilities(has_repo_access: bool) -> ClientCapabili
                             "tags": ["string"]
                         },
                         "insight": "string",
-                        "diagram": "object (required diagram JSON)",
+                        "diagram": "flow LR x[label=X kind=generic] y[label=Y kind=generic] x --> y[label=rel]",
                         "sub_flow": "string (optional grouping)",
                         "hunk_ids": ["string (e.g., 'src/main.rs#H1')"]
                     }

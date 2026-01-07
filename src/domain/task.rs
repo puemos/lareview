@@ -9,7 +9,7 @@ pub type TaskId = String;
 
 /// Risk level associated with a review task, indicating the potential impact of the changes
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "UPPERCASE")]
+#[serde(rename_all = "snake_case")]
 pub enum RiskLevel {
     /// Low risk
     #[default]
@@ -54,7 +54,7 @@ impl RiskLevel {
 
 /// Status of a review item (task or feedback)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "UPPERCASE")]
+#[serde(rename_all = "snake_case")]
 pub enum ReviewStatus {
     #[default]
     #[serde(alias = "PENDING")]

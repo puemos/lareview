@@ -149,14 +149,9 @@ fn validate_task_diagram(task: &ReviewTask) -> Result<()> {
         .is_some_and(|diagram| !diagram.trim().is_empty());
     if !has_diagram {
         anyhow::bail!(
-            "Task {} missing diagram. Every task must include a diagram JSON block.",
+            "Task {} missing diagram. Every task must include a diagram.",
             task.id
         );
-    }
-
-    if let Some(diagram) = &task.diagram {
-        crate::infra::diagram::parse_json(diagram)
-            .map_err(|e| anyhow::anyhow!("Invalid diagram JSON: {e}"))?;
     }
 
     Ok(())

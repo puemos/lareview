@@ -1,6 +1,9 @@
+use log::{info, warn};
 use rusqlite::Connection;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize logging - respects RUST_LOG environment variable
+    let _ = env_logger::try_init();
     run()
 }
 
@@ -15,12 +18,14 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     // Check if database exists
     if !db_path.exists() {
-        println!("Database does not exist at: {}", db_path.display());
-        println!("No reset needed.");
+        info!(
+            "Database does not exist at: {}. No reset needed.",
+            db_path.display()
+        );
         return Ok(());
     }
 
-    println!("Connecting to database at: {}", db_path.display());
+    info!("Connecting to database at: {}", db_path.display());
 
     let conn = Connection::open(&db_path)?;
 
@@ -33,7 +38,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     if tables_exist == 0 {
-        println!("Tables do not exist. No reset needed.");
+        info!("Tables do not exist. No reset needed.");
         return Ok(());
     }
 
@@ -46,28 +51,28 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     let comment_count: i64 =
         conn.query_row("SELECT COUNT(*) FROM comments", [], |row| row.get(0))?;
 
-    println!("Current record counts:");
-    println!("  Reviews: {}", review_count);
-    println!("  Review Runs: {}", run_count);
-    println!("  Tasks: {}", task_count);
-    println!("  Feedback: {}", feedback_count);
-    println!("  Comments: {}", comment_count);
+    info!("Current record counts:");
+    info!("  Reviews: {}", review_count);
+    info!("  Review Runs: {}", run_count);
+    info!("  Tasks: {}", task_count);
+    info!("  Feedback: {}", feedback_count);
+    info!("  Comments: {}", comment_count);
 
     // Reset all tables by deleting all records
     conn.execute("DELETE FROM comments", [])?;
-    println!("Cleared comments table");
+    info!("Cleared comments table");
 
     conn.execute("DELETE FROM feedback", [])?;
-    println!("Cleared feedback table");
+    info!("Cleared feedback table");
 
     conn.execute("DELETE FROM tasks", [])?;
-    println!("Cleared tasks table");
+    info!("Cleared tasks table");
 
     conn.execute("DELETE FROM review_runs", [])?;
-    println!("Cleared review_runs table");
+    info!("Cleared review_runs table");
 
     conn.execute("DELETE FROM reviews", [])?;
-    println!("Cleared reviews table");
+    info!("Cleared reviews table");
 
     // Verify that all tables are empty
     let review_count_after: i64 =
@@ -81,12 +86,12 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     let comment_count_after: i64 =
         conn.query_row("SELECT COUNT(*) FROM comments", [], |row| row.get(0))?;
 
-    println!("\nAfter reset:");
-    println!("  Reviews: {}", review_count_after);
-    println!("  Review Runs: {}", run_count_after);
-    println!("  Tasks: {}", task_count_after);
-    println!("  Feedback: {}", feedback_count_after);
-    println!("  Comments: {}", comment_count_after);
+    info!("After reset:");
+    info!("  Reviews: {}", review_count_after);
+    info!("  Review Runs: {}", run_count_after);
+    info!("  Tasks: {}", task_count_after);
+    info!("  Feedback: {}", feedback_count_after);
+    info!("  Comments: {}", comment_count_after);
 
     if review_count_after == 0
         && run_count_after == 0
@@ -94,12 +99,12 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         && feedback_count_after == 0
         && comment_count_after == 0
     {
-        println!("\nDatabase successfully reset! All records have been deleted.");
+        info!("Database successfully reset! All records have been deleted.");
     } else {
-        eprintln!("\nWarning: Some records still exist in the database.");
+        warn!("Some records still exist in the database.");
     }
 
-    println!("Database location: {}", db_path.display());
+    info!("Database location: {}", db_path.display());
 
     Ok(())
 }

@@ -14,6 +14,10 @@ impl TaskRepository {
     pub fn new(conn: DbConn) -> Self {
         Self { conn }
     }
+
+    pub fn list(&self) -> Result<Vec<ReviewTask>> {
+        self.find_all()
+    }
 }
 
 impl TaskRepository {
