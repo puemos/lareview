@@ -12,7 +12,6 @@ This file provides a comprehensive overview of the `lareview` project, intended 
 - **GUI Framework:** [Tauri](https://tauri.app/) for desktop app shell with [React](https://react.dev/) + [Tailwind CSS](https://tailwindcss.com/) frontend
 - **Asynchronous Runtime:** [`tokio`](https://tokio.rs/) for managing asynchronous operations.
 - **Database:** [`rusqlite`](https://github.com/rusqlite/rusqlite) for local data storage (SQLite).
-- **Diff/Patch Handling:** [`unidiff`](https://crates.io/crates/unidiff) and [`similar`](https://crates.io/crates/similar) for processing code differences.
 - **Templating:** [`handlebars`](https://crates.io/crates/handlebars) for text templating, likely for generating prompts or reports.
 - **Agent Communication:** `agent-client-protocol` for interacting with an AI agent.
 - **Diagramming:** [D2](https://d2lang.com/) for architecture diagrams.
