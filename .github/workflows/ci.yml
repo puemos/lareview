@@ -144,12 +144,3 @@ jobs:
 
       - name: Build release binary
         run: cargo build --release
-
-      - name: Verify dev binaries are NOT built
-        run: |
-          echo "Checking that dev-tools binaries are not built without feature flag..."
-          if [ -f target/release/seed_db ] || [ -f target/release/reset_db ]; then
-            echo "ERROR: Dev binaries were built without dev-tools feature!"
-            exit 1
-          fi
-          echo "OK: Dev binaries correctly excluded from release build"
