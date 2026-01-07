@@ -163,15 +163,12 @@ pub async fn install_cli() -> Result<(), String> {
                 format!("Failed to create symlink: {}", e)
             }
         })?;
+
+        Ok(())
     }
 
     #[cfg(not(target_os = "macos"))]
-    {
-        return Err("CLI installation is only supported on macOS".to_string());
-    }
-
-    #[cfg(target_os = "macos")]
-    Ok(())
+    Err("CLI installation is only supported on macOS".to_string())
 }
 
 #[tauri::command]
