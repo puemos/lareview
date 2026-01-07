@@ -53,6 +53,11 @@ jobs:
       - name: Check formatting
         run: cargo fmt -- --check
 
+      - name: Create dummy frontend assets
+        run: |
+          mkdir -p frontend/dist
+          touch frontend/dist/index.html
+
       - name: Lint (default features)
         run: cargo clippy -- -D warnings
 
@@ -86,6 +91,11 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: ". -> target"
+
+      - name: Create dummy frontend assets
+        run: |
+          mkdir -p frontend/dist
+          touch frontend/dist/index.html
 
       - name: Run tests
         run: cargo test --verbose
