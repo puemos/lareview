@@ -68,7 +68,7 @@ impl Database {
 
         #[cfg(target_os = "linux")]
         {
-            if let Ok(xdg) = std::env::var_os("XDG_DATA_HOME") {
+            if let Some(xdg) = std::env::var_os("XDG_DATA_HOME") {
                 return PathBuf::from(xdg).join("lareview").join("db.sqlite");
             }
             if let Some(home) = home::home_dir() {

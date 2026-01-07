@@ -170,6 +170,7 @@ pub async fn install_cli() -> Result<(), String> {
         return Err("CLI installation is only supported on macOS".to_string());
     }
 
+    #[cfg(target_os = "macos")]
     Ok(())
 }
 
