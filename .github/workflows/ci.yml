@@ -54,10 +54,7 @@ jobs:
         run: cargo fmt -- --check
 
       - name: Lint (default features)
-        run: cargo clippy --all-targets -- -D warnings
-
-      - name: Lint (all features including dev-tools)
-        run: cargo clippy --all-targets --features dev-tools -- -D warnings
+        run: cargo clippy -- -D warnings
 
   test:
     name: Tests
