@@ -100,7 +100,26 @@ The CLI launches the GUI in the background and passes your diff/repo info seamle
 
 ## Installation
 
-### Option A: Download a release
+### Option A: Homebrew (Recommended)
+
+Install LaReview via Homebrew with a single command:
+
+#### macOS
+
+```bash
+# First, tap the repository
+brew tap puemos/tap
+# Then install
+brew install --cask lareview
+```
+
+#### Linux
+
+```bash
+brew install puemos/tap/lareview
+```
+
+### Option B: Download a release
 
 1. Go to the [Releases page](https://github.com/puemos/lareview/releases) and download the latest binary for your operating system.
 2. Follow the instructions for your OS below.
@@ -127,17 +146,17 @@ The CLI launches the GUI in the background and passes your diff/repo info seamle
     mv ./lareview /usr/local/bin/lareview
     ```
 
-### Option B: One-click CLI installation
+### Option C: One-click CLI installation
 
 Launch LaReview and go to **Settings → CLI Installation** for a one-click setup to add `lareview` to your PATH.
 
-### Option C: Run from source
+### Option D: Run from source
 
 ```bash
 cargo run
 ```
 
-### Option C: Build a local macOS .app (dev)
+### Option E: Build a local macOS .app (dev)
 
 ```bash
 scripts/build_macos_app.sh
@@ -223,9 +242,9 @@ Wipe local state:
 - Reset/seed sample data:
 
   If you need more advanced control, use the CLI.
-  
+
   ### CLI Reference
-  
+
 - Checks:
 
   - `cargo fmt -- --check`

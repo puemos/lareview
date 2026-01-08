@@ -663,28 +663,41 @@
                     Local-first. Free. Open Source.
                 </p>
 
-                <div class="flex flex-col md:flex-row justify-center gap-4">
-                    <a
-                        href="https://github.com/puemos/lareview/releases"
-                        class="flex items-center hover:-translate-y-1 transition-transform justify-center gap-2 bg-velura-dark text-velura-bg px-10 py-5 text-sm font-bold tracking-widest border border-transparent"
-                        aria-label="Download LaReview for macOS (Apple Silicon and Intel)"
-                    >
-                        <i class="ph-bold ph-apple-logo text-lg"></i> macOS App
-                    </a>
-                    <a
-                        href="https://github.com/puemos/lareview/releases"
-                        class="flex items-center hover:-translate-y-1 transition-transform justify-center gap-2 bg-transparent text-velura-dark px-10 py-5 text-sm font-bold tracking-widest border border-theme"
-                        aria-label="Download LaReview for macOS and Linux"
-                    >
-                        <i class="ph-bold ph-apple-logo text-lg"></i>
-                        <i class="ph-bold ph-linux-logo text-lg"></i> macOS /
-                        Linux
-                    </a>
-                </div>
-                <div class="mt-4 font-mono text-xs text-velura-gray">
-                    CLI: <code>lareview</code>,
-                    <code>lareview pr owner/repo#123</code>,
-                    <code>git diff | lareview</code>
+                <div class="flex flex-col items-center gap-8">
+                    <!-- Primary Hero Command -->
+                    <div class="relative group cursor-pointer w-full max-w-2xl mx-auto" 
+                         onclick="navigator.clipboard.writeText('brew install --cask puemos/tap/lareview'); const el = this.querySelector('.copy-feedback'); el.classList.remove('opacity-0'); setTimeout(() => el.classList.add('opacity-0'), 2000);">
+                        <div class="bg-velura-dark text-velura-bg px-6 md:px-10 py-6 rounded-md font-mono text-sm md:text-lg shadow-xl flex items-center justify-between gap-4 hover:-translate-y-1 transition-transform border border-transparent">
+                            <div class="flex items-center gap-3 md:gap-4 overflow-x-auto scrollbar-hide">
+                                <span class="text-green-400 select-none">$</span>
+                                <span class="whitespace-nowrap">brew install --cask puemos/tap/lareview</span>
+                            </div>
+                            <i class="ph-bold ph-copy text-velura-gray group-hover:text-white transition-colors flex-shrink-0"></i>
+                        </div>
+                        <div class="copy-feedback absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 transition-opacity whitespace-nowrap pointer-events-none">
+                            Copied to clipboard!
+                        </div>
+                    </div>
+            
+                    <!-- Divider / Or -->
+                    <div class="text-velura-gray font-mono text-xs tracking-widest uppercase">or download binary</div>
+            
+                    <!-- Secondary Buttons -->
+                    <div class="flex flex-col md:flex-row justify-center gap-4 w-full">
+                        <a href="https://github.com/puemos/lareview/releases" class="bg-transparent text-velura-dark px-8 py-4 text-sm font-bold tracking-widest border border-theme flex items-center justify-center gap-2 hover:-translate-y-1 transition-transform">
+                            <i class="ph-bold ph-apple-logo text-lg"></i> macOS App
+                        </a>
+                        <a href="https://github.com/puemos/lareview/releases" class="bg-transparent text-velura-dark px-8 py-4 text-sm font-bold tracking-widest border border-theme flex items-center justify-center gap-2 hover:-translate-y-1 transition-transform">
+                            <i class="ph-bold ph-linux-logo text-lg"></i> Linux
+                        </a>
+                    </div>
+                    
+                    <!-- Tertiary options -->
+                    <div class="mt-2 font-mono text-xs text-velura-gray group cursor-pointer" 
+                         onclick="navigator.clipboard.writeText('git diff | lareview'); this.classList.add('text-green-600'); setTimeout(() => this.classList.remove('text-green-600'), 1000);"
+                         title="Click to copy">
+                         Pipe from git: <code class="bg-gray-200 px-2 py-1 rounded transition-colors group-hover:bg-gray-300">git diff | lareview</code>
+                    </div>
                 </div>
             </div>
         </section>
