@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.19] - 2026-01-08
+
+### Added
+
+- **CI/CD**: Added Homebrew formula and cask auto-bump job to release workflow using `brew` CLI
+
 ## [0.0.18] - 2026-01-07
 
 ### Added
