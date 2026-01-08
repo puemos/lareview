@@ -87,14 +87,55 @@ jobs:
           args: ${{ matrix.args }}
 
   publish-homebrew:
-    name: Bump Homebrew
+    name: Bump Homebrew Tap
     needs: release
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
-      - name: Bump Formula and Cask
-        env:
-          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GH_TOKEN }}
+      - name: Checkout homebrew-tap
+        uses: actions/checkout@v4
+        with:
+          repository: puemos/homebrew-tap
+          token: ${{ secrets.GH_TOKEN }}
+          path: homebrew-tap
+
+      - name: Get release info
+        id: release
         run: |
-          brew tap puemos/homebrew-tap
-          brew bump-formula-pr --no-browse puemos/homebrew-tap/lareview || true
-          brew bump-cask-pr --no-browse puemos/homebrew-tap/lareview || true
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update Formula and Cask
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          cd homebrew-tap
+
+          # Get SHA256 for Linux AppImage
+          APPIMAGE_URL="https://github.com/puemos/lareview/releases/download/v${VERSION}/LaReview_${VERSION}_amd64.AppImage"
+          APPIMAGE_SHA=$(curl -sL "$APPIMAGE_URL" | sha256sum | cut -d' ' -f1)
+
+          # Get SHA256 for macOS ARM
+          ARM_URL="https://github.com/puemos/lareview/releases/download/v${VERSION}/LaReview_aarch64.app.tar.gz"
+          ARM_SHA=$(curl -sL "$ARM_URL" | sha256sum | cut -d' ' -f1)
+
+          # Get SHA256 for macOS Intel
+          INTEL_URL="https://github.com/puemos/lareview/releases/download/v${VERSION}/LaReview_x64.app.tar.gz"
+          INTEL_SHA=$(curl -sL "$INTEL_URL" | sha256sum | cut -d' ' -f1)
+
+          # Update Formula
+          sed -i "s|url \"https://github.com/puemos/lareview/releases/download/v[^\"]*\"|url \"https://github.com/puemos/lareview/releases/download/v${VERSION}/LaReview_${VERSION}_amd64.AppImage\"|" Formula/lareview.rb
+          sed -i "s/version \"[^\"]*\"/version \"${VERSION}\"/" Formula/lareview.rb
+          sed -i "s/sha256 \"[^\"]*\"/sha256 \"${APPIMAGE_SHA}\"/" Formula/lareview.rb
+
+          # Update Cask
+          sed -i "s/version \"[^\"]*\"/version \"${VERSION}\"/" Casks/lareview.rb
+          sed -i "s/sha256 arm:   \"[^\"]*\"/sha256 arm:   \"${ARM_SHA}\"/" Casks/lareview.rb
+          sed -i "s/intel: \"[^\"]*\"/intel: \"${INTEL_SHA}\"/" Casks/lareview.rb
+
+          # Commit and push
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --staged --quiet || git commit -m "Bump lareview to v${VERSION}"
+          git push
