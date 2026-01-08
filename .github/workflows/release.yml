@@ -96,5 +96,5 @@ jobs:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           brew tap puemos/homebrew-tap
-          brew bump-formula-pr --tap=puemos/homebrew-tap --no-browse lareview || true
-          brew bump-cask-pr --tap=puemos/homebrew-tap --no-browse lareview || true
+          brew bump-formula-pr --no-browse puemos/homebrew-tap/lareview || true
+          brew bump-cask-pr --no-browse puemos/homebrew-tap/lareview || true
