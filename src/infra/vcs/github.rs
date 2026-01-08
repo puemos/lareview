@@ -77,8 +77,6 @@ struct GhPrViewJson {
     url: String,
     #[serde(rename = "headRefOid")]
     head_ref_oid: Option<String>,
-    #[serde(rename = "baseRefOid")]
-    base_ref_oid: Option<String>,
 }
 
 pub async fn fetch_pr_metadata(pr: &GitHubPrRef) -> Result<GitHubPrMetadata> {
@@ -89,7 +87,7 @@ pub async fn fetch_pr_metadata(pr: &GitHubPrRef) -> Result<GitHubPrMetadata> {
             "view",
             pr.url.as_str(),
             "--json",
-            "title,url,headRefOid,baseRefOid",
+            "title,url,headRefOid",
         ])
         .output()
         .await
@@ -107,7 +105,7 @@ pub async fn fetch_pr_metadata(pr: &GitHubPrRef) -> Result<GitHubPrMetadata> {
         title: parsed.title,
         url: parsed.url,
         head_sha: parsed.head_ref_oid,
-        base_sha: parsed.base_ref_oid,
+        base_sha: None,
     })
 }
 
