@@ -25,7 +25,7 @@ LaReview turns a PR or unified diff into a task tree so you can review changes i
 
 ## Demo
 
-https://github.com/user-attachments/assets/e3a553b6-cc4f-4381-b1c0-e0f45169ad75
+https://github.com/user-attachments/assets/28abaf1e-9100-4484-b6a5-18d8dfec427e
 
 ## Key Features
 
