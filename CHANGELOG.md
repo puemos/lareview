@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.18] - 2026-01-07
+
+### Added
+
+- **Tauri 2 Architecture**: Complete migration from egui to Tauri 2 with React frontend
+- **React Frontend**: New modern UI built with React, TanStack Query, custom hooks, and Vite
+- **Agent Icons**: New icons for Claude, Codex, Gemini, Grok, Kimi, Mistral, OpenCode, and Qwen
+- **Landing Page**: New dedicated landing page (`landing/`) with marketing assets and SEO optimization
+- **Tauri Capabilities**: Desktop and macOS capability schemas for permission management
+
+### Changed
+
+- **UI Framework**: Migrated from egui to Tauri 2 with React frontend
+- **Command System**: New unified Tauri command handlers (`src/commands/mod.rs`)
+- **Project Structure**: Separated frontend into dedicated `frontend/` directory with Vite
+- **Build Pipeline**: Updated CI/CD for Tauri builds, codesigning, and artifact generation
+
+### Removed
+
+- **egui UI**: Removed entire `src/ui/` directory
+- **Legacy CLI**: Removed standalone `src/bin/lareview_cli.rs` (integrated into main binary)
+- **Old Templates**: Removed `src/prompts/mod.rs` (moved `generate_tasks.hbs` to `src/`)
+
 ## [0.0.17] - 2026-01-02
 
 ### Added

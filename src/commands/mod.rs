@@ -111,7 +111,7 @@ pub async fn get_cli_status() -> Result<CliStatus, String> {
         output.and_then(|o| {
             if o.status.success() {
                 let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
-                // "lareview 0.0.17" -> "0.0.17"
+                // "lareview 0.0.18" -> "0.0.18"
                 Some(s.replace("lareview ", ""))
             } else {
                 None
