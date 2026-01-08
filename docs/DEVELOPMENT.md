@@ -8,7 +8,6 @@
 ## Common commands
 
 - Run the app: `cargo run`
-- Reset/seed sample data: `cargo run --bin reset_db --features dev-tools`, `cargo run --bin seed_db --features dev-tools`
 - Format: `cargo fmt`
 - Lint: `cargo clippy --all-targets --all-features -- -D warnings`
 - Test: `cargo test`

@@ -12,7 +12,7 @@ Thanks for your interest in improving LaReview! This document outlines the basic
   - `cargo test`
 - Optional but encouraged: `cargo deny check` (also runs in scheduled CI) to spot advisory/license issues early.
 - UI/dev loop: `cargo tauri dev` launches the desktop app with hot reload.
-- Local data lives in `~/.local/share/lareview/db.sqlite` (Linux) or `~/Library/Application Support/LaReview/db.sqlite` (macOS); `cargo run --bin reset_db --features dev-tools` clears it, `cargo run --bin seed_db --features dev-tools` populates sample data.
+- Local data lives in `~/.local/share/lareview/db.sqlite` (Linux) or `~/Library/Application Support/LaReview/db.sqlite` (macOS).
 
 ## Pull requests
 

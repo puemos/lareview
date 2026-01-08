@@ -72,21 +72,10 @@ path = "src/lib.rs"
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
-dev-tools = []
 
 [[bin]]
 name = "lareview"
 path = "src/main.rs"
-
-[[bin]]
-name = "reset_db"
-path = "src/bin/reset_db.rs"
-required-features = ["dev-tools"]
-
-[[bin]]
-name = "seed_db"
-path = "src/bin/seed_db.rs"
-required-features = ["dev-tools"]
 
 [dev-dependencies]
 

@@ -222,9 +222,10 @@ Wipe local state:
 - Run the app: `cargo run`
 - Reset/seed sample data:
 
-  - `cargo run --bin reset_db --features dev-tools`
-  - `cargo run --bin seed_db --features dev-tools`
-
+  If you need more advanced control, use the CLI.
+  
+  ### CLI Reference
+  
 - Checks:
 
   - `cargo fmt -- --check`

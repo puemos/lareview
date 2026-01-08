@@ -100,9 +100,6 @@ jobs:
       - name: Run tests
         run: cargo test --verbose
 
-      - name: Run tests (all features)
-        run: cargo test --verbose --features dev-tools
-
   build:
     name: Build Check
     runs-on: ubuntu-latest

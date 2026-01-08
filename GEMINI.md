@@ -100,23 +100,7 @@ Or run frontend dev server separately:
 cd frontend && pnpm dev
 ```
 
-### Database Management Scripts
-
-The project includes utility scripts for database management:
-
-1. **Seed Database** - Populate the database with sample data:
-
-```bash
-cargo run --bin seed_db --features dev-tools
-```
-
-2. **Reset Database** - Clear all data from the database:
-
-```bash
-cargo run --bin reset_db --features dev-tools
-```
-
-## Development Conventions
+### Development Conventions
 
 - **Formatting:** The project uses `rustfmt` for consistent code formatting.
 - **Linting:** `clippy` is used with a strict warning policy (`-D warnings`), meaning all warnings are treated as errors in the CI pipeline.

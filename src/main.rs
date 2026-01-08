@@ -6,8 +6,6 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use log::{error, info};
-#[cfg(feature = "dev-tools")]
-use std::process::{Command, Stdio};
 
 use lareview::infra;
 use lareview::infra::cli::diff::{self, read_stdin_diff};
@@ -80,14 +78,6 @@ enum Commands {
         #[arg(default_value = "0")]
         index: usize,
     },
-
-    /// Reset the database (maintenance command)
-    #[command(name = "db-reset")]
-    DbReset,
-
-    /// Seed the database with test data (maintenance command)
-    #[command(name = "db-seed")]
-    DbSeed,
 }
 
 use std::io::Write;
@@ -194,48 +184,6 @@ fn process_cli_args(args: &Args) -> Result<(Option<DiffRequest>, Option<PendingD
                     source: format!("stash@{{{}}}", index),
                     created_at: chrono::Utc::now(),
                 });
-            }
-            #[cfg(feature = "dev-tools")]
-            Commands::DbReset => {
-                let status = Command::new("cargo")
-                    .args(["run", "--bin", "reset_db", "--features", "dev-tools"])
-                    .stdin(Stdio::inherit())
-                    .stdout(Stdio::inherit())
-                    .stderr(Stdio::inherit())
-                    .spawn()
-                    .context("Failed to spawn reset_db")?
-                    .wait()
-                    .context("reset_db exited with error")?;
-                if !status.success() {
-                    anyhow::bail!("reset_db exited with non-zero status: {}", status);
-                }
-            }
-            #[cfg(feature = "dev-tools")]
-            Commands::DbSeed => {
-                let status = Command::new("cargo")
-                    .args(["run", "--bin", "seed_db", "--features", "dev-tools"])
-                    .stdin(Stdio::inherit())
-                    .stdout(Stdio::inherit())
-                    .stderr(Stdio::inherit())
-                    .spawn()
-                    .context("Failed to spawn seed_db")?
-                    .wait()
-                    .context("seed_db exited with error")?;
-                if !status.success() {
-                    anyhow::bail!("seed_db exited with non-zero status: {}", status);
-                }
-            }
-            #[cfg(not(feature = "dev-tools"))]
-            Commands::DbReset => {
-                anyhow::bail!(
-                    "db-reset requires --features dev-tools. Run: cargo run --bin reset_db --features dev-tools"
-                );
-            }
-            #[cfg(not(feature = "dev-tools"))]
-            Commands::DbSeed => {
-                anyhow::bail!(
-                    "db-seed requires --features dev-tools. Run: cargo run --bin seed_db --features dev-tools"
-                );
             }
         }
     } else if let Some(pr_ref) = &args.pr {

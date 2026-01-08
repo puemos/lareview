@@ -105,12 +105,6 @@
         },
         "gui": {
           "description": "Open the GUI"
-        },
-        "db-reset": {
-          "description": "Reset the database (requires dev-tools feature)"
-        },
-        "db-seed": {
-          "description": "Seed the database with test data (requires dev-tools feature)"
         }
       }
     },
