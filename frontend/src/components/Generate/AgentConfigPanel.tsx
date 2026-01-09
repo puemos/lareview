@@ -1,6 +1,8 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { Database } from '@phosphor-icons/react';
 import { AgentSelector } from './AgentSelector';
+import { Tooltip } from '../Common/Tooltip';
 import type { Agent, LinkedRepo } from '../../types';
 
 interface AgentConfigPanelProps {
@@ -58,31 +60,48 @@ export const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
         </div>
       </div>
 
-      <button
-        onClick={onGenerate}
-        disabled={!hasDiff || isGenerating}
-        className={`shadow-custom flex w-full items-center justify-center gap-2 rounded-md py-2.5 text-xs font-bold transition-all active:scale-[0.98] ${
-          isGenerating
-            ? 'bg-status-ignored/10 text-status-ignored border-status-ignored/20 hover:bg-status-ignored/20 border'
-            : 'bg-brand text-bg-primary hover:brightness-110'
-        }`}
-      >
-        {isGenerating ? (
-          <>
-            <StopIcon size={14} />
-            Stop Generation
-          </>
-        ) : (
-          <>
-            <PlayIcon size={14} />
-            Generate Review
-          </>
-        )}
-      </button>
+      {!hasDiff && !isGenerating ? (
+        <Tooltip content="Please add a diff to generate a review">
+          <motion.button
+            onClick={onGenerate}
+            disabled={true}
+            className="shadow-custom relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-md py-2.5 text-xs font-bold transition-all bg-bg-tertiary text-text-disabled border-border/50 cursor-not-allowed border"
+          >
+            <div className="relative z-10 flex items-center justify-center gap-2">
+              <PlayIcon size={14} />
+              <span>Generate Review</span>
+            </div>
+          </motion.button>
+        </Tooltip>
+      ) : (
+        <motion.button
+          whileTap={!isGenerating ? { scale: 0.98 } : {}}
+          onClick={onGenerate}
+          disabled={isGenerating}
+          className={`shadow-custom relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-md py-2.5 text-xs font-bold transition-all ${
+            isGenerating
+              ? 'bg-status-ignored/10 text-status-ignored border-status-ignored/20 hover:bg-status-ignored/20 border'
+              : 'bg-brand text-bg-primary hover:brightness-110'
+          }`}
+        >
+          <div className="relative z-10 flex items-center justify-center gap-2">
+            {isGenerating ? (
+              <>
+                <StopIcon size={14} />
+                <span>Stop Generation</span>
+              </>
+            ) : (
+              <>
+                <PlayIcon size={14} />
+                <span>Generate Review</span>
+              </>
+            )}
+          </div>
+        </motion.button>
+      )}
     </div>
   );
 };
-
 const StopIcon = ({ size }: { size: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
     <rect x="6" y="6" width="12" height="12" rx="2" />

@@ -1,4 +1,6 @@
 import React, { Suspense } from 'react';
+import { motion } from 'framer-motion';
+import { SHARED_LAYOUT_TRANSITION } from '../../constants/animations';
 import type { ReviewTask, Feedback } from '../../types';
 import { TaskList, TaskListSkeleton } from './TaskList';
 import { FeedbackList } from './FeedbackList';
@@ -61,7 +63,7 @@ export const ReviewSidebar: React.FC<ReviewSidebarProps> = ({
           >
             <button
               onClick={onAddGlobalFeedback}
-              className="bg-brand text-brand-fg border-brand hover:bg-brand/90 flex w-full items-center justify-center gap-1.5 rounded border px-3 py-1.5 text-[10px] font-medium whitespace-nowrap transition-all cursor-pointer"
+              className="bg-brand text-brand-fg border-brand hover:bg-brand/90 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded border px-3 py-1.5 text-[10px] font-medium whitespace-nowrap transition-all"
               title="Add Global Feedback"
             >
               <ICONS.ICON_FEEDBACK size={12} weight="bold" />
@@ -70,7 +72,7 @@ export const ReviewSidebar: React.FC<ReviewSidebarProps> = ({
           </div>
           <button
             onClick={onOpenExportModal}
-            className="bg-bg-tertiary hover:bg-bg-tertiary/80 text-text-secondary hover:text-text-primary border-border/50 flex flex-1 items-center justify-center gap-1.5 overflow-hidden rounded border py-1.5 text-[10px] font-medium whitespace-nowrap transition-all cursor-pointer"
+            className="bg-bg-tertiary hover:bg-bg-tertiary/80 text-text-secondary hover:text-text-primary border-border/50 flex flex-1 cursor-pointer items-center justify-center gap-1.5 overflow-hidden rounded border py-1.5 text-[10px] font-medium whitespace-nowrap transition-all"
             title="Export Review"
           >
             <ICONS.ACTION_EXPORT size={12} />
@@ -132,14 +134,21 @@ interface TabButtonProps {
 const TabButton: React.FC<TabButtonProps> = ({ active, onClick, icon: Icon, label, count }) => (
   <button
     onClick={onClick}
-    className={`flex flex-1 items-center justify-center gap-1.5 rounded-[3px] py-1.5 text-[10px] font-medium transition-all cursor-pointer ${
-      active
-        ? 'bg-bg-primary text-text-primary shadow-sm'
-        : 'text-text-disabled hover:text-text-secondary'
+    className={`relative flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[3px] py-1.5 text-[10px] font-medium transition-colors ${
+      active ? 'text-text-primary' : 'text-text-disabled hover:text-text-secondary'
     }`}
   >
-    <Icon size={12} />
-    {label}
-    {count > 0 && <span className="text-[10px] opacity-60">({count})</span>}
+    {active && (
+      <motion.div
+        layoutId="sidebar-tab-bg"
+        className="bg-bg-primary absolute inset-0 z-0 rounded-[3px] shadow-sm"
+        transition={SHARED_LAYOUT_TRANSITION}
+      />
+    )}
+    <div className="relative z-10 flex items-center gap-1.5">
+      <Icon size={12} />
+      {label}
+      {count > 0 && <span className="text-[10px] opacity-60">({count})</span>}
+    </div>
   </button>
 );

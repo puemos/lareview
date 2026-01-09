@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { CaretRight, CaretDown, TerminalWindow, Warning, Code, Check } from '@phosphor-icons/react';
@@ -142,23 +143,34 @@ function renderMessage(
       return <ToolCallItem data={msg.data} virtualizer={virtualizer} />;
     case 'error':
       return (
-        <div className="text-status-deleted animate-fade-in my-1 flex gap-2 px-0 py-2 font-mono text-xs">
+        <motion.div
+          key={`error-${msg.timestamp}`}
+          initial={{ opacity: 0, y: 8, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+          className="text-status-deleted my-1 flex gap-2 px-0 py-2 font-mono text-xs"
+        >
           <div className="shrink-0">
             <Warning size={14} weight="fill" />
           </div>
           <div className="break-words whitespace-pre-wrap">
             {'>'} Error: {msg.message}
           </div>
-        </div>
+        </motion.div>
       );
     case 'completed':
       return (
-        <div className="text-success animate-fade-in border-border/30 my-1 mt-4 flex justify-center gap-2 border-t border-dashed px-0 py-4 font-mono text-xs">
+        <motion.div
+          initial={{ opacity: 0, y: 12, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 30, delay: 0.1 }}
+          className="text-success border-border/30 my-1 mt-4 flex justify-center gap-2 border-t border-dashed px-0 py-4 font-mono text-xs"
+        >
           <div className="shrink-0">
             <Check size={14} weight="bold" />
           </div>
           <div>{'>'} REVIEW_GENERATION_COMPLETE</div>
-        </div>
+        </motion.div>
       );
     default:
       return null;
@@ -188,7 +200,12 @@ const ThinkingItem = ({ text, virtualizer }: { text: string; virtualizer: any })
   if (!cleanText) return null;
 
   return (
-    <div ref={contentRef} className="animate-fade-in group flex flex-col gap-1 py-1">
+    <motion.div
+      initial={{ opacity: 0, y: 6, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+      className="group flex flex-col gap-1 py-1"
+    >
       <button
         onClick={toggle}
         className="text-text-tertiary hover:text-text-secondary flex w-fit items-center gap-2 font-mono text-[10px] transition-colors select-none"
@@ -197,26 +214,43 @@ const ThinkingItem = ({ text, virtualizer }: { text: string; virtualizer: any })
         <span>{'>'} thinking_process...</span>
       </button>
 
-      {isExpanded && (
-        <div className="border-border/30 my-1 ml-1 border-l pl-4">
-          <div className="markdown-content text-text-secondary font-mono text-xs leading-relaxed opacity-80">
-            <ReactMarkdown>{cleanText}</ReactMarkdown>
-          </div>
-        </div>
-      )}
-    </div>
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            onAnimationComplete={() => {
+              if (contentRef.current?.parentElement?.parentElement) {
+                virtualizer.measureElement(contentRef.current.parentElement.parentElement);
+              }
+            }}
+            className="border-border/30 my-1 ml-1 overflow-hidden border-l pl-4"
+          >
+            <div className="markdown-content text-text-secondary font-mono text-xs leading-relaxed opacity-80">
+              <ReactMarkdown>{cleanText}</ReactMarkdown>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 };
 
 const MessageItem = ({ text }: { text: string }) => {
   return (
-    <div className="animate-fade-in group flex gap-3 py-2">
+    <motion.div
+      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+      className="group flex gap-3 py-2"
+    >
       <div className="min-w-0 flex-1 space-y-1">
         <div className="markdown-content text-text-primary font-sans text-sm leading-relaxed break-words whitespace-pre-wrap">
           <ReactMarkdown>{text}</ReactMarkdown>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 
@@ -266,7 +300,12 @@ const ToolCallItem = ({ data, virtualizer }: { data: any; virtualizer: any }) =>
   };
 
   return (
-    <div ref={contentRef} className="animate-fade-in group my-1 py-0.5">
+    <motion.div
+      initial={{ opacity: 0, y: 6, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+      className="group my-1 py-0.5"
+    >
       <div
         onClick={toggle}
         className="-mx-1.5 flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 transition-colors select-none hover:bg-white/5"
@@ -296,37 +335,51 @@ const ToolCallItem = ({ data, virtualizer }: { data: any; virtualizer: any }) =>
         </div>
       </div>
 
-      {isExpanded && (
-        <div className="border-border/30 mt-1 ml-[5px] overflow-hidden border-l pl-4">
-          <div className="space-y-2 py-1">
-            <div className="space-y-0.5">
-              <div className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
-                Input
-              </div>
-              <div className="text-text-secondary bg-bg-tertiary/40 border-border/50 overflow-x-auto rounded border p-2 font-mono text-[10px]">
-                <pre className="break-all whitespace-pre-wrap">
-                  {typeof rawInput === 'object'
-                    ? JSON.stringify(rawInput, null, 2)
-                    : rawInput || 'No input'}
-                </pre>
-              </div>
-            </div>
-
-            {rawOutput && (
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            onAnimationComplete={() => {
+              if (contentRef.current?.parentElement?.parentElement) {
+                virtualizer.measureElement(contentRef.current.parentElement.parentElement);
+              }
+            }}
+            className="border-border/30 mt-1 ml-[5px] overflow-hidden border-l pl-4"
+          >
+            <div className="space-y-2 py-1">
               <div className="space-y-0.5">
                 <div className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
-                  Output
+                  Input
                 </div>
-                <div className="text-text-secondary bg-bg-tertiary/40 border-border/50 max-h-[200px] overflow-x-auto rounded border p-2 font-mono text-[10px]">
+                <div className="text-text-secondary bg-bg-tertiary/40 border-border/50 overflow-x-auto rounded border p-2 font-mono text-[10px]">
                   <pre className="break-all whitespace-pre-wrap">
-                    {typeof rawOutput === 'object' ? JSON.stringify(rawOutput, null, 2) : rawOutput}
+                    {typeof rawInput === 'object'
+                      ? JSON.stringify(rawInput, null, 2)
+                      : rawInput || 'No input'}
                   </pre>
                 </div>
               </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+
+              {rawOutput && (
+                <div className="space-y-0.5">
+                  <div className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
+                    Output
+                  </div>
+                  <div className="text-text-secondary bg-bg-tertiary/40 border-border/50 max-h-[200px] overflow-x-auto rounded border p-2 font-mono text-[10px]">
+                    <pre className="break-all whitespace-pre-wrap">
+                      {typeof rawOutput === 'object'
+                        ? JSON.stringify(rawOutput, null, 2)
+                        : rawOutput}
+                    </pre>
+                  </div>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 };

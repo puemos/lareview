@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { ICONS } from '../../constants/icons';
 import { Check } from '@phosphor-icons/react';
@@ -34,24 +35,27 @@ export const Select: React.FC<SelectProps> = ({
 
   return (
     <SelectPrimitive.Root value={value} onValueChange={onChange} disabled={disabled}>
-      <SelectPrimitive.Trigger
-        className={`bg-bg-tertiary hover:bg-bg-secondary border-border/50 text-text-primary focus:border-brand focus:ring-brand/20 flex min-w-[100px] items-center justify-between gap-2 rounded border px-2.5 py-1.5 text-[11px] font-medium transition-all focus:ring-1 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${className} `}
-      >
-        <span className="flex items-center gap-1.5 truncate">
-          <SelectPrimitive.Value placeholder={placeholder}>
-            {selectedOption && (
-              <span className="text-text-primary flex items-center gap-1.5 overflow-hidden">
-                {selectedOption.icon && (
-                  <selectedOption.icon size={14} className={selectedOption.color} />
-                )}
-                <span className="truncate">{selectedOption.label}</span>
-              </span>
-            )}
-          </SelectPrimitive.Value>
-        </span>
-        <SelectPrimitive.Icon className="text-text-tertiary shrink-0">
-          <ICONS.CHEVRON_DOWN size={10} />
-        </SelectPrimitive.Icon>
+      <SelectPrimitive.Trigger asChild>
+        <motion.button
+          whileTap={{ scale: 0.98 }}
+          className={`bg-bg-tertiary hover:bg-bg-secondary border-border/50 text-text-primary focus:border-brand focus:ring-brand/20 flex min-w-[100px] items-center justify-between gap-2 rounded border px-2.5 py-1.5 text-[11px] font-medium transition-all focus:ring-1 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${className} `}
+        >
+          <span className="flex items-center gap-1.5 truncate">
+            <SelectPrimitive.Value placeholder={placeholder}>
+              {selectedOption && (
+                <span className="text-text-primary flex items-center gap-1.5 overflow-hidden">
+                  {selectedOption.icon && (
+                    <selectedOption.icon size={14} className={selectedOption.color} />
+                  )}
+                  <span className="truncate">{selectedOption.label}</span>
+                </span>
+              )}
+            </SelectPrimitive.Value>
+          </span>
+          <SelectPrimitive.Icon className="text-text-tertiary shrink-0">
+            <ICONS.CHEVRON_DOWN size={10} />
+          </SelectPrimitive.Icon>
+        </motion.button>
       </SelectPrimitive.Trigger>
 
       <SelectPrimitive.Portal>

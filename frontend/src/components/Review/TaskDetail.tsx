@@ -1,4 +1,6 @@
 import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { SHARED_LAYOUT_TRANSITION, CONTENT_TRANSITION } from '../../constants/animations';
 import ReactMarkdown from 'react-markdown';
 import { Mermaid } from '../Common/Mermaid';
 import { DiffViewer } from '../DiffViewer/DiffViewer';
@@ -186,7 +188,7 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
                 <span className="flex items-center gap-1.5">
                   Changes
                   {diffStats.additions > 0 || diffStats.deletions > 0 ? (
-                    <span className="font-mono text-[10px]">
+                    <span className="font-mono text-[10px] opacity-70">
                       +{diffStats.additions}/-{diffStats.deletions}
                     </span>
                   ) : null}
@@ -215,37 +217,46 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
       </div>
 
       <div className="relative flex-1 overflow-hidden">
-        {activeTab === 'diff' && (
-          <div className="absolute inset-0">
-            <DiffViewer
-              files={filteredFiles}
-              selectedFile={selectedFile}
-              onSelectFile={onSelectFile}
-              highlightedHunks={highlightedHunks}
-              onAddFeedback={onAddFeedback}
-            />
-          </div>
-        )}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -2 }}
+            transition={CONTENT_TRANSITION}
+            className="absolute inset-0"
+          >
+            {activeTab === 'diff' && (
+              <DiffViewer
+                files={filteredFiles}
+                selectedFile={selectedFile}
+                onSelectFile={onSelectFile}
+                highlightedHunks={highlightedHunks}
+                onAddFeedback={onAddFeedback}
+              />
+            )}
 
-        {activeTab === 'description' && (
-          <div className="custom-scrollbar h-full overflow-y-auto p-8">
-            <div className="animate-fade-in mx-auto max-w-3xl space-y-6">
-              <TaskDescription description={task.description} />
+            {activeTab === 'description' && (
+              <div className="custom-scrollbar h-full overflow-y-auto p-8">
+                <div className="animate-fade-in mx-auto max-w-3xl space-y-6">
+                  <TaskDescription description={task.description} />
 
-              {task.insight && <TaskInsight insight={task.insight} />}
+                  {task.insight && <TaskInsight insight={task.insight} />}
 
-              <TaskFiles files={task.files} />
-            </div>
-          </div>
-        )}
+                  <TaskFiles files={task.files} />
+                </div>
+              </div>
+            )}
 
-        {activeTab === 'diagram' && task.diagram && (
-          <div className="custom-scrollbar bg-bg-secondary/20 flex h-full flex-col items-center overflow-y-auto p-8">
-            <div className="animate-fade-in w-full max-w-4xl">
-              <Mermaid chart={task.diagram} className="border-border border shadow-sm" />
-            </div>
-          </div>
-        )}
+            {activeTab === 'diagram' && task.diagram && (
+              <div className="custom-scrollbar bg-bg-secondary/20 flex h-full flex-col items-center overflow-y-auto p-8">
+                <div className="animate-fade-in w-full max-w-4xl">
+                  <Mermaid chart={task.diagram} className="border-border border shadow-sm" />
+                </div>
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -259,19 +270,26 @@ const TabButton: React.FC<{
 }> = ({ active, onClick, icon: Icon, label }) => (
   <button
     onClick={onClick}
-    className={`flex items-center gap-1.5 rounded-[3px] px-3 py-1.5 text-[11px] font-medium transition-all ${
-      active
-        ? 'bg-bg-primary text-text-primary shadow-sm'
-        : 'text-text-disabled hover:text-text-secondary'
+    className={`relative flex items-center gap-1.5 rounded-[3px] px-3 py-1.5 text-[11px] font-medium transition-colors ${
+      active ? 'text-text-primary' : 'text-text-disabled hover:text-text-secondary'
     }`}
   >
-    <Icon
-      size={12}
-      className={
-        active ? 'text-text-primary' : 'text-text-disabled group-hover:text-text-secondary'
-      }
-    />
-    {label}
+    {active && (
+      <motion.div
+        layoutId="active-tab-bg"
+        className="bg-bg-primary absolute inset-0 z-0 rounded-[3px] shadow-sm"
+        transition={SHARED_LAYOUT_TRANSITION}
+      />
+    )}
+    <div className="relative z-10 flex items-center gap-1.5">
+      <Icon
+        size={12}
+        className={
+          active ? 'text-text-primary' : 'text-text-disabled group-hover:text-text-secondary'
+        }
+      />
+      {label}
+    </div>
   </button>
 );
 
