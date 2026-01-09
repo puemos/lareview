@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Editor, { DiffEditor } from '@monaco-editor/react';
 import { FileCode, CaretDown, CaretRight } from '@phosphor-icons/react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ICONS } from '../../constants/icons';
 import { parseDiffLocally } from '../../utils/diffParser';
 import { getLanguageFromPath } from '../../utils/languages';
 
@@ -180,13 +182,21 @@ export const DiffEditorPanel: React.FC<DiffEditorPanelProps> = ({
         )}
       </div>
 
-      {validationError && (
-        <div className="absolute right-4 bottom-16 left-4">
-          <div className="bg-status-ignored/10 border-status-ignored/20 text-status-ignored rounded-md border px-3 py-2 text-[10px]">
-            {validationError}
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {validationError && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className="absolute right-4 bottom-16 left-4 z-20 flex justify-center"
+          >
+            <div className="bg-status-in_progress/5 border-status-in_progress/10 text-status-in_progress shadow-custom flex items-center gap-2 rounded-lg border px-4 py-2.5 text-xs font-medium backdrop-blur-md">
+              <ICONS.ICON_WARNING size={16} weight="bold" />
+              <span>{validationError}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

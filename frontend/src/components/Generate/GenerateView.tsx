@@ -93,20 +93,24 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     return null;
   }, []);
 
+  const diffValidationError = useMemo(() => {
+    if (!diffText.trim()) return null;
+    return validateDiff(diffText);
+  }, [diffText, validateDiff]);
+
+  const isDiffValid = diffText.trim().length > 0 && !diffValidationError;
+
   // Auto-switch to diff mode on valid pasting
   useEffect(() => {
     if (
       viewMode === 'raw' &&
-      diffText.trim().length > 10 &&
+      isDiffValid &&
       diffText !== lastAutoSwitchedTextRef.current
     ) {
-      const error = validateDiff(diffText);
-      if (!error) {
-        setViewMode('diff');
-        lastAutoSwitchedTextRef.current = diffText;
-      }
+      setViewMode('diff');
+      lastAutoSwitchedTextRef.current = diffText;
     }
-  }, [diffText, viewMode, validateDiff]);
+  }, [diffText, viewMode, isDiffValid]);
 
   const handleGenerate = useCallback(async () => {
     setValidationError(null);
@@ -420,7 +424,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
             diffText={diffText}
             viewMode={viewMode}
             onDiffTextChange={setDiffText}
-            validationError={validationError}
+            validationError={diffValidationError || validationError}
           />
 
           <DiffStats
@@ -441,7 +445,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
             isGenerating={isGenerating}
             onGenerate={handleGenerate}
             onStop={handleStop}
-            hasDiff={diffText.trim().length > 0}
+            isDiffValid={isDiffValid}
           />
 
           <PlanOverview

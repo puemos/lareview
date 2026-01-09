@@ -15,7 +15,7 @@ interface AgentConfigPanelProps {
   isGenerating: boolean;
   onGenerate: () => void;
   onStop: () => void;
-  hasDiff: boolean;
+  isDiffValid: boolean;
 }
 
 
@@ -29,7 +29,7 @@ export const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
   isGenerating,
   onGenerate,
   onStop,
-  hasDiff,
+  isDiffValid,
 }) => {
   return (
     <div className="border-border space-y-6 border-b p-5">
@@ -63,8 +63,8 @@ export const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
         </div>
       </div>
 
-      {!hasDiff && !isGenerating ? (
-        <Tooltip content="Please add a diff to generate a review">
+      {!isDiffValid && !isGenerating ? (
+        <Tooltip content="Please add a valid git diff to generate a review">
           <motion.button
             disabled={true}
             className="bg-bg-tertiary border-border/50 text-text-disabled shadow-custom relative flex w-full cursor-not-allowed items-center justify-center gap-2 overflow-hidden rounded-md border py-2.5 text-xs font-bold transition-all"
@@ -81,7 +81,7 @@ export const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
           onClick={isGenerating ? onStop : onGenerate}
           className={`shadow-custom relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-md py-2.5 text-xs font-bold transition-all ${
             isGenerating
-              ? 'bg-status-rejected/10 text-status-rejected border-status-rejected/20 hover:bg-status-rejected/20 border cursor-pointer'
+              ? 'bg-status-ignored/10 text-status-ignored border-status-ignored/20 hover:bg-status-ignored/20 border cursor-pointer'
               : 'bg-brand text-bg-primary hover:brightness-110'
           }`}
         >
