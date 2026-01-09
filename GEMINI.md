@@ -4,113 +4,282 @@ This file provides a comprehensive overview of the `lareview` project, intended 
 
 ## Project Overview
 
-`lareview` is a desktop application for code review, built with Rust. It provides a graphical user interface to review code changes (diffs), generate review tasks, and add notes. The application uses an external AI agent for parts of the review process, communicating via the Agent Client Protocol (ACP).
+**LaReview** is a desktop code review companion that generates intent-driven review plans with AI. Built with Rust and Tauri, it provides a graphical user interface to review code changes (diffs), generate review tasks, and add notes. The application uses an external AI agent for parts of the review process, communicating via the Agent Client Protocol (ACP).
 
 ### Key Technologies
 
-- **Language:** [Rust](https://www.rust-lang.org/) (2024 Edition)
-- **GUI Framework:** [Tauri](https://tauri.app/) for desktop app shell with [React](https://react.dev/) + [Tailwind CSS](https://tailwindcss.com/) frontend
-- **Asynchronous Runtime:** [`tokio`](https://tokio.rs/) for managing asynchronous operations.
-- **Database:** [`rusqlite`](https://github.com/rusqlite/rusqlite) for local data storage (SQLite).
-- **Templating:** [`handlebars`](https://crates.io/crates/handlebars) for text templating, likely for generating prompts or reports.
-- **Agent Communication:** `agent-client-protocol` for interacting with an AI agent.
-- **Diagramming:** [D2](https://d2lang.com/) for architecture diagrams.
+#### Backend (Rust)
 
-### Architecture
+| Technology                                                                | Purpose                 |
+| ------------------------------------------------------------------------- | ----------------------- |
+| [Rust](https://www.rust-lang.org/) (2024 Edition)                         | Core language           |
+| [Tauri](https://tauri.app/) v2                                            | Desktop app shell & IPC |
+| [`tokio`](https://tokio.rs/)                                              | Asynchronous runtime    |
+| [`rusqlite`](https://github.com/rusqlite/rusqlite)                        | Local SQLite database   |
+| [`handlebars`](https://crates.io/crates/handlebars)                       | Prompt templating       |
+| [`agent-client-protocol`](https://crates.io/crates/agent-client-protocol) | AI agent communication  |
+| [`pmcp`](https://crates.io/crates/pmcp)                                   | MCP client support      |
+| [`syntect`](https://crates.io/crates/syntect)                             | Syntax highlighting     |
 
-The project follows a modular structure:
+#### Frontend (React)
 
-- `src/main.rs`: The application entry point for the Tauri backend.
-- `src/commands/mod.rs`: Tauri commands (Rust) that the frontend calls via IPC.
-- `src/ui/` (deprecated): Old egui UI code being phased out.
-- `frontend/`: New React + TypeScript frontend built with Vite.
-- `src/domain core data structures (/`: Defines thestructs) used throughout the application, like `ReviewTask`, `Review`, `Feedback`.
-- `src/infra/acp/`: Contains logic for the Agent Client Protocol, suggesting communication with an external agent for tasks like generating reviews.
-- `src/infra/db/`: Database layer with SQLite persistence.
-- `src/prompts/`: Includes `handlebars` templates, likely used to generate prompts for the AI agent.
+| Technology                                                  | Purpose                 |
+| ----------------------------------------------------------- | ----------------------- |
+| [React](https://react.dev/) v19                             | UI framework            |
+| [TypeScript](https://www.typescriptlang.org/)               | Type-safe JavaScript    |
+| [Tailwind CSS](https://tailwindcss.com/) v4                 | Styling                 |
+| [Vite](https://vitejs.dev/) v7                              | Build tool              |
+| [Zustand](https://zustand.docs.pmnd.rs/)                    | State management        |
+| [Monaco Editor](https://microsoft.github.io/monaco-editor/) | Code diff viewer        |
+| [TanStack Query](https://tanstack.com/query)                | Data fetching & caching |
+| [Phosphor Icons](https://phosphoricons.com/)                | Icon library            |
+| [Vitest](https://vitest.dev/)                               | Testing framework       |
+
+---
+
+## Architecture
+
+The project follows a modular, layered architecture:
+
+- **Domain layer** (`src/domain/`): Pure business logic, no external dependencies
+- **Infrastructure layer** (`src/infra/`): External integrations (DB, VCS, ACP)
+- **Commands** (`src/commands/`): Thin wrappers exposing functionality to frontend
+- **Components** (`frontend/src/components/`): Organized by feature/view
+
+---
 
 ## UI Views
 
-LaReview has a Tauri-based desktop shell with two main views:
+LaReview has a Tauri-based desktop shell with three main views:
 
-- **GENERATE:** This view allows the user to paste a diff, select an AI agent, and generate a review plan.
-- **REVIEW:** This view displays the review plan in a tree-based navigation system. The user can navigate through the plan, view task details, and add notes.
+| View         | Description                                                                                      |
+| ------------ | ------------------------------------------------------------------------------------------------ |
+| **Generate** | Paste a diff (or fetch from GitHub PR), select an AI agent, and generate a review plan           |
+| **Review**   | Tree-based navigation through the review plan; view task details, code changes, and add feedback |
+| **Settings** | Configure AI agents, editor preferences, and application settings                                |
+
+---
 
 ## Building and Running
 
-The following commands are used for common development tasks, as inferred from the `ci.yml` workflow.
+### Prerequisites
 
-### Check Formatting
+- Rust nightly toolchain (see `rust-toolchain.toml`)
+- Node.js & pnpm
+- Tauri CLI: `cargo install tauri-cli`
 
-To check if the code is formatted according to project standards:
-
-```bash
-cargo fmt -- --check
-```
-
-### Git
-
-1. Never commit without running `cargo fmt` and `cargo clippy`.
-2. Use `git rebase` instead of `git merge` to keep the commit history clean.
-3. Do not commit or push asking for review or approval.
-4. Commit structure should follow the conventional commit format `action(scope): subject`.
-5. Commit messages should be concise and descriptive and include all stuff done based on the diff.
-
-### Linting
-
-To run the clippy linter and check for warnings:
+### Development Commands
 
 ```bash
-cargo clippy --all-targets --all-features -- -D warnings
-```
-
-### Running Tests
-
-To execute the test suite:
-
-```bash
-cargo test
-```
-
-### Building the Application
-
-To compile the Rust backend:
-
-```bash
-cargo build
-```
-
-To build the frontend:
-
-```bash
-cd frontend && pnpm build
-```
-
-### Running the Application
-
-To build and run the application in development mode:
-
-```bash
+# Run the full application (backend + frontend)
 cargo tauri dev
-```
 
-Or run frontend dev server separately:
-
-```bash
+# Or run frontend dev server separately
 cd frontend && pnpm dev
 ```
 
-### Development Conventions
+### Build Commands
 
-- **Formatting:** The project uses `rustfmt` for consistent code formatting.
-- **Linting:** `clippy` is used with a strict warning policy (`-D warnings`), meaning all warnings are treated as errors in the CI pipeline.
-- **Testing:** Unit and integration tests are run with `cargo test`.
-- **Dependencies:** The project uses a specific nightly toolchain as defined in `rust-toolchain.toml`.
+```bash
+# Build Rust backend
+cargo build
+
+# Build frontend
+cd frontend && pnpm build
+
+# Build production release
+cargo tauri build
+```
+
+### Code Quality
+
+```bash
+# Check formatting
+cargo fmt -- --check
+
+# Run linter (warnings = errors)
+cargo clippy --all-targets --all-features -- -D warnings
+
+# Run Rust tests
+cargo test
+
+# Run frontend linter
+cd frontend && pnpm lint
+
+# Run frontend tests
+cd frontend && pnpm test
+```
+
+---
+
+## Development Conventions
+
+### Formatting & Linting
+
+- **Rust:** Uses `rustfmt` for formatting and `clippy` with strict policy (`-D warnings`)
+- **Frontend:** Uses ESLint + Prettier with Tailwind plugin
+- **Toolchain:** Nightly Rust as defined in `rust-toolchain.toml`
+
+### Git Workflow
+
+1. **Always** run `cargo fmt` and `cargo clippy` before committing
+2. Use `git rebase` instead of `git merge` to keep history clean
+3. Follow [Conventional Commits](https://www.conventionalcommits.org/) format: `action(scope): subject`
+   - Examples: `feat(review): add feedback threading`, `fix(diff): handle binary files`
+4. Write concise, descriptive commit messages that summarize all changes
+5. Do not commit or push asking for review or approval
+
+### Code Organization
+
+- **Domain layer** (`src/domain/`): Pure business logic, no external dependencies
+- **Infrastructure layer** (`src/infra/`): External integrations (DB, VCS, ACP)
+- **Commands** (`src/commands/`): Thin wrappers exposing functionality to frontend
+- **Components** (`frontend/src/components/`): Organized by feature/view
+
+---
 
 ## New Release Process
 
-- **Release Preparation:** Ensure all tests pass and the code is formatted correctly.
-- **Version Bump:** Update the version number in `Cargo.toml` and `Cargo.lock`.
-- **Documentation:** Update the README and other documentation files.
-- **Commit and Tag:** Commit the changes and tag the release.
-- **Publish:** Push and push the tags. GitHub CI will do the rest.
+1. **Preparation:** Ensure all tests pass and code is formatted
+2. **Version Bump:** Update version in:
+   - `Cargo.toml`
+   - `Cargo.lock` (run `cargo build`)
+   - `tauri.conf.json`
+3. **Changelog:** Update `CHANGELOG.md` with new version and release notes
+4. **Documentation:** Update `README.md` if needed
+5. **Commit & Tag:**
+   ```bash
+   git add -A
+   git commit -m "chore(release): v0.0.X"
+   git tag v0.0.X
+   git push && git push --tags
+   ```
+6. **Publish:** GitHub CI will handle the rest (builds, releases, Homebrew tap)
+
+---
+
+## Key Data Structures
+
+### Domain Models
+
+| Model        | File                 | Description                                                          |
+| ------------ | -------------------- | -------------------------------------------------------------------- |
+| `Review`     | `domain/review.rs`   | A review session with metadata and state                             |
+| `ReviewTask` | `domain/task.rs`     | Individual review item with severity, description, and code location |
+| `Feedback`   | `domain/feedback.rs` | User notes and comments on code                                      |
+
+### Frontend State
+
+| Store            | Purpose                                     |
+| ---------------- | ------------------------------------------- |
+| `useReviewStore` | Current review session and navigation state |
+| React Query      | Server state management and caching         |
+
+---
+
+## External Integrations
+
+### Agent Client Protocol (ACP)
+
+The application communicates with AI agents via ACP for:
+
+- Generating review plans from diffs
+- Analyzing code changes for potential issues
+- Suggesting review focus areas
+
+### GitHub Integration
+
+- Fetch diffs from GitHub Pull Requests
+- Push review feedback as PR comments
+- Deep linking support via `lareview://` protocol
+
+---
+
+## Useful Links
+
+- **Repository:** https://github.com/puemos/lareview
+- **Landing Page:** https://lareview.dev (source in `landing/`)
+- **Changelog:** See `CHANGELOG.md`
+- **Contributing:** See `CONTRIBUTING.md`
+
+---
+
+## Agent Guidelines
+
+This section provides guidance for AI coding agents working on this repository.
+
+### Efficiency Tips
+
+- **Text replacement:** Use `sed` for simple, targeted text replacements across files
+- **File searching:** Use `rg` (ripgrep) for fast, regex-capable code search
+- **Prefer small edits:** Make surgical edits rather than rewriting entire files
+- **Batch related changes:** Group related modifications into a single logical commit
+
+### Understanding the Codebase
+
+1. **Start with types:** When exploring a feature, begin with `src/domain/` to understand the core data structures
+2. **Follow the IPC boundary:** Commands in `src/commands/` bridge frontend and backend—trace from there
+3. **Check the templates:** Prompt logic lives in `*.hbs` files in `src/`
+4. **Frontend follows backend:** Frontend types in `frontend/src/types/` mirror Rust structs
+
+### Common Patterns
+
+#### Adding a New Tauri Command
+
+1. Define the function in `src/commands/mod.rs`
+2. Register it in `main.rs` via `.invoke_handler()`
+3. Call from frontend using `@tauri-apps/api/core`'s `invoke()`
+
+#### Adding a New React Component
+
+1. Create a new directory under `frontend/src/components/`
+2. Export from an `index.tsx` file
+3. Use existing hooks from `frontend/src/hooks/` for data fetching
+4. Follow existing Tailwind patterns from sibling components
+
+#### Database Migrations
+
+1. Add SQL file to `migrations/`
+2. Migrations run automatically on app start
+
+### Testing Workflow
+
+```bash
+# Quick validation before committing
+cargo fmt && cargo clippy --all-targets --all-features -- -D warnings && cargo test
+
+# Frontend validation
+cd frontend && pnpm lint && pnpm test && pnpm build
+```
+
+### Things to Avoid
+
+- **Don't modify `Cargo.lock` manually**—let Cargo manage it
+- **Don't inline Tailwind classes excessively**—extract to components if repeated
+- **Don't add new dependencies without justification**—prefer existing crates
+- **Don't skip error handling**—use `anyhow::Result` or proper `thiserror` types
+
+### File Naming Conventions
+
+| Location         | Convention       | Example          |
+| ---------------- | ---------------- | ---------------- |
+| Rust modules     | `snake_case.rs`  | `review_task.rs` |
+| React components | `PascalCase.tsx` | `TaskDetail.tsx` |
+| React hooks      | `camelCase.ts`   | `useFeedback.ts` |
+| Utility files    | `camelCase.ts`   | `formatDate.ts`  |
+
+### Quick Reference Commands
+
+```bash
+# Find all Tauri commands
+rg "#\[tauri::command\]" src/
+
+# Find React component usage
+rg "<ComponentName" frontend/src/
+
+# Find all TODO/FIXME comments
+rg "TODO|FIXME" --type rust --type ts
+
+# Check what changed in a file
+git log -p --follow -n 5 -- path/to/file
+```
