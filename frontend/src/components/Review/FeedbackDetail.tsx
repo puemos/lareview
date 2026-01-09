@@ -331,23 +331,34 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
         </div>
       </div>
 
-      <div className="border-border bg-bg-secondary/30 border-t p-4">
-        <div className="relative">
+      <div className="border-border border-t p-3">
+        <div className="relative rounded-lg border border-border bg-bg-secondary shadow-sm transition-all focus-within:border-brand/50 focus-within:ring-1 focus-within:ring-brand/50">
           <textarea
             value={replyText}
             onChange={e => setReplyText(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                handleAddComment();
+              }
+            }}
             placeholder="Write a reply..."
-            className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand w-full resize-none rounded-lg border px-3 py-2 pr-20 text-xs focus:outline-none"
-            rows={2}
+            className="w-full resize-none bg-transparent px-3 py-2.5 text-xs text-text-primary placeholder:text-text-disabled focus:outline-none"
+            rows={Math.max(1, Math.min(5, replyText.split('\n').length))}
+            style={{ minHeight: '36px' }}
             disabled={isAddingComment}
           />
-          <button
-            onClick={handleAddComment}
-            disabled={!replyText.trim() || isAddingComment}
-            className="bg-brand hover:bg-brand/90 absolute right-2 bottom-2 rounded px-2 py-1 text-[10px] font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isAddingComment ? '...' : 'Reply'}
-          </button>
+          <div className="flex items-center justify-between px-2 pb-2 pt-1">
+            <span className="px-1 text-[10px] text-text-disabled opacity-0 transition-opacity focus-within:opacity-100 group-focus-within:opacity-100">
+              {replyText.length > 0 ? '⌘ + Enter to send' : ''}
+            </span>
+            <button
+              onClick={handleAddComment}
+              disabled={!replyText.trim() || isAddingComment}
+              className="rounded bg-brand px-2.5 py-1 text-[10px] font-medium text-brand-fg transition-all hover:bg-brand/90 disabled:opacity-50"
+            >
+              {isAddingComment ? 'Sending...' : 'Reply'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
