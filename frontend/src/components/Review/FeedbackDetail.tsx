@@ -321,7 +321,7 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
                       {formatTimestamp(comment.created_at)}
                     </span>
                   </div>
-                  <div className="prose prose-invert prose-xs text-text-secondary max-w-none">
+                  <div className="prose prose-invert prose-sm text-text-secondary max-w-none">
                     <ReactMarkdown>{comment.body}</ReactMarkdown>
                   </div>
                 </div>

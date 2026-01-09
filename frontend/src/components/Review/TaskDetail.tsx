@@ -315,7 +315,7 @@ const TaskInsight: React.FC<{ insight: string }> = ({ insight }) => {
         <ICONS.VIEW_GENERATE size={12} />
         Insight
       </h4>
-      <div className="prose prose-invert prose-xs text-text-secondary max-w-none leading-normal">
+      <div className="prose prose-invert prose-sm text-text-secondary max-w-none leading-normal">
         <ReactMarkdown
           components={{
             code: CodeBlock,
