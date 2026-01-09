@@ -3,7 +3,7 @@
 
 use lareview::domain::{
     Comment, DiffRef, Feedback, FeedbackImpact, HunkRef, LinkedRepo, Review, ReviewRun,
-    ReviewSource, ReviewStatus, ReviewTask, TaskStats,
+    ReviewRunStatus, ReviewSource, ReviewStatus, ReviewTask, TaskStats,
 };
 use lareview::infra::db::{Database, repository::*};
 use std::path::PathBuf;
@@ -55,6 +55,7 @@ fn test_full_database_workflow() -> anyhow::Result<()> {
         input_ref: "input".into(),
         diff_text: "diff".into(),
         diff_hash: "h".into(),
+        status: ReviewRunStatus::Completed,
         created_at: "now".into(),
     };
     run_repo.save(&run)?;
@@ -165,6 +166,7 @@ fn test_task_diff_refs_serialization_deserialization() -> anyhow::Result<()> {
         input_ref: "input".to_string(),
         diff_text: "diff".into(),
         diff_hash: "h".to_string(),
+        status: ReviewRunStatus::Completed,
         created_at: "now".to_string(),
     };
     run_repo.save(&run)?;
@@ -281,6 +283,7 @@ fn test_task_with_null_diff_refs() -> anyhow::Result<()> {
         input_ref: "input".to_string(),
         diff_text: "diff".into(),
         diff_hash: "h".to_string(),
+        status: ReviewRunStatus::Completed,
         created_at: "now".to_string(),
     };
     run_repo.save(&run)?;

@@ -45,6 +45,11 @@ interface AppStore {
   progressMessages: ProgressMessage[];
   plan: Plan | null;
   pendingSource: ReviewSource | null;
+  selectedRepoId: string;
+  prRef: string;
+  viewMode: 'raw' | 'diff';
+  planItems: string[];
+  isPlanExpanded: boolean;
 
   setDiffText: (text: string) => void;
   setParsedDiff: (diff: ParsedDiff | null) => void;
@@ -67,6 +72,11 @@ interface AppStore {
   clearProgressMessages: () => void;
   setPendingSource: (source: ReviewSource | null) => void;
   updatePlanItemStatus: (content: string, status: string) => void;
+  setSelectedRepoId: (repoId: string) => void;
+  setPrRef: (prRef: string) => void;
+  setViewMode: (mode: 'raw' | 'diff') => void;
+  setPlanItems: (items: string[] | ((items: string[]) => string[])) => void;
+  setIsPlanExpanded: (isExpanded: boolean) => void;
   reset: () => void;
 }
 
@@ -89,6 +99,11 @@ export const useAppStore = create<AppStore>()(
         progressMessages: [],
         plan: null,
         pendingSource: null,
+        selectedRepoId: '',
+        prRef: '',
+        viewMode: 'raw',
+        planItems: [],
+        isPlanExpanded: false,
 
         setDiffText: text => set({ diffText: text }),
         setParsedDiff: diff => set({ parsedDiff: diff }),
@@ -325,6 +340,15 @@ export const useAppStore = create<AppStore>()(
             return { plan: { ...state.plan, entries: newEntries } };
           }),
 
+        setSelectedRepoId: repoId => set({ selectedRepoId: repoId }),
+        setPrRef: prRef => set({ prRef }),
+        setViewMode: mode => set({ viewMode: mode }),
+        setPlanItems: items =>
+          set(state => ({
+            planItems: typeof items === 'function' ? items(state.planItems) : items,
+          })),
+        setIsPlanExpanded: isExpanded => set({ isPlanExpanded: isExpanded }),
+
         reset: () =>
           set({
             diffText: '',
@@ -341,6 +365,11 @@ export const useAppStore = create<AppStore>()(
             progressMessages: [],
             plan: null,
             pendingSource: null,
+            selectedRepoId: '',
+            prRef: '',
+            viewMode: 'raw',
+            planItems: [],
+            isPlanExpanded: false,
           }),
       }),
       {

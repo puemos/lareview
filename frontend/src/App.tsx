@@ -10,6 +10,7 @@ import { createQueryClient } from './lib/query-client';
 import { ErrorBoundary } from './components/Common/ErrorBoundary';
 import { TooltipProvider } from './components/Common/Tooltip';
 import { ICONS } from './constants/icons';
+import { GenerationProvider } from './contexts/GenerationContext';
 
 import { SettingsPageSkeleton } from './components/Settings/SettingsPageSkeleton';
 
@@ -127,43 +128,48 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <div className="flex h-screen flex-col overflow-hidden bg-gray-900 text-white">
-          <Toaster
-            position="bottom-right"
-            theme="dark"
-            closeButton
-            icons={{
-              success: <ICONS.STATUS_DONE size={18} className="text-green-400" />,
-              info: <ICONS.ICON_INFO size={18} className="text-blue-400" />,
-              warning: <ICONS.ICON_WARNING size={18} className="text-yellow-400" />,
-              error: <ICONS.STATUS_IGNORED size={18} className="text-red-400" />,
-              loading: <ICONS.ACTION_LOADING size={18} className="text-brand animate-spin" />,
-            }}
-            toastOptions={{
-              classNames: {
-                title: '!font-semibold',
-                description: '!text-text-secondary !text-[11px]',
-              },
-              className:
-                '!shadow-custom !bg-bg-tertiary !text-text-primary !rounded-lg !border !border-border !py-3',
-            }}
-          />
+      <GenerationProvider>
+        <TooltipProvider>
+          <div className="flex h-screen flex-col overflow-hidden bg-gray-900 text-white">
+            <Toaster
+              position="bottom-right"
+              theme="dark"
+              closeButton
+              icons={{
+                success: <ICONS.STATUS_DONE size={18} className="text-green-400" />,
+                info: <ICONS.ICON_INFO size={18} className="text-blue-400" />,
+                warning: <ICONS.ICON_WARNING size={18} className="text-yellow-400" />,
+                error: <ICONS.STATUS_IGNORED size={18} className="text-red-400" />,
+                loading: <ICONS.ACTION_LOADING size={18} className="text-brand animate-spin" />,
+              }}
+              toastOptions={{
+                classNames: {
+                  title: '!font-semibold',
+                  description: '!text-text-secondary !text-[11px]',
+                },
+                className:
+                  '!shadow-custom !bg-bg-tertiary !text-text-primary !rounded-lg !border !border-border !py-3',
+              }}
+            />
 
-          {error && (
-            <div className="z-50 flex items-center justify-between bg-red-500 px-4 py-2 text-white">
-              <span>{error}</span>
-              <button onClick={() => setError(null)} className="ml-4 rounded px-2 hover:bg-red-600">
-                ✕
-              </button>
+            {error && (
+              <div className="z-50 flex items-center justify-between bg-red-500 px-4 py-2 text-white">
+                <span>{error}</span>
+                <button
+                  onClick={() => setError(null)}
+                  className="ml-4 rounded px-2 hover:bg-red-600"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+            <div className="flex flex-1 overflow-hidden">
+              <Sidebar currentView={currentView} onViewChange={setCurrentView} />
+              <main className="flex-1 overflow-hidden">{renderView()}</main>
             </div>
-          )}
-          <div className="flex flex-1 overflow-hidden">
-            <Sidebar currentView={currentView} onViewChange={setCurrentView} />
-            <main className="flex-1 overflow-hidden">{renderView()}</main>
           </div>
-        </div>
-      </TooltipProvider>
+        </TooltipProvider>
+      </GenerationProvider>
     </QueryClientProvider>
   );
 }

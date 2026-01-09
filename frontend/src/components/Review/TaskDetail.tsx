@@ -93,7 +93,7 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
         onSelectFile(filteredFiles[0]);
       }
     }
-  }, [task.id, activeTab, filteredFiles, onSelectFile]);
+  }, [task.id, activeTab, filteredFiles, onSelectFile, selectedFile]);
 
   const highlightedHunks = React.useMemo(
     () =>

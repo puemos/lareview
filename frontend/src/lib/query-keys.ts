@@ -22,6 +22,7 @@ export type ReviewRunsQuery = Array<{
   diff_text: string;
   created_at: string;
   task_count: number;
+  status: string;
 }>;
 export type TasksQuery = ReviewTask[];
 export type ReposQuery = Array<{

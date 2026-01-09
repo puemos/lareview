@@ -555,6 +555,7 @@ fn save_by_file_and_line(config: &ServerConfig, args: &Value) -> Result<String> 
         input_ref: ctx.input_ref.clone(),
         diff_text: ctx.diff_text.clone(),
         diff_hash: ctx.diff_hash.clone(),
+        status: crate::domain::ReviewRunStatus::Running,
         created_at: ctx
             .created_at
             .clone()

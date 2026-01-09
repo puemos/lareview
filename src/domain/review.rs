@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::str::FromStr;
 use std::sync::Arc;
 
 /// Unique identifier for a pull request
@@ -75,6 +77,45 @@ impl ReviewSource {
     }
 }
 
+/// Status of a review generation run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewRunStatus {
+    Queued,
+    Running,
+    #[default]
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+impl fmt::Display for ReviewRunStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Queued => write!(f, "queued"),
+            Self::Running => write!(f, "running"),
+            Self::Completed => write!(f, "completed"),
+            Self::Failed => write!(f, "failed"),
+            Self::Cancelled => write!(f, "cancelled"),
+        }
+    }
+}
+
+impl FromStr for ReviewRunStatus {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "QUEUED" | "PENDING" => Ok(Self::Queued),
+            "RUNNING" | "IN_PROGRESS" | "INPROGRESS" => Ok(Self::Running),
+            "COMPLETED" | "DONE" => Ok(Self::Completed),
+            "FAILED" | "ERROR" => Ok(Self::Failed),
+            "CANCELLED" | "CANCELED" => Ok(Self::Cancelled),
+            _ => Ok(Self::Completed),
+        }
+    }
+}
+
 /// A single generation run for a review (diff + agent output).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReviewRun {
@@ -90,6 +131,9 @@ pub struct ReviewRun {
     pub diff_text: Arc<str>,
     /// Hash of `diff_text` for quick change checks/dedupe.
     pub diff_hash: String,
+    /// Current status of the review run.
+    #[serde(default)]
+    pub status: ReviewRunStatus,
     /// Creation timestamp in RFC3339 format.
     pub created_at: String,
 }

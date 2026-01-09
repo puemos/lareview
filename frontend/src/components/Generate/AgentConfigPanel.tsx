@@ -137,22 +137,6 @@ export const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
 
           {/* Sparkles */}
           {isGenerating && <Sparkles />}
-
-          {/* Radial pulse */}
-          {isGenerating && (
-            <motion.div
-              animate={{
-                scale: [1, 1.2, 1],
-                opacity: [0.3, 0.6, 0.3],
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                ease: 'easeInOut',
-              }}
-              className="absolute inset-0 rounded-full border border-current opacity-20"
-            />
-          )}
         </motion.button>
       )}
     </div>

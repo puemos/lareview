@@ -7,6 +7,7 @@ import { ICONS } from '../../constants/icons';
 import type { ViewType } from '../../types';
 import { useReviews } from '../../hooks/useReviews';
 import { useTauri } from '../../hooks/useTauri';
+import { queryKeys } from '../../lib/query-keys';
 
 interface SidebarProps {
   currentView: ViewType;
@@ -17,22 +18,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) =
   const queryClient = useQueryClient();
   const { setReviewId, reviewId } = useAppStore();
   const { data: reviews = [], isLoading, invalidate } = useReviews();
-  const { deleteReview } = useTauri();
+  const { deleteReview, getReviewRuns } = useTauri();
   const [error, setError] = useState<string | null>(null);
   const [reviewToDelete, setReviewToDelete] = useState<string | null>(null);
 
   const prefetchReview = useCallback(
     (reviewId: string) => {
       queryClient.prefetchQuery({
-        queryKey: ['reviewRuns', reviewId],
-        queryFn: async () => {
-          const { getReviewRuns } = await import('../../hooks/useTauri').then(m => m.useTauri());
-          return getReviewRuns(reviewId);
-        },
+        queryKey: queryKeys.reviewRuns(reviewId),
+        queryFn: () => getReviewRuns(reviewId),
         staleTime: 1000 * 30,
       });
     },
-    [queryClient]
+    [queryClient, getReviewRuns]
   );
 
   const handleReviewClick = (id: string) => {
@@ -130,7 +128,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) =
                     className="flex h-4 w-4 shrink-0 items-center justify-center"
                     aria-hidden="true"
                   >
-                    {review.status === 'in_progress' ? (
+                    {review.active_run_status === 'running' ||
+                    review.active_run_status === 'queued' ? (
                       <ICONS.ACTION_LOADING
                         size={10}
                         className="animate-spin text-blue-400"

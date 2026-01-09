@@ -204,6 +204,8 @@ export const useTauri = () => {
       task_count: number;
       created_at: string;
       source: ReviewSource;
+      status: string;
+      active_run_status?: string | null;
     }>
   > => {
     return invoke('get_all_reviews');
@@ -221,6 +223,7 @@ export const useTauri = () => {
         diff_text: string;
         created_at: string;
         task_count: number;
+        status: string;
       }>
     > => {
       return invoke('get_review_runs', { reviewId });

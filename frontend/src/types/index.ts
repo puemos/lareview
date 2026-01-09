@@ -180,6 +180,7 @@ export interface Review {
   task_count: number;
   agent_id?: string;
   status: string;
+  active_run_status?: string | null;
 }
 
 export type ReviewSource =

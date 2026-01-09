@@ -503,6 +503,7 @@ async fn test_save_agent_comment() {
             input_ref: "diff".into(),
             diff_text: "diff --git a/file.rs b/file.rs\n--- a/file.rs\n+++ b/file.rs\n@@ -1,1 +1,1 @@\n-old\n+new\n".into(),
             diff_hash: "h".into(),
+            status: crate::domain::ReviewRunStatus::Completed,
             created_at: "2024-01-01T00:00:00Z".into(),
         };
     run_repo.save(&run).unwrap();

@@ -1,6 +1,6 @@
 use crate::domain::{
-    Comment, Feedback, FeedbackImpact, LinkedRepo, Review, ReviewRun, ReviewSource, ReviewStatus,
-    TaskStats,
+    Comment, Feedback, FeedbackImpact, LinkedRepo, Review, ReviewRun, ReviewRunStatus, ReviewSource,
+    ReviewStatus, TaskStats,
 };
 use crate::infra::db::Database;
 use crate::infra::db::repository::*;
@@ -35,6 +35,7 @@ fn test_task_repository() -> anyhow::Result<()> {
         input_ref: "diff".into(),
         diff_text: "diff --git a b".into(),
         diff_hash: "h".into(),
+        status: ReviewRunStatus::Completed,
         created_at: "now".into(),
     };
     run_repo.save(&run)?;
@@ -232,11 +233,13 @@ fn test_review_run_repository() -> anyhow::Result<()> {
         input_ref: "input".into(),
         diff_text: "diff".into(),
         diff_hash: "h".into(),
+        status: ReviewRunStatus::Running,
         created_at: "now".into(),
     };
 
     repo.save(&run)?;
-    assert!(repo.find_by_id(&"run-1".into())?.is_some());
+    let fetched = repo.find_by_id(&"run-1".into())?.expect("run exists");
+    assert_eq!(fetched.status, ReviewRunStatus::Running);
     assert_eq!(repo.find_by_review_id(&"rev-1".into())?.len(), 1);
     assert_eq!(repo.list_all()?.len(), 1);
 
@@ -315,6 +318,7 @@ fn test_review_cascading_deletion() -> anyhow::Result<()> {
         input_ref: "input".into(),
         diff_text: "diff".into(),
         diff_hash: "h".into(),
+        status: ReviewRunStatus::Completed,
         created_at: "now".into(),
     })?;
 
@@ -360,6 +364,46 @@ fn test_review_cascading_deletion() -> anyhow::Result<()> {
     assert_eq!(run_repo.find_by_review_id(&review_id)?.len(), 0);
     assert_eq!(task_repo.find_by_run(&run_id)?.len(), 0);
     assert_eq!(feedback_repo.find_by_review(&review_id)?.len(), 0);
+
+    Ok(())
+}
+
+#[test]
+fn test_review_run_repository_status_update() -> anyhow::Result<()> {
+    let db = Database::open_in_memory()?;
+    let repo = ReviewRunRepository::new(db.connection());
+    let review_repo = ReviewRepository::new(db.connection());
+
+    let review = Review {
+        id: "rev-1".to_string(),
+        title: "Test Review".to_string(),
+        summary: None,
+        source: ReviewSource::DiffPaste {
+            diff_hash: "h".into(),
+        },
+        active_run_id: None,
+        status: ReviewStatus::Todo,
+        created_at: "now".to_string(),
+        updated_at: "now".to_string(),
+    };
+    review_repo.save(&review)?;
+
+    let run = ReviewRun {
+        id: "run-1".into(),
+        review_id: "rev-1".into(),
+        agent_id: "agent".into(),
+        input_ref: "input".into(),
+        diff_text: "diff".into(),
+        diff_hash: "h".into(),
+        status: ReviewRunStatus::Running,
+        created_at: "now".into(),
+    };
+
+    repo.save(&run)?;
+    repo.update_status(&"run-1".into(), ReviewRunStatus::Failed)?;
+
+    let updated = repo.find_by_id(&"run-1".into())?.expect("run exists");
+    assert_eq!(updated.status, ReviewRunStatus::Failed);
 
     Ok(())
 }

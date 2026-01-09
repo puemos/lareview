@@ -34,6 +34,9 @@ pub struct AppState {
 impl AppState {
     pub fn new() -> Self {
         let db = Database::open().expect("Failed to open database");
+        if let Err(err) = db.mark_stale_runs_failed() {
+            log::warn!("Failed to mark stale runs as failed: {}", err);
+        }
         Self {
             db: Arc::new(Mutex::new(db)),
             config: Arc::new(RwLock::new(AppConfig::default())),

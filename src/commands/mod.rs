@@ -1,7 +1,8 @@
 use crate::application::review::export::{ExportData, ExportOptions, ReviewExporter};
 use crate::domain::{
     Comment, Feedback, FeedbackAnchor, FeedbackImpact, FeedbackSide,
-    LinkedRepo as DomainLinkedRepo, Review, ReviewRun, ReviewSource, ReviewStatus, ReviewTask,
+    LinkedRepo as DomainLinkedRepo, Review, ReviewRun, ReviewRunStatus, ReviewSource, ReviewStatus,
+    ReviewTask,
 };
 use crate::infra::acp::{
     AgentRegistry, GenerateTasksInput, ProgressEvent, RunContext, generate_tasks_with_acp,
@@ -205,6 +206,7 @@ pub async fn generate_review(
         input_ref: format!("diff-{}", &diff_hash[..8]),
         diff_text: Arc::from(diff_text.as_str()),
         diff_hash: diff_hash.clone(),
+        status: ReviewRunStatus::Running,
         created_at: now.clone(),
     };
 
@@ -221,7 +223,7 @@ pub async fn generate_review(
         summary: None,
         source: source.clone(),
         active_run_id: Some(run_id.clone()),
-        status: ReviewStatus::InProgress,
+        status: ReviewStatus::Todo,
         created_at: now.clone(),
         updated_at: now.clone(),
     };
@@ -371,7 +373,7 @@ pub async fn generate_review(
         agent_args: candidate_args,
         progress_tx: Some(mcp_tx),
         mcp_server_binary: None,
-        timeout_secs: Some(300),
+        timeout_secs: Some(1000),
         cancel_token: Some(cancel_token),
         debug: std::env::var("RUST_LOG")
             .map(|v| v.contains("acp"))
@@ -391,12 +393,16 @@ pub async fn generate_review(
             let tasks_result = db.get_tasks_by_run(&run_id);
             let task_count = tasks_result.map(|t| t.len()).unwrap_or(0);
 
-            let mut review = db
-                .get_review(&review_id)
-                .map_err(|e| e.to_string())?
-                .unwrap();
-            review.status = ReviewStatus::Done;
-            db.save_review(&review).map_err(|e| e.to_string())?;
+            if let Err(err) = db
+                .run_repo()
+                .update_status(&run_id, ReviewRunStatus::Completed)
+            {
+                log::error!(
+                    "Failed to update run status to completed for {}: {}",
+                    run_id,
+                    err
+                );
+            }
 
             let _ = on_progress.send(ProgressEventPayload::Completed { task_count });
         }
@@ -406,16 +412,26 @@ pub async fn generate_review(
                 message: format!("Generation failed: {}", e),
             });
             let db = state.db.lock().map_err(|e| e.to_string())?;
+            let is_cancelled = e.to_string().contains("cancelled by user");
+            let status = if is_cancelled {
+                ReviewRunStatus::Cancelled
+            } else {
+                ReviewRunStatus::Failed
+            };
+            if let Err(err) = db.run_repo().update_status(&run_id, status) {
+                log::error!(
+                    "Failed to update run status for {} to {:?}: {}",
+                    run_id,
+                    status,
+                    err
+                );
+            }
 
-            if e.to_string().contains("cancelled by user") {
+            if is_cancelled {
                 let _ = db.review_repo().delete(&review_id);
                 return Err("cancelled by user".to_string());
             }
 
-            if let Ok(Some(mut review)) = db.get_review(&review_id) {
-                review.status = ReviewStatus::Done;
-                let _ = db.save_review(&review);
-            }
             return Err(e.to_string());
         }
     }
@@ -1244,6 +1260,8 @@ pub struct ReviewState {
     pub created_at: String,
     pub source: crate::domain::ReviewSource,
     pub status: String,
+    #[serde(default)]
+    pub active_run_status: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1253,6 +1271,7 @@ pub struct ReviewRunState {
     pub agent_id: String,
     pub input_ref: String,
     pub diff_text: String,
+    pub status: String,
     pub created_at: String,
     pub task_count: usize,
 }

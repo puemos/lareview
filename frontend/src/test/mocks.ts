@@ -19,7 +19,8 @@ const createMockReview = (overrides = {}): Review => ({
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
   task_count: 5,
-  status: 'pending',
+  status: 'todo',
+  active_run_status: 'completed',
   ...overrides,
 });
 

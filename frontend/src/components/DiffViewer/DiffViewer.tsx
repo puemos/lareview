@@ -316,17 +316,17 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
             diffAlgorithm: 'advanced',
             experimental: {
               showMoves: true,
-            } as any,
+            },
             hideUnchangedRegions: {
               enabled: true,
               contextLineCount: 3,
               minimumLineCount: 15, // Slightly lowered for better hiding
               revealLineCount: 5,
-            } as any,
+            },
             stickyScroll: {
               enabled: true,
               maxLineCount: 5,
-            } as any,
+            },
             bracketPairColorization: {
               enabled: true,
             },

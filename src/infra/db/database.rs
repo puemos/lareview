@@ -128,6 +128,7 @@ impl Database {
                 input_ref TEXT NOT NULL,
                 diff_text TEXT NOT NULL,
                 diff_hash TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'completed',
                 created_at TEXT NOT NULL,
                 FOREIGN KEY(review_id) REFERENCES reviews(id) ON DELETE CASCADE
             );
@@ -200,6 +201,23 @@ impl Database {
             )?;
         }
 
+        // Migration: Add status to review_runs if it doesn't exist
+        let has_run_status = conn
+            .prepare("SELECT 1 FROM pragma_table_info('review_runs') WHERE name = 'status'")?
+            .exists([])?;
+
+        if !has_run_status {
+            conn.execute(
+                "ALTER TABLE review_runs ADD COLUMN status TEXT DEFAULT 'completed' NOT NULL",
+                [],
+            )?;
+        }
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_review_runs_status ON review_runs(status)",
+            [],
+        )?;
+
         Ok(())
     }
 
@@ -238,7 +256,12 @@ impl Database {
     pub fn get_pending_reviews(&self) -> Result<Vec<PendingReviewState>, rusqlite::Error> {
         let conn = self.conn.lock().expect("Failed to acquire database lock");
         let mut stmt = conn.prepare(
-            "SELECT id, active_run_id, source_json, status, created_at, updated_at FROM reviews WHERE active_run_id IS NOT NULL ORDER BY updated_at DESC LIMIT 10"
+            "SELECT r.id, r.active_run_id, r.source_json, r.created_at, r.updated_at
+             FROM reviews r
+             JOIN review_runs rr ON r.active_run_id = rr.id
+             WHERE rr.status IN ('running', 'queued')
+             ORDER BY r.updated_at DESC
+             LIMIT 10",
         )?;
         let rows = stmt.query_map([], |row| {
             let id: String = row.get(0)?;
@@ -283,7 +306,7 @@ impl Database {
     pub fn get_all_reviews(&self) -> Result<Vec<ReviewState>, rusqlite::Error> {
         let conn = self.conn.lock().expect("Failed to acquire database lock");
         let mut stmt = conn.prepare(
-            "SELECT r.id, r.title, r.summary, rr.agent_id, COUNT(t.id) as task_count, r.created_at, r.source_json, r.status
+            "SELECT r.id, r.title, r.summary, rr.agent_id, COUNT(t.id) as task_count, r.created_at, r.source_json, r.status, rr.status
              FROM reviews r
              LEFT JOIN review_runs rr ON r.active_run_id = rr.id
              LEFT JOIN tasks t ON t.run_id = rr.id
@@ -298,6 +321,7 @@ impl Database {
                 });
 
             let status_str: String = row.get(7)?;
+            let active_run_status: Option<String> = row.get(8)?;
 
             Ok(ReviewState {
                 id: row.get(0)?,
@@ -308,6 +332,7 @@ impl Database {
                 created_at: row.get(5)?,
                 source,
                 status: status_str,
+                active_run_status,
             })
         })?;
         let mut reviews = Vec::new();
@@ -320,7 +345,7 @@ impl Database {
     pub fn get_review_runs(&self, review_id: &str) -> Result<Vec<ReviewRunState>, rusqlite::Error> {
         let conn = self.conn.lock().expect("Failed to acquire database lock");
         let mut stmt = conn.prepare(
-            "SELECT rr.id, rr.review_id, rr.agent_id, rr.input_ref, rr.diff_text, rr.created_at, COUNT(t.id) as task_count
+            "SELECT rr.id, rr.review_id, rr.agent_id, rr.input_ref, rr.diff_text, rr.status, rr.created_at, COUNT(t.id) as task_count
              FROM review_runs rr
              LEFT JOIN tasks t ON t.run_id = rr.id
              WHERE rr.review_id = ?1
@@ -334,8 +359,9 @@ impl Database {
                 agent_id: row.get(2)?,
                 input_ref: row.get(3)?,
                 diff_text: row.get(4)?,
-                created_at: row.get(5)?,
-                task_count: row.get::<_, i32>(6)? as usize,
+                status: row.get(5)?,
+                created_at: row.get(6)?,
+                task_count: row.get::<_, i32>(7)? as usize,
             })
         })?;
         let mut runs = Vec::new();
@@ -418,8 +444,8 @@ impl Database {
     pub fn save_run(&self, run: &ReviewRun) -> Result<(), rusqlite::Error> {
         let conn = self.conn.lock().expect("Failed to acquire database lock");
         conn.execute(
-            "INSERT INTO review_runs (id, review_id, agent_id, input_ref, diff_text, diff_hash, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            "INSERT INTO review_runs (id, review_id, agent_id, input_ref, diff_text, diff_hash, status, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
              ON CONFLICT(id) DO NOTHING",
             params![
                 &run.id,
@@ -428,6 +454,7 @@ impl Database {
                 &run.input_ref,
                 &run.diff_text,
                 &run.diff_hash,
+                &run.status.to_string(),
                 &run.created_at,
             ],
         )?;
@@ -537,6 +564,162 @@ impl Database {
         repo.delete(&feedback_id_str).map_err(|e| {
             rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(1), Some(e.to_string()))
         })?;
+        Ok(())
+    }
+
+    pub fn mark_stale_runs_failed(&self) -> Result<usize, rusqlite::Error> {
+        let conn = self.conn.lock().expect("Failed to acquire database lock");
+        conn.execute(
+            "UPDATE review_runs SET status = 'failed' WHERE status IN ('running', 'queued')",
+            [],
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::{Review, ReviewRun, ReviewRunStatus, ReviewSource, ReviewStatus};
+
+    #[test]
+    fn test_get_all_reviews_includes_active_run_status() -> anyhow::Result<()> {
+        let db = Database::open_in_memory()?;
+
+        let review = Review {
+            id: "rev-1".to_string(),
+            title: "Test Review".to_string(),
+            summary: None,
+            source: ReviewSource::DiffPaste {
+                diff_hash: "h".into(),
+            },
+            active_run_id: Some("run-1".into()),
+            status: ReviewStatus::Todo,
+            created_at: "now".to_string(),
+            updated_at: "now".to_string(),
+        };
+        db.save_review(&review)?;
+
+        let run = ReviewRun {
+            id: "run-1".into(),
+            review_id: review.id.clone(),
+            agent_id: "agent".into(),
+            input_ref: "input".into(),
+            diff_text: "diff".into(),
+            diff_hash: "h".into(),
+            status: ReviewRunStatus::Running,
+            created_at: "now".into(),
+        };
+        db.save_run(&run)?;
+
+        let reviews = db.get_all_reviews()?;
+        assert_eq!(reviews.len(), 1);
+        assert_eq!(
+            reviews[0].active_run_status.as_deref(),
+            Some("running")
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_pending_reviews_filters_by_run_status() -> anyhow::Result<()> {
+        let db = Database::open_in_memory()?;
+
+        let running_review = Review {
+            id: "rev-running".to_string(),
+            title: "Running Review".to_string(),
+            summary: None,
+            source: ReviewSource::DiffPaste {
+                diff_hash: "h".into(),
+            },
+            active_run_id: Some("run-1".into()),
+            status: ReviewStatus::Todo,
+            created_at: "now".to_string(),
+            updated_at: "now".to_string(),
+        };
+        db.save_review(&running_review)?;
+
+        let completed_review = Review {
+            id: "rev-completed".to_string(),
+            title: "Completed Review".to_string(),
+            summary: None,
+            source: ReviewSource::DiffPaste {
+                diff_hash: "h2".into(),
+            },
+            active_run_id: Some("run-2".into()),
+            status: ReviewStatus::Todo,
+            created_at: "now".to_string(),
+            updated_at: "now".to_string(),
+        };
+        db.save_review(&completed_review)?;
+
+        db.save_run(&ReviewRun {
+            id: "run-1".into(),
+            review_id: running_review.id.clone(),
+            agent_id: "agent".into(),
+            input_ref: "input".into(),
+            diff_text: "diff".into(),
+            diff_hash: "h".into(),
+            status: ReviewRunStatus::Running,
+            created_at: "now".into(),
+        })?;
+
+        db.save_run(&ReviewRun {
+            id: "run-2".into(),
+            review_id: completed_review.id.clone(),
+            agent_id: "agent".into(),
+            input_ref: "input".into(),
+            diff_text: "diff".into(),
+            diff_hash: "h2".into(),
+            status: ReviewRunStatus::Completed,
+            created_at: "now".into(),
+        })?;
+
+        let pending = db.get_pending_reviews()?;
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].id, running_review.id);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_mark_stale_runs_failed() -> anyhow::Result<()> {
+        let db = Database::open_in_memory()?;
+
+        let review = Review {
+            id: "rev-stale".to_string(),
+            title: "Stale Review".to_string(),
+            summary: None,
+            source: ReviewSource::DiffPaste {
+                diff_hash: "h".into(),
+            },
+            active_run_id: Some("run-stale".into()),
+            status: ReviewStatus::Todo,
+            created_at: "now".to_string(),
+            updated_at: "now".to_string(),
+        };
+        db.save_review(&review)?;
+
+        db.save_run(&ReviewRun {
+            id: "run-stale".into(),
+            review_id: review.id.clone(),
+            agent_id: "agent".into(),
+            input_ref: "input".into(),
+            diff_text: "diff".into(),
+            diff_hash: "h".into(),
+            status: ReviewRunStatus::Running,
+            created_at: "now".into(),
+        })?;
+
+        let updated = db.mark_stale_runs_failed()?;
+        assert_eq!(updated, 1);
+
+        let run = db
+            .run_repo()
+            .find_by_id(&"run-stale".into())?
+            .expect("run exists");
+        assert_eq!(run.status, ReviewRunStatus::Failed);
+
         Ok(())
     }
 }
