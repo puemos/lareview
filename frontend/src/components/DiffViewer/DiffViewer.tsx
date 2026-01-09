@@ -146,6 +146,11 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
   const path = file.name || file.new_path || 'unknown';
   const language = getLanguageFromPath(path);
 
+
+  // Auto-detect new files (all additions, no deletions) or purely deleted files
+  // If it's a new file, we might want to default to 'unified' or just ensure side-by-side looks good.
+  // Actually, for new files, side-by-side with original empty is standard, but let's ensure the minimap helps.
+  
   const handleOpenInEditor = async () => {
     try {
       const lineNumber = highlightedHunks.length > 0 ? highlightedHunks[0].newStart : 1;
@@ -171,14 +176,16 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
         }
 
         if (line.startsWith('-') && !line.startsWith('---')) {
+          // Deletion: add to original only
           originalLines.push(line.slice(1));
-          modifiedLines.push('');
         } else if (line.startsWith('+') && !line.startsWith('+++')) {
-          originalLines.push('');
+          // Addition: add to modified only
           modifiedLines.push(line.slice(1));
         } else {
-          originalLines.push(line);
-          modifiedLines.push(line);
+          // Context line: add to both (strip leading space if present)
+          const contextLine = line.startsWith(' ') ? line.slice(1) : line;
+          originalLines.push(contextLine);
+          modifiedLines.push(contextLine);
         }
       }
     });
@@ -244,11 +251,15 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
     });
   };
 
+  // Check if file is "new" (added)
+  const isNewFile = file.status === 'added' || (file.hunks.every(h => h.old_lines === 0) && file.hunks.some(h => h.new_lines > 0));
+
   return (
     <div className="bg-bg-primary flex flex-1 flex-col overflow-hidden">
       <div className="border-border bg-bg-secondary/50 flex items-center justify-between border-b px-4 py-2">
         <div className="flex items-center gap-3">
           <span className="text-text-primary font-mono text-xs">{path}</span>
+          {isNewFile && <span className="text-status-added text-[10px] font-medium border border-status-added/20 bg-status-added/10 px-1.5 rounded">NEW</span>}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -274,13 +285,18 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
           modifiedLanguage={language}
           options={{
             readOnly: true,
-            minimap: { enabled: false },
+            minimap: { 
+                enabled: true,
+                renderCharacters: false,
+                scale: 2,
+                showSlider: 'always'
+            },
             fontSize: 12,
             lineHeight: 20,
             fontFamily: "'GeistMono', 'Monaco', monospace",
             scrollBeyondLastLine: false,
             padding: { top: 16, bottom: 16 },
-            renderSideBySide: true,
+            renderSideBySide: true, // Keep split view even for new files as it's often preferred for consistency, but improved minimap helps
             automaticLayout: true,
             originalEditable: false,
             renderLineHighlight: 'none',
@@ -298,8 +314,9 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
             } as any,
             hideUnchangedRegions: {
               enabled: true,
-              contextLineCount: 3,
-              minimumLineCount: 20,
+              contextLineCount: 3, 
+              minimumLineCount: 15, // Slightly lowered for better hiding
+              revealLineCount: 5
             } as any,
             stickyScroll: {
               enabled: true,
