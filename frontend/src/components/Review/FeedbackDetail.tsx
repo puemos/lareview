@@ -231,10 +231,11 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
             {isGitHubReview && onPushToGitHub && (
               <button
                 onClick={onPushToGitHub}
-                className="text-text-tertiary hover:text-accent-primary hover:bg-accent-primary/10 rounded p-1.5 transition-colors"
+                className="hover:text-text-primary text-text-tertiary flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors hover:bg-white/5 active:scale-[0.98]"
                 title="Push comment to GitHub"
               >
                 <ICONS.ICON_GITHUB size={14} />
+                <span>Push Comment</span>
               </button>
             )}
             <button

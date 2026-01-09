@@ -12,6 +12,7 @@ import { DiffSkeleton } from './DiffSkeleton';
 import { EmptyState } from './EmptyState';
 import { ErrorState } from './ErrorState';
 import { SelectionModal, ExportFormat } from './SelectionModal';
+import { PushToGitHubModal } from './PushToGitHubModal';
 import { useReviews } from '../../hooks/useReviews';
 import { useTauri } from '../../hooks/useTauri';
 import { useDelayedLoading } from '../../hooks/useDelayedLoading';
@@ -54,6 +55,7 @@ export const ReviewView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'diff' | 'description' | 'diagram'>('description');
   const [sidebarTab, setSidebarTab] = useState<'tasks' | 'feedback'>('tasks');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPushModalOpen, setIsPushModalOpen] = useState(false);
 
   useEffect(() => {
     if (tasks.length > 0 && !selectedTaskId && !isTasksLoading && sidebarTab === 'tasks') {
@@ -133,14 +135,14 @@ export const ReviewView: React.FC = () => {
     }
   };
 
-  const handlePushFeedbackToGitHub = async () => {
+  const handlePushFeedbackToGitHub = () => {
     if (!selectedFeedbackId) return;
-    try {
-      const url = await pushGitHubFeedback(selectedFeedbackId);
-      alert('Feedback pushed to GitHub: ' + url);
-    } catch (e) {
-      alert('Push failed: ' + e);
-    }
+    setIsPushModalOpen(true);
+  };
+
+  const handleConfirmPush = async () => {
+    if (!selectedFeedbackId) return;
+    return await pushGitHubFeedback(selectedFeedbackId);
   };
 
   // Use delayed loading to prevent flashing
@@ -250,6 +252,12 @@ export const ReviewView: React.FC = () => {
         tasks={tasks}
         feedbacks={feedbacks}
         isGitHubAvailable={isGitHubReview}
+      />
+      
+      <PushToGitHubModal
+        isOpen={isPushModalOpen}
+        onClose={() => setIsPushModalOpen(false)}
+        onConfirm={handleConfirmPush}
       />
     </div>
   );

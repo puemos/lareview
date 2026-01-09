@@ -45,6 +45,7 @@ import {
   HandPalm,
   Lightbulb,
   Microscope,
+  Info,
 } from '@phosphor-icons/react';
 
 /**
@@ -115,4 +116,5 @@ export const ICONS = {
   IMPACT_BLOCKING: HandPalm,
   IMPACT_NICE_TO_HAVE: Lightbulb,
   IMPACT_NITPICK: Microscope,
+  ICON_INFO: Info,
 } as const;
