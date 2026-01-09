@@ -86,10 +86,12 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
   }, [parsedDiff?.files, task.diff_refs]);
 
   React.useEffect(() => {
-    if (filteredFiles.length > 0 && !selectedFile) {
-      onSelectFile(filteredFiles[0]);
+    if (filteredFiles.length > 0) {
+      if (activeTab === 'diff' || !selectedFile) {
+        onSelectFile(filteredFiles[0]);
+      }
     }
-  }, [filteredFiles, selectedFile, onSelectFile]);
+  }, [task.id, activeTab, filteredFiles, onSelectFile]);
 
   const highlightedHunks = React.useMemo(
     () =>
