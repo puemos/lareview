@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.20] - 2026-01-09
+
+### Added
+
+- **Feedback**: Added global and line-specific feedback support.
+- **UI/UX**: Custom confirmation modals for feedback and review deletion.
+- **UI/UX**: Improved plan UI with Phosphor icons and synchronized status tracking.
+- **UI/UX**: Risk level icons with tooltips in task lists and headers.
+- **Review**: Auto-selection of the first change when switching tasks.
+- **Settings**: Ability to modify AI agent arguments in settings.
+
+### Changed
+
+- **UI/UX**: Refined feedback interaction and improved diff viewer reliability.
+- **UI/UX**: Enhanced feedback reply design and visual contrast.
+- **UI/UX**: Standardized markdown styling to `prose-sm` for better readability.
+
+### Fixed
+
+- **Frontend**: Fixed `react-markdown` dependency placement.
+- **Diff**: Improved handling of new files in the diff viewer.
+
 ## [0.0.19] - 2026-01-08
 
 ### Added
