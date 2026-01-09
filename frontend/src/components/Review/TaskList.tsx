@@ -10,6 +10,8 @@ interface TaskListProps {
   isFetching: boolean;
 }
 
+import { Tooltip } from '../Common/Tooltip';
+
 export const TaskList: React.FC<TaskListProps> = ({
   tasks,
   selectedTaskId,
@@ -27,41 +29,37 @@ export const TaskList: React.FC<TaskListProps> = ({
     );
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return ICONS.STATUS_TODO;
-      case 'in_progress':
-        return ICONS.STATUS_IN_PROGRESS;
-      case 'done':
-        return ICONS.STATUS_DONE;
-      case 'ignored':
-        return ICONS.STATUS_IGNORED;
+  const getRiskIcon = (risk: string) => {
+    switch (risk) {
+      case 'low':
+        return ICONS.RISK_LOW;
+      case 'medium':
+        return ICONS.RISK_MEDIUM;
+      case 'high':
+        return ICONS.RISK_HIGH;
       default:
-        return ICONS.STATUS_TODO;
+        return ICONS.RISK_LOW;
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'text-status-todo';
-      case 'in_progress':
-        return 'text-status-in_progress';
-      case 'done':
-        return 'text-status-done';
-      case 'ignored':
-        return 'text-status-ignored';
+  const getRiskColor = (risk: string) => {
+    switch (risk) {
+      case 'low':
+        return 'text-risk-low';
+      case 'medium':
+        return 'text-risk-medium';
+      case 'high':
+        return 'text-risk-high';
       default:
-        return 'text-status-todo';
+        return 'text-risk-low';
     }
   };
 
   return (
     <div className="custom-scrollbar flex-1 overflow-y-auto">
       {tasks.map((task: ReviewTask) => {
-        const StatusIcon = getStatusIcon(task.status);
-        const statusColor = getStatusColor(task.status);
+        const RiskIcon = getRiskIcon(task.stats.risk);
+        const riskColor = getRiskColor(task.stats.risk);
 
         return (
           <button
@@ -76,7 +74,11 @@ export const TaskList: React.FC<TaskListProps> = ({
             )}
             <div className="flex w-full min-w-0 items-center gap-2.5">
               <div className="flex-shrink-0">
-                <StatusIcon size={14} className={statusColor} />
+                <Tooltip content={`Risk: ${task.stats.risk.toUpperCase()}`}>
+                  <div className="cursor-help">
+                    <RiskIcon size={14} className={riskColor} />
+                  </div>
+                </Tooltip>
               </div>
               <h3
                 className={`flex-1 truncate text-xs leading-relaxed font-medium ${

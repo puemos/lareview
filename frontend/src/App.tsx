@@ -6,6 +6,7 @@ import { useAppStore } from './store';
 import { Sidebar } from './components/Layout/Sidebar';
 import { createQueryClient } from './lib/query-client';
 import { ErrorBoundary } from './components/Common/ErrorBoundary';
+import { TooltipProvider } from './components/Common/Tooltip';
 
 import { SettingsPageSkeleton } from './components/Settings/SettingsPageSkeleton';
 
@@ -123,20 +124,22 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="flex h-screen flex-col overflow-hidden bg-gray-900 text-white">
-        {error && (
-          <div className="z-50 flex items-center justify-between bg-red-500 px-4 py-2 text-white">
-            <span>{error}</span>
-            <button onClick={() => setError(null)} className="ml-4 rounded px-2 hover:bg-red-600">
-              ✕
-            </button>
+      <TooltipProvider>
+        <div className="flex h-screen flex-col overflow-hidden bg-gray-900 text-white">
+          {error && (
+            <div className="z-50 flex items-center justify-between bg-red-500 px-4 py-2 text-white">
+              <span>{error}</span>
+              <button onClick={() => setError(null)} className="ml-4 rounded px-2 hover:bg-red-600">
+                ✕
+              </button>
+            </div>
+          )}
+          <div className="flex flex-1 overflow-hidden">
+            <Sidebar currentView={currentView} onViewChange={setCurrentView} />
+            <main className="flex-1 overflow-hidden">{renderView()}</main>
           </div>
-        )}
-        <div className="flex flex-1 overflow-hidden">
-          <Sidebar currentView={currentView} onViewChange={setCurrentView} />
-          <main className="flex-1 overflow-hidden">{renderView()}</main>
         </div>
-      </div>
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }

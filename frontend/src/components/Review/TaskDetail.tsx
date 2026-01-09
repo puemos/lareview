@@ -5,6 +5,7 @@ import { DiffViewer } from '../DiffViewer/DiffViewer';
 import { Select } from '../Common/Select';
 import type { ReviewTask, ParsedDiff, DiffFile, DiffRef, HunkRef } from '../../types';
 import { ICONS } from '../../constants/icons';
+import { Tooltip } from '../Common/Tooltip';
 
 interface TaskDetailProps {
   task: ReviewTask | null;
@@ -114,10 +115,51 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
     return { additions, deletions };
   }, [filteredFiles]);
 
+
+
+// ... (existing imports)
+
+// ... (inside TaskDetail component)
+
+  const getRiskIcon = (risk: string) => {
+    switch (risk) {
+      case 'low':
+        return ICONS.RISK_LOW;
+      case 'medium':
+        return ICONS.RISK_MEDIUM;
+      case 'high':
+        return ICONS.RISK_HIGH;
+      default:
+        return ICONS.RISK_LOW;
+    }
+  };
+
+  const getRiskColor = (risk: string) => {
+    switch (risk) {
+      case 'low':
+        return 'text-risk-low';
+      case 'medium':
+        return 'text-risk-medium';
+      case 'high':
+        return 'text-risk-high';
+      default:
+        return 'text-risk-low';
+    }
+  };
+
+  const RiskIcon = getRiskIcon(task.stats.risk);
+  const riskColor = getRiskColor(task.stats.risk);
+
   return (
     <div className="bg-bg-primary flex h-full flex-col">
       <div className="border-border bg-bg-secondary/50 z-10 border-b px-4 py-3">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <Tooltip content={`Risk Level: ${task.stats.risk.toUpperCase()}`}>
+            <div className={`flex items-center gap-1.5 rounded-full bg-bg-surface px-2 py-1 text-[10px] font-medium tracking-wider ${riskColor} border border-border/50`}>
+              <RiskIcon size={12} weight="fill" />
+              {task.stats.risk}
+            </div>
+          </Tooltip>
           <h2 className="text-text-primary hover:text-brand flex-1 cursor-pointer truncate text-sm font-medium">
             {task.title}
           </h2>
