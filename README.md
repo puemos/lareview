@@ -8,7 +8,7 @@
 
 <h1 align="center">La Review</h1>
 
-<p align="center"><b>Turn a diff into a review checklist.</b></p>
+<p align="center"><b>The IDE for Code Review.</b></p>
 
 <p align="center">
   <a href="https://github.com/puemos/lareview/actions/workflows/ci.yml"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/puemos/lareview/ci.yml?style=flat-square" /></a>
@@ -21,7 +21,9 @@
 
 ---
 
-LaReview turns a PR or unified diff into a task tree so you can review changes in a deliberate order instead of scrolling. It’s local-first: state in SQLite, PR fetch via gh, and plan generation via an ACP agent you run.
+LaReview is a **code review workbench** for senior engineers. It turns a PR or diff into a structured plan, visualizing architecture and breaking down complex logic so you can review with depth and understanding.
+
+Unlike auto-review bots that race to find bugs, LaReview is a local-first tool designed for active engagement—giving you the insights of a staff engineer without your code ever leaving your machine.
 
 ## Demo
 
@@ -33,12 +35,12 @@ LaReview is designed for a local-first, secure, and focused review experience.
 
 | Screenshot                                                                                    | Feature                                                                                                                                                                                                                                                            |
 | :-------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <img src="assets/screenshots/generate.webp" width="400" alt="Plan Generation View" />         | **AI-Powered Plan Generation**<br>Input a GitHub PR reference (e.g., `owner/repo#123`) or paste a raw diff. LaReview uses your local ACP agent to analyze the changes and generate a structured review plan based on the author's intent.                          |
-| <img src="assets/screenshots/review-changes.webp" width="400" alt="Structured Review Tree" /> | **Structured Task Tree & Notes**<br>Navigate the review as a hierarchical tree. Mark tasks as **To Do**, **In Progress**, or **Done**. Attach contextual notes to specific tasks or lines of code to keep track of your thoughts.                                  |
-| <img src="assets/screenshots/review-changes.webp" width="400" alt="Task-focused Diff" />      | **Task-Focused Diffs**<br>Stop context switching. When you select a task, the diff viewer only shows the specific hunks relevant to completing that task, isolating the noise.                                                                                     |
-| <img src="assets/screenshots/review-feedback-item.webp" width="400" alt="Feedback Items" />   | **Agent-Generated Feedback**<br>The AI agent doesn't just plan; it actively identifies issues. It can autonomously create feedback items (nitpicks, blocking issues, or suggestions) anchored to specific lines of code, helping you catch bugs before they merge. |
-| <img src="assets/screenshots/repos.webp" width="400" alt="Linked Repositories" />             | **Local Repository Context**<br>Link your local Git repositories to LaReview. This gives the AI agent full access to search your codebase and list files, providing maximum context for more accurate and insightful reviews.                                      |
-| <img src="assets/screenshots/review-diagram.webp" width="400" alt="Diagram Viewer" />         | **Visual Diagram View**<br>Visualize the structure and flow of changes with automatically generated diagrams, helping you understand complex refactors faster. (Requires D2).                                                                                      |
+| <img src="assets/screenshots/generate.webp" width="400" alt="Plan Generation View" />         | **AI-Powered Planning**<br>Input a PR or diff. LaReview acts as a staff engineer, analyzing intent and building a structured review plan to guide your attention.                                                                                                  |
+| <img src="assets/screenshots/review-changes.webp" width="400" alt="Structured Review Tree" /> | **Structured Task Tree**<br>Navigate the review as a hierarchical tree. Mark tasks as **To Do**, **In Progress**, or **Done**. Attach contextual notes to specific tasks or lines of code to keep track of your thoughts.                                          |
+| <img src="assets/screenshots/review-changes.webp" width="400" alt="Task-focused Diff" />      | **Task-Focused Diffs**<br>Focus on one logical change at a time. The workbench isolates relevant code hunks for each task, eliminating noise.                                                                                                                      |
+| <img src="assets/screenshots/review-feedback-item.webp" width="400" alt="Feedback Items" />   | **Agent Feedback**<br>The AI proactively identifies bugs and style issues, creating feedback threads anchored to specific lines of code automatically.                                                                                                             |
+| <img src="assets/screenshots/repos.webp" width="400" alt="Linked Repositories" />             | **Local Context (Zero Data Leaks)**<br>Link local Git repos to give the agent full access to search your codebase without upload. Your code stays on your machine.                                                                                                 |
+| <img src="assets/screenshots/review-diagram.webp" width="400" alt="Diagram Viewer" />         | **Visual Diagrams**<br>Visualize the flow. Automatically generate diagrams to see architectural changes before you read a single line of code. (Requires D2).                                                                                                      |
 | <img src="assets/screenshots/settings.webp" width="400" alt="Settings View" />                | **Agent Settings**<br>Configure per-agent executables, environment variables, and custom ACP agents.                                                                                                                                                               |
 | <img src="assets/screenshots/export-github.webp" width="400" alt="GitHub Sync" />             | **GitHub Push**<br>Submit your review feedback directly to GitHub PRs with automatic summary generation.                                                                                                                                                           |
 | <img src="assets/screenshots/export-github.webp" width="400" alt="Export & Share" />          | **Export & Share**<br>Export your review summary to Markdown with diagrams and code insights. Copy to clipboard or save to file.                                                                                                                                   |
@@ -51,7 +53,7 @@ LaReview is designed for a local-first, secure, and focused review experience.
    - Paste a unified diff, or
    - Paste a GitHub PR reference: `owner/repo#123` or a PR URL
 2. **Fetch (for PRs)**
-   - LaReview uses the GitHub CLI (`gh`) locally
+   - LaReview fetches data locally via the GitHub CLI (`gh`). No intermediate servers.
 3. **Generate a review plan**
    - The review plan is generated by an AI agent you run via ACP (Agent Client Protocol)
 4. **Review**

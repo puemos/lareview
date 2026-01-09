@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>LaReview — It's good for your code reviews</title>
+        <title>LaReview — The Code Review Workbench</title>
         <link
             rel="icon"
             type="image/svg+xml"
@@ -11,14 +11,14 @@
             href="./assets/logo/favicon.svg"
         />
 
-        <meta name="description" content="LaReview transforms code diffs into simple to follow review checklists. Open source tool supporting Claude, OpenCode, Gemini, and more. Free forever.">
+        <meta name="description" content="The local-first IDE for code review. LaReview transforms diffs into structured review plans, diagrams, and insights. Built for senior engineers who value depth.">
         <meta name="robots" content="index, follow">
         <link rel="canonical" href="https://lareview.dev/">
         <meta name="theme-color" content="#EBE6DE">
 
         <!-- Open Graph -->
-        <meta property="og:title" content="LaReview: Do Better Code Reviews">
-        <meta property="og:description" content="Stop doom-scrolling through diffs. LaReview uses your local AI agent to generate structured review tasks. Free & open source.">
+        <meta property="og:title" content="LaReview: The Code Review Workbench">
+        <meta property="og:description" content="Stop doom-scrolling. LaReview is a local-first workbench that uses AI to generate structured review plans and diagrams.">
         <meta property="og:type" content="website">
         <meta property="og:url" content="https://lareview.dev/">
         <meta property="og:image" content="./assets/og-image.png">
@@ -27,8 +27,8 @@
         <!-- Twitter -->
         <meta name="twitter:card" content="summary_large_image">
         <meta name="twitter:site" content="@puemos">
-        <meta name="twitter:title" content="LaReview: It's good for your code reviews">
-        <meta name="twitter:description" content="Turn diffs into structured review tasks with local-first AI. Supports Claude, OpenCode, Gemini, and more.">
+        <meta name="twitter:title" content="LaReview: The Code Review Workbench">
+        <meta name="twitter:description" content="Turn diffs into structured review tasks with local-first AI. Privacy-focused, depth-oriented.">
         <meta name="twitter:image" content="./assets/og-image.png">
 
         <!-- Structured Data -->
@@ -44,11 +44,11 @@
             "price": "0",
             "priceCurrency": "USD"
           },
-          "description": "Code review tool that transforms diffs into structured review tasks using local coding agents.",
+          "description": "Code review workbench that transforms diffs into structured review tasks using local coding agents.",
           "featureList": [
             "AI-powered planning",
             "Task-focused diffs",
-            "Agent feedback",
+            "Architectural Diagrams",
             "Local context",
             "GitHub sync",
             "CLI support",
@@ -141,17 +141,15 @@
                         <h2
                             class="font-display text-4xl md:text-5xl leading-tight mb-6 font-light"
                         >
-                            Turn a diff into a <br />
+                            The IDE for <br />
                             <span class="font-medium italic"
-                                >review checklist.</span
+                                >Code Review.</span
                             >
                         </h2>
                         <p
                             class="text-velura-gray max-w-md text-lg leading-relaxed mb-8"
                         >
-                            Stop doom-scrolling through diffs. LaReview uses
-                            your local ACP agent to generate a structured plan,
-                            identify issues, and help you review deliberately.
+                            Stop doom-scrolling. LaReview is a local-first workbench that turns diffs into structured plans, diagrams, and architectural insights.
                         </p>
 
                         <div class="flex flex-wrap gap-4">
@@ -342,6 +340,43 @@
             </div>
         </div>
 
+        <section class="py-20 px-8 border-b border-theme bg-[#F3F0EB]">
+            <div class="max-w-6xl mx-auto">
+                <div class="flex flex-col md:flex-row gap-12 items-center">
+                    <div class="flex-1">
+                        <h2 class="font-display text-4xl mb-6">Not Another Bot.</h2>
+                        <p class="text-lg text-velura-gray mb-8 leading-relaxed">
+                            Most AI tools are <b>bots</b> that race to find bugs.
+                            <br><br>
+                            LaReview is a <b>workbench</b> designed to help you understand them. We don't just lint your code; we visualize architecture, map complex logic, and give you the tools to review with the depth of a staff engineer.
+                        </p>
+                        <ul class="space-y-4 font-mono text-sm">
+                            <li class="flex items-center gap-3">
+                                <i class="ph-bold ph-check text-green-600"></i>
+                                <span><b>Active Engagement</b> vs Passive Scrolling</span>
+                            </li>
+                            <li class="flex items-center gap-3">
+                                <i class="ph-bold ph-check text-green-600"></i>
+                                <span><b>Architectural Insight</b> vs Line-by-Line Nitpicks</span>
+                            </li>
+                            <li class="flex items-center gap-3">
+                                <i class="ph-bold ph-check text-green-600"></i>
+                                <span><b>Zero Data Leaks</b> vs Cloud Data Leaks</span>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="flex-1">
+                         <div class="bg-velura-bg border border-theme p-8 shadow-sm">
+                            <h3 class="font-bold uppercase tracking-widest mb-4 border-b border-theme pb-2">The Workbench Philosophy</h3>
+                            <p class="mb-4 font-display text-xl">"Merge confidence, not just merge speed."</p>
+                            <p class="text-sm text-velura-gray">
+                                Senior engineers know that catching a bug is good, but understanding the system impact is better. LaReview is designed for the deep dive.
+                            </p>
+                         </div>
+                    </div>
+                </div>
+            </div>
+        </section>
 
         <section id="features" aria-labelledby="features-heading" class="w-full">
             <h2 id="features-heading" class="sr-only">Features</h2>
@@ -358,9 +393,7 @@
                             AI-Powered Planning
                         </h3>
                         <p class="text-velura-gray max-w-lg mx-auto min-h-12">
-                            Input a PR reference or paste a raw diff. LaReview
-                            uses your coding agent to analyze intent and
-                            generate a structured review plan.
+                            Input a PR or diff. LaReview acts as a staff engineer, analyzing intent and building a structured review plan to guide your attention.
                         </p>
                     </div>
                     <div
@@ -390,9 +423,7 @@
                             Task-Focused Diffs
                         </h3>
                         <p class="text-velura-gray min-h-12">
-                            Stop context switching. Select a task, and the
-                            viewer isolates only the relevant hunks of code.
-                            Review step-by-step.
+                            Focus on one logical change at a time. The workbench isolates relevant code hunks for each task, eliminating noise.
                         </p>
                     </div>
                     <div class="mt-8 border border-theme p-2 bg-stone-200">
@@ -444,9 +475,7 @@
                             Local Context
                         </h3>
                         <p class="text-velura-gray min-h-12">
-                            Link local Git repos to give the agent full access
-                            to search your codebase, providing deeper insights
-                            than a simple diff review.
+                            Link local Git repos to give the agent full access to search your codebase without upload. Zero data leaks.
                         </p>
                     </div>
                     <div class="mt-8 border border-theme p-2 bg-stone-200">
@@ -555,18 +584,16 @@
                             >07</span
                         >
                         <h3 class="text-2xl font-bold uppercase mb-2">
-                            Export & Share
+                            Visual Diagrams
                         </h3>
                         <p class="text-velura-gray">
-                            Export your review summary to Markdown with diagrams
-                            and code insights. Copy to clipboard or save to
-                            file.
+                            Visualize the flow. Automatically generate diagrams to see architectural changes before you read a single line of code.
                         </p>
                     </div>
                     <div class="mt-8 border border-theme p-2 bg-stone-200">
                         <img
-                            src="./assets/screenshots/export-github.webp"
-                            alt="Markdown export preview with diagrams, code insights, and structured review summary"
+                            src="./assets/screenshots/review-diagram.webp"
+                            alt="Visual diagram showing code architecture and flow changes"
                             class="w-full cursor-zoom-in lightbox-trigger"
                             loading="lazy"
                             decoding="async"
