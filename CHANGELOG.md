@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.21] - 2026-01-09
+
+### Added
+
+- **Generation**: Implemented stop functionality for agent generation.
+- **Generate**: Added real-time diff validation.
+- **UI/UX**: Implemented minimalist toast notifications (Sonner) for user feedback.
+- **UI/UX**: Added premium micro-interactions and refactored animation system.
+
+### Changed
+
+- **Generate**: Refined alert UI for better visual feedback.
+- **Docs**: Updated release process documentation.
+
 ## [0.0.20] - 2026-01-09
 
 ### Added
