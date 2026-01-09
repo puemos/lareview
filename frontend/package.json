@@ -10,7 +10,7 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@monaco-editor/react": "^4.6.0",
+    "@monaco-editor/react": "^4.7.0",
     "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-tooltip": "^1.2.8",
@@ -24,6 +24,7 @@
     "date-fns": "^4.1.0",
     "mermaid": "^11.12.2",
     "react": "^19.2.3",
+    "monaco-editor": "^0.55.1",
     "react-dom": "^19.2.3",
     "zustand": "^5.0.9"
   },
@@ -46,7 +47,6 @@
     "eslint-plugin-react-refresh": "^0.4.26",
     "globals": "^17.0.0",
     "jsdom": "^27.0.0",
-    "monaco-editor": "^0.55.1",
     "postcss": "^8.5.0",
     "prettier": "^3.7.4",
     "prettier-plugin-tailwindcss": "^0.7.2",

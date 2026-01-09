@@ -9,7 +9,7 @@ importers:
   .:
     dependencies:
       '@monaco-editor/react':
-        specifier: ^4.6.0
+        specifier: ^4.7.0
         version: 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@phosphor-icons/react':
         specifier: ^2.1.10
@@ -47,6 +47,9 @@ importers:
       mermaid:
         specifier: ^11.12.2
         version: 11.12.2
+      monaco-editor:
+        specifier: ^0.55.1
+        version: 0.55.1
       react:
         specifier: ^19.2.3
         version: 19.2.3
@@ -111,9 +114,6 @@ importers:
       jsdom:
         specifier: ^27.0.0
         version: 27.4.0
-      monaco-editor:
-        specifier: ^0.55.1
-        version: 0.55.1
       postcss:
         specifier: ^8.5.0
         version: 8.5.6

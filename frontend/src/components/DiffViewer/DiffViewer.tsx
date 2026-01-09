@@ -205,19 +205,41 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
     const originalEditor = diffEditor.getOriginalEditor();
     const modifiedEditor = diffEditor.getModifiedEditor();
 
+    let hoverDecorations: string[] = [];
+
     [originalEditor, modifiedEditor].forEach(ed => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (ed as any).addAction({
-        id: 'add-feedback',
-        label: 'Add Feedback',
-        contextMenuGroupId: 'navigation',
-        run: () => {
-          const position = ed.getPosition();
-          if (position && onAddFeedback) {
+      // Show + icon on hover anywhere in the line or gutter
+      ed.onMouseMove(e => {
+        const line = e.target.position?.lineNumber;
+        if (line) {
+          hoverDecorations = ed.deltaDecorations(hoverDecorations, [
+            {
+              range: new monaco.Range(line, 1, line, 1),
+              options: {
+                isWholeLine: true,
+                glyphMarginClassName: 'add-feedback-gutter-icon',
+                stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+              },
+            },
+          ]);
+        } else {
+          hoverDecorations = ed.deltaDecorations(hoverDecorations, []);
+        }
+      });
+
+      ed.onMouseLeave(() => {
+        hoverDecorations = ed.deltaDecorations(hoverDecorations, []);
+      });
+
+      // Handle click on + icon
+      ed.onMouseDown(e => {
+        if (e.target.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
+          const line = e.target.position?.lineNumber;
+          if (line && onAddFeedback) {
             const side = ed === originalEditor ? 'old' : 'new';
-            onAddFeedback(file, position.lineNumber, side);
+            onAddFeedback(file, line, side);
           }
-        },
+        }
       });
     });
   };
@@ -266,9 +288,30 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
             ignoreTrimWhitespace: false,
             codeLens: false,
             folding: true,
-            glyphMargin: false,
+            glyphMargin: true,
             lineNumbers: 'on' as const,
-            renderIndicators: false,
+            renderIndicators: true,
+            // Premium DX/UX enhancements
+            diffAlgorithm: 'advanced',
+            experimental: {
+              showMoves: true,
+            } as any,
+            hideUnchangedRegions: {
+              enabled: true,
+              contextLineCount: 3,
+              minimumLineCount: 20,
+            } as any,
+            stickyScroll: {
+              enabled: true,
+              maxLineCount: 5,
+            } as any,
+            bracketPairColorization: {
+              enabled: true,
+            },
+            renderWhitespace: 'boundary',
+            smoothScrolling: true,
+            cursorSmoothCaretAnimation: 'on',
+            cursorBlinking: 'smooth',
           }}
         />
       </div>
