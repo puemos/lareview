@@ -1,8 +1,10 @@
 use crate::infra::app_config::AppConfig;
 use crate::infra::db::Database;
 use parking_lot::RwLock;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Clone)]
 pub struct DiffRequest {
@@ -26,6 +28,7 @@ pub struct AppState {
     pub config: Arc<RwLock<AppConfig>>,
     pub diff_request: Arc<Mutex<Option<DiffRequest>>>,
     pub pending_diff: Arc<Mutex<Option<PendingDiff>>>,
+    pub active_runs: Arc<Mutex<HashMap<String, CancellationToken>>>,
 }
 
 impl AppState {
@@ -36,6 +39,7 @@ impl AppState {
             config: Arc::new(RwLock::new(AppConfig::default())),
             diff_request: Arc::new(Mutex::new(None)),
             pending_diff: Arc::new(Mutex::new(None)),
+            active_runs: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }

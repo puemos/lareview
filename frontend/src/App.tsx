@@ -1,4 +1,6 @@
 import { useEffect, useState, lazy, Suspense, useCallback } from 'react';
+import { Toaster } from 'sonner';
+
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useTauri } from './hooks/useTauri';
 import { listen } from '@tauri-apps/api/event';
@@ -7,6 +9,7 @@ import { Sidebar } from './components/Layout/Sidebar';
 import { createQueryClient } from './lib/query-client';
 import { ErrorBoundary } from './components/Common/ErrorBoundary';
 import { TooltipProvider } from './components/Common/Tooltip';
+import { ICONS } from './constants/icons';
 
 import { SettingsPageSkeleton } from './components/Settings/SettingsPageSkeleton';
 
@@ -126,6 +129,27 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <div className="flex h-screen flex-col overflow-hidden bg-gray-900 text-white">
+          <Toaster
+            position="bottom-right"
+            theme="dark"
+            closeButton
+            icons={{
+              success: <ICONS.STATUS_DONE size={18} className="text-green-400" />,
+              info: <ICONS.ICON_INFO size={18} className="text-blue-400" />,
+              warning: <ICONS.ICON_WARNING size={18} className="text-yellow-400" />,
+              error: <ICONS.STATUS_IGNORED size={18} className="text-red-400" />,
+              loading: <ICONS.ACTION_LOADING size={18} className="text-brand animate-spin" />,
+            }}
+            toastOptions={{
+              classNames: {
+                title: '!font-semibold',
+                description: '!text-text-secondary !text-[11px]',
+              },
+              className:
+                '!shadow-custom !bg-bg-tertiary !text-text-primary !rounded !border !border-border !py-3',
+            }}
+          />
+
           {error && (
             <div className="z-50 flex items-center justify-between bg-red-500 px-4 py-2 text-white">
               <span>{error}</span>

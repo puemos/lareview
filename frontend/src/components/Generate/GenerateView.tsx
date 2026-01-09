@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Channel } from '@tauri-apps/api/core';
 import { GithubLogo, Trash, X } from '@phosphor-icons/react';
 import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { useTauri } from '../../hooks/useTauri';
 import { useAppStore } from '../../store';
 import { useAgents } from '../../hooks/useAgents';
@@ -38,7 +39,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   const [isPlanExpanded, setIsPlanExpanded] = useState(false);
   const currentTaskTitleRef = React.useRef<string | null>(null);
 
-  const { generateReview, parseDiff, fetchGithubPR } = useTauri();
+  const { generateReview, parseDiff, fetchGithubPR, stop_generation } = useTauri();
   const { data: agents = [] } = useAgents();
   const { data: repos = [] } = useRepos();
   const queryClient = useQueryClient();
@@ -59,6 +60,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
 
   const setReviewId = useAppStore(state => state.setReviewId);
   const setRunId = useAppStore(state => state.setRunId);
+  const runId = useAppStore(state => state.runId);
   const setTasks = useAppStore(state => state.setTasks);
 
   const globalDiffText = useAppStore(state => state.diffText);
@@ -132,6 +134,10 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
       setParsedDiff(diff);
 
       const onProgress = new Channel<ProgressEventPayload>();
+
+      // Generate runId early so we can stop it
+      const currentRunId = crypto.randomUUID();
+      setRunId(currentRunId);
 
       onProgress.onmessage = (payload: ProgressEventPayload) => {
         switch (payload.event) {
@@ -239,20 +245,37 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
       const result = await generateReview(
         diffText,
         agentId,
+        currentRunId,
         pendingSource || undefined,
         onProgress
       );
 
       setReviewId(result.review_id);
-      setRunId(result.run_id || '');
       setTasks([]);
+
       setIsGenerating(false);
       isGeneratingRef.current = false;
       setIsGeneratingStore(false);
       _onNavigate('review');
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to generate review:', error);
-      addProgressMessage('error', `Failed to generate review: ${error}`);
+      const isCancelled =
+        error instanceof Error
+          ? error.message.includes('cancelled by user')
+          : String(error).includes('cancelled by user');
+
+      if (isCancelled) {
+        addProgressMessage('error', 'Generation stopped by user');
+        toast('Generation stopped', {
+          description: 'The pending review has been deleted.',
+        });
+      } else {
+        addProgressMessage('error', `Failed to generate review: ${error}`);
+        toast.error('Generation failed', {
+          description: String(error),
+        });
+      }
+
       setIsGenerating(false);
       isGeneratingRef.current = false;
       setIsGeneratingStore(false);
@@ -276,6 +299,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     handleServerUpdate,
     _onNavigate,
     pendingSource,
+    updatePlanItemStatus,
   ]);
 
   const handleFetchPr = useCallback(async () => {
@@ -333,6 +357,18 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
       setIsPlanExpanded(true);
     }
   }, [planItemsToRender.length]);
+
+  const handleStop = useCallback(async () => {
+    if (runId) {
+      try {
+        await stop_generation(runId);
+        addProgressMessage('log', 'Stop signal sent...');
+      } catch (error) {
+        console.error('Failed to stop generation:', error);
+        addProgressMessage('error', `Failed to stop: ${error}`);
+      }
+    }
+  }, [runId, stop_generation, addProgressMessage]);
 
   return (
     <div className="bg-bg-primary flex h-full flex-col">
@@ -404,6 +440,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
             onRepoSelect={setSelectedRepoId}
             isGenerating={isGenerating}
             onGenerate={handleGenerate}
+            onStop={handleStop}
             hasDiff={diffText.trim().length > 0}
           />
 

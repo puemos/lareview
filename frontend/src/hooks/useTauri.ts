@@ -255,19 +255,21 @@ export const useTauri = () => {
     async (
       diffText: string,
       agentId: string,
+      runId?: string,
       source?: ReviewSource,
       onProgress?: Channel<ProgressEventPayload>
     ): Promise<{ task_count: number; review_id: string; run_id?: string }> => {
-      console.log({ agentId, source });
       return invoke('generate_review', {
         diffText,
         agentId,
+        runId,
         source,
         onProgress,
       });
     },
     []
   );
+
 
   const loadTasks = useCallback(async (runId?: string): Promise<ReviewTask[]> => {
     return invoke('load_tasks', { runId });
@@ -558,5 +560,9 @@ export const useTauri = () => {
     }> => {
       return invoke('acquire_diff_from_request');
     }, []),
+    stop_generation: useCallback(async (runId: string): Promise<void> => {
+      return invoke('stop_generation', { runId });
+    }, []),
   };
 };
+

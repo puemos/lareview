@@ -32,18 +32,26 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
   return (
     <div className="animate-in fade-in fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm duration-200">
-      <div 
+      <div
         className="bg-bg-primary border-border/50 animate-in zoom-in-95 flex w-full max-w-md flex-col rounded-xl border shadow-2xl duration-200"
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
       >
         <div className="border-border/50 bg-bg-secondary/30 flex items-center justify-between rounded-t-xl border-b px-5 py-4">
           <div className="flex items-center gap-2.5">
-            <div className={`rounded-md p-1.5 ${
-              confirmVariant === 'danger' ? 'bg-status-ignored/10 text-status-ignored' : 
-              confirmVariant === 'brand' ? 'bg-brand/10 text-brand' : 
-              'bg-accent/10 text-accent'
-            }`}>
-              {confirmVariant === 'danger' ? <ICONS.ICON_WARNING size={18} /> : <ICONS.ICON_INFO size={18} />}
+            <div
+              className={`rounded-md p-1.5 ${
+                confirmVariant === 'danger'
+                  ? 'bg-status-ignored/10 text-status-ignored'
+                  : confirmVariant === 'brand'
+                    ? 'bg-brand/10 text-brand'
+                    : 'bg-accent/10 text-accent'
+              }`}
+            >
+              {confirmVariant === 'danger' ? (
+                <ICONS.ICON_WARNING size={18} />
+              ) : (
+                <ICONS.ICON_INFO size={18} />
+              )}
             </div>
             <h3 className="text-text-primary text-sm font-semibold">{title}</h3>
           </div>
@@ -56,9 +64,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         </div>
 
         <div className="p-6">
-          <p className="text-text-secondary text-sm leading-relaxed mb-6">
-            {message}
-          </p>
+          <p className="text-text-secondary mb-6 text-sm leading-relaxed">{message}</p>
 
           <div className="flex justify-end gap-3">
             <button
@@ -71,7 +77,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             <button
               onClick={onConfirm}
               disabled={isProcessing}
-              className={`flex min-w-[100px] items-center justify-center gap-2 rounded-lg px-6 py-2 text-xs font-semibold transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${variantStyles[confirmVariant]}`}
+              className={`flex min-w-25 items-center justify-center gap-2 rounded-lg px-6 py-2 text-xs font-semibold transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${variantStyles[confirmVariant]}`}
             >
               {isProcessing ? (
                 <>

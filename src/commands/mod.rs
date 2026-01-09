@@ -16,6 +16,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tauri::{State, ipc::Channel};
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -183,12 +184,13 @@ pub async fn generate_review(
     state: State<'_, AppState>,
     diff_text: String,
     agent_id: String,
+    run_id: Option<String>,
     source: Option<ReviewSource>,
     on_progress: Channel<ProgressEventPayload>,
 ) -> Result<ReviewGenerationResult, String> {
     let diff_hash = hash_diff(&diff_text);
     let review_id = Uuid::new_v4().to_string();
-    let run_id = Uuid::new_v4().to_string();
+    let run_id = run_id.unwrap_or_else(|| Uuid::new_v4().to_string());
 
     let source = source.unwrap_or_else(|| ReviewSource::DiffPaste {
         diff_hash: diff_hash.clone(),
@@ -356,6 +358,12 @@ pub async fn generate_review(
         db.save_run(&run).map_err(|e| e.to_string())?;
     }
 
+    let cancel_token = CancellationToken::new();
+    {
+        let mut active = state.active_runs.lock().unwrap();
+        active.insert(run_id.clone(), cancel_token.clone());
+    }
+
     let result = generate_tasks_with_acp(GenerateTasksInput {
         run_context,
         repo_root: None,
@@ -364,12 +372,18 @@ pub async fn generate_review(
         progress_tx: Some(mcp_tx),
         mcp_server_binary: None,
         timeout_secs: Some(300),
-        cancel_token: None,
+        cancel_token: Some(cancel_token),
         debug: std::env::var("RUST_LOG")
             .map(|v| v.contains("acp"))
             .unwrap_or(false),
     })
     .await;
+
+    // Cleanup: remove token from active_runs
+    {
+        let mut active = state.active_runs.lock().unwrap();
+        active.remove(&run_id);
+    }
 
     match result {
         Ok(_) => {
@@ -392,10 +406,17 @@ pub async fn generate_review(
                 message: format!("Generation failed: {}", e),
             });
             let db = state.db.lock().map_err(|e| e.to_string())?;
+
+            if e.to_string().contains("cancelled by user") {
+                let _ = db.review_repo().delete(&review_id);
+                return Err("cancelled by user".to_string());
+            }
+
             if let Ok(Some(mut review)) = db.get_review(&review_id) {
                 review.status = ReviewStatus::Done;
                 let _ = db.save_review(&review);
             }
+            return Err(e.to_string());
         }
     }
 
@@ -404,6 +425,20 @@ pub async fn generate_review(
         review_id,
         run_id: Some(run_id),
     })
+}
+
+#[tauri::command]
+pub async fn stop_generation(state: State<'_, AppState>, run_id: String) -> Result<(), String> {
+    let token = {
+        let active = state.active_runs.lock().unwrap();
+        active.get(&run_id).cloned()
+    };
+
+    if let Some(token) = token {
+        token.cancel();
+    }
+
+    Ok(())
 }
 
 #[tauri::command]

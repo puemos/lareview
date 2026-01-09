@@ -16,7 +16,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) =
   const queryClient = useQueryClient();
   const { setReviewId, reviewId } = useAppStore();
   const { data: reviews = [], isLoading, invalidate } = useReviews();
-  const hasInProgressReview = reviews.some(r => r.status === 'in_progress');
   const { deleteReview } = useTauri();
   const [error, setError] = useState<string | null>(null);
   const [reviewToDelete, setReviewToDelete] = useState<string | null>(null);
@@ -98,15 +97,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) =
             }
           }}
           ariaLabel="Navigate to Reviews"
-          suffix={
-            hasInProgressReview ? (
-              <ICONS.ACTION_LOADING
-                size={12}
-                className="animate-spin text-blue-500/60"
-                aria-hidden="true"
-              />
-            ) : null
-          }
         />
         {reviews.length > 0 && !isLoading && (
           <div className="relative my-1 flex flex-col gap-0.5 pl-4">
@@ -130,7 +120,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) =
                     reviewId === review.id && currentView === 'review' ? 'page' : undefined
                   }
                 >
-                  <span className="flex items-center justify-center shrink-0 w-4 h-4" aria-hidden="true">
+                  <span
+                    className="flex h-4 w-4 shrink-0 items-center justify-center"
+                    aria-hidden="true"
+                  >
                     {review.status === 'in_progress' ? (
                       <ICONS.ACTION_LOADING
                         size={10}
@@ -143,7 +136,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) =
                       />
                     )}
                   </span>
-                  <span className="truncate flex-1">{review.title}</span>
+                  <span className="flex-1 truncate">{review.title}</span>
                   <button
                     onClick={e => handleDeleteReview(e, review.id)}
                     className="z-10 shrink-0 rounded-md p-1 text-gray-500/50 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-400/10 hover:text-red-400"

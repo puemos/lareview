@@ -14,8 +14,10 @@ interface AgentConfigPanelProps {
   onRepoSelect: (repoId: string) => void;
   isGenerating: boolean;
   onGenerate: () => void;
+  onStop: () => void;
   hasDiff: boolean;
 }
+
 
 export const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
   agents,
@@ -26,6 +28,7 @@ export const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
   onRepoSelect,
   isGenerating,
   onGenerate,
+  onStop,
   hasDiff,
 }) => {
   return (
@@ -63,9 +66,8 @@ export const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
       {!hasDiff && !isGenerating ? (
         <Tooltip content="Please add a diff to generate a review">
           <motion.button
-            onClick={onGenerate}
             disabled={true}
-            className="shadow-custom relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-md py-2.5 text-xs font-bold transition-all bg-bg-tertiary text-text-disabled border-border/50 cursor-not-allowed border"
+            className="bg-bg-tertiary border-border/50 text-text-disabled shadow-custom relative flex w-full cursor-not-allowed items-center justify-center gap-2 overflow-hidden rounded-md border py-2.5 text-xs font-bold transition-all"
           >
             <div className="relative z-10 flex items-center justify-center gap-2">
               <PlayIcon size={14} />
@@ -75,41 +77,124 @@ export const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
         </Tooltip>
       ) : (
         <motion.button
-          whileTap={!isGenerating ? { scale: 0.98 } : {}}
-          onClick={onGenerate}
-          disabled={isGenerating}
+          whileTap={{ scale: 0.98 }}
+          onClick={isGenerating ? onStop : onGenerate}
           className={`shadow-custom relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-md py-2.5 text-xs font-bold transition-all ${
             isGenerating
-              ? 'bg-status-ignored/10 text-status-ignored border-status-ignored/20 hover:bg-status-ignored/20 border'
+              ? 'bg-status-rejected/10 text-status-rejected border-status-rejected/20 hover:bg-status-rejected/20 border cursor-pointer'
               : 'bg-brand text-bg-primary hover:brightness-110'
           }`}
         >
+          {/* Iridescent shimmer overlay */}
+          {isGenerating && (
+            <motion.div
+              animate={{
+                backgroundPosition: ['200% 50%', '-200% 50%'],
+              }}
+              transition={{
+                duration: 4,
+                repeat: Infinity,
+                ease: "linear"
+              }}
+              style={{
+                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.05), rgba(168,85,247,0.15), rgba(255,255,255,0.05), transparent)',
+                backgroundSize: '200% 100%',
+              }}
+              className="absolute inset-0 z-0"
+            />
+          )}
+
+
           <div className="relative z-10 flex items-center justify-center gap-2">
-            {isGenerating ? (
-              <>
-                <StopIcon size={14} />
-                <span>Stop Generation</span>
-              </>
-            ) : (
-              <>
-                <PlayIcon size={14} />
-                <span>Generate Review</span>
-              </>
-            )}
+            <motion.div
+              animate={{
+                scale: isGenerating ? [1, 1.1, 1] : 1,
+                rotate: isGenerating ? [0, 90] : 0,
+              }}
+              transition={{
+                type: 'spring',
+                stiffness: 500,
+                damping: 30,
+              }}
+              className="flex items-center justify-center"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" className="fill-current">
+                <motion.path
+                  animate={{
+                    d: isGenerating 
+                      ? "M6 6 L18 6 L18 18 L6 18 Z" // Square (Stop)
+                      : "M8 5 L19 12 L8 19 Z"     // Triangle (Play)
+                  }}
+                  transition={{
+                    type: 'spring',
+                    stiffness: 400,
+                    damping: 25,
+                  }}
+                />
+              </svg>
+            </motion.div>
+            <span>{isGenerating ? 'Stop Generation' : 'Generate Review'}</span>
           </div>
+
+          {/* Sparkles */}
+          {isGenerating && <Sparkles />}
+          
+          {/* Radial pulse */}
+          {isGenerating && (
+            <motion.div
+              animate={{
+                scale: [1, 1.2, 1],
+                opacity: [0.3, 0.6, 0.3],
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                ease: 'easeInOut',
+              }}
+              className="absolute inset-0 rounded-full border border-current opacity-20"
+            />
+          )}
         </motion.button>
       )}
     </div>
   );
 };
-const StopIcon = ({ size }: { size: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
-    <rect x="6" y="6" width="12" height="12" rx="2" />
-  </svg>
-);
+
+const Sparkles = () => {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
+      {[...Array(6)].map((_, i) => (
+        <motion.div
+          key={i}
+          animate={{
+            x: [0, (Math.random() - 0.5) * 40],
+            y: [0, (Math.random() - 0.5) * 40],
+            opacity: [0, 1, 0],
+            scale: [0, 1, 0],
+          }}
+          transition={{
+            duration: 1 + Math.random() * 2,
+            repeat: Infinity,
+            delay: Math.random() * 2,
+          }}
+          className="bg-current absolute h-1 w-1 rounded-full"
+          style={{
+            left: `${10 + Math.random() * 80}%`,
+            top: `${10 + Math.random() * 80}%`,
+          }}
+        />
+      ))}
+    </div>
+  );
+};
 
 const PlayIcon = ({ size }: { size: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
     <path d="M8 5v14l11-7z" />
   </svg>
 );
+
+
+
+
+
