@@ -11,10 +11,7 @@ export function useReviews() {
     queryKey: queryKeys.reviews,
     queryFn: async () => {
       const result = await getAllReviews();
-      return result.map(r => ({
-        ...r,
-        status: 'pending',
-      })) as Review[];
+      return result as Review[];
     },
   });
 

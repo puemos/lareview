@@ -22,6 +22,7 @@ fn test_task_repository() -> anyhow::Result<()> {
             diff_hash: "h".into(),
         },
         active_run_id: Some("run-1".into()),
+        status: ReviewStatus::Todo,
         created_at: "now".to_string(),
         updated_at: "now".to_string(),
     };
@@ -108,6 +109,7 @@ fn test_comment_repository() -> anyhow::Result<()> {
             diff_hash: "h".into(),
         },
         active_run_id: None,
+        status: ReviewStatus::Todo,
         created_at: "now".to_string(),
         updated_at: "now".to_string(),
     };
@@ -163,6 +165,7 @@ fn test_feedback_repository() -> anyhow::Result<()> {
             diff_hash: "h".into(),
         },
         active_run_id: None,
+        status: ReviewStatus::Todo,
         created_at: "now".to_string(),
         updated_at: "now".to_string(),
     };
@@ -216,6 +219,7 @@ fn test_review_run_repository() -> anyhow::Result<()> {
             diff_hash: "h".into(),
         },
         active_run_id: None,
+        status: ReviewStatus::Todo,
         created_at: "now".to_string(),
         updated_at: "now".to_string(),
     };
@@ -255,6 +259,7 @@ fn test_review_repository() -> anyhow::Result<()> {
             diff_hash: "h".into(),
         },
         active_run_id: None,
+        status: ReviewStatus::Todo,
         created_at: "now".to_string(),
         updated_at: "now".to_string(),
     };
@@ -298,6 +303,7 @@ fn test_review_cascading_deletion() -> anyhow::Result<()> {
             diff_hash: "h".into(),
         },
         active_run_id: Some(run_id.clone()),
+        status: ReviewStatus::Todo,
         created_at: "now".into(),
         updated_at: "now".into(),
     })?;

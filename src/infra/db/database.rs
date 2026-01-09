@@ -1,7 +1,7 @@
 use crate::commands::{LinkedRepoState, PendingReviewState, ReviewRunState, ReviewState};
 use crate::domain::{Comment, Feedback, Review, ReviewRun, ReviewTask};
 use anyhow::Result;
-use rusqlite::Connection;
+use rusqlite::{Connection, params};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -116,6 +116,7 @@ impl Database {
                 summary TEXT,
                 source_json TEXT NOT NULL,
                 active_run_id TEXT,
+                status TEXT NOT NULL DEFAULT 'todo',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
@@ -183,8 +184,22 @@ impl Database {
             CREATE INDEX IF NOT EXISTS idx_feedback_anchor ON feedback(anchor_file_path, anchor_line);
             CREATE INDEX IF NOT EXISTS idx_comments_feedback_id ON comments(feedback_id);
             CREATE INDEX IF NOT EXISTS idx_comments_feedback_created_at ON comments(feedback_id, created_at);
+
             "#,
         )?;
+
+        // Migration: Add status to reviews if it doesn't exist
+        let has_status = conn
+            .prepare("SELECT 1 FROM pragma_table_info('reviews') WHERE name = 'status'")?
+            .exists([])?;
+
+        if !has_status {
+            conn.execute(
+                "ALTER TABLE reviews ADD COLUMN status TEXT DEFAULT 'todo' NOT NULL",
+                [],
+            )?;
+        }
+
         Ok(())
     }
 
@@ -223,7 +238,7 @@ impl Database {
     pub fn get_pending_reviews(&self) -> Result<Vec<PendingReviewState>, rusqlite::Error> {
         let conn = self.conn.lock().expect("Failed to acquire database lock");
         let mut stmt = conn.prepare(
-            "SELECT id, active_run_id, source_json, created_at, updated_at FROM reviews WHERE active_run_id IS NOT NULL ORDER BY updated_at DESC LIMIT 10"
+            "SELECT id, active_run_id, source_json, status, created_at, updated_at FROM reviews WHERE active_run_id IS NOT NULL ORDER BY updated_at DESC LIMIT 10"
         )?;
         let rows = stmt.query_map([], |row| {
             let id: String = row.get(0)?;
@@ -268,7 +283,7 @@ impl Database {
     pub fn get_all_reviews(&self) -> Result<Vec<ReviewState>, rusqlite::Error> {
         let conn = self.conn.lock().expect("Failed to acquire database lock");
         let mut stmt = conn.prepare(
-            "SELECT r.id, r.title, r.summary, rr.agent_id, COUNT(t.id) as task_count, r.created_at, r.source_json
+            "SELECT r.id, r.title, r.summary, rr.agent_id, COUNT(t.id) as task_count, r.created_at, r.source_json, r.status
              FROM reviews r
              LEFT JOIN review_runs rr ON r.active_run_id = rr.id
              LEFT JOIN tasks t ON t.run_id = rr.id
@@ -282,6 +297,8 @@ impl Database {
                     diff_hash: String::new(),
                 });
 
+            let status_str: String = row.get(7)?;
+
             Ok(ReviewState {
                 id: row.get(0)?,
                 title: row.get(1)?,
@@ -290,6 +307,7 @@ impl Database {
                 task_count: row.get::<_, i32>(4)? as usize,
                 created_at: row.get(5)?,
                 source,
+                status: status_str,
             })
         })?;
         let mut reviews = Vec::new();
@@ -361,20 +379,19 @@ impl Database {
             rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(1), Some(e.to_string()))
         })?;
         conn.execute(
-            r#"
-            INSERT INTO reviews (id, title, summary, source_json, active_run_id, created_at, updated_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-            ON CONFLICT(id) DO NOTHING
-            "#,
-            (
+            "INSERT INTO reviews (id, title, summary, source_json, active_run_id, status, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+             ON CONFLICT(id) DO NOTHING",
+            params![
                 &review.id,
                 &review.title,
                 &review.summary,
                 &source_json,
                 &review.active_run_id,
+                &review.status.to_string(),
                 &review.created_at,
                 &review.updated_at,
-            ),
+            ],
         )?;
         Ok(())
     }
@@ -401,12 +418,10 @@ impl Database {
     pub fn save_run(&self, run: &ReviewRun) -> Result<(), rusqlite::Error> {
         let conn = self.conn.lock().expect("Failed to acquire database lock");
         conn.execute(
-            r#"
-            INSERT INTO review_runs (id, review_id, agent_id, input_ref, diff_text, diff_hash, created_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-            ON CONFLICT(id) DO NOTHING
-            "#,
-            (
+            "INSERT INTO review_runs (id, review_id, agent_id, input_ref, diff_text, diff_hash, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT(id) DO NOTHING",
+            params![
                 &run.id,
                 &run.review_id,
                 &run.agent_id,
@@ -414,7 +429,7 @@ impl Database {
                 &run.diff_text,
                 &run.diff_hash,
                 &run.created_at,
-            ),
+            ],
         )?;
         Ok(())
     }
@@ -423,12 +438,10 @@ impl Database {
         let conn = self.conn.lock().expect("Failed to acquire database lock");
         let anchor = feedback.anchor.as_ref();
         conn.execute(
-            r#"
-            INSERT INTO feedback (id, review_id, task_id, title, status, impact, anchor_file_path, anchor_line, anchor_side, anchor_hunk_ref, anchor_head_sha, author, created_at, updated_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
-            ON CONFLICT(id) DO NOTHING
-            "#,
-            (
+            "INSERT INTO feedback (id, review_id, task_id, title, status, impact, anchor_file_path, anchor_line, anchor_side, anchor_hunk_ref, anchor_head_sha, author, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+             ON CONFLICT(id) DO NOTHING",
+            params![
                 &feedback.id,
                 &feedback.review_id,
                 &feedback.task_id.as_ref(),
@@ -443,7 +456,7 @@ impl Database {
                 &feedback.author,
                 &feedback.created_at,
                 &feedback.updated_at,
-            ),
+            ],
         )?;
         Ok(())
     }
@@ -451,12 +464,10 @@ impl Database {
     pub fn save_comment(&self, comment: &Comment) -> Result<(), rusqlite::Error> {
         let conn = self.conn.lock().expect("Failed to acquire database lock");
         conn.execute(
-            r#"
-            INSERT INTO comments (id, feedback_id, author, body, parent_id, created_at, updated_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-            ON CONFLICT(id) DO NOTHING
-            "#,
-            (
+            "INSERT INTO comments (id, feedback_id, author, body, parent_id, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT(id) DO NOTHING",
+            params![
                 &comment.id,
                 &comment.feedback_id,
                 &comment.author,
@@ -464,7 +475,7 @@ impl Database {
                 &comment.parent_id,
                 &comment.created_at,
                 &comment.updated_at,
-            ),
+            ],
         )?;
         Ok(())
     }
@@ -500,9 +511,10 @@ impl Database {
     ) -> Result<(), rusqlite::Error> {
         let repo = self.feedback_repo();
         let feedback_id_str = feedback_id.to_string();
-        repo.update_status(&feedback_id_str, status).map_err(|e| {
-            rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(1), Some(e.to_string()))
-        })?;
+        repo.update_status(&feedback_id_str, status)
+            .map_err(|e: anyhow::Error| {
+                rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(1), Some(e.to_string()))
+            })?;
         Ok(())
     }
 

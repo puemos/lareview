@@ -16,6 +16,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) =
   const queryClient = useQueryClient();
   const { setReviewId, reviewId } = useAppStore();
   const { data: reviews = [], isLoading, invalidate } = useReviews();
+  const hasInProgressReview = reviews.some(r => r.status === 'in_progress');
   const { deleteReview } = useTauri();
   const [error, setError] = useState<string | null>(null);
 
@@ -91,6 +92,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) =
             }
           }}
           ariaLabel="Navigate to Reviews"
+          suffix={
+            hasInProgressReview ? (
+              <ICONS.ACTION_LOADING
+                size={12}
+                className="animate-spin text-blue-500/60"
+                aria-hidden="true"
+              />
+            ) : null
+          }
         />
         {reviews.length > 0 && !isLoading && (
           <div className="relative my-1 flex flex-col gap-0.5 pl-4">
@@ -114,11 +124,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) =
                     reviewId === review.id && currentView === 'review' ? 'page' : undefined
                   }
                 >
-                  <span
-                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${review.status === 'done' ? 'bg-green-500/50' : 'bg-blue-500/50'}`}
-                    aria-hidden="true"
-                  />
-                  <span className="truncate">{review.title}</span>
+                  <span className="flex items-center justify-center shrink-0 w-4 h-4" aria-hidden="true">
+                    {review.status === 'in_progress' ? (
+                      <ICONS.ACTION_LOADING
+                        size={10}
+                        className="animate-spin text-blue-400"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${review.status === 'done' ? 'bg-green-500/50' : 'bg-blue-500/50'}`}
+                      />
+                    )}
+                  </span>
+                  <span className="truncate flex-1">{review.title}</span>
                   <button
                     onClick={e => handleDeleteReview(e, review.id)}
                     className="z-10 shrink-0 rounded-md p-1 text-gray-500/50 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-400/10 hover:text-red-400"
@@ -160,9 +179,17 @@ interface SidebarItemProps {
   isActive: boolean;
   onClick: () => void;
   ariaLabel?: string;
+  suffix?: React.ReactNode;
 }
 
-const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, isActive, onClick, ariaLabel }) => (
+const SidebarItem: React.FC<SidebarItemProps> = ({
+  icon,
+  label,
+  isActive,
+  onClick,
+  ariaLabel,
+  suffix,
+}) => (
   <button
     onClick={onClick}
     className={`group mx-2 flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-all select-none ${
@@ -179,6 +206,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, isActive, onClic
     >
       {icon}
     </div>
-    <span className="font-medium">{label}</span>
+    <span className="flex-1 text-left font-medium">{label}</span>
+    {suffix}
   </button>
 );

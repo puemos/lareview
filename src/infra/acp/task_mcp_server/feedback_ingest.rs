@@ -572,6 +572,7 @@ fn save_by_file_and_line(config: &ServerConfig, args: &Value) -> Result<String> 
         summary: None,
         source: ctx.source.clone(),
         active_run_id: Some(ctx.run_id.clone()),
+        status: crate::domain::ReviewStatus::Todo,
         created_at: ctx
             .created_at
             .clone()

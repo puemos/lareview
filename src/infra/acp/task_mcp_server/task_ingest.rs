@@ -216,6 +216,7 @@ pub(super) fn save_task(config: &ServerConfig, raw_task: Value) -> Result<Review
         summary: None, // Always start with no summary; it's added by finalize_review
         source: ctx.source.clone(),
         active_run_id: Some(ctx.run_id.clone()),
+        status: crate::domain::ReviewStatus::Todo,
         created_at: ctx
             .created_at
             .clone()
@@ -320,6 +321,7 @@ pub(super) fn update_review_metadata(config: &ServerConfig, args: Value) -> Resu
         summary: None,
         source: ctx.source.clone(),
         active_run_id: Some(ctx.run_id.clone()),
+        status: crate::domain::ReviewStatus::Todo,
         created_at: ctx
             .created_at
             .clone()

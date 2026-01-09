@@ -41,6 +41,7 @@ fn test_full_database_workflow() -> anyhow::Result<()> {
             diff_hash: "h".into(),
         },
         active_run_id: None,
+        status: ReviewStatus::Todo,
         created_at: "now".to_string(),
         updated_at: "now".to_string(),
     };
@@ -151,6 +152,7 @@ fn test_task_diff_refs_serialization_deserialization() -> anyhow::Result<()> {
             diff_hash: "h".into(),
         },
         active_run_id: None,
+        status: ReviewStatus::Todo,
         created_at: "now".to_string(),
         updated_at: "now".to_string(),
     };
@@ -266,6 +268,7 @@ fn test_task_with_null_diff_refs() -> anyhow::Result<()> {
             diff_hash: "h".into(),
         },
         active_run_id: None,
+        status: ReviewStatus::Todo,
         created_at: "now".to_string(),
         updated_at: "now".to_string(),
     };

@@ -195,15 +195,6 @@ pub async fn generate_review(
     });
 
     let now = chrono::Utc::now().to_rfc3339();
-    let review = Review {
-        id: review_id.clone(),
-        title: "AI Review".to_string(),
-        summary: None,
-        source: source.clone(),
-        active_run_id: Some(run_id.clone()),
-        created_at: now.clone(),
-        updated_at: now.clone(),
-    };
 
     let run = ReviewRun {
         id: run_id.clone(),
@@ -215,16 +206,22 @@ pub async fn generate_review(
         created_at: now.clone(),
     };
 
-    let run_context = RunContext {
-        review_id: review_id.clone(),
-        run_id: run_id.clone(),
-        agent_id: agent_id.clone(),
-        input_ref: run.input_ref.clone(),
-        diff_text: Arc::from(diff_text.as_str()),
-        diff_hash,
-        source,
-        initial_title: None,
-        created_at: Some(now),
+    let initial_title = match &source {
+        ReviewSource::GitHubPr { repo, number, .. } => {
+            format!("PR {}#{}", repo, number)
+        }
+        _ => "AI Review".to_string(),
+    };
+
+    let review = Review {
+        id: review_id.clone(),
+        title: initial_title,
+        summary: None,
+        source: source.clone(),
+        active_run_id: Some(run_id.clone()),
+        status: ReviewStatus::InProgress,
+        created_at: now.clone(),
+        updated_at: now.clone(),
     };
 
     let (candidate_label, command, candidate_args) = {
@@ -245,6 +242,18 @@ pub async fn generate_review(
         let candidate_args = agent_candidate.args.clone();
 
         (candidate_label, command, candidate_args)
+    };
+
+    let run_context = RunContext {
+        review_id: review_id.clone(),
+        run_id: run_id.clone(),
+        agent_id: agent_id.clone(),
+        input_ref: run.input_ref.clone(),
+        diff_text: Arc::from(diff_text.as_str()),
+        diff_hash,
+        source,
+        initial_title: None,
+        created_at: Some(now),
     };
 
     let (mcp_tx, mut mcp_rx) = mpsc::unbounded_channel::<ProgressEvent>();
@@ -368,6 +377,13 @@ pub async fn generate_review(
             let tasks_result = db.get_tasks_by_run(&run_id);
             let task_count = tasks_result.map(|t| t.len()).unwrap_or(0);
 
+            let mut review = db
+                .get_review(&review_id)
+                .map_err(|e| e.to_string())?
+                .unwrap();
+            review.status = ReviewStatus::Done;
+            db.save_review(&review).map_err(|e| e.to_string())?;
+
             let _ = on_progress.send(ProgressEventPayload::Completed { task_count });
         }
         Err(e) => {
@@ -375,6 +391,11 @@ pub async fn generate_review(
             let _ = on_progress.send(ProgressEventPayload::Error {
                 message: format!("Generation failed: {}", e),
             });
+            let db = state.db.lock().map_err(|e| e.to_string())?;
+            if let Ok(Some(mut review)) = db.get_review(&review_id) {
+                review.status = ReviewStatus::Done;
+                let _ = db.save_review(&review);
+            }
         }
     }
 
@@ -449,6 +470,7 @@ pub fn parse_diff(diff_text: String) -> Result<ParsedDiff, String> {
         hunk_manifest: manifest,
         files,
         source: None,
+        title: None,
     })
 }
 
@@ -935,6 +957,7 @@ pub async fn fetch_github_pr(
         .map_err(|e| e.to_string())?;
 
     let mut parsed = parse_diff(diff_text)?;
+    parsed.title = Some(metadata.title.clone());
     parsed.source = Some(ReviewSource::GitHubPr {
         owner: pr_metadata.owner,
         repo: pr_metadata.repo,
@@ -1185,6 +1208,7 @@ pub struct ReviewState {
     pub task_count: usize,
     pub created_at: String,
     pub source: crate::domain::ReviewSource,
+    pub status: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1289,6 +1313,8 @@ pub struct ParsedDiff {
     pub files: Vec<ParsedDiffFile>,
     #[serde(default)]
     pub source: Option<ReviewSource>,
+    #[serde(default)]
+    pub title: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

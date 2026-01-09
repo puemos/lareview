@@ -20,6 +20,9 @@ pub struct Review {
     pub source: ReviewSource,
     /// Latest run ID currently shown in the Review UI.
     pub active_run_id: Option<ReviewRunId>,
+    /// Current status of the review.
+    #[serde(default)]
+    pub status: crate::domain::ReviewStatus,
     /// Creation timestamp in RFC3339 format.
     pub created_at: String,
     /// Update timestamp in RFC3339 format.

@@ -489,6 +489,7 @@ async fn test_save_agent_comment() {
             diff_hash: "h".into(),
         },
         active_run_id: Some("run-1".into()),
+        status: crate::domain::ReviewStatus::Todo,
         created_at: "2024-01-01T00:00:00Z".into(),
         updated_at: "2024-01-01T00:00:00Z".into(),
     };
