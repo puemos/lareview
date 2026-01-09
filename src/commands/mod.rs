@@ -972,6 +972,7 @@ pub fn update_agent_config(
     _state: State<'_, AppState>,
     id: String,
     path: String,
+    args: Option<Vec<String>>,
 ) -> Result<(), String> {
     use crate::infra::app_config::{load_config, save_config};
     let mut config = load_config();
@@ -982,6 +983,9 @@ pub fn update_agent_config(
     for custom in config.custom_agents.iter_mut() {
         if custom.id == id {
             custom.command = path.clone();
+            if let Some(new_args) = &args {
+                custom.args = new_args.clone();
+            }
             found_custom = true;
             break;
         }
@@ -989,7 +993,10 @@ pub fn update_agent_config(
 
     if !found_custom {
         // Assume it's a built-in agent (or one we want to override)
-        config.agent_path_overrides.insert(id, path);
+        config.agent_path_overrides.insert(id.clone(), path);
+        if let Some(new_args) = args {
+            config.agent_args_overrides.insert(id, new_args);
+        }
     }
 
     save_config(&config).map_err(|e| e.to_string())?;

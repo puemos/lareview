@@ -16,6 +16,7 @@ pub struct AppConfig {
     pub has_seen_requirements: bool,
     pub custom_agents: Vec<CustomAgentConfig>,
     pub agent_path_overrides: HashMap<String, String>,
+    pub agent_args_overrides: HashMap<String, Vec<String>>,
     pub agent_envs: HashMap<String, HashMap<String, String>>,
     pub preferred_editor_id: Option<String>,
 }
@@ -101,6 +102,12 @@ mod tests {
         let mut path_overrides = HashMap::new();
         path_overrides.insert("gemini".to_string(), "/custom/gemini".to_string());
 
+        let mut args_overrides = HashMap::new();
+        args_overrides.insert(
+            "gemini".to_string(),
+            vec!["--verbose".to_string(), "--fast".to_string()],
+        );
+
         let config = AppConfig {
             has_seen_requirements: true,
             custom_agents: vec![CustomAgentConfig {
@@ -111,6 +118,7 @@ mod tests {
                 args: vec!["--flag".into()],
             }],
             agent_path_overrides: path_overrides,
+            agent_args_overrides: args_overrides,
             agent_envs,
             preferred_editor_id: Some("vscode".into()),
         };
@@ -134,6 +142,10 @@ mod tests {
             loaded.agent_path_overrides.get("gemini").unwrap(),
             "/custom/gemini"
         );
+        let loaded_args = loaded.agent_args_overrides.get("gemini").unwrap();
+        assert_eq!(loaded_args.len(), 2);
+        assert_eq!(loaded_args[0], "--verbose");
+
         assert_eq!(
             loaded
                 .agent_envs

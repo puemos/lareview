@@ -83,6 +83,10 @@ pub fn list_agent_candidates() -> Vec<AgentCandidate> {
             candidate.command = Some(override_path.clone());
             candidate.available = !override_path.is_empty();
         }
+
+        if let Some(override_args) = config.agent_args_overrides.get(&candidate.id) {
+            candidate.args = override_args.clone();
+        }
     }
 
     for custom in &config.custom_agents {

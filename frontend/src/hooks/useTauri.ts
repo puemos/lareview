@@ -444,8 +444,8 @@ export const useTauri = () => {
     return invoke('unlink_repo', { repoId });
   }, []);
 
-  const updateAgentConfig = useCallback(async (id: string, path: string): Promise<void> => {
-    return invoke('update_agent_config', { id, path });
+  const updateAgentConfig = useCallback(async (id: string, path: string, args?: string[]): Promise<void> => {
+    return invoke('update_agent_config', { id, path, args });
   }, []);
 
   const selectRepoFolder = useCallback(async (): Promise<string | null> => {

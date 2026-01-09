@@ -527,7 +527,13 @@ const AgentsSettings: React.FC = () => {
   const { getAgents, updateAgentConfig } = useTauri();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editState, setEditState] = useState<{ path: string; args: string }>({
+    path: '',
+    args: '',
+  });
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
 
   const fetchAgents = useCallback(async () => {
     setIsLoading(true);
@@ -545,16 +551,38 @@ const AgentsSettings: React.FC = () => {
     fetchAgents();
   }, [fetchAgents]);
 
-  const handleUpdatePath = (id: string, newPath: string) => {
-    setAgents(prev => prev.map(agent => (agent.id === id ? { ...agent, path: newPath } : agent)));
+  useEffect(() => {
+    if (savedId) {
+      const timer = setTimeout(() => setSavedId(null), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [savedId]);
+
+  const handleEdit = (agent: Agent) => {
+    setEditingId(agent.id);
+    setEditState({
+      path: agent.path || '',
+      args: (agent.args || []).join(' '),
+    });
   };
 
-  const handleSave = async (agent: Agent) => {
-    setSavingId(agent.id);
+  const handleCancel = () => {
+    setEditingId(null);
+    setEditState({ path: '', args: '' });
+  };
+
+  const handleSave = async (agentId: string) => {
+    setSavingId(agentId);
     try {
-      await updateAgentConfig(agent.id, agent.path || '');
-      // Refresh to get updated availability
+      const argsArray = editState.args
+        .split(' ')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+      await updateAgentConfig(agentId, editState.path, argsArray);
       await fetchAgents();
+      setEditingId(null);
+      setSavedId(agentId);
     } catch (error) {
       console.error('Failed to update agent:', error);
     } finally {
@@ -587,7 +615,9 @@ const AgentsSettings: React.FC = () => {
           {agents.map(agent => (
             <div
               key={agent.id}
-              className="bg-bg-secondary/40 border-border group hover:border-brand/30 rounded-lg border p-5 transition-all"
+              className={`bg-bg-secondary/40 border-border rounded-lg border p-5 transition-all ${
+                editingId === agent.id ? 'ring-brand/20 ring-2' : 'hover:border-brand/30'
+              }`}
             >
               <div className="mb-4 flex items-start justify-between">
                 <div className="flex items-start gap-4">
@@ -620,49 +650,112 @@ const AgentsSettings: React.FC = () => {
                     </p>
                   </div>
                 </div>
+                {editingId !== agent.id && (
+                  <div className="flex items-center gap-2">
+                    {savedId === agent.id && (
+                      <span className="text-status-done text-xs font-medium animate-in fade-in zoom-in duration-300">
+                        Saved!
+                      </span>
+                    )}
+                    <button
+                      onClick={() => handleEdit(agent)}
+                      className="text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded px-3 py-1.5 text-xs font-medium transition-colors"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3">
-                <div>
-                  <label className="text-text-disabled mb-2 block text-[10px] font-bold tracking-wider uppercase">
-                    Executable Path / Command
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={agent.path || ''}
-                      onChange={e => handleUpdatePath(agent.id, e.target.value)}
-                      placeholder="e.g. /usr/local/bin/agent-bin"
-                      className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand flex-1 rounded-md border px-3 py-2 font-mono text-xs transition-all focus:outline-none"
-                    />
-                    <button
-                      onClick={() => handleSave(agent)}
-                      disabled={savingId === agent.id}
-                      className="bg-brand text-bg-primary shadow-custom flex items-center gap-2 rounded-md px-4 py-2 text-xs font-bold transition-all hover:brightness-110 disabled:opacity-50"
-                    >
-                      {savingId === agent.id ? (
-                        <ArrowsClockwise size={14} className="animate-spin" />
-                      ) : (
-                        <FloppyDisk size={14} weight="fill" />
-                      )}
-                      Save
-                    </button>
+                {editingId === agent.id ? (
+                  <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+                    <div className="grid gap-3">
+                      <div>
+                        <label className="text-text-disabled mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
+                          Executable Path / Command
+                        </label>
+                        <input
+                          type="text"
+                          value={editState.path}
+                          onChange={e =>
+                            setEditState(prev => ({ ...prev, path: e.target.value }))
+                          }
+                          placeholder="e.g. /usr/local/bin/agent-bin"
+                          className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand w-full rounded-md border px-3 py-2 font-mono text-xs transition-all focus:outline-none"
+                          autoFocus
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-text-disabled mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
+                          Arguments
+                        </label>
+                        <input
+                          type="text"
+                          value={editState.args}
+                          onChange={e =>
+                            setEditState(prev => ({ ...prev, args: e.target.value }))
+                          }
+                          placeholder="e.g. --model=gpt-4 --temperature=0.7"
+                          className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand w-full rounded-md border px-3 py-2 font-mono text-xs transition-all focus:outline-none"
+                        />
+                        <p className="text-text-tertiary mt-1 text-[10px]">
+                          Space-separated arguments passed to the agent command.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-4">
+                      <button
+                        onClick={handleCancel}
+                        disabled={savingId === agent.id}
+                        className="text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleSave(agent.id)}
+                        disabled={savingId === agent.id}
+                        className="bg-brand text-bg-primary shadow-custom flex items-center gap-2 rounded-md px-4 py-2 text-xs font-bold transition-all hover:brightness-110 disabled:opacity-50"
+                      >
+                        {savingId === agent.id ? (
+                          <ArrowsClockwise size={14} className="animate-spin" />
+                        ) : (
+                          <FloppyDisk size={14} weight="fill" />
+                        )}
+                        Save Changes
+                      </button>
+                    </div>
                   </div>
-                </div>
-                {agent.args && agent.args.length > 0 && (
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <span className="text-text-disabled text-[10px] font-bold uppercase">
-                      Args:
-                    </span>
-                    <div className="no-scrollbar flex gap-1 overflow-x-auto pb-1">
-                      {agent.args.map((arg, i) => (
-                        <span
-                          key={i}
-                          className="bg-bg-tertiary border-border text-text-secondary rounded border px-1.5 py-0.5 font-mono text-[10px] whitespace-nowrap"
-                        >
-                          {arg}
-                        </span>
-                      ))}
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <span className="text-text-disabled mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                        Path
+                      </span>
+                      <code className="bg-bg-tertiary text-text-secondary block truncate rounded px-2 py-1 font-mono text-xs">
+                        {agent.path || '(Default)'}
+                      </code>
+                    </div>
+                    <div>
+                      <span className="text-text-disabled mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                        Args
+                      </span>
+                      {agent.args && agent.args.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {agent.args.map((arg, i) => (
+                            <span
+                              key={i}
+                              className="bg-bg-tertiary border-border text-text-secondary rounded border px-1.5 py-0.5 font-mono text-[10px]"
+                            >
+                              {arg}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-text-tertiary text-xs italic">None</span>
+                      )}
                     </div>
                   </div>
                 )}
