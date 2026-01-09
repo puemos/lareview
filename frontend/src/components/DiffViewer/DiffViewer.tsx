@@ -17,6 +17,7 @@ interface DiffViewerProps {
     newLines: number;
   }>;
   viewMode?: 'unified' | 'split';
+  onAddFeedback?: (file: DiffFile, line: number, side: 'old' | 'new') => void;
 }
 
 export const DiffViewer: React.FC<DiffViewerProps> = ({
@@ -25,6 +26,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
   onSelectFile,
   highlightedHunks = [],
   viewMode = 'split',
+  onAddFeedback,
 }) => {
   return (
     <div className="bg-bg-primary flex h-full">
@@ -37,6 +39,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
               h => h.file === selectedFile.name || h.file === selectedFile.new_path
             )}
             viewMode={viewMode}
+            onAddFeedback={onAddFeedback}
           />
         ) : (
           <div className="text-text-disabled flex flex-1 items-center justify-center">
@@ -135,9 +138,10 @@ interface DiffContentProps {
     newLines: number;
   }>;
   viewMode: 'unified' | 'split';
+  onAddFeedback?: (file: DiffFile, line: number, side: 'old' | 'new') => void;
 }
 
-const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks }) => {
+const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAddFeedback }) => {
   const { openInEditor } = useTauri();
   const path = file.name || file.new_path || 'unknown';
   const language = getLanguageFromPath(path);
@@ -185,7 +189,7 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks }) => 
     };
   }, [file.hunks]);
 
-  const handleEditorDidMount = (_editor: unknown, monaco: typeof import('monaco-editor')) => {
+  const handleEditorDidMount = (editor: unknown, monaco: typeof import('monaco-editor')) => {
     monaco.editor.defineTheme('lareview-dark', {
       base: 'vs-dark',
       inherit: true,
@@ -196,6 +200,26 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks }) => 
       },
     });
     monaco.editor.setTheme('lareview-dark');
+
+    const diffEditor = editor as import('monaco-editor').editor.IDiffEditor;
+    const originalEditor = diffEditor.getOriginalEditor();
+    const modifiedEditor = diffEditor.getModifiedEditor();
+
+    [originalEditor, modifiedEditor].forEach(ed => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (ed as any).addAction({
+        id: 'add-feedback',
+        label: 'Add Feedback',
+        contextMenuGroupId: 'navigation',
+        run: () => {
+          const position = ed.getPosition();
+          if (position && onAddFeedback) {
+            const side = ed === originalEditor ? 'old' : 'new';
+            onAddFeedback(file, position.lineNumber, side);
+          }
+        },
+      });
+    });
   };
 
   return (

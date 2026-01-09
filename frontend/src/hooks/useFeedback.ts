@@ -22,11 +22,11 @@ export interface UseFeedbackResult {
 
 export interface CreateFeedbackInput {
   review_id: string;
-  task_id: string;
+  task_id?: string;
   title: string;
-  file_path: string;
-  line_number: number;
-  side: string;
+  file_path?: string;
+  line_number?: number;
+  side?: string;
   content: string;
   impact: Feedback['impact'];
 }
@@ -66,7 +66,17 @@ export function useFeedback(reviewId: string | null): UseFeedbackResult {
   });
 
   const createMutation = useMutation({
-    mutationFn: (input: CreateFeedbackInput) => saveFeedback(input),
+    mutationFn: (input: CreateFeedbackInput) =>
+      saveFeedback({
+        review_id: input.review_id,
+        task_id: input.task_id,
+        title: input.title,
+        file_path: input.file_path,
+        line_number: input.line_number,
+        side: input.side,
+        content: input.content,
+        impact: input.impact,
+      }),
     onSuccess: () => {
       if (reviewId) {
         queryClient.invalidateQueries({

@@ -17,6 +17,7 @@ interface ReviewSidebarProps {
   onSelectTask: (taskId: string | null) => void;
   onSelectFeedback: (feedbackId: string | null) => void;
   onOpenExportModal: () => void;
+  onAddGlobalFeedback: () => void;
 }
 
 export const ReviewSidebar: React.FC<ReviewSidebarProps> = ({
@@ -32,6 +33,7 @@ export const ReviewSidebar: React.FC<ReviewSidebarProps> = ({
   onSelectTask,
   onSelectFeedback,
   onOpenExportModal,
+  onAddGlobalFeedback,
 }) => {
   const handleTabChange = (tab: 'tasks' | 'feedback') => {
     onSidebarTabChange(tab);
@@ -51,10 +53,24 @@ export const ReviewSidebar: React.FC<ReviewSidebarProps> = ({
   return (
     <div className="border-border bg-bg-secondary/30 flex w-[300px] flex-col border-r">
       <div className="border-border bg-bg-secondary/50 border-b p-3">
-        <div className="mb-3 flex gap-2">
+        <div className="mb-3 flex">
+          <div
+            className={`flex items-center overflow-hidden transition-all duration-300 ease-in-out ${
+              sidebarTab === 'feedback' ? 'mr-2 flex-1 opacity-100' : 'mr-0 flex-[0_0_0] opacity-0'
+            }`}
+          >
+            <button
+              onClick={onAddGlobalFeedback}
+              className="bg-brand text-brand-fg border-brand hover:bg-brand/90 flex w-full items-center justify-center gap-1.5 rounded border px-3 py-1.5 text-[10px] font-medium whitespace-nowrap transition-all cursor-pointer"
+              title="Add Global Feedback"
+            >
+              <ICONS.ICON_FEEDBACK size={12} weight="bold" />
+              Add Feedback
+            </button>
+          </div>
           <button
             onClick={onOpenExportModal}
-            className="bg-bg-tertiary hover:bg-bg-tertiary/80 text-text-secondary hover:text-text-primary border-border/50 flex flex-1 items-center justify-center gap-1.5 rounded border py-1.5 text-[10px] font-medium transition-all"
+            className="bg-bg-tertiary hover:bg-bg-tertiary/80 text-text-secondary hover:text-text-primary border-border/50 flex flex-1 items-center justify-center gap-1.5 overflow-hidden rounded border py-1.5 text-[10px] font-medium whitespace-nowrap transition-all cursor-pointer"
             title="Export Review"
           >
             <ICONS.ACTION_EXPORT size={12} />
@@ -116,7 +132,7 @@ interface TabButtonProps {
 const TabButton: React.FC<TabButtonProps> = ({ active, onClick, icon: Icon, label, count }) => (
   <button
     onClick={onClick}
-    className={`flex flex-1 items-center justify-center gap-1.5 rounded-[3px] py-1.5 text-[10px] font-medium transition-all ${
+    className={`flex flex-1 items-center justify-center gap-1.5 rounded-[3px] py-1.5 text-[10px] font-medium transition-all cursor-pointer ${
       active
         ? 'bg-bg-primary text-text-primary shadow-sm'
         : 'text-text-disabled hover:text-text-secondary'

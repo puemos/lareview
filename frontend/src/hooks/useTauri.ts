@@ -280,11 +280,11 @@ export const useTauri = () => {
   const saveFeedback = useCallback(
     async (feedback: {
       review_id: string;
-      task_id: string;
+      task_id?: string;
       title: string;
-      file_path: string;
-      line_number: number;
-      side: string;
+      file_path?: string;
+      line_number?: number;
+      side?: string;
       content: string;
       impact: string;
     }): Promise<string> => {

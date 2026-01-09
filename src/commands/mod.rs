@@ -527,16 +527,22 @@ pub fn save_feedback(
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let id = Uuid::new_v4().to_string();
 
-    let anchor = FeedbackAnchor {
-        file_path: Some(feedback.file_path),
-        line_number: Some(feedback.line_number),
-        side: if feedback.side == "old" {
-            Some(FeedbackSide::Old)
-        } else {
-            Some(FeedbackSide::New)
-        },
-        hunk_ref: None,
-        head_sha: None,
+    let anchor = if let (Some(file_path), Some(line_number), Some(side)) =
+        (feedback.file_path, feedback.line_number, feedback.side)
+    {
+        Some(FeedbackAnchor {
+            file_path: Some(file_path),
+            line_number: Some(line_number),
+            side: if side == "old" {
+                Some(FeedbackSide::Old)
+            } else {
+                Some(FeedbackSide::New)
+            },
+            hunk_ref: None,
+            head_sha: None,
+        })
+    } else {
+        None
     };
 
     let impact = FeedbackImpact::from_str(&feedback.impact).unwrap_or(FeedbackImpact::Nitpick);
@@ -544,11 +550,11 @@ pub fn save_feedback(
     let feedback_domain = Feedback {
         id: id.clone(),
         review_id: feedback.review_id,
-        task_id: Some(feedback.task_id),
+        task_id: feedback.task_id,
         title: feedback.title,
         status: ReviewStatus::Todo,
         impact,
-        anchor: Some(anchor),
+        anchor,
         author: "user".to_string(),
         created_at: chrono::Utc::now().to_rfc3339(),
         updated_at: chrono::Utc::now().to_rfc3339(),
@@ -1111,11 +1117,11 @@ pub struct ReviewGenerationResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeedbackInput {
     pub review_id: String,
-    pub task_id: String,
+    pub task_id: Option<String>,
     pub title: String,
-    pub file_path: String,
-    pub line_number: u32,
-    pub side: String,
+    pub file_path: Option<String>,
+    pub line_number: Option<u32>,
+    pub side: Option<String>,
     pub content: String,
     pub impact: String,
 }

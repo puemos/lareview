@@ -18,6 +18,8 @@ import { useTauri } from '../../hooks/useTauri';
 import { useDelayedLoading } from '../../hooks/useDelayedLoading';
 import type { ReviewTask, Feedback } from '../../types';
 import { ReviewViewSkeleton } from './ReviewViewSkeleton';
+import { AddFeedbackModal } from './AddFeedbackModal';
+import type {  DiffFile } from '../../types';
 
 export const ReviewView: React.FC = () => {
   const selectedFile = useAppStore(state => state.selectedFile);
@@ -45,6 +47,8 @@ export const ReviewView: React.FC = () => {
     updateImpact,
     isUpdatingImpact: isUpdatingFeedbackImpact,
     deleteFeedback,
+    createFeedback,
+    isCreating: isCreatingFeedback,
   } = useFeedback(reviewId);
   const { comments, isLoading: isCommentsLoading } = useFeedbackComments(selectedFeedbackId);
   const addCommentMutation = useAddComment();
@@ -56,6 +60,15 @@ export const ReviewView: React.FC = () => {
   const [sidebarTab, setSidebarTab] = useState<'tasks' | 'feedback'>('tasks');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPushModalOpen, setIsPushModalOpen] = useState(false);
+
+  // Feedback Modal State
+  const [isAddFeedbackModalOpen, setIsAddFeedbackModalOpen] = useState(false);
+  const [addFeedbackContext, setAddFeedbackContext] = useState<{
+    type: 'global' | 'line';
+    file?: string;
+    line?: number;
+    side?: 'old' | 'new';
+  }>({ type: 'global' });
 
   useEffect(() => {
     if (tasks.length > 0 && !selectedTaskId && !isTasksLoading && sidebarTab === 'tasks') {
@@ -145,6 +158,41 @@ export const ReviewView: React.FC = () => {
     return await pushGitHubFeedback(selectedFeedbackId);
   };
 
+  const handleAddGlobalFeedback = () => {
+    setAddFeedbackContext({ type: 'global' });
+    setIsAddFeedbackModalOpen(true);
+  };
+
+  const handleAddLineFeedback = (file: DiffFile, line: number, side: 'old' | 'new') => {
+    setAddFeedbackContext({
+      type: 'line',
+      file: file.name || file.new_path || 'unknown',
+      line,
+      side,
+    });
+    setIsAddFeedbackModalOpen(true);
+  };
+
+  const handleCreateFeedback = (
+    title: string,
+    impact: 'blocking' | 'nice_to_have' | 'nitpick',
+    content: string
+  ) => {
+    if (!reviewId) return;
+
+    createFeedback({
+      review_id: reviewId,
+      title,
+      content,
+      impact,
+      file_path: addFeedbackContext.type === 'line' ? addFeedbackContext.file : undefined,
+      line_number: addFeedbackContext.type === 'line' ? addFeedbackContext.line : undefined,
+      side: addFeedbackContext.type === 'line' ? addFeedbackContext.side : undefined,
+    });
+
+    setIsAddFeedbackModalOpen(false);
+  };
+
   // Use delayed loading to prevent flashing
   const shouldShowSkeleton = useDelayedLoading(
     isReviewLoading || (!!reviewId && !runId && !reviewError)
@@ -182,6 +230,7 @@ export const ReviewView: React.FC = () => {
         onSelectTask={selectTask}
         onSelectFeedback={selectFeedback}
         onOpenExportModal={() => setIsModalOpen(true)}
+        onAddGlobalFeedback={handleAddGlobalFeedback}
       />
 
       <div className="bg-bg-primary relative flex min-w-0 flex-1 flex-col">
@@ -226,6 +275,7 @@ export const ReviewView: React.FC = () => {
                   onTabChange={setActiveTab}
                   onStatusChange={handleStatusChange}
                   isUpdatingStatus={isUpdatingStatus}
+                  onAddFeedback={handleAddLineFeedback}
                 />
               ) : parsedDiff ? (
                 <div className="flex flex-1 flex-col">
@@ -235,6 +285,7 @@ export const ReviewView: React.FC = () => {
                       files={parsedDiff.files || []}
                       selectedFile={selectedFile}
                       onSelectFile={selectFile}
+                      onAddFeedback={handleAddLineFeedback}
                     />
                   </div>
                 </div>
@@ -258,6 +309,14 @@ export const ReviewView: React.FC = () => {
         isOpen={isPushModalOpen}
         onClose={() => setIsPushModalOpen(false)}
         onConfirm={handleConfirmPush}
+      />
+      
+      <AddFeedbackModal
+        isOpen={isAddFeedbackModalOpen}
+        onClose={() => setIsAddFeedbackModalOpen(false)}
+        onAdd={handleCreateFeedback}
+        context={addFeedbackContext}
+        isAdding={isCreatingFeedback}
       />
     </div>
   );

@@ -23,6 +23,7 @@ interface TaskDetailProps {
   onTabChange: (tab: 'diff' | 'description' | 'diagram') => void;
   onStatusChange?: (status: string) => void;
   isUpdatingStatus?: boolean;
+  onAddFeedback?: (file: DiffFile, line: number, side: 'old' | 'new') => void;
 }
 
 type IconComponent = React.ComponentType<{ size: number; className?: string }>;
@@ -36,6 +37,7 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
   onTabChange,
   onStatusChange,
   isUpdatingStatus,
+  onAddFeedback,
 }) => {
   if (!task) {
     return (
@@ -218,6 +220,7 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
               selectedFile={selectedFile}
               onSelectFile={onSelectFile}
               highlightedHunks={highlightedHunks}
+              onAddFeedback={onAddFeedback}
             />
           </div>
         )}
