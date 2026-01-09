@@ -56,6 +56,9 @@ importers:
       react-dom:
         specifier: ^19.2.3
         version: 19.2.3(react@19.2.3)
+      react-markdown:
+        specifier: 9.1.0
+        version: 9.1.0(@types/react@19.2.7)(react@19.2.3)
       zustand:
         specifier: ^5.0.9
         version: 5.0.9(@types/react@19.2.7)(react@19.2.3)(use-sync-external-store@1.6.0(react@19.2.3))
@@ -123,9 +126,6 @@ importers:
       prettier-plugin-tailwindcss:
         specifier: ^0.7.2
         version: 0.7.2(prettier@3.7.4)
-      react-markdown:
-        specifier: 9.1.0
-        version: 9.1.0(@types/react@19.2.7)(react@19.2.3)
       tailwindcss:
         specifier: ^4.1.18
         version: 4.1.18
