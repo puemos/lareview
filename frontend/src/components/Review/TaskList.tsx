@@ -1,9 +1,9 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  SPRING_TIGHT, 
-  SHARED_LAYOUT_TRANSITION, 
-  WHILE_TAP_SCALE 
+import {
+  SPRING_TIGHT,
+  SHARED_LAYOUT_TRANSITION,
+  WHILE_TAP_SCALE,
 } from '../../constants/animations';
 import type { ReviewTask } from '../../types';
 import { ICONS } from '../../constants/icons';
@@ -110,24 +110,24 @@ export const TaskList: React.FC<TaskListProps> = ({
                   transition={SHARED_LAYOUT_TRANSITION}
                 />
               )}
-            <div className="flex w-full min-w-0 items-center gap-2.5">
-              <div className="flex-shrink-0">
-                <Tooltip content={`Risk: ${task.stats.risk.toUpperCase()}`}>
-                  <div className="cursor-help">
-                    <RiskIcon size={14} className={riskColor} />
-                  </div>
-                </Tooltip>
+              <div className="flex w-full min-w-0 items-center gap-2.5">
+                <div className="flex-shrink-0">
+                  <Tooltip content={`Risk: ${task.stats.risk.toUpperCase()}`}>
+                    <div className="cursor-help">
+                      <RiskIcon size={14} className={riskColor} />
+                    </div>
+                  </Tooltip>
+                </div>
+                <h3
+                  className={`flex-1 truncate text-xs leading-relaxed font-medium ${
+                    selectedTaskId === task.id
+                      ? 'text-text-primary'
+                      : 'text-text-secondary group-hover:text-text-primary'
+                  } ${task.status === 'done' ? 'text-text-disabled line-through opacity-50' : ''}`}
+                >
+                  {task.title}
+                </h3>
               </div>
-              <h3
-                className={`flex-1 truncate text-xs leading-relaxed font-medium ${
-                  selectedTaskId === task.id
-                    ? 'text-text-primary'
-                    : 'text-text-secondary group-hover:text-text-primary'
-                } ${task.status === 'done' ? 'text-text-disabled line-through opacity-50' : ''}`}
-              >
-                {task.title}
-              </h3>
-            </div>
             </motion.button>
           );
         })}

@@ -121,11 +121,9 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
     return { additions, deletions };
   }, [filteredFiles]);
 
+  // ... (existing imports)
 
-
-// ... (existing imports)
-
-// ... (inside TaskDetail component)
+  // ... (inside TaskDetail component)
 
   const getRiskIcon = (risk: string) => {
     switch (risk) {
@@ -161,7 +159,9 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
       <div className="border-border bg-bg-secondary/50 z-10 border-b px-4 py-3">
         <div className="mb-3 flex items-center justify-between gap-3">
           <Tooltip content={`Risk Level: ${task.stats.risk.toUpperCase()}`}>
-            <div className={`flex items-center gap-1.5 rounded-full bg-bg-surface px-2 py-1 text-[10px] font-medium tracking-wider ${riskColor} border border-border/50`}>
+            <div
+              className={`bg-bg-surface flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-medium tracking-wider ${riskColor} border-border/50 border`}
+            >
               <RiskIcon size={12} weight="fill" />
               {task.stats.risk}
             </div>

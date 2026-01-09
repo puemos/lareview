@@ -96,16 +96,16 @@ export const PushToGitHubModal: React.FC<PushToGitHubModalProps> = ({
         </div>
 
         <div className="p-6">
-          <div className="mb-6 flex items-start gap-4 rounded-lg bg-blue-500/5 p-4 border border-blue-500/10">
-             <div className="text-accent mt-0.5">
-               <ICONS.ICON_INFO size={20} />
-             </div>
-             <div>
-               <h4 className="text-text-primary mb-1 text-sm font-medium">Confirmation</h4>
-               <p className="text-text-secondary text-xs leading-relaxed">
-                 Are you sure you want to push this feedback as a comment to the linked GitHub PR?
-               </p>
-             </div>
+          <div className="mb-6 flex items-start gap-4 rounded-lg border border-blue-500/10 bg-blue-500/5 p-4">
+            <div className="text-accent mt-0.5">
+              <ICONS.ICON_INFO size={20} />
+            </div>
+            <div>
+              <h4 className="text-text-primary mb-1 text-sm font-medium">Confirmation</h4>
+              <p className="text-text-secondary text-xs leading-relaxed">
+                Are you sure you want to push this feedback as a comment to the linked GitHub PR?
+              </p>
+            </div>
           </div>
 
           {error && (

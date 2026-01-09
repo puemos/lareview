@@ -5,11 +5,7 @@ import { Select } from '../Common/Select';
 interface AddFeedbackModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (
-    title: string,
-    impact: 'blocking' | 'nice_to_have' | 'nitpick',
-    content: string
-  ) => void;
+  onAdd: (title: string, impact: 'blocking' | 'nice_to_have' | 'nitpick', content: string) => void;
   context: {
     type: 'global' | 'line';
     file?: string;
@@ -65,17 +61,17 @@ export const AddFeedbackModal: React.FC<AddFeedbackModalProps> = ({
           <h2 className="text-text-primary text-sm font-medium">Add Feedback</h2>
           <button
             onClick={onClose}
-            className="text-text-tertiary hover:text-text-primary transition-colors cursor-pointer"
+            className="text-text-tertiary hover:text-text-primary cursor-pointer transition-colors"
           >
             <ICONS.ACTION_CLOSE size={16} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 p-4">
           {context.type !== 'global' && (
             <div className="bg-bg-secondary/50 border-border/50 rounded border p-2">
-              <div className="text-xs text-text-tertiary mb-1">Context</div>
-              <div className="flex items-center gap-2 text-sm text-text-primary font-mono">
+              <div className="text-text-tertiary mb-1 text-xs">Context</div>
+              <div className="text-text-primary flex items-center gap-2 font-mono text-sm">
                 <ICONS.TAB_CHANGES size={14} />
                 <span>
                   {context.file}:{context.line}
@@ -85,19 +81,19 @@ export const AddFeedbackModal: React.FC<AddFeedbackModalProps> = ({
           )}
 
           <div className="space-y-1">
-            <label className="text-xs text-text-secondary font-medium">Title</label>
+            <label className="text-text-secondary text-xs font-medium">Title</label>
             <input
               type="text"
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="Brief summary of the issue"
-              className="w-full rounded border border-border bg-bg-tertiary px-3 py-2 text-sm text-text-primary placeholder:text-text-disabled focus:border-brand focus:outline-none"
+              className="border-border bg-bg-tertiary text-text-primary placeholder:text-text-disabled focus:border-brand w-full rounded border px-3 py-2 text-sm focus:outline-none"
               autoFocus
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs text-text-secondary font-medium">Impact</label>
+            <label className="text-text-secondary text-xs font-medium">Impact</label>
             <Select
               value={impact}
               onChange={val => setImpact(val as typeof impact)}
@@ -107,12 +103,12 @@ export const AddFeedbackModal: React.FC<AddFeedbackModalProps> = ({
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs text-text-secondary font-medium">Details</label>
+            <label className="text-text-secondary text-xs font-medium">Details</label>
             <textarea
               value={content}
               onChange={e => setContent(e.target.value)}
               placeholder="Describe the issue in detail (Markdown supported)"
-              className="w-full rounded border border-border bg-bg-tertiary px-3 py-2 text-sm text-text-primary placeholder:text-text-disabled focus:border-brand focus:outline-none min-h-[120px] resize-y"
+              className="border-border bg-bg-tertiary text-text-primary placeholder:text-text-disabled focus:border-brand min-h-[120px] w-full resize-y rounded border px-3 py-2 text-sm focus:outline-none"
             />
           </div>
 
@@ -120,14 +116,14 @@ export const AddFeedbackModal: React.FC<AddFeedbackModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-bg-secondary rounded transition-colors cursor-pointer"
+              className="text-text-secondary hover:text-text-primary hover:bg-bg-secondary cursor-pointer rounded px-3 py-1.5 text-xs font-medium transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!title.trim() || !content.trim() || isAdding}
-              className="px-3 py-1.5 text-xs font-medium text-brand-fg bg-brand hover:bg-brand/90 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
+              className="text-brand-fg bg-brand hover:bg-brand/90 flex cursor-pointer items-center gap-2 rounded px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isAdding ? 'Adding...' : 'Add Feedback'}
             </button>

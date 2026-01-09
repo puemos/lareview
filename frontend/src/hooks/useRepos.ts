@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { useTauri } from '../hooks/useTauri';
 import { queryKeys } from '../lib/query-keys';
 
@@ -21,11 +22,17 @@ export function useRepos() {
 
   const addRepo = useMutation({
     mutationFn: (path: string) => linkRepo(path),
-    onSuccess: () => {
+    onSuccess: (_result, path) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.repos });
+      toast('Repository Linked', {
+        description: `${path.split('/').pop()} is now linked.`,
+      });
     },
     onError: (error: Error) => {
       console.error('Failed to add repo:', error);
+      toast('Failed to link repository', {
+        description: error.message,
+      });
     },
   });
 
@@ -42,13 +49,21 @@ export function useRepos() {
 
       return { previousRepos };
     },
-    onError: (_error, _repoId, context) => {
+    onError: (error, _repoId, context) => {
       if (context?.previousRepos) {
         queryClient.setQueryData(queryKeys.repos, context.previousRepos);
       }
+      toast('Failed to unlink repository', {
+        description: error instanceof Error ? error.message : String(error),
+      });
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.repos });
+    },
+    onSuccess: () => {
+      toast('Repository Unlinked', {
+        description: 'The repository has been removed.',
+      });
     },
   });
 

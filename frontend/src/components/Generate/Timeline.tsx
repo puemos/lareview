@@ -60,7 +60,8 @@ export const Timeline: React.FC<TimelineProps> = ({ messages }) => {
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const element = e.currentTarget;
     // Use a slightly larger tolerance to make "sticking" easier
-    const atBottom = Math.abs(element.scrollHeight - element.scrollTop - element.clientHeight) < 100;
+    const atBottom =
+      Math.abs(element.scrollHeight - element.scrollTop - element.clientHeight) < 100;
     setIsAtBottom(atBottom);
   }, []);
 

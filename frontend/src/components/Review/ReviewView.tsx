@@ -20,7 +20,7 @@ import { useDelayedLoading } from '../../hooks/useDelayedLoading';
 import type { ReviewTask, Feedback } from '../../types';
 import { ReviewViewSkeleton } from './ReviewViewSkeleton';
 import { AddFeedbackModal } from './AddFeedbackModal';
-import type {  DiffFile } from '../../types';
+import type { DiffFile } from '../../types';
 
 export const ReviewView: React.FC = () => {
   const selectedFile = useAppStore(state => state.selectedFile);
@@ -311,13 +311,13 @@ export const ReviewView: React.FC = () => {
         feedbacks={feedbacks}
         isGitHubAvailable={isGitHubReview}
       />
-      
+
       <PushToGitHubModal
         isOpen={isPushModalOpen}
         onClose={() => setIsPushModalOpen(false)}
         onConfirm={handleConfirmPush}
       />
-      
+
       <AddFeedbackModal
         isOpen={isAddFeedbackModalOpen}
         onClose={() => setIsAddFeedbackModalOpen(false)}

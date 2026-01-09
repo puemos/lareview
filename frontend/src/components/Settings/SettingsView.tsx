@@ -22,6 +22,7 @@ import type {
   EditorConfig,
   CliStatus,
 } from '../../types';
+import { toast } from 'sonner';
 import { useTauri } from '../../hooks/useTauri';
 import { useDelayedLoading } from '../../hooks/useDelayedLoading';
 import { GitHubSkeleton, CliSkeleton, EditorSkeleton, AgentsSkeleton } from './SettingsSkeleton';
@@ -137,17 +138,28 @@ const GitHubSettings: React.FC = () => {
   const [status, setStatus] = useState<GitHubStatusType | null>(null);
   const [isChecking, setIsChecking] = useState(true);
 
-  const checkStatus = useCallback(async () => {
-    setIsChecking(true);
-    try {
-      const result = await getGitHubStatus();
-      setStatus(result);
-    } catch (error) {
-      console.error('Failed to check GitHub status:', error);
-    } finally {
-      setIsChecking(false);
-    }
-  }, [getGitHubStatus]);
+  const checkStatus = useCallback(
+    async (manual = false) => {
+      setIsChecking(true);
+      try {
+        const result = await getGitHubStatus();
+        setStatus(result);
+        if (manual === true) {
+          toast('Status Refreshed', {
+            description: 'GitHub connection status updated.',
+          });
+        }
+      } catch (error) {
+        console.error('Failed to check GitHub status:', error);
+        toast('Failed to refresh status', {
+          description: error instanceof Error ? error.message : String(error),
+        });
+      } finally {
+        setIsChecking(false);
+      }
+    },
+    [getGitHubStatus]
+  );
 
   useEffect(() => {
     checkStatus();
@@ -233,7 +245,7 @@ const GitHubSettings: React.FC = () => {
 
             <div className="pt-2">
               <button
-                onClick={checkStatus}
+                onClick={() => checkStatus(true)}
                 disabled={isChecking}
                 className="bg-bg-tertiary text-text-primary hover:bg-bg-secondary border-border inline-flex items-center gap-2 rounded-md border px-4 py-2 text-xs font-medium shadow-sm transition-colors disabled:opacity-50"
               >
@@ -334,8 +346,14 @@ const CliSettings: React.FC = () => {
     try {
       await installCli();
       await fetchStatus();
+      toast('CLI Tools Installed', {
+        description: 'The lareview command is now available in your terminal.',
+      });
     } catch (error) {
       setInstallError(error as string);
+      toast('Installation Failed', {
+        description: String(error),
+      });
     } finally {
       setIsInstalling(false);
     }
@@ -455,8 +473,15 @@ const EditorSettings: React.FC = () => {
     try {
       await updateEditorConfig(editorId);
       setConfig({ preferred_editor_id: editorId });
+      const editorLabel = editors.find(e => e.id === editorId)?.label;
+      toast('Editor Updated', {
+        description: editorLabel ? `${editorLabel} set as default.` : 'Default editor updated.',
+      });
     } catch (error) {
       console.error('Failed to update editor preference:', error);
+      toast('Failed to update editor', {
+        description: error instanceof Error ? error.message : String(error),
+      });
     }
   };
 
@@ -583,8 +608,14 @@ const AgentsSettings: React.FC = () => {
       await fetchAgents();
       setEditingId(null);
       setSavedId(agentId);
+      toast('Agent Updated', {
+        description: 'Configuration saved successfully.',
+      });
     } catch (error) {
       console.error('Failed to update agent:', error);
+      toast('Failed to update agent', {
+        description: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setSavingId(null);
     }
@@ -653,7 +684,7 @@ const AgentsSettings: React.FC = () => {
                 {editingId !== agent.id && (
                   <div className="flex items-center gap-2">
                     {savedId === agent.id && (
-                      <span className="text-status-done text-xs font-medium animate-in fade-in zoom-in duration-300">
+                      <span className="text-status-done animate-in fade-in zoom-in text-xs font-medium duration-300">
                         Saved!
                       </span>
                     )}
@@ -678,9 +709,7 @@ const AgentsSettings: React.FC = () => {
                         <input
                           type="text"
                           value={editState.path}
-                          onChange={e =>
-                            setEditState(prev => ({ ...prev, path: e.target.value }))
-                          }
+                          onChange={e => setEditState(prev => ({ ...prev, path: e.target.value }))}
                           placeholder="e.g. /usr/local/bin/agent-bin"
                           className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand w-full rounded-md border px-3 py-2 font-mono text-xs transition-all focus:outline-none"
                           autoFocus
@@ -694,9 +723,7 @@ const AgentsSettings: React.FC = () => {
                         <input
                           type="text"
                           value={editState.args}
-                          onChange={e =>
-                            setEditState(prev => ({ ...prev, args: e.target.value }))
-                          }
+                          onChange={e => setEditState(prev => ({ ...prev, args: e.target.value }))}
                           placeholder="e.g. --model=gpt-4 --temperature=0.7"
                           className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand w-full rounded-md border px-3 py-2 font-mono text-xs transition-all focus:outline-none"
                         />

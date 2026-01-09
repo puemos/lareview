@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { ConfirmationModal } from '../Common/ConfirmationModal';
@@ -56,9 +57,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) =
         onViewChange('generate');
       }
       setReviewToDelete(null);
+      toast('Review Deleted', {
+        description: 'The review and all associated data were removed.',
+      });
     } catch (err) {
       console.error('Failed to delete review:', err);
-      setError(err instanceof Error ? err.message : String(err));
+      toast('Failed to delete review', {
+        description: err instanceof Error ? err.message : String(err),
+      });
       setReviewToDelete(null);
     }
   };

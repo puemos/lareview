@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { useTauri } from '../hooks/useTauri';
 import { queryKeys } from '../lib/query-keys';
 import type { ReviewTask } from '../types';
@@ -43,14 +44,22 @@ export function useTasks(runId: string | null): UseTasksResult & {
 
       return { previousTasks };
     },
-    onError: (_error, _vars, context) => {
+    onError: (error, _vars, context) => {
       if (context?.previousTasks) {
         queryClient.setQueryData(queryKey, context.previousTasks);
       }
+      toast('Failed to update task', {
+        description: error instanceof Error ? error.message : String(error),
+      });
     },
-    onSettled: () => {
+    onSettled: (_data, _error, { status }) => {
       if (runId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.tasks(runId) });
+      }
+      if (!_error) {
+        toast('Task Updated', {
+          description: `Task marked as ${status.replace('_', ' ')}.`,
+        });
       }
     },
   });

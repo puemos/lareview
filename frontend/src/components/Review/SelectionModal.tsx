@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ICONS } from '../../constants/icons';
+import { toast } from 'sonner';
 import type { ReviewTask, Feedback } from '../../types';
 import { useTauri } from '../../hooks/useTauri';
 
@@ -76,6 +77,9 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
         setResultUrl(result);
       } else if (format === 'markdown') {
         onClose();
+        toast('Copied to Clipboard', {
+          description: 'Review markdown is ready to paste.',
+        });
       }
     } catch (e) {
       setError(String(e));

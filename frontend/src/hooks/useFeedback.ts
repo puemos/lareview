@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { useTauri } from '../hooks/useTauri';
 import { queryKeys } from '../lib/query-keys';
 import type { Feedback, Comment } from '../types';
@@ -83,30 +84,54 @@ export function useFeedback(reviewId: string | null): UseFeedbackResult {
           queryKey: queryKeys.feedbackByReview(reviewId),
         });
       }
+      toast('Feedback Created', {
+        description: 'Your feedback has been saved successfully.',
+      });
+    },
+    onError: error => {
+      toast('Failed to create feedback', {
+        description: error instanceof Error ? error.message : String(error),
+      });
     },
   });
 
   const statusMutation = useMutation({
     mutationFn: ({ feedbackId, status }: { feedbackId: string; status: Feedback['status'] }) =>
       updateFeedbackStatus(feedbackId, status),
-    onSuccess: () => {
+    onSuccess: (_result, { status }) => {
       if (reviewId) {
         queryClient.invalidateQueries({
           queryKey: queryKeys.feedbackByReview(reviewId),
         });
       }
+      toast('Status Updated', {
+        description: `Feedback status set to ${status.replace('_', ' ')}.`,
+      });
+    },
+    onError: error => {
+      toast('Failed to update status', {
+        description: error instanceof Error ? error.message : String(error),
+      });
     },
   });
 
   const impactMutation = useMutation({
     mutationFn: ({ feedbackId, impact }: { feedbackId: string; impact: Feedback['impact'] }) =>
       updateFeedbackImpact(feedbackId, impact),
-    onSuccess: () => {
+    onSuccess: (_result, { impact }) => {
       if (reviewId) {
         queryClient.invalidateQueries({
           queryKey: queryKeys.feedbackByReview(reviewId),
         });
       }
+      toast('Impact Updated', {
+        description: `Feedback impact set to ${impact.replace('_', ' ')}.`,
+      });
+    },
+    onError: error => {
+      toast('Failed to update impact', {
+        description: error instanceof Error ? error.message : String(error),
+      });
     },
   });
 
@@ -118,6 +143,14 @@ export function useFeedback(reviewId: string | null): UseFeedbackResult {
           queryKey: queryKeys.feedbackByReview(reviewId),
         });
       }
+      toast('Feedback Deleted', {
+        description: 'The feedback item has been removed.',
+      });
+    },
+    onError: error => {
+      toast('Failed to delete feedback', {
+        description: error instanceof Error ? error.message : String(error),
+      });
     },
   });
 
@@ -160,6 +193,14 @@ export function useAddComment() {
     onSuccess: (_result, { feedbackId }) => {
       queryClient.invalidateQueries({
         queryKey: ['feedback-comments', feedbackId],
+      });
+      toast('Comment Added', {
+        description: 'Your reply has been posted successfully.',
+      });
+    },
+    onError: error => {
+      toast('Failed to add comment', {
+        description: error instanceof Error ? error.message : String(error),
       });
     },
   });

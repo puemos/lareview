@@ -333,7 +333,7 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
       </div>
 
       <div className="border-border border-t p-3">
-        <div className="relative rounded-lg border border-border bg-bg-secondary shadow-sm transition-all focus-within:border-brand/50 focus-within:ring-1 focus-within:ring-brand/50">
+        <div className="border-border bg-bg-secondary focus-within:border-brand/50 focus-within:ring-brand/50 relative rounded-lg border shadow-sm transition-all focus-within:ring-1">
           <textarea
             value={replyText}
             onChange={e => setReplyText(e.target.value)}
@@ -343,19 +343,19 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
               }
             }}
             placeholder="Write a reply..."
-            className="w-full resize-none bg-transparent px-3 py-2.5 text-xs text-text-primary placeholder:text-text-disabled focus:outline-none"
+            className="text-text-primary placeholder:text-text-disabled w-full resize-none bg-transparent px-3 py-2.5 text-xs focus:outline-none"
             rows={Math.max(1, Math.min(5, replyText.split('\n').length))}
             style={{ minHeight: '36px' }}
             disabled={isAddingComment}
           />
-          <div className="flex items-center justify-between px-2 pb-2 pt-1">
-            <span className="px-1 text-[10px] text-text-disabled opacity-0 transition-opacity focus-within:opacity-100 group-focus-within:opacity-100">
+          <div className="flex items-center justify-between px-2 pt-1 pb-2">
+            <span className="text-text-disabled px-1 text-[10px] opacity-0 transition-opacity group-focus-within:opacity-100 focus-within:opacity-100">
               {replyText.length > 0 ? '⌘ + Enter to send' : ''}
             </span>
             <button
               onClick={handleAddComment}
               disabled={!replyText.trim() || isAddingComment}
-              className="rounded bg-brand px-2.5 py-1 text-[10px] font-medium text-brand-fg transition-all hover:bg-brand/90 disabled:opacity-50"
+              className="bg-brand text-brand-fg hover:bg-brand/90 rounded px-2.5 py-1 text-[10px] font-medium transition-all disabled:opacity-50"
             >
               {isAddingComment ? 'Sending...' : 'Reply'}
             </button>

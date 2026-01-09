@@ -18,7 +18,6 @@ interface AgentConfigPanelProps {
   isDiffValid: boolean;
 }
 
-
 export const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
   agents,
   repos,
@@ -81,7 +80,7 @@ export const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
           onClick={isGenerating ? onStop : onGenerate}
           className={`shadow-custom relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-md py-2.5 text-xs font-bold transition-all ${
             isGenerating
-              ? 'bg-status-ignored/10 text-status-ignored border-status-ignored/20 hover:bg-status-ignored/20 border cursor-pointer'
+              ? 'bg-status-ignored/10 text-status-ignored border-status-ignored/20 hover:bg-status-ignored/20 cursor-pointer border'
               : 'bg-brand text-bg-primary hover:brightness-110'
           }`}
         >
@@ -94,16 +93,16 @@ export const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
               transition={{
                 duration: 4,
                 repeat: Infinity,
-                ease: "linear"
+                ease: 'linear',
               }}
               style={{
-                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.05), rgba(168,85,247,0.15), rgba(255,255,255,0.05), transparent)',
+                background:
+                  'linear-gradient(90deg, transparent, rgba(255,255,255,0.05), rgba(168,85,247,0.15), rgba(255,255,255,0.05), transparent)',
                 backgroundSize: '200% 100%',
               }}
               className="absolute inset-0 z-0"
             />
           )}
-
 
           <div className="relative z-10 flex items-center justify-center gap-2">
             <motion.div
@@ -121,9 +120,9 @@ export const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
               <svg width="14" height="14" viewBox="0 0 24 24" className="fill-current">
                 <motion.path
                   animate={{
-                    d: isGenerating 
-                      ? "M6 6 L18 6 L18 18 L6 18 Z" // Square (Stop)
-                      : "M8 5 L19 12 L8 19 Z"     // Triangle (Play)
+                    d: isGenerating
+                      ? 'M6 6 L18 6 L18 18 L6 18 Z' // Square (Stop)
+                      : 'M8 5 L19 12 L8 19 Z', // Triangle (Play)
                   }}
                   transition={{
                     type: 'spring',
@@ -138,7 +137,7 @@ export const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
 
           {/* Sparkles */}
           {isGenerating && <Sparkles />}
-          
+
           {/* Radial pulse */}
           {isGenerating && (
             <motion.div
@@ -177,7 +176,7 @@ const Sparkles = () => {
             repeat: Infinity,
             delay: Math.random() * 2,
           }}
-          className="bg-current absolute h-1 w-1 rounded-full"
+          className="absolute h-1 w-1 rounded-full bg-current"
           style={{
             left: `${10 + Math.random() * 80}%`,
             top: `${10 + Math.random() * 80}%`,
@@ -193,8 +192,3 @@ const PlayIcon = ({ size }: { size: number }) => (
     <path d="M8 5v14l11-7z" />
   </svg>
 );
-
-
-
-
-

@@ -146,7 +146,7 @@ function App() {
                 description: '!text-text-secondary !text-[11px]',
               },
               className:
-                '!shadow-custom !bg-bg-tertiary !text-text-primary !rounded !border !border-border !py-3',
+                '!shadow-custom !bg-bg-tertiary !text-text-primary !rounded-lg !border !border-border !py-3',
             }}
           />
 

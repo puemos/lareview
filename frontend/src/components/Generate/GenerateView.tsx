@@ -102,11 +102,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
 
   // Auto-switch to diff mode on valid pasting
   useEffect(() => {
-    if (
-      viewMode === 'raw' &&
-      isDiffValid &&
-      diffText !== lastAutoSwitchedTextRef.current
-    ) {
+    if (viewMode === 'raw' && isDiffValid && diffText !== lastAutoSwitchedTextRef.current) {
       setViewMode('diff');
       lastAutoSwitchedTextRef.current = diffText;
     }
@@ -260,6 +256,9 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
       setIsGenerating(false);
       isGeneratingRef.current = false;
       setIsGeneratingStore(false);
+      toast('Generation Complete', {
+        description: 'Your review plan is ready.',
+      });
       _onNavigate('review');
     } catch (error: unknown) {
       console.error('Failed to generate review:', error);
@@ -275,7 +274,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
         });
       } else {
         addProgressMessage('error', `Failed to generate review: ${error}`);
-        toast.error('Generation failed', {
+        toast('Generation failed', {
           description: String(error),
         });
       }

@@ -270,7 +270,6 @@ export const useTauri = () => {
     []
   );
 
-
   const loadTasks = useCallback(async (runId?: string): Promise<ReviewTask[]> => {
     return invoke('load_tasks', { runId });
   }, []);
@@ -446,9 +445,12 @@ export const useTauri = () => {
     return invoke('unlink_repo', { repoId });
   }, []);
 
-  const updateAgentConfig = useCallback(async (id: string, path: string, args?: string[]): Promise<void> => {
-    return invoke('update_agent_config', { id, path, args });
-  }, []);
+  const updateAgentConfig = useCallback(
+    async (id: string, path: string, args?: string[]): Promise<void> => {
+      return invoke('update_agent_config', { id, path, args });
+    },
+    []
+  );
 
   const selectRepoFolder = useCallback(async (): Promise<string | null> => {
     const result = await open({
@@ -565,4 +567,3 @@ export const useTauri = () => {
     }, []),
   };
 };
-
