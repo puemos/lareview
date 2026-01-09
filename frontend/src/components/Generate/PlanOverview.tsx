@@ -1,21 +1,17 @@
 import React from 'react';
 import { ListChecks, CaretDown, CaretUp } from '@phosphor-icons/react';
 import clsx from 'clsx';
-
-interface PlanEntry {
-  content: string;
-  status?: string;
-}
+import { PlanSteps, PlanStep } from './PlanSteps';
 
 interface PlanOverviewProps {
-  items: PlanEntry[];
+  items: PlanStep[];
   isExpanded: boolean;
   onToggle: () => void;
 }
 
 export const PlanOverview: React.FC<PlanOverviewProps> = ({ items, isExpanded, onToggle }) => {
   return (
-    <div className="border-border bg-bg-primary/30 flex min-h-0 flex-col border-b">
+    <div className="border-border bg-bg-primary/30 flex min-h-0 flex-col">
       <div
         role="button"
         tabIndex={0}
@@ -50,34 +46,6 @@ export const PlanOverview: React.FC<PlanOverviewProps> = ({ items, isExpanded, o
           </div>
         </div>
       </div>
-    </div>
-  );
-};
-
-interface PlanStepsProps {
-  steps: PlanEntry[];
-}
-
-const PlanSteps: React.FC<PlanStepsProps> = ({ steps }) => {
-  if (steps.length === 0) {
-    return (
-      <div className="text-text-disabled py-8 text-center text-xs opacity-50">
-        No plan items yet
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      {steps.map((step, index) => (
-        <div
-          key={index}
-          className="bg-bg-secondary/50 hover:bg-bg-secondary flex items-start gap-2 rounded-md p-2 transition-colors"
-        >
-          <div className="bg-brand mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" />
-          <span className="text-text-secondary text-xs leading-relaxed">{step.content}</span>
-        </div>
-      ))}
     </div>
   );
 };

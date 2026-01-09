@@ -36,6 +36,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   const [planItems, setPlanItems] = useState<string[]>([]);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isPlanExpanded, setIsPlanExpanded] = useState(false);
+  const currentTaskTitleRef = React.useRef<string | null>(null);
 
   const { generateReview, parseDiff, fetchGithubPR } = useTauri();
   const { data: agents = [] } = useAgents();
@@ -47,6 +48,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   const setParsedDiff = useAppStore(state => state.setParsedDiff);
   const setIsGeneratingStore = useAppStore(state => state.setIsGenerating);
   const handleServerUpdate = useAppStore(state => state.handleServerUpdate);
+  const updatePlanItemStatus = useAppStore(state => state.updatePlanItemStatus);
   const plan = useAppStore(state => state.plan);
 
   const addProgressMessage = useAppStore(state => state.addProgressMessage);
@@ -207,12 +209,17 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
             break;
           case 'TaskStarted': {
             const title = (payload.data as { title: string }).title;
+            currentTaskTitleRef.current = title;
             addProgressMessage('task_started', title);
-            setPlanItems(prev => [...prev, title]);
+            updatePlanItemStatus(title, 'in_progress');
+            setPlanItems(prev => (prev.includes(title) ? prev : [...prev, title]));
             break;
           }
           case 'TaskCompleted':
             addProgressMessage('task_added', `Task completed`);
+            if (currentTaskTitleRef.current) {
+              updatePlanItemStatus(currentTaskTitleRef.current, 'completed');
+            }
             break;
           case 'Completed':
             addProgressMessage('completed', 'Review generation complete!');
@@ -305,13 +312,20 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   }, [setDiffTextStore, setParsedDiff, setPendingSource]);
 
   const planItemsToRender = useMemo(() => {
-    if (plan && plan.entries.length > 0) {
-      return plan.entries.map(e => ({
+    const items =
+      plan?.entries.map(e => ({
         content: e.content,
         status: e.status || 'pending',
-      }));
-    }
-    return planItems.map(s => ({ content: s, status: 'pending' }));
+      })) || [];
+
+    // Add any ad-hoc tasks that aren't in the plan
+    planItems.forEach(content => {
+      if (!items.find(i => i.content === content)) {
+        items.push({ content, status: 'completed' });
+      }
+    });
+
+    return items;
   }, [plan, planItems]);
 
   useEffect(() => {

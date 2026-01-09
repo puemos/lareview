@@ -46,7 +46,7 @@ export const Timeline: React.FC<TimelineProps> = ({ messages }) => {
       rafIdRef.current = window.setTimeout(() => {
         if (rowVirtualizer) {
           try {
-            rowVirtualizer.scrollToIndex(visibleMessages.length - 1);
+            rowVirtualizer.scrollToIndex(visibleMessages.length - 1, { align: 'end' });
           } catch {
             // ignore scroll errors
           }
@@ -58,7 +58,8 @@ export const Timeline: React.FC<TimelineProps> = ({ messages }) => {
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const element = e.currentTarget;
-    const atBottom = Math.abs(element.scrollHeight - element.scrollTop - element.clientHeight) < 50;
+    // Use a slightly larger tolerance to make "sticking" easier
+    const atBottom = Math.abs(element.scrollHeight - element.scrollTop - element.clientHeight) < 100;
     setIsAtBottom(atBottom);
   }, []);
 
@@ -114,7 +115,7 @@ export const Timeline: React.FC<TimelineProps> = ({ messages }) => {
       {!isAtBottom && visibleMessages.length > 0 && (
         <button
           onClick={() => {
-            rowVirtualizer.scrollToIndex(visibleMessages.length - 1);
+            rowVirtualizer.scrollToIndex(visibleMessages.length - 1, { align: 'end' });
             setIsAtBottom(true);
           }}
           className="bg-bg-tertiary border-border text-text-secondary hover:text-text-primary animate-fade-in absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 transform items-center gap-2 rounded-full border px-3 py-1.5 font-mono text-[10px] shadow-xl transition-all"

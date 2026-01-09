@@ -66,6 +66,7 @@ interface AppStore {
   handleServerUpdate: (update: SessionUpdate | Plan) => void;
   clearProgressMessages: () => void;
   setPendingSource: (source: ReviewSource | null) => void;
+  updatePlanItemStatus: (content: string, status: string) => void;
   reset: () => void;
 }
 
@@ -314,6 +315,15 @@ export const useAppStore = create<AppStore>()(
         clearProgressMessages: () => set({ progressMessages: [] }),
 
         setPendingSource: source => set({ pendingSource: source }),
+
+        updatePlanItemStatus: (content, status) =>
+          set(state => {
+            if (!state.plan) return {};
+            const newEntries = state.plan.entries.map(entry =>
+              entry.content === content ? { ...entry, status } : entry
+            );
+            return { plan: { ...state.plan, entries: newEntries } };
+          }),
 
         reset: () =>
           set({
