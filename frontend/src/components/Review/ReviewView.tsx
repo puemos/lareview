@@ -13,6 +13,7 @@ import { EmptyState } from './EmptyState';
 import { ErrorState } from './ErrorState';
 import { SelectionModal, ExportFormat } from './SelectionModal';
 import { PushToGitHubModal } from './PushToGitHubModal';
+import { ConfirmationModal } from '../Common/ConfirmationModal';
 import { useReviews } from '../../hooks/useReviews';
 import { useTauri } from '../../hooks/useTauri';
 import { useDelayedLoading } from '../../hooks/useDelayedLoading';
@@ -60,6 +61,7 @@ export const ReviewView: React.FC = () => {
   const [sidebarTab, setSidebarTab] = useState<'tasks' | 'feedback'>('tasks');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPushModalOpen, setIsPushModalOpen] = useState(false);
+  const [isDeleteFeedbackModalOpen, setIsDeleteFeedbackModalOpen] = useState(false);
 
   // Feedback Modal State
   const [isAddFeedbackModalOpen, setIsAddFeedbackModalOpen] = useState(false);
@@ -102,9 +104,14 @@ export const ReviewView: React.FC = () => {
   };
 
   const handleDeleteFeedback = () => {
-    if (selectedFeedbackId && window.confirm('Are you sure you want to delete this feedback?')) {
+    setIsDeleteFeedbackModalOpen(true);
+  };
+
+  const confirmDeleteFeedback = () => {
+    if (selectedFeedbackId) {
       deleteFeedback({ feedbackId: selectedFeedbackId });
       selectFeedback(null);
+      setIsDeleteFeedbackModalOpen(false);
     }
   };
 
@@ -317,6 +324,16 @@ export const ReviewView: React.FC = () => {
         onAdd={handleCreateFeedback}
         context={addFeedbackContext}
         isAdding={isCreatingFeedback}
+      />
+
+      <ConfirmationModal
+        isOpen={isDeleteFeedbackModalOpen}
+        onClose={() => setIsDeleteFeedbackModalOpen(false)}
+        onConfirm={confirmDeleteFeedback}
+        title="Delete Feedback"
+        message="Are you sure you want to delete this feedback item? This action cannot be undone."
+        confirmLabel="Delete"
+        confirmVariant="danger"
       />
     </div>
   );

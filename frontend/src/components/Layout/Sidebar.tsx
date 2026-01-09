@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ask } from '@tauri-apps/plugin-dialog';
 import { useAppStore } from '../../store';
+import { ConfirmationModal } from '../Common/ConfirmationModal';
 import { ICONS } from '../../constants/icons';
 import type { ViewType } from '../../types';
 import { useReviews } from '../../hooks/useReviews';
@@ -19,6 +19,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) =
   const hasInProgressReview = reviews.some(r => r.status === 'in_progress');
   const { deleteReview } = useTauri();
   const [error, setError] = useState<string | null>(null);
+  const [reviewToDelete, setReviewToDelete] = useState<string | null>(null);
 
   const prefetchReview = useCallback(
     (reviewId: string) => {
@@ -43,18 +44,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) =
   const handleDeleteReview = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     setError(null);
-    const confirmed = await ask('Are you sure you want to delete this review?');
-    if (!confirmed) return;
+    setReviewToDelete(id);
+  };
+
+  const confirmDeleteReview = async () => {
+    if (!reviewToDelete) return;
     try {
-      await deleteReview(id);
+      await deleteReview(reviewToDelete);
       invalidate();
-      if (reviewId === id) {
+      if (reviewId === reviewToDelete) {
         setReviewId(null);
         onViewChange('generate');
       }
+      setReviewToDelete(null);
     } catch (err) {
       console.error('Failed to delete review:', err);
       setError(err instanceof Error ? err.message : String(err));
+      setReviewToDelete(null);
     }
   };
 
@@ -168,6 +174,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) =
         isActive={currentView === 'settings'}
         onClick={() => onViewChange('settings')}
         ariaLabel="Navigate to Settings"
+      />
+
+      <ConfirmationModal
+        isOpen={!!reviewToDelete}
+        onClose={() => setReviewToDelete(null)}
+        onConfirm={confirmDeleteReview}
+        title="Delete Review"
+        message="Are you sure you want to delete this review? All associated feedback and data will be permanently removed."
+        confirmLabel="Delete"
+        confirmVariant="danger"
       />
     </aside>
   );
