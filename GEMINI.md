@@ -140,21 +140,24 @@ cd frontend && pnpm test
 
 ## New Release Process
 
-1. **Preparation:** Ensure all tests pass and code is formatted
+1. **Preparation:** Ensure all tests pass and code is formatted.
+   - **Backend:** `cargo fmt && cargo clippy --all-targets --all-features -- -D warnings && cargo test`
+   - **Frontend:** `cd frontend && pnpm lint && pnpm test && pnpm build`
 2. **Version Bump:** Update version in:
    - `Cargo.toml`
-   - `Cargo.lock` (run `cargo build`)
    - `tauri.conf.json`
-3. **Changelog:** Update `CHANGELOG.md` with new version and release notes
-4. **Documentation:** Update `README.md` if needed
+   - `Cargo.lock` (run `cargo build` to sync)
+3. **Changelog:** Update `CHANGELOG.md` with new version and release notes.
+4. **Documentation:** Update `README.md` if needed.
 5. **Commit & Tag:**
    ```bash
    git add -A
    git commit -m "chore(release): v0.0.X"
-   git tag v0.0.X
+   # Use annotated tag with changelog summary for better release visibility
+   git tag -a v0.0.X -m "v0.0.X entry from CHANGELOG.md"
    git push && git push --tags
    ```
-6. **Publish:** GitHub CI will handle the rest (builds, releases, Homebrew tap)
+6. **Publish:** GitHub CI will handle the rest (builds, releases, Homebrew tap).
 
 ---
 
