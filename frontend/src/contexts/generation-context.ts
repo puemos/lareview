@@ -4,6 +4,7 @@ import type { ReviewSource } from '../types';
 export interface StartGenerationArgs {
   diffText: string;
   agentId: string;
+  repoId?: string;
   source?: ReviewSource | null;
 }
 

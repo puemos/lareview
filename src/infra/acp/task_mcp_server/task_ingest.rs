@@ -366,10 +366,9 @@ pub(super) fn update_review_metadata(config: &ServerConfig, args: Value) -> Resu
         .save(&review_run)
         .with_context(|| format!("save review run {}", ctx.run_id))?;
 
-    if let Err(err) = review_run_repo.update_status(
-        &ctx.run_id,
-        crate::domain::ReviewRunStatus::Completed,
-    ) {
+    if let Err(err) =
+        review_run_repo.update_status(&ctx.run_id, crate::domain::ReviewRunStatus::Completed)
+    {
         log_to_file(
             config,
             &format!(

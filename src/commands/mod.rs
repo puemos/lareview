@@ -1,8 +1,9 @@
 use crate::application::review::export::{ExportData, ExportOptions, ReviewExporter};
+use crate::application::review::rules::resolve_rules;
 use crate::domain::{
     Comment, Feedback, FeedbackAnchor, FeedbackImpact, FeedbackSide,
-    LinkedRepo as DomainLinkedRepo, Review, ReviewRun, ReviewRunStatus, ReviewSource, ReviewStatus,
-    ReviewTask,
+    LinkedRepo as DomainLinkedRepo, ResolvedRule, Review, ReviewRule, ReviewRun, ReviewRunStatus,
+    ReviewSource, ReviewStatus, ReviewTask, RuleScope,
 };
 use crate::infra::acp::{
     AgentRegistry, GenerateTasksInput, ProgressEvent, RunContext, generate_tasks_with_acp,
@@ -186,6 +187,7 @@ pub async fn generate_review(
     diff_text: String,
     agent_id: String,
     run_id: Option<String>,
+    repo_id: Option<String>,
     source: Option<ReviewSource>,
     on_progress: Channel<ProgressEventPayload>,
 ) -> Result<ReviewGenerationResult, String> {
@@ -366,8 +368,28 @@ pub async fn generate_review(
         active.insert(run_id.clone(), cancel_token.clone());
     }
 
+    let repo_id = repo_id.and_then(|id| {
+        let trimmed = id.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    });
+
+    let diff_paths = DiffIndex::new(&diff_text)
+        .map(|index| index.get_all_file_paths())
+        .unwrap_or_default();
+
+    let rules: Vec<ResolvedRule> = {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let all_rules = db.rule_repo().list_enabled().map_err(|e| e.to_string())?;
+        resolve_rules(&all_rules, repo_id.as_deref(), &diff_paths)
+    };
+
     let result = generate_tasks_with_acp(GenerateTasksInput {
         run_context,
+        rules,
         repo_root: None,
         agent_command: command,
         agent_args: candidate_args,
@@ -624,6 +646,7 @@ pub fn save_feedback(
         id: id.clone(),
         review_id: feedback.review_id,
         task_id: feedback.task_id,
+        rule_id: feedback.rule_id,
         title: feedback.title,
         status: ReviewStatus::Todo,
         impact,
@@ -1199,6 +1222,7 @@ pub struct ReviewGenerationResult {
 pub struct FeedbackInput {
     pub review_id: String,
     pub task_id: Option<String>,
+    pub rule_id: Option<String>,
     pub title: String,
     pub file_path: Option<String>,
     pub line_number: Option<u32>,
@@ -1324,6 +1348,112 @@ pub fn update_editor_config(editor_id: String) -> Result<(), String> {
     let mut config = load_config();
     config.preferred_editor_id = Some(editor_id);
     save_config(&config).map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewRuleInput {
+    pub scope: String,
+    pub repo_id: Option<String>,
+    pub glob: Option<String>,
+    pub text: String,
+    pub enabled: bool,
+}
+
+#[tauri::command]
+pub fn get_review_rules(state: State<'_, AppState>) -> Result<Vec<ReviewRule>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.rule_repo().list_all().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn create_review_rule(
+    state: State<'_, AppState>,
+    input: ReviewRuleInput,
+) -> Result<ReviewRule, String> {
+    let now = chrono::Utc::now().to_rfc3339();
+    let rule_id = Uuid::new_v4().to_string();
+    let rule = build_review_rule(rule_id, now.clone(), now, input)?;
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.rule_repo().save(&rule).map_err(|e| e.to_string())?;
+    Ok(rule)
+}
+
+#[tauri::command]
+pub fn update_review_rule(
+    state: State<'_, AppState>,
+    id: String,
+    input: ReviewRuleInput,
+) -> Result<ReviewRule, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let existing = db
+        .rule_repo()
+        .find_by_id(&id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Review rule not found".to_string())?;
+    let now = chrono::Utc::now().to_rfc3339();
+    let rule = build_review_rule(id, existing.created_at, now, input)?;
+    db.rule_repo().save(&rule).map_err(|e| e.to_string())?;
+    Ok(rule)
+}
+
+#[tauri::command]
+pub fn delete_review_rule(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.rule_repo().delete(&id).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn build_review_rule(
+    id: String,
+    created_at: String,
+    updated_at: String,
+    input: ReviewRuleInput,
+) -> Result<ReviewRule, String> {
+    let scope = RuleScope::from_str(&input.scope.to_lowercase()).map_err(|e| e.to_string())?;
+    let repo_id = input.repo_id.and_then(|value| {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    });
+    let glob = input.glob.and_then(|value| {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    });
+    let text = input.text.trim().to_string();
+    if text.is_empty() {
+        return Err("Rule text cannot be empty".to_string());
+    }
+
+    match scope {
+        RuleScope::Global => {
+            if repo_id.is_some() {
+                return Err("Global rules cannot target a repository".to_string());
+            }
+        }
+        RuleScope::Repo => {
+            if repo_id.is_none() {
+                return Err("Repository rules require a repo_id".to_string());
+            }
+        }
+    }
+
+    Ok(ReviewRule {
+        id,
+        scope,
+        repo_id,
+        glob,
+        text,
+        enabled: input.enabled,
+        created_at,
+        updated_at,
+    })
 }
 
 #[tauri::command]

@@ -1,3 +1,4 @@
+use crate::domain::ResolvedRule;
 use crate::infra::acp::task_mcp_server::RunContext;
 use crate::prompts;
 use agent_client_protocol::{ClientCapabilities, FileSystemCapability, Meta};
@@ -8,6 +9,7 @@ use std::path::PathBuf;
 pub(super) fn build_prompt(
     run: &RunContext,
     repo_root: Option<&PathBuf>,
+    rules: &[ResolvedRule],
 ) -> anyhow::Result<String> {
     let has_repo_access = repo_root.is_some();
     let source_json = serde_json::to_string(&run.source).unwrap_or_default();
@@ -28,7 +30,9 @@ pub(super) fn build_prompt(
             "unified_manifest": unified_manifest,
             "has_repo_access": has_repo_access,
             "repo_root": repo_root.map(|p| p.display().to_string()),
-            "repo_access_note": if has_repo_access { "read-only" } else { "none" }
+            "repo_access_note": if has_repo_access { "read-only" } else { "none" },
+            "has_rules": !rules.is_empty(),
+            "rules": rules
         }),
     )
     .context("failed to render generate_tasks prompt")

@@ -91,6 +91,7 @@ export interface Feedback {
   id: string;
   review_id: string;
   task_id: string | null;
+  rule_id?: string | null;
   title: string;
   status: 'todo' | 'in_progress' | 'done' | 'ignored';
   impact: 'blocking' | 'nice_to_have' | 'nitpick';
@@ -122,6 +123,19 @@ export interface LinkedRepo {
   path: string;
   name: string;
   linked_at?: string;
+}
+
+export type RuleScope = 'global' | 'repo';
+
+export interface ReviewRule {
+  id: string;
+  scope: RuleScope;
+  repo_id?: string | null;
+  glob?: string | null;
+  text: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Agent {
@@ -195,7 +209,7 @@ export type ReviewSource =
       base_sha?: string;
     };
 
-export type ViewType = 'generate' | 'review' | 'repos' | 'settings';
+export type ViewType = 'generate' | 'review' | 'repos' | 'rules' | 'settings';
 
 export interface Plan {
   entries: PlanEntry[];

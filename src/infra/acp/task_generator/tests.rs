@@ -73,7 +73,8 @@ mod policy_tests {
     fn prompt_renders_no_repo_access_block() {
         let diff = "diff --git a/src/a.rs b/src/a.rs\n--- a/src/a.rs\n+++ b/src/a.rs\n";
         let run = sample_run(diff);
-        let prompt = crate::infra::acp::task_generator::prompt::build_prompt(&run, None).unwrap();
+        let prompt =
+            crate::infra::acp::task_generator::prompt::build_prompt(&run, None, &[]).unwrap();
         assert!(prompt.contains("You do NOT have repository access."));
         assert!(prompt.contains("Use `lareview-tasks_return_task` for each task"));
         assert!(prompt.contains("Use `lareview-tasks_finalize_review` at the end"));
@@ -86,7 +87,8 @@ mod policy_tests {
         let run = sample_run(diff);
         let root = std::path::PathBuf::from("/tmp/repo-root");
         let prompt =
-            crate::infra::acp::task_generator::prompt::build_prompt(&run, Some(&root)).unwrap();
+            crate::infra::acp::task_generator::prompt::build_prompt(&run, Some(&root), &[])
+                .unwrap();
         assert!(prompt.contains("You have READ-ONLY access"));
         assert!(prompt.contains(&root.display().to_string()));
         assert!(prompt.contains("Allowed tools:"));
@@ -99,8 +101,31 @@ mod policy_tests {
         let run = sample_run(diff);
         // We can't easily trigger a rendering error without modifying the prompt name in build_prompt,
         // but we can test that it's a Result.
-        let res = crate::infra::acp::task_generator::prompt::build_prompt(&run, None);
+        let res = crate::infra::acp::task_generator::prompt::build_prompt(&run, None, &[]);
         assert!(res.is_ok());
+    }
+
+    #[test]
+    fn prompt_includes_rules_block() {
+        use crate::domain::{ResolvedRule, RuleScope};
+        let diff = "diff --git a/src/a.rs b/src/a.rs\n--- a/src/a.rs\n+++ b/src/a.rs\n";
+        let run = sample_run(diff);
+        let rules = vec![ResolvedRule {
+            id: "rule-1".into(),
+            scope: RuleScope::Global,
+            repo_id: None,
+            glob: Some("src/**/*.rs".into()),
+            text: "Prioritize auth checks".into(),
+            matched_files: vec!["src/a.rs".into()],
+            has_matches: true,
+        }];
+        let prompt =
+            crate::infra::acp::task_generator::prompt::build_prompt(&run, None, &rules).unwrap();
+        assert!(prompt.contains("Additional review rules"));
+        assert!(prompt.contains("Prioritize auth checks"));
+        assert!(prompt.contains("[rule-1]"));
+        assert!(!prompt.contains("[global|rule-1]"));
+        assert!(prompt.contains("src/**/*.rs"));
     }
 
     #[test]

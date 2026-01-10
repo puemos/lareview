@@ -3010,7 +3010,7 @@ dependencies = [
 
 [[package]]
 name = "lareview"
-version = "0.0.21"
+version = "0.0.22"
 dependencies = [
  "agent-client-protocol",
  "anyhow",
@@ -3024,6 +3024,7 @@ dependencies = [
  "fix-path-env",
  "fontdb",
  "futures",
+ "globset",
  "grep",
  "handlebars",
  "home",

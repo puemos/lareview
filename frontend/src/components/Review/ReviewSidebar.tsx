@@ -1,7 +1,7 @@
 import React, { Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { SHARED_LAYOUT_TRANSITION } from '../../constants/animations';
-import type { ReviewTask, Feedback } from '../../types';
+import type { ReviewTask, Feedback, ReviewRule } from '../../types';
 import { TaskList, TaskListSkeleton } from './TaskList';
 import { FeedbackList } from './FeedbackList';
 import { ICONS } from '../../constants/icons';
@@ -10,6 +10,7 @@ interface ReviewSidebarProps {
   sidebarTab: 'tasks' | 'feedback';
   tasks: ReviewTask[];
   feedbacks: Feedback[];
+  rulesById: Record<string, ReviewRule>;
   selectedTaskId: string | null;
   selectedFeedbackId: string | null;
   isTasksLoading: boolean;
@@ -26,6 +27,7 @@ export const ReviewSidebar: React.FC<ReviewSidebarProps> = ({
   sidebarTab,
   tasks,
   feedbacks,
+  rulesById,
   selectedTaskId,
   selectedFeedbackId,
   isTasksLoading,
@@ -114,6 +116,7 @@ export const ReviewSidebar: React.FC<ReviewSidebarProps> = ({
       {sidebarTab === 'feedback' && (
         <FeedbackList
           feedbacks={feedbacks}
+          rulesById={rulesById}
           selectedFeedbackId={selectedFeedbackId}
           onSelectFeedback={onSelectFeedback}
           isLoading={isFeedbacksLoading}

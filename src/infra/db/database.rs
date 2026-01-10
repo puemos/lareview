@@ -153,6 +153,7 @@ impl Database {
                 id TEXT PRIMARY KEY,
                 review_id TEXT NOT NULL,
                 task_id TEXT,
+                rule_id TEXT,
                 title TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'todo',
                 impact TEXT NOT NULL DEFAULT 'nitpick',
@@ -180,11 +181,25 @@ impl Database {
                 FOREIGN KEY(parent_id) REFERENCES comments(id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS review_rules (
+                id TEXT PRIMARY KEY,
+                scope TEXT NOT NULL,
+                repo_id TEXT,
+                glob TEXT,
+                text TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(repo_id) REFERENCES repos(id) ON DELETE CASCADE
+            );
+
             CREATE INDEX IF NOT EXISTS idx_feedback_task_id ON feedback(task_id);
             CREATE INDEX IF NOT EXISTS idx_feedback_review_id ON feedback(review_id);
             CREATE INDEX IF NOT EXISTS idx_feedback_anchor ON feedback(anchor_file_path, anchor_line);
             CREATE INDEX IF NOT EXISTS idx_comments_feedback_id ON comments(feedback_id);
             CREATE INDEX IF NOT EXISTS idx_comments_feedback_created_at ON comments(feedback_id, created_at);
+            CREATE INDEX IF NOT EXISTS idx_review_rules_repo_id ON review_rules(repo_id);
+            CREATE INDEX IF NOT EXISTS idx_review_rules_scope ON review_rules(scope);
 
             "#,
         )?;
@@ -200,6 +215,16 @@ impl Database {
                 [],
             )?;
         }
+
+        let has_rule_id = conn
+            .prepare("SELECT 1 FROM pragma_table_info('feedback') WHERE name = 'rule_id'")?
+            .exists([])?;
+
+        if !has_rule_id {
+            conn.execute("ALTER TABLE feedback ADD COLUMN rule_id TEXT", [])?;
+        }
+
+        Self::migrate_legacy_custom_rules(conn)?;
 
         // Migration: Add status to review_runs if it doesn't exist
         let has_run_status = conn
@@ -221,6 +246,175 @@ impl Database {
         Ok(())
     }
 
+    fn migrate_legacy_custom_rules(conn: &Connection) -> Result<()> {
+        let has_custom_rules = Self::table_exists(conn, "custom_rules")?;
+        let has_custom_rules_repos = Self::table_exists(conn, "custom_rules_repos")?;
+        let has_feedback_rules = Self::table_exists(conn, "feedback_rules")?;
+        let feedback_fk_custom = Self::feedback_fk_targets(conn)?
+            .iter()
+            .any(|target| target == "custom_rules");
+
+        if !has_custom_rules
+            && !has_custom_rules_repos
+            && !has_feedback_rules
+            && !feedback_fk_custom
+        {
+            return Ok(());
+        }
+
+        conn.execute_batch("PRAGMA foreign_keys = OFF;")?;
+        conn.execute_batch("BEGIN;")?;
+
+        let result = (|| {
+            if feedback_fk_custom {
+                Self::rebuild_feedback_without_custom_rules_fk(conn)?;
+            }
+
+            conn.execute("DROP TABLE IF EXISTS feedback_rules", [])?;
+            conn.execute("DROP TABLE IF EXISTS custom_rules_repos", [])?;
+            conn.execute("DROP TABLE IF EXISTS custom_rules", [])?;
+
+            Ok(())
+        })();
+
+        match result {
+            Ok(()) => {
+                conn.execute_batch("COMMIT;")?;
+            }
+            Err(err) => {
+                let _ = conn.execute_batch("ROLLBACK;");
+                conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+                return Err(err);
+            }
+        }
+
+        conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+        Ok(())
+    }
+
+    fn rebuild_feedback_without_custom_rules_fk(conn: &Connection) -> Result<()> {
+        if !Self::table_exists(conn, "feedback")? {
+            return Ok(());
+        }
+
+        let has_rule_name = Self::column_exists(conn, "feedback", "rule_name")?;
+        let has_anchor_diff_line_idx =
+            Self::column_exists(conn, "feedback", "anchor_diff_line_idx")?;
+        let has_anchor_diff_hash = Self::column_exists(conn, "feedback", "anchor_diff_hash")?;
+
+        let mut extra_defs = Vec::new();
+        if has_rule_name {
+            extra_defs.push("rule_name TEXT");
+        }
+        if has_anchor_diff_line_idx {
+            extra_defs.push("anchor_diff_line_idx INTEGER");
+        }
+        if has_anchor_diff_hash {
+            extra_defs.push("anchor_diff_hash TEXT");
+        }
+
+        let extra_defs = if extra_defs.is_empty() {
+            String::new()
+        } else {
+            format!(
+                ",\n                {}",
+                extra_defs.join(",\n                ")
+            )
+        };
+
+        let create_sql = format!(
+            r#"
+            CREATE TABLE feedback_new (
+                id TEXT PRIMARY KEY,
+                review_id TEXT NOT NULL,
+                task_id TEXT,
+                rule_id TEXT,
+                title TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'todo',
+                impact TEXT NOT NULL DEFAULT 'nitpick',
+                anchor_file_path TEXT,
+                anchor_line INTEGER,
+                anchor_side TEXT,
+                anchor_hunk_ref TEXT,
+                anchor_head_sha TEXT,
+                author TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL{extra_defs},
+                FOREIGN KEY(review_id) REFERENCES reviews(id) ON DELETE CASCADE,
+                FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+            );
+            "#
+        );
+        conn.execute_batch(&create_sql)?;
+
+        let mut columns = vec![
+            "id",
+            "review_id",
+            "task_id",
+            "rule_id",
+            "title",
+            "status",
+            "impact",
+            "anchor_file_path",
+            "anchor_line",
+            "anchor_side",
+            "anchor_hunk_ref",
+            "anchor_head_sha",
+            "author",
+            "created_at",
+            "updated_at",
+        ];
+        if has_rule_name {
+            columns.push("rule_name");
+        }
+        if has_anchor_diff_line_idx {
+            columns.push("anchor_diff_line_idx");
+        }
+        if has_anchor_diff_hash {
+            columns.push("anchor_diff_hash");
+        }
+
+        let column_list = columns.join(", ");
+        let insert_sql =
+            format!("INSERT INTO feedback_new ({column_list}) SELECT {column_list} FROM feedback");
+        conn.execute(&insert_sql, [])?;
+
+        conn.execute("DROP TABLE feedback", [])?;
+        conn.execute("ALTER TABLE feedback_new RENAME TO feedback", [])?;
+
+        conn.execute_batch(
+            r#"
+            CREATE INDEX IF NOT EXISTS idx_feedback_task_id ON feedback(task_id);
+            CREATE INDEX IF NOT EXISTS idx_feedback_review_id ON feedback(review_id);
+            CREATE INDEX IF NOT EXISTS idx_feedback_anchor ON feedback(anchor_file_path, anchor_line);
+            "#,
+        )?;
+
+        Ok(())
+    }
+
+    fn table_exists(conn: &Connection, name: &str) -> Result<bool> {
+        let mut stmt =
+            conn.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1 LIMIT 1")?;
+        Ok(stmt.exists([name])?)
+    }
+
+    fn column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool> {
+        let sql = format!("SELECT 1 FROM pragma_table_info('{table}') WHERE name = '{column}'");
+        let mut stmt = conn.prepare(&sql)?;
+        Ok(stmt.exists([])?)
+    }
+
+    fn feedback_fk_targets(conn: &Connection) -> Result<Vec<String>> {
+        let mut stmt = conn.prepare("PRAGMA foreign_key_list('feedback')")?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(2))?;
+        let mut targets = Vec::new();
+        for row in rows {
+            targets.push(row?);
+        }
+        Ok(targets)
+    }
+
     pub fn connection(&self) -> Arc<Mutex<Connection>> {
         self.conn.clone()
     }
@@ -239,6 +433,10 @@ impl Database {
 
     pub fn comment_repo(&self) -> crate::infra::db::repository::CommentRepository {
         crate::infra::db::repository::CommentRepository::new(self.connection())
+    }
+
+    pub fn rule_repo(&self) -> crate::infra::db::repository::ReviewRuleRepository {
+        crate::infra::db::repository::ReviewRuleRepository::new(self.connection())
     }
 
     pub fn review_repo(&self) -> crate::infra::db::repository::ReviewRepository {
@@ -465,13 +663,14 @@ impl Database {
         let conn = self.conn.lock().expect("Failed to acquire database lock");
         let anchor = feedback.anchor.as_ref();
         conn.execute(
-            "INSERT INTO feedback (id, review_id, task_id, title, status, impact, anchor_file_path, anchor_line, anchor_side, anchor_hunk_ref, anchor_head_sha, author, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+            "INSERT INTO feedback (id, review_id, task_id, rule_id, title, status, impact, anchor_file_path, anchor_line, anchor_side, anchor_hunk_ref, anchor_head_sha, author, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
              ON CONFLICT(id) DO NOTHING",
             params![
                 &feedback.id,
                 &feedback.review_id,
                 &feedback.task_id.as_ref(),
+                &feedback.rule_id.as_ref(),
                 &feedback.title,
                 &feedback.status.to_string(),
                 &feedback.impact.to_string(),
@@ -613,10 +812,7 @@ mod tests {
 
         let reviews = db.get_all_reviews()?;
         assert_eq!(reviews.len(), 1);
-        assert_eq!(
-            reviews[0].active_run_status.as_deref(),
-            Some("running")
-        );
+        assert_eq!(reviews[0].active_run_status.as_deref(), Some("running"));
 
         Ok(())
     }

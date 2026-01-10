@@ -13,6 +13,7 @@ import type {
   EditorConfig,
   CliStatus,
   ReviewSource,
+  ReviewRule,
 } from '../types';
 import { useCallback } from 'react';
 
@@ -87,6 +88,14 @@ export interface SessionUpdate {
   availableCommands?: AvailableCommand[];
   meta?: Record<string, unknown> | null;
   mode?: string;
+}
+
+interface ReviewRuleInput {
+  scope: 'global' | 'repo';
+  repo_id?: string | null;
+  glob?: string | null;
+  text: string;
+  enabled: boolean;
 }
 
 export function isAgentMessageChunk(update: SessionUpdate): update is SessionUpdate & {
@@ -259,6 +268,7 @@ export const useTauri = () => {
       diffText: string,
       agentId: string,
       runId?: string,
+      repoId?: string,
       source?: ReviewSource,
       onProgress?: Channel<ProgressEventPayload>
     ): Promise<{ task_count: number; review_id: string; run_id?: string }> => {
@@ -266,6 +276,7 @@ export const useTauri = () => {
         diffText,
         agentId,
         runId,
+        repoId,
         source,
         onProgress,
       });
@@ -285,6 +296,7 @@ export const useTauri = () => {
     async (feedback: {
       review_id: string;
       task_id?: string;
+      rule_id?: string;
       title: string;
       file_path?: string;
       line_number?: number;
@@ -440,6 +452,28 @@ export const useTauri = () => {
     return invoke('get_github_status');
   }, []);
 
+  const getReviewRules = useCallback(async (): Promise<ReviewRule[]> => {
+    return invoke('get_review_rules');
+  }, []);
+
+  const createReviewRule = useCallback(
+    async (input: ReviewRuleInput): Promise<ReviewRule> => {
+      return invoke('create_review_rule', { input });
+    },
+    []
+  );
+
+  const updateReviewRule = useCallback(
+    async (id: string, input: ReviewRuleInput): Promise<ReviewRule> => {
+      return invoke('update_review_rule', { id, input });
+    },
+    []
+  );
+
+  const deleteReviewRule = useCallback(async (id: string): Promise<void> => {
+    return invoke('delete_review_rule', { id });
+  }, []);
+
   const linkRepo = useCallback(async (path: string): Promise<LinkedRepo> => {
     return invoke('link_repo', { path });
   }, []);
@@ -525,6 +559,10 @@ export const useTauri = () => {
     getGitHubToken,
     setGitHubToken,
     getGitHubStatus,
+    getReviewRules,
+    createReviewRule,
+    updateReviewRule,
+    deleteReviewRule,
     linkRepo,
     unlinkRepo,
     selectRepoFolder,

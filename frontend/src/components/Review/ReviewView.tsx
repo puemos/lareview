@@ -1,10 +1,11 @@
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useMemo } from 'react';
 import { useAppStore } from '../../store';
 import { DiffViewer } from '../DiffViewer/DiffViewer';
 import { useReview } from '../../hooks/useReview';
 import { useParsedDiff } from '../../hooks/useParsedDiff';
 import { useTasks } from '../../hooks/useTasks';
 import { useFeedback, useFeedbackComments, useAddComment } from '../../hooks/useFeedback';
+import { useRules } from '../../hooks/useRules';
 import { FeedbackDetail } from './FeedbackDetail';
 import { ReviewSidebar } from './ReviewSidebar';
 import { TaskDetail } from './TaskDetail';
@@ -17,7 +18,7 @@ import { ConfirmationModal } from '../Common/ConfirmationModal';
 import { useReviews } from '../../hooks/useReviews';
 import { useTauri } from '../../hooks/useTauri';
 import { useDelayedLoading } from '../../hooks/useDelayedLoading';
-import type { ReviewTask, Feedback } from '../../types';
+import type { ReviewTask, Feedback, ReviewRule } from '../../types';
 import { ReviewViewSkeleton } from './ReviewViewSkeleton';
 import { AddFeedbackModal } from './AddFeedbackModal';
 import type { DiffFile } from '../../types';
@@ -51,6 +52,7 @@ export const ReviewView: React.FC = () => {
     createFeedback,
     isCreating: isCreatingFeedback,
   } = useFeedback(reviewId);
+  const { data: rules = [] } = useRules();
   const { comments, isLoading: isCommentsLoading } = useFeedbackComments(selectedFeedbackId);
   const addCommentMutation = useAddComment();
   const { exportReviewMarkdown, pushGitHubReview, pushGitHubFeedback, copyToClipboard } =
@@ -81,6 +83,13 @@ export const ReviewView: React.FC = () => {
   const selectedTask = tasks.find((t: ReviewTask) => t.id === selectedTaskId);
   const selectedFeedback: Feedback | null =
     feedbacks.find((f: Feedback) => f.id === selectedFeedbackId) || null;
+  const rulesById = useMemo(() => {
+    const map: Record<string, ReviewRule> = {};
+    rules.forEach(rule => {
+      map[rule.id] = rule;
+    });
+    return map;
+  }, [rules]);
 
   const handleStatusChange = (status: string) => {
     if (selectedTask) {
@@ -224,21 +233,22 @@ export const ReviewView: React.FC = () => {
 
   return (
     <div className="bg-bg-primary flex h-full">
-      <ReviewSidebar
-        sidebarTab={sidebarTab}
-        tasks={tasks}
-        feedbacks={feedbacks}
-        selectedTaskId={selectedTaskId}
-        selectedFeedbackId={selectedFeedbackId}
-        isTasksLoading={isTasksLoading}
-        isTasksFetching={isTasksFetching}
-        isFeedbacksLoading={isFeedbacksLoading}
-        onSidebarTabChange={setSidebarTab}
-        onSelectTask={selectTask}
-        onSelectFeedback={selectFeedback}
-        onOpenExportModal={() => setIsModalOpen(true)}
-        onAddGlobalFeedback={handleAddGlobalFeedback}
-      />
+        <ReviewSidebar
+          sidebarTab={sidebarTab}
+          tasks={tasks}
+          feedbacks={feedbacks}
+          selectedTaskId={selectedTaskId}
+          selectedFeedbackId={selectedFeedbackId}
+          isTasksLoading={isTasksLoading}
+          isTasksFetching={isTasksFetching}
+          isFeedbacksLoading={isFeedbacksLoading}
+          onSidebarTabChange={setSidebarTab}
+          onSelectTask={selectTask}
+          onSelectFeedback={selectFeedback}
+          onOpenExportModal={() => setIsModalOpen(true)}
+          onAddGlobalFeedback={handleAddGlobalFeedback}
+          rulesById={rulesById}
+        />
 
       <div className="bg-bg-primary relative flex min-w-0 flex-1 flex-col">
         <Suspense fallback={<DiffSkeleton />}>
@@ -250,6 +260,7 @@ export const ReviewView: React.FC = () => {
           ) : sidebarTab === 'feedback' ? (
             <FeedbackDetail
               feedback={selectedFeedback}
+              rulesById={rulesById}
               comments={isCommentsLoading ? [] : comments}
               onUpdateStatus={handleFeedbackStatusChange}
               onUpdateImpact={handleFeedbackImpactChange}

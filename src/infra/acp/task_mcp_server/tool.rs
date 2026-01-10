@@ -810,6 +810,10 @@ fn add_feedback_schema() -> Value {
             "task_id": {
                 "type": "string",
                 "description": "Optional: Link this comment to a specific task ID."
+            },
+            "rule_id": {
+                "type": "string",
+                "description": "Optional: Rule ID that motivated this feedback (include when applying a rule)."
             }
         },
         "required": ["body"]

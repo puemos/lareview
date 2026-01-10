@@ -1,3 +1,4 @@
+use crate::domain::ResolvedRule;
 use crate::infra::acp::task_mcp_server::RunContext;
 use std::path::PathBuf;
 
@@ -5,6 +6,8 @@ use std::path::PathBuf;
 pub struct GenerateTasksInput {
     /// Review/run context for the task generation (also persisted by the MCP server).
     pub run_context: RunContext,
+    /// Review rules that apply to this run and should be injected into the prompt.
+    pub rules: Vec<ResolvedRule>,
     /// Optional repository root for read-only context.
     ///
     /// When this is None, the agent must operate diff-only without filesystem or terminal access.

@@ -538,7 +538,8 @@ async fn test_save_agent_comment() {
         "line": 1,
         "body": "This is a comment",
         "side": "new",
-        "impact": "blocking"
+        "impact": "blocking",
+        "rule_id": "global|rule-1"
     });
 
     let feedback_id =
@@ -550,6 +551,7 @@ async fn test_save_agent_comment() {
     let feedback = feedback_repo.find_by_id(&feedback_id).unwrap().unwrap();
     assert_eq!(feedback.task_id, Some("task-1".to_string()));
     assert_eq!(feedback.impact, crate::domain::FeedbackImpact::Blocking);
+    assert_eq!(feedback.rule_id, Some("rule-1".to_string()));
 
     let comment_repo = crate::infra::db::CommentRepository::new(db.connection());
     let comments = comment_repo.list_for_feedback(&feedback_id).unwrap();

@@ -24,6 +24,7 @@ export interface UseFeedbackResult {
 export interface CreateFeedbackInput {
   review_id: string;
   task_id?: string;
+  rule_id?: string;
   title: string;
   file_path?: string;
   line_number?: number;
@@ -71,6 +72,7 @@ export function useFeedback(reviewId: string | null): UseFeedbackResult {
       saveFeedback({
         review_id: input.review_id,
         task_id: input.task_id,
+        rule_id: input.rule_id,
         title: input.title,
         file_path: input.file_path,
         line_number: input.line_number,

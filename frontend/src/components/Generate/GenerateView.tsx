@@ -112,6 +112,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     const ok = await startGeneration({
       diffText,
       agentId,
+      repoId: selectedRepoId || undefined,
       source: pendingSource,
     });
     if (ok) {
@@ -126,6 +127,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     setAgentIdStore,
     _onNavigate,
     pendingSource,
+    selectedRepoId,
   ]);
 
   const handleFetchPr = useCallback(async () => {

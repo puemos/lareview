@@ -165,6 +165,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) =
         onClick={() => onViewChange('repos')}
         ariaLabel="Navigate to Repositories"
       />
+      <SidebarItem
+        icon={<ICONS.VIEW_RULES size={16} />}
+        label="Rules"
+        isActive={currentView === 'rules'}
+        onClick={() => onViewChange('rules')}
+        ariaLabel="Navigate to Rules"
+      />
       <div className="flex-1" />
       <SidebarItem
         icon={<ICONS.VIEW_SETTINGS size={16} />}

@@ -36,6 +36,22 @@ pub(super) fn save_agent_comment(config: &ServerConfig, args: Value) -> Result<S
     save_by_file_and_line(config, &args)
 }
 
+fn extract_rule_id(args: &Value) -> Option<String> {
+    let raw = args
+        .get("rule_id")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())?;
+
+    let normalized = raw.rsplit_once('|').map(|(_, id)| id.trim()).unwrap_or(raw);
+
+    if normalized.is_empty() {
+        None
+    } else {
+        Some(normalized.to_string())
+    }
+}
+
 /// Save feedback using a simple line ID (e.g., "L3").
 /// This is the preferred method as it requires no string matching.
 fn save_by_line_id(
@@ -93,6 +109,7 @@ fn save_by_line_id(
         .get("task_id")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
+    let rule_id = extract_rule_id(args);
 
     let ctx = load_run_context(config);
     let db = open_database(config)?;
@@ -175,6 +192,7 @@ fn save_by_line_id(
         id: feedback_id.clone(),
         review_id: ctx.review_id.clone(),
         task_id: final_task_id,
+        rule_id,
         title,
         status: ReviewStatus::Todo,
         impact,
@@ -261,6 +279,7 @@ fn save_by_content(
         .get("task_id")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
+    let rule_id = extract_rule_id(args);
 
     let ctx = load_run_context(config);
     let db = open_database(config)?;
@@ -309,6 +328,7 @@ fn save_by_content(
         id: feedback_id.clone(),
         review_id: ctx.review_id.clone(),
         task_id: final_task_id,
+        rule_id,
         title,
         status: ReviewStatus::Todo,
         impact,
@@ -527,6 +547,7 @@ fn save_by_file_and_line(config: &ServerConfig, args: &Value) -> Result<String> 
         .get("task_id")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
+    let rule_id = extract_rule_id(args);
 
     let side = match side_str.to_lowercase().as_str() {
         "old" => FeedbackSide::Old,
@@ -631,6 +652,7 @@ fn save_by_file_and_line(config: &ServerConfig, args: &Value) -> Result<String> 
         id: feedback_id.clone(),
         review_id: ctx.review_id.clone(),
         task_id: final_task_id,
+        rule_id,
         title,
         status: ReviewStatus::Todo,
         impact,

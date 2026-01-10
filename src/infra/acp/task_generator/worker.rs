@@ -92,6 +92,7 @@ pub async fn generate_tasks_with_acp(input: GenerateTasksInput) -> Result<Genera
 async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<GenerateTasksResult> {
     let GenerateTasksInput {
         run_context,
+        rules,
         repo_root,
         agent_command,
         agent_args,
@@ -276,7 +277,7 @@ async fn generate_tasks_with_acp_inner(input: GenerateTasksInput) -> Result<Gene
     push_log(&logs, "new_session ok", debug);
 
     // Send prompt
-    let prompt_text = build_prompt(&run_context, repo_root.as_ref())?;
+    let prompt_text = build_prompt(&run_context, repo_root.as_ref(), &rules)?;
     push_log(&logs, "prompt", debug);
     let prompt_result = connection
         .prompt(PromptRequest::new(
@@ -475,6 +476,7 @@ mod tests {
                 initial_title: None,
                 created_at: None,
             },
+            rules: Vec::new(),
             repo_root: None,
             agent_command: "non_existent_binary".into(),
             agent_args: vec![],
@@ -506,6 +508,7 @@ mod tests {
                 initial_title: None,
                 created_at: None,
             },
+            rules: Vec::new(),
             repo_root: None,
             agent_command: "sleep".into(),
             agent_args: vec!["10".into()],
@@ -543,6 +546,7 @@ mod tests {
                 initial_title: None,
                 created_at: None,
             },
+            rules: Vec::new(),
             repo_root: None,
             agent_command: "sleep".into(),
             agent_args: vec!["10".into()],

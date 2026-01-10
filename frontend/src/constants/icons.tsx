@@ -46,6 +46,7 @@ import {
   Lightbulb,
   Microscope,
   Info,
+  Gavel,
 } from '@phosphor-icons/react';
 
 /**
@@ -70,6 +71,7 @@ export const ICONS = {
   VIEW_GENERATE: Asterisk,
   VIEW_REVIEW: Eyes,
   VIEW_REPOS: Folder,
+  VIEW_RULES: Gavel,
   VIEW_SETTINGS: Gear,
 
   TAB_DESCRIPTION: FileText,

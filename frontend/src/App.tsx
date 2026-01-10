@@ -34,10 +34,15 @@ const ReposView = lazy(() =>
     default: module.ReposView,
   }))
 );
+const RulesView = lazy(() =>
+  import('./components/Rules/RulesView').then(module => ({
+    default: module.RulesView,
+  }))
+);
 
 const queryClient = createQueryClient();
 
-type View = 'generate' | 'review' | 'repos' | 'settings';
+type View = 'generate' | 'review' | 'repos' | 'rules' | 'settings';
 
 function App() {
   const [currentView, setCurrentView] = useState<View>('generate');
@@ -111,6 +116,8 @@ function App() {
           );
         case 'repos':
           return <ReposView onNavigate={setCurrentView} />;
+        case 'rules':
+          return <RulesView />;
         case 'settings':
           return <SettingsView onNavigate={setCurrentView} />;
         default:

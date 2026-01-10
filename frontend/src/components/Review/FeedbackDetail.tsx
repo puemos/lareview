@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { Feedback, Comment } from '../../types';
+import type { Feedback, Comment, ReviewRule } from '../../types';
 import { ICONS } from '../../constants/icons';
 import ReactMarkdown from 'react-markdown';
 import { useQuery } from '@tanstack/react-query';
@@ -9,6 +9,7 @@ import { Select } from '../Common/Select';
 
 interface FeedbackDetailProps {
   feedback: Feedback | null;
+  rulesById: Record<string, ReviewRule>;
   comments: Comment[];
   onUpdateStatus: (status: Feedback['status']) => void;
   onUpdateImpact: (impact: Feedback['impact']) => void;
@@ -139,6 +140,7 @@ const DiffSnippetSkeleton: React.FC = () => (
 
 export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
   feedback,
+  rulesById,
   comments,
   onUpdateStatus,
   onUpdateImpact,
@@ -154,6 +156,7 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
   const [replyText, setReplyText] = useState('');
   const [isTitleEditing, setIsTitleEditing] = useState(false);
   const [titleValue, setTitleValue] = useState('');
+  const rule = feedback?.rule_id ? rulesById[feedback.rule_id] : null;
 
   const { data: diffSnippet, isLoading: isDiffLoading } = useQuery<DiffSnippet | null>({
     queryKey: ['feedback-diff', feedback?.id],
@@ -249,17 +252,20 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
         </div>
 
         <div className="flex w-full items-center justify-between">
-          {feedback.anchor?.file_path ? (
-            <div>
+          <div className="space-y-1">
+            {feedback.anchor?.file_path ? (
               <span className="text-text-tertiary font-mono text-[10px]">
                 {feedback.anchor.file_path}:{feedback.anchor.line_number}
               </span>
-            </div>
-          ) : (
-            <div>
+            ) : (
               <span className="text-text-tertiary font-mono text-[10px]">General</span>
-            </div>
-          )}
+            )}
+            {feedback.rule_id && (
+              <span className="text-text-tertiary text-[10px]">
+                Rule: {rule?.text || feedback.rule_id}
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <Select
               value={feedback.status}

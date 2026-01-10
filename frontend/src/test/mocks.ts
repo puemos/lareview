@@ -100,6 +100,17 @@ interface MockTauriReturn {
   getFeedbackComments: Mock<(feedbackId: string) => Promise<Comment[]>>;
   addComment: Mock<(feedbackId: string, body: string) => Promise<string>>;
   getFeedbackByReview: Mock<(reviewId: string) => Promise<Feedback[]>>;
+  generateReview: Mock<
+    (
+      diffText: string,
+      agentId: string,
+      runId?: string,
+      repoId?: string,
+      source?: string,
+      onProgress?: any
+    ) => Promise<{ task_count: number; review_id: string; run_id?: string }>
+  >;
+  stop_generation: Mock<(runId: string) => Promise<void>>;
 }
 
 function createMockTauri(): MockTauriReturn {
@@ -129,6 +140,12 @@ function createMockTauri(): MockTauriReturn {
     getFeedbackComments: vi.fn().mockResolvedValue([]),
     addComment: vi.fn().mockResolvedValue('comment-1'),
     getFeedbackByReview: vi.fn().mockResolvedValue([createMockFeedback()]),
+    generateReview: vi.fn().mockResolvedValue({
+      task_count: 5,
+      review_id: 'review-1',
+      run_id: 'run-1',
+    }),
+    stop_generation: vi.fn().mockResolvedValue(undefined),
   };
   return mock;
 }

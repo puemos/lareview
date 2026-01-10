@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.22] - 2026-01-10
+
+### Added
+
+- **Rules**: Added comprehensive Rules system for code reviews.
+- **UI/UX**: Implemented interactive Rule popovers and hover tooltips.
+- **Generation**: Fixed state persistence issues during agent generation.
+- **Database**: New migrations and repository support for Rule-based feedback.
+- **Integration**: Added Rule ingestion support to MCP server.
+
 ## [0.0.21] - 2026-01-09
 
 ### Added

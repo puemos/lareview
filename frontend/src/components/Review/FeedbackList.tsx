@@ -1,9 +1,11 @@
 import React from 'react';
-import type { Feedback } from '../../types';
+import type { Feedback, ReviewRule } from '../../types';
 import { ICONS } from '../../constants/icons';
+import { RulePopover } from './RulePopover';
 
 interface FeedbackListProps {
   feedbacks: Feedback[];
+  rulesById: Record<string, ReviewRule>;
   selectedFeedbackId: string | null;
   onSelectFeedback: (feedbackId: string) => void;
   isLoading?: boolean;
@@ -37,6 +39,7 @@ const IMPACT_CONFIG = {
 
 export const FeedbackList: React.FC<FeedbackListProps> = ({
   feedbacks,
+  rulesById,
   selectedFeedbackId,
   onSelectFeedback,
   isLoading = false,
@@ -79,6 +82,9 @@ export const FeedbackList: React.FC<FeedbackListProps> = ({
         const isActive = selectedFeedbackId === feedback.id;
         const impact =
           IMPACT_CONFIG[feedback.impact as keyof typeof IMPACT_CONFIG] || IMPACT_CONFIG.nitpick;
+        const rule =
+          feedback.rule_id && rulesById[feedback.rule_id] ? rulesById[feedback.rule_id] : null;
+        const ruleLabel = rule?.text || feedback.rule_id;
 
         return (
           <button
@@ -102,6 +108,9 @@ export const FeedbackList: React.FC<FeedbackListProps> = ({
               >
                 {feedback.title || 'Untitled Feedback'}
               </h3>
+              {ruleLabel && (
+                <RulePopover rule={rule} ruleId={feedback.rule_id || ''} />
+              )}
             </div>
           </button>
         );

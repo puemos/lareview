@@ -9,6 +9,7 @@ export const queryKeys = {
   feedbackByReview: (reviewId: string) => ['feedback', 'byReview', reviewId] as const,
   repos: ['repos'] as const,
   agents: ['agents'] as const,
+  rules: ['rules'] as const,
 };
 
 export type QueryKeyType = typeof queryKeys;

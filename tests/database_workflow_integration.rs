@@ -6,6 +6,7 @@ use lareview::domain::{
     ReviewRunStatus, ReviewSource, ReviewStatus, ReviewTask, TaskStats,
 };
 use lareview::infra::db::{Database, repository::*};
+use rusqlite::{Connection, params};
 use std::path::PathBuf;
 
 #[test]
@@ -85,6 +86,7 @@ fn test_full_database_workflow() -> anyhow::Result<()> {
         id: "t-1".into(),
         review_id: review.id.clone(),
         task_id: Some(task.id.clone()),
+        rule_id: None,
         title: "Feedback".into(),
         status: ReviewStatus::Todo,
         impact: FeedbackImpact::Nitpick,
@@ -247,6 +249,137 @@ fn test_task_diff_refs_serialization_deserialization() -> anyhow::Result<()> {
             &"src/extension/extension-background/src/services/fetch-loader.ts".to_string()
         )
     );
+
+    Ok(())
+}
+
+#[test]
+fn test_migrates_legacy_custom_rules_feedback_fk() -> anyhow::Result<()> {
+    let tmp_dir = tempfile::tempdir()?;
+    let db_path = tmp_dir.path().join("db.sqlite");
+
+    {
+        let conn = Connection::open(&db_path)?;
+        conn.execute_batch(
+            r#"
+            PRAGMA foreign_keys = ON;
+
+            CREATE TABLE reviews (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                summary TEXT,
+                source_json TEXT NOT NULL,
+                active_run_id TEXT,
+                status TEXT NOT NULL DEFAULT 'todo',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE tasks (
+                id TEXT PRIMARY KEY
+            );
+
+            CREATE TABLE custom_rules (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                rule_type TEXT NOT NULL,
+                content TEXT NOT NULL,
+                glob_pattern TEXT,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                is_global INTEGER NOT NULL DEFAULT 0
+            );
+
+            CREATE TABLE feedback (
+                id TEXT PRIMARY KEY,
+                review_id TEXT NOT NULL,
+                task_id TEXT,
+                title TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'todo',
+                impact TEXT NOT NULL DEFAULT 'nitpick',
+                anchor_file_path TEXT,
+                anchor_line INTEGER,
+                anchor_side TEXT,
+                anchor_hunk_ref TEXT,
+                anchor_head_sha TEXT,
+                author TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                rule_id TEXT,
+                rule_name TEXT,
+                anchor_diff_line_idx INTEGER,
+                anchor_diff_hash TEXT,
+                FOREIGN KEY(review_id) REFERENCES reviews(id) ON DELETE CASCADE,
+                FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+                FOREIGN KEY(rule_id) REFERENCES custom_rules(id)
+            );
+            "#,
+        )?;
+
+        conn.execute(
+            "INSERT INTO reviews (id, title, summary, source_json, active_run_id, status, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "rev-1",
+                "Legacy Review",
+                Option::<String>::None,
+                "{}",
+                Option::<String>::None,
+                "todo",
+                "now",
+                "now"
+            ],
+        )?;
+
+        conn.execute(
+            "INSERT INTO custom_rules (id, name, rule_type, content, glob_pattern, enabled, created_at, is_global)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                "rule-1",
+                "Legacy Rule",
+                "text",
+                "Legacy rule content",
+                Option::<String>::None,
+                1,
+                "now",
+                1
+            ],
+        )?;
+
+        conn.execute(
+            "INSERT INTO feedback (id, review_id, title, status, impact, author, created_at, updated_at, rule_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                "fb-1",
+                "rev-1",
+                "Legacy Feedback",
+                "todo",
+                "nitpick",
+                "agent",
+                "now",
+                "now",
+                "rule-1"
+            ],
+        )?;
+    }
+
+    let db = Database::open_at(db_path)?;
+    let feedback_repo = FeedbackRepository::new(db.connection());
+    let feedback = feedback_repo.find_by_id("fb-1")?.expect("feedback exists");
+    assert_eq!(feedback.rule_id, Some("rule-1".to_string()));
+
+    let conn = db.connection();
+    let conn = conn.lock().unwrap();
+    let has_custom_rules = conn
+        .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='custom_rules'")?
+        .exists([])?;
+    assert!(!has_custom_rules);
+
+    let mut stmt = conn.prepare("PRAGMA foreign_key_list('feedback')")?;
+    let targets: Vec<String> = stmt
+        .query_map([], |row| row.get::<_, String>(2))?
+        .collect::<Result<_, _>>()?;
+    assert!(!targets.iter().any(|target| target == "custom_rules"));
 
     Ok(())
 }

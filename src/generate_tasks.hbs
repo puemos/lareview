@@ -35,6 +35,19 @@
 </input>
 
 <instructions>
+  {{#if has_rules}}
+  <review_rules>
+    Additional review rules (apply strictly). Each rule includes an ID.
+    When you add feedback because of a rule, include `rule_id` with the rule's ID (the bracketed value, no scope prefix) in the add_feedback payload.
+    {{#each rules}}
+    - [{{id}}] {{text}}
+      (scope: {{scope}})
+      {{#if glob}}(glob: {{glob}}){{/if}}
+      {{#if has_matches}}(matched: {{#each matched_files}}`{{this}}` {{/each}}){{/if}}
+    {{/each}}
+  </review_rules>
+  {{/if}}
+
   <repo_access>
     {{#if has_repo_access}}
     You have READ-ONLY access to the repository working tree at: {{repo_root}}

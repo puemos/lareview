@@ -89,6 +89,9 @@ pub struct Feedback {
     /// Linked task ID (optional)
     #[serde(default)]
     pub task_id: Option<TaskId>,
+    /// Optional rule ID that inspired this feedback
+    #[serde(default)]
+    pub rule_id: Option<String>,
     /// Brief title/summary of the feedback
     pub title: String,
     /// Current status of the feedback

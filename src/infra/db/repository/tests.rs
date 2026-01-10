@@ -1,6 +1,6 @@
 use crate::domain::{
-    Comment, Feedback, FeedbackImpact, LinkedRepo, Review, ReviewRun, ReviewRunStatus, ReviewSource,
-    ReviewStatus, TaskStats,
+    Comment, Feedback, FeedbackImpact, LinkedRepo, Review, ReviewRule, ReviewRun, ReviewRunStatus,
+    ReviewSource, ReviewStatus, RuleScope, TaskStats,
 };
 use crate::infra::db::Database;
 use crate::infra::db::repository::*;
@@ -96,6 +96,36 @@ fn test_repo_repository() -> anyhow::Result<()> {
 }
 
 #[test]
+fn test_review_rule_repository() -> anyhow::Result<()> {
+    let db = Database::open_in_memory()?;
+    let repo = ReviewRuleRepository::new(db.connection());
+
+    let rule = ReviewRule {
+        id: "rule-1".into(),
+        scope: RuleScope::Global,
+        repo_id: None,
+        glob: Some("src/**/*.rs".into()),
+        text: "Focus on auth changes".into(),
+        enabled: true,
+        created_at: "now".into(),
+        updated_at: "now".into(),
+    };
+
+    repo.save(&rule)?;
+    let all = repo.list_all()?;
+    assert_eq!(all.len(), 1);
+    assert_eq!(all[0].id, "rule-1");
+
+    let enabled = repo.list_enabled()?;
+    assert_eq!(enabled.len(), 1);
+
+    repo.delete("rule-1")?;
+    assert_eq!(repo.list_all()?.len(), 0);
+
+    Ok(())
+}
+
+#[test]
 fn test_comment_repository() -> anyhow::Result<()> {
     let db = Database::open_in_memory()?;
     let repo = CommentRepository::new(db.connection());
@@ -120,6 +150,7 @@ fn test_comment_repository() -> anyhow::Result<()> {
         id: "t-1".into(),
         review_id: "rev-1".into(),
         task_id: None,
+        rule_id: None,
         title: "Feedback".into(),
         status: ReviewStatus::Todo,
         impact: FeedbackImpact::Nitpick,
@@ -176,6 +207,7 @@ fn test_feedback_repository() -> anyhow::Result<()> {
         id: "t-1".into(),
         review_id: "rev-1".into(),
         task_id: None,
+        rule_id: None,
         title: "Feedback".into(),
         status: ReviewStatus::Todo,
         impact: FeedbackImpact::Nitpick,
@@ -341,6 +373,7 @@ fn test_review_cascading_deletion() -> anyhow::Result<()> {
         id: "f-1".into(),
         review_id: review_id.clone(),
         task_id: Some(task_id.clone()),
+        rule_id: None,
         title: "Feedback".into(),
         status: ReviewStatus::Todo,
         impact: FeedbackImpact::Nitpick,

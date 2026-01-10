@@ -33,7 +33,7 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const currentTaskTitleRef = useRef<string | null>(null);
 
   const startGeneration = useCallback(
-    async ({ diffText, agentId, source }: StartGenerationArgs): Promise<boolean> => {
+    async ({ diffText, agentId, repoId, source }: StartGenerationArgs): Promise<boolean> => {
       if (isGeneratingRef.current) return false;
 
       isGeneratingRef.current = true;
@@ -143,6 +143,8 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             case 'Completed':
               addProgressMessage('completed', 'Review generation complete!');
               queryClient.invalidateQueries({ queryKey: ['reviews'] });
+              isGeneratingRef.current = false;
+              setIsGeneratingStore(false);
               break;
             case 'Error':
               addProgressMessage('error', (payload.data as { message: string }).message);
@@ -158,6 +160,7 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           diffText,
           agentId,
           currentRunId,
+          repoId,
           source || undefined,
           onProgress
         );

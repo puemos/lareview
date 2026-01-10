@@ -8,6 +8,7 @@ mod feedback_link;
 mod repo;
 mod review;
 mod review_run;
+mod rule;
 mod task;
 
 pub use comment::CommentRepository;
@@ -16,6 +17,7 @@ pub use feedback_link::FeedbackLinkRepository;
 pub use repo::RepoRepository;
 pub use review::ReviewRepository;
 pub use review_run::ReviewRunRepository;
+pub use rule::ReviewRuleRepository;
 pub use task::TaskRepository;
 
 use rusqlite::Connection;
