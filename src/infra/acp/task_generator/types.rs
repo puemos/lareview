@@ -13,6 +13,8 @@ pub struct GenerateTasksInput {
     /// When this is None, the agent must operate diff-only without filesystem or terminal access.
     /// When Some, the agent may read files under this root for context only.
     pub repo_root: Option<PathBuf>,
+    /// Optional snapshot path to cleanup after generation.
+    pub cleanup_path: Option<PathBuf>,
     /// Command to execute the ACP agent.
     pub agent_command: String,
     /// Arguments to pass to the ACP agent command.

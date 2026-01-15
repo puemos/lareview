@@ -54,8 +54,8 @@
 
     Rules:
     - The <diff> provided in this prompt is the only diff you should use for task creation.
+    - You are encouraged to read files to understand the full context of changes. Use `fs/read_text_file` to inspect the code surrounding the diffs or check referenced symbols.
     - Do NOT run git diff, git show, git log, or any command that generates diffs/patches.
-    - You may only read files for context, and only when needed to understand code referenced in the provided <diff> or to produce accurate diagrams of those changes.
     - Do not write or modify files. Do not run builds or tests.
     {{else}}
     You do NOT have repository access.

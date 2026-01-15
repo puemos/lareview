@@ -233,22 +233,22 @@ export const ReviewView: React.FC = () => {
 
   return (
     <div className="bg-bg-primary flex h-full">
-        <ReviewSidebar
-          sidebarTab={sidebarTab}
-          tasks={tasks}
-          feedbacks={feedbacks}
-          selectedTaskId={selectedTaskId}
-          selectedFeedbackId={selectedFeedbackId}
-          isTasksLoading={isTasksLoading}
-          isTasksFetching={isTasksFetching}
-          isFeedbacksLoading={isFeedbacksLoading}
-          onSidebarTabChange={setSidebarTab}
-          onSelectTask={selectTask}
-          onSelectFeedback={selectFeedback}
-          onOpenExportModal={() => setIsModalOpen(true)}
-          onAddGlobalFeedback={handleAddGlobalFeedback}
-          rulesById={rulesById}
-        />
+      <ReviewSidebar
+        sidebarTab={sidebarTab}
+        tasks={tasks}
+        feedbacks={feedbacks}
+        selectedTaskId={selectedTaskId}
+        selectedFeedbackId={selectedFeedbackId}
+        isTasksLoading={isTasksLoading}
+        isTasksFetching={isTasksFetching}
+        isFeedbacksLoading={isFeedbacksLoading}
+        onSidebarTabChange={setSidebarTab}
+        onSelectTask={selectTask}
+        onSelectFeedback={selectFeedback}
+        onOpenExportModal={() => setIsModalOpen(true)}
+        onAddGlobalFeedback={handleAddGlobalFeedback}
+        rulesById={rulesById}
+      />
 
       <div className="bg-bg-primary relative flex min-w-0 flex-1 flex-col">
         <Suspense fallback={<DiffSkeleton />}>

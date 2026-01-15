@@ -1,19 +1,30 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Channel } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ProgressEventPayload } from '../hooks/useTauri';
 import { useTauri } from '../hooks/useTauri';
 import { useAppStore } from '../store';
+
 import {
   GenerationContext,
   type GenerationContextValue,
   type StartGenerationArgs,
 } from './generation-context';
+import { ConfirmationModal } from '../components/Common/ConfirmationModal';
+
+interface WorktreeRequest {
+  repoId: string;
+  repoName: string;
+  commitSha: string;
+  resolve: (confirmed: boolean) => void;
+}
 
 export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { generateReview, parseDiff, stop_generation } = useTauri();
+  const { generateReview, parseDiff, stop_generation, getLinkedRepos } = useTauri();
   const queryClient = useQueryClient();
+
+  const [worktreeRequest, setWorktreeRequest] = useState<WorktreeRequest | null>(null);
 
   const setDiffTextStore = useAppStore(state => state.setDiffText);
   const setAgentIdStore = useAppStore(state => state.setAgentId);
@@ -156,12 +167,42 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           }
         };
 
+        // Check if we should create a worktree for GitHub PRs
+        let useWorktree = false;
+
+        if (source?.type === 'github_pr' && source.head_sha && repoId) {
+          // Check if we have a linked repo that matches
+          try {
+            const linkedRepos = await getLinkedRepos();
+            const matchingRepo = linkedRepos.find(r => r.id === repoId);
+
+            if (matchingRepo) {
+              // Show modal and wait for user response
+              const shouldCreate = await new Promise<boolean>(resolve => {
+                setWorktreeRequest({
+                  repoId,
+                  repoName: matchingRepo.name,
+                  commitSha: source.head_sha!,
+                  resolve,
+                });
+              });
+
+              if (shouldCreate) {
+                useWorktree = true;
+              }
+            }
+          } catch (err) {
+            console.warn('Failed to check worktree eligibility:', err);
+          }
+        }
+
         const result = await generateReview(
           diffText,
           agentId,
           currentRunId,
           repoId,
           source || undefined,
+          useWorktree,
           onProgress
         );
 
@@ -203,6 +244,7 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       addProgressMessage,
       clearProgressMessages,
       generateReview,
+      getLinkedRepos,
       handleServerUpdate,
       parseDiff,
       queryClient,
@@ -238,5 +280,36 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     [startGeneration, stopGeneration]
   );
 
-  return <GenerationContext.Provider value={value}>{children}</GenerationContext.Provider>;
+  const handleWorktreeConfirm = useCallback(() => {
+    if (worktreeRequest) {
+      worktreeRequest.resolve(true);
+      setWorktreeRequest(null);
+    }
+  }, [worktreeRequest]);
+
+  const handleWorktreeCancel = useCallback(() => {
+    if (worktreeRequest) {
+      worktreeRequest.resolve(false);
+      setWorktreeRequest(null);
+    }
+  }, [worktreeRequest]);
+
+  return (
+    <GenerationContext.Provider value={value}>
+      {children}
+      <ConfirmationModal
+        isOpen={!!worktreeRequest}
+        onClose={handleWorktreeCancel}
+        onConfirm={handleWorktreeConfirm}
+        title="Enable Code Access"
+        message={
+          worktreeRequest
+            ? `Create a temporary snapshot of "${worktreeRequest.repoName}" at commit ${worktreeRequest.commitSha.slice(0, 7)}? This lets the agent read the PR's source code for better analysis.`
+            : ''
+        }
+        confirmLabel="Create Snapshot"
+        confirmVariant="brand"
+      />
+    </GenerationContext.Provider>
+  );
 };

@@ -181,7 +181,55 @@ pub fn clear_pending_diff(state: State<'_, AppState>) -> Result<(), String> {
     Ok(())
 }
 
+struct SnapshotCleanupGuard {
+    path: Option<std::path::PathBuf>,
+}
+
+impl SnapshotCleanupGuard {
+    fn new(path: Option<std::path::PathBuf>) -> Self {
+        Self { path }
+    }
+}
+
+impl Drop for SnapshotCleanupGuard {
+    fn drop(&mut self) {
+        if let Some(path) = &self.path
+            && path.exists()
+        {
+            let _ = std::fs::remove_dir_all(path);
+        }
+    }
+}
+
+async fn cleanup_snapshot(path: &std::path::Path) {
+    let mut retries = 5;
+    let mut delay = std::time::Duration::from_millis(200);
+
+    loop {
+        if !path.exists() {
+            break;
+        }
+
+        if let Err(e) = std::fs::remove_dir_all(path) {
+            log::warn!("Failed to cleanup snapshot {}: {}", path.display(), e);
+        }
+
+        if !path.exists() {
+            break;
+        }
+
+        retries -= 1;
+        if retries == 0 {
+            break;
+        }
+
+        tokio::time::sleep(delay).await;
+        delay *= 2;
+    }
+}
+
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn generate_review(
     state: State<'_, AppState>,
     diff_text: String,
@@ -189,6 +237,31 @@ pub async fn generate_review(
     run_id: Option<String>,
     repo_id: Option<String>,
     source: Option<ReviewSource>,
+    use_worktree: bool,
+    on_progress: Channel<ProgressEventPayload>,
+) -> Result<ReviewGenerationResult, String> {
+    generate_review_inner(
+        state.inner(),
+        diff_text,
+        agent_id,
+        run_id,
+        repo_id,
+        source,
+        use_worktree,
+        on_progress,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn generate_review_inner(
+    state: &AppState,
+    diff_text: String,
+    agent_id: String,
+    run_id: Option<String>,
+    repo_id: Option<String>,
+    source: Option<ReviewSource>,
+    use_worktree: bool,
     on_progress: Channel<ProgressEventPayload>,
 ) -> Result<ReviewGenerationResult, String> {
     let diff_hash = hash_diff(&diff_text);
@@ -198,6 +271,56 @@ pub async fn generate_review(
     let source = source.unwrap_or_else(|| ReviewSource::DiffPaste {
         diff_hash: diff_hash.clone(),
     });
+
+    // Create snapshot if requested and applicable
+    let snapshot_path = if use_worktree {
+        let repo_id_ref = &repo_id;
+        if let (
+            Some(rid),
+            ReviewSource::GitHubPr {
+                head_sha: Some(head_sha),
+                ..
+            },
+        ) = (repo_id_ref, &source)
+        {
+            let repos = {
+                let db = state.db.lock().map_err(|e| e.to_string())?;
+                db.get_linked_repos().map_err(|e| e.to_string())?
+            };
+            if let Some(repo) = repos.iter().find(|r| r.id == *rid) {
+                let manager = crate::infra::vcs::snapshot::SnapshotManager::new(
+                    std::path::PathBuf::from(&repo.path),
+                );
+
+                // Notify via progress channel
+                let _ = on_progress.send(ProgressEventPayload::Log(format!(
+                    "Creating snapshot for {} at {}...",
+                    repo.name,
+                    &head_sha[..7]
+                )));
+
+                let snapshot_path = manager
+                    .create(&run_id, head_sha)
+                    .await
+                    .map_err(|e| e.to_string())?;
+
+                let _ = on_progress.send(ProgressEventPayload::Log(format!(
+                    "Snapshot ready at {}",
+                    snapshot_path.display()
+                )));
+
+                Some(snapshot_path)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let _snapshot_guard = SnapshotCleanupGuard::new(snapshot_path.clone());
 
     let now = chrono::Utc::now().to_rfc3339();
 
@@ -387,10 +510,14 @@ pub async fn generate_review(
         resolve_rules(&all_rules, repo_id.as_deref(), &diff_paths)
     };
 
+    // Use snapshot path as repo_root if provided for agent access
+    let repo_root = snapshot_path.clone();
+
     let result = generate_tasks_with_acp(GenerateTasksInput {
         run_context,
         rules,
-        repo_root: None,
+        repo_root,
+        cleanup_path: snapshot_path.clone(),
         agent_command: command,
         agent_args: candidate_args,
         progress_tx: Some(mcp_tx),
@@ -407,6 +534,10 @@ pub async fn generate_review(
     {
         let mut active = state.active_runs.lock().unwrap();
         active.remove(&run_id);
+    }
+
+    if let Some(snapshot_path) = snapshot_path.as_ref() {
+        cleanup_snapshot(snapshot_path).await;
     }
 
     match result {
@@ -1187,7 +1318,7 @@ pub fn link_repo(state: State<'_, AppState>, path: String) -> Result<LinkedRepo,
         id: id.clone(),
         name: name.clone(),
         path: std::path::PathBuf::from(path.clone()),
-        remotes: Vec::new(),
+        remotes: detect_remotes(&path),
         created_at: linked_at.clone(),
     };
 
@@ -1307,6 +1438,7 @@ pub struct LinkedRepoState {
     pub path: String,
     pub review_count: usize,
     pub linked_at: String,
+    pub remotes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1331,6 +1463,29 @@ pub async fn get_available_editors() -> Vec<EditorCandidate> {
             path: e.path.to_string_lossy().to_string(),
         })
         .collect()
+}
+
+fn detect_remotes(path: &str) -> Vec<String> {
+    use std::process::Command;
+    let output = Command::new("git")
+        .args(["remote", "-v"])
+        .current_dir(path)
+        .output();
+
+    match output {
+        Ok(output) if output.status.success() => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let mut remotes = std::collections::HashSet::new();
+            for line in stdout.lines() {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 2 {
+                    remotes.insert(parts[1].to_string());
+                }
+            }
+            remotes.into_iter().collect()
+        }
+        _ => Vec::new(),
+    }
 }
 
 #[tauri::command]
@@ -2022,4 +2177,134 @@ pub struct DiffRequestState {
     pub to: String,
     pub agent: Option<String>,
     pub source: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::{LinkedRepo, ReviewSource};
+    use std::sync::Mutex;
+    use tauri::ipc::Channel;
+    use tempfile::tempdir;
+
+    static DB_TEST_MUTEX: Mutex<()> = Mutex::new(());
+
+    #[tokio::test]
+    #[allow(clippy::await_holding_lock)]
+    async fn test_generate_review_cleans_snapshot_on_failure() {
+        let _guard = DB_TEST_MUTEX.lock().unwrap();
+        let tmp_dir = tempdir().expect("tempdir");
+        let db_path = tmp_dir.path().join("db.sqlite");
+        let original_db_path = std::env::var("LAREVIEW_DB_PATH").ok();
+        let original_codex_bin = std::env::var("CODEX_ACP_BIN").ok();
+
+        unsafe {
+            std::env::set_var("LAREVIEW_DB_PATH", db_path.to_string_lossy().to_string());
+            std::env::set_var("CODEX_ACP_BIN", "/usr/bin/false");
+        }
+
+        let repo_dir = tempdir().expect("repo tempdir");
+        let repo_path = repo_dir.path();
+        let init = std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(repo_path)
+            .status();
+
+        if init.is_err() || !init.unwrap().success() {
+            restore_env(original_db_path, original_codex_bin);
+            return;
+        }
+
+        let _ = std::process::Command::new("git")
+            .args(["config", "user.email", "test@test.com"])
+            .current_dir(repo_path)
+            .status();
+        let _ = std::process::Command::new("git")
+            .args(["config", "user.name", "Test"])
+            .current_dir(repo_path)
+            .status();
+
+        std::fs::write(repo_path.join("test.txt"), "hello").expect("write file");
+        let _ = std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo_path)
+            .status();
+        let _ = std::process::Command::new("git")
+            .args(["commit", "-m", "initial"])
+            .current_dir(repo_path)
+            .status();
+
+        let output = std::process::Command::new("git")
+            .args(["rev-parse", "HEAD"])
+            .current_dir(repo_path)
+            .output()
+            .expect("rev-parse");
+        let commit_sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+        let state = AppState::new();
+        let linked_repo = LinkedRepo {
+            id: "repo-1".to_string(),
+            name: "test-repo".to_string(),
+            path: repo_path.to_path_buf(),
+            remotes: vec![],
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        {
+            let db = state.db.lock().unwrap();
+            db.repo_repo().save(&linked_repo).expect("save repo");
+        }
+
+        let run_id = uuid::Uuid::new_v4().to_string();
+        let channel: Channel<ProgressEventPayload> = Channel::new(|_| Ok(()));
+        let result = generate_review_inner(
+            &state,
+            "diff".to_string(),
+            "codex".to_string(),
+            Some(run_id.clone()),
+            Some(linked_repo.id.clone()),
+            Some(ReviewSource::GitHubPr {
+                owner: "owner".to_string(),
+                repo: "repo".to_string(),
+                number: 1,
+                url: None,
+                head_sha: Some(commit_sha),
+                base_sha: None,
+            }),
+            true,
+            channel,
+        )
+        .await;
+
+        assert!(result.is_err());
+
+        let snapshot_path = std::env::temp_dir().join("lareview-snapshots").join(run_id);
+        assert!(
+            !snapshot_path.exists(),
+            "snapshot should be removed after generation"
+        );
+
+        restore_env(original_db_path, original_codex_bin);
+    }
+
+    fn restore_env(original_db_path: Option<String>, original_codex_bin: Option<String>) {
+        if let Some(original) = original_db_path {
+            unsafe {
+                std::env::set_var("LAREVIEW_DB_PATH", original);
+            }
+        } else {
+            unsafe {
+                std::env::remove_var("LAREVIEW_DB_PATH");
+            }
+        }
+
+        if let Some(original) = original_codex_bin {
+            unsafe {
+                std::env::set_var("CODEX_ACP_BIN", original);
+            }
+        } else {
+            unsafe {
+                std::env::remove_var("CODEX_ACP_BIN");
+            }
+        }
+    }
 }

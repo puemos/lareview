@@ -1,0 +1,44 @@
+use lareview::domain::ReviewSource;
+use lareview::infra::acp::RunContext;
+use lareview::infra::acp::{GenerateTasksInput, generate_tasks_with_acp};
+use std::sync::Arc;
+
+#[tokio::test]
+async fn test_generate_tasks_with_fake_agent_finalize_only() {
+    let agent_path = env!("CARGO_BIN_EXE_fake_acp_agent");
+    let run_context = RunContext {
+        review_id: "review".to_string(),
+        run_id: "run".to_string(),
+        agent_id: "fake".to_string(),
+        input_ref: "diff".to_string(),
+        diff_text: Arc::from("diff"),
+        diff_hash: "hash".to_string(),
+        source: ReviewSource::DiffPaste {
+            diff_hash: "hash".to_string(),
+        },
+        initial_title: None,
+        created_at: None,
+    };
+
+    let input = GenerateTasksInput {
+        run_context,
+        rules: Vec::new(),
+        repo_root: None,
+        cleanup_path: None,
+        agent_command: agent_path.to_string(),
+        agent_args: Vec::new(),
+        progress_tx: None,
+        mcp_server_binary: None,
+        timeout_secs: Some(10),
+        cancel_token: None,
+        debug: true,
+    };
+
+    let result = generate_tasks_with_acp(input).await;
+    assert!(result.is_ok());
+    let logs = result.unwrap().logs;
+    assert!(
+        logs.iter()
+            .any(|entry| entry.contains("finalized without returning any tasks"))
+    );
+}

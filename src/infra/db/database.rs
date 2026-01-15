@@ -581,18 +581,37 @@ impl Database {
         let conn = self.conn.lock().expect("Failed to acquire database lock");
         let mut stmt =
             conn.prepare("SELECT id, name, path, created_at FROM repos ORDER BY created_at DESC")?;
+
         let rows = stmt.query_map([], |row| {
-            Ok(LinkedRepoState {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                path: row.get(2)?,
-                review_count: 0,
-                linked_at: row.get(3)?,
-            })
+            let id: String = row.get(0)?;
+            let name: String = row.get(1)?;
+            let path: String = row.get(2)?;
+            let linked_at: String = row.get(3)?;
+
+            Ok((id, name, path, linked_at))
         })?;
+
         let mut repos = Vec::new();
         for row in rows {
-            repos.push(row?);
+            let (id, name, path, linked_at) = row?;
+
+            // Fetch remotes
+            let mut remote_stmt =
+                conn.prepare("SELECT url FROM repo_remotes WHERE repo_id = ?1")?;
+            let remote_rows = remote_stmt.query_map([&id], |r| r.get::<_, String>(0))?;
+            let mut remotes = Vec::new();
+            for r in remote_rows {
+                remotes.push(r?);
+            }
+
+            repos.push(LinkedRepoState {
+                id,
+                name,
+                path,
+                review_count: 0,
+                linked_at,
+                remotes,
+            });
         }
         Ok(repos)
     }

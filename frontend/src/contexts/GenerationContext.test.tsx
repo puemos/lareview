@@ -6,11 +6,12 @@ import { GenerationProvider } from './GenerationContext';
 import { useGeneration } from './useGeneration';
 import { mockTauri } from '../test/mocks';
 import { useAppStore } from '../store';
+import type { ProgressEventPayload } from '../hooks/useTauri';
 
 vi.mock('@tauri-apps/api/core', () => {
   return {
     Channel: class {
-      onmessage: ((payload: any) => void) | null = null;
+      onmessage: ((payload: ProgressEventPayload) => void) | null = null;
       send = vi.fn();
     },
     invoke: vi.fn(),
@@ -37,8 +38,8 @@ const createWrapper = () => {
 };
 
 interface MockChannel {
-  onmessage: ((payload: any) => void) | null;
-  send: (payload: any) => void;
+  onmessage: ((payload: ProgressEventPayload) => void) | null;
+  send: (payload: ProgressEventPayload) => void;
 }
 
 describe('GenerationContext', () => {
@@ -53,11 +54,10 @@ describe('GenerationContext', () => {
     });
 
     // Mock generateReview to be slow
-    
+
     vi.mocked(mockTauri.generateReview).mockImplementation(() => new Promise(() => {}));
 
     act(() => {
-      
       result.current.startGeneration({
         diffText: 'test diff',
         agentId: 'test-agent',
@@ -75,15 +75,14 @@ describe('GenerationContext', () => {
     });
 
     let channelInstance: MockChannel | null = null;
-    
+
     vi.mocked(mockTauri.generateReview).mockImplementation(async (...args) => {
-      channelInstance = args[5];
+      channelInstance = args[6];
       // Keep the promise pending until we send the Completed event
       return new Promise(() => {});
     });
 
     act(() => {
-      
       result.current.startGeneration({
         diffText: 'test diff',
         agentId: 'test-agent',
@@ -110,14 +109,13 @@ describe('GenerationContext', () => {
     });
 
     let channelInstance: MockChannel | null = null;
-    
+
     vi.mocked(mockTauri.generateReview).mockImplementation(async (...args) => {
-      channelInstance = args[5];
+      channelInstance = args[6];
       return new Promise(() => {});
     });
 
     act(() => {
-      
       result.current.startGeneration({
         diffText: 'test diff',
         agentId: 'test-agent',

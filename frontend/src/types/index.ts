@@ -123,6 +123,16 @@ export interface LinkedRepo {
   path: string;
   name: string;
   linked_at?: string;
+  remotes: string[];
+  review_count?: number;
+}
+
+export interface WorktreeSession {
+  id: string;
+  repo_id: string;
+  worktree_path: string;
+  commit_sha: string;
+  created_at: string;
 }
 
 export type RuleScope = 'global' | 'repo';

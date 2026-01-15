@@ -1,4 +1,5 @@
 import { vi, type Mock } from 'vitest';
+import type { Channel } from '@tauri-apps/api/core';
 import type {
   ReviewTask,
   Review,
@@ -8,7 +9,9 @@ import type {
   ReviewRun,
   Feedback,
   Comment,
+  ReviewSource,
 } from '../types';
+import type { ProgressEventPayload } from '../hooks/useTauri';
 
 const createMockReview = (overrides = {}): Review => ({
   id: 'review-1',
@@ -106,8 +109,9 @@ interface MockTauriReturn {
       agentId: string,
       runId?: string,
       repoId?: string,
-      source?: string,
-      onProgress?: any
+      source?: ReviewSource,
+      useWorktree?: boolean,
+      onProgress?: Channel<ProgressEventPayload>
     ) => Promise<{ task_count: number; review_id: string; run_id?: string }>
   >;
   stop_generation: Mock<(runId: string) => Promise<void>>;

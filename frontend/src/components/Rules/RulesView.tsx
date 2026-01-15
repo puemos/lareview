@@ -30,10 +30,7 @@ export const RulesView: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState<RuleDraft>(emptyDraft);
 
-  const globalRules = useMemo(
-    () => rules.filter(rule => rule.scope === 'global'),
-    [rules]
-  );
+  const globalRules = useMemo(() => rules.filter(rule => rule.scope === 'global'), [rules]);
   const repoRules = useMemo(() => rules.filter(rule => rule.scope === 'repo'), [rules]);
 
   const repoName = (repoId?: string | null) =>
@@ -323,7 +320,7 @@ const RuleForm: React.FC<RuleFormProps> = ({
         />
       </label>
 
-      <label className="flex items-center gap-2 text-xs text-text-secondary">
+      <label className="text-text-secondary flex items-center gap-2 text-xs">
         <input
           type="checkbox"
           checked={draft.enabled}
@@ -337,7 +334,7 @@ const RuleForm: React.FC<RuleFormProps> = ({
         <button
           onClick={onSubmit}
           disabled={disabled || repoRequired || isLoading}
-          className="bg-brand text-bg-primary hover:brightness-110 disabled:bg-bg-tertiary disabled:text-text-disabled rounded-md px-3 py-2 text-xs font-semibold transition-all disabled:cursor-not-allowed"
+          className="bg-brand text-bg-primary disabled:bg-bg-tertiary disabled:text-text-disabled rounded-md px-3 py-2 text-xs font-semibold transition-all hover:brightness-110 disabled:cursor-not-allowed"
         >
           {submitLabel}
         </button>
@@ -399,10 +396,7 @@ const RuleSection: React.FC<RuleSectionProps> = ({
       ) : (
         <div className="space-y-3">
           {rules.map(rule => (
-            <div
-              key={rule.id}
-              className="bg-bg-secondary/40 border-border rounded-lg border p-4"
-            >
+            <div key={rule.id} className="bg-bg-secondary/40 border-border rounded-lg border p-4">
               {editingId === rule.id ? (
                 <RuleForm
                   draft={editingDraft}
@@ -418,16 +412,16 @@ const RuleSection: React.FC<RuleSectionProps> = ({
                     <div className="space-y-1">
                       <div className="text-text-primary text-sm font-medium">{rule.text}</div>
                       <div className="text-text-tertiary flex flex-wrap items-center gap-2 text-[10px]">
-                        <span className="rounded bg-bg-tertiary px-2 py-0.5 uppercase">
+                        <span className="bg-bg-tertiary rounded px-2 py-0.5 uppercase">
                           {rule.scope}
                         </span>
                         {rule.scope === 'repo' && (
-                          <span className="rounded bg-bg-tertiary px-2 py-0.5">
+                          <span className="bg-bg-tertiary rounded px-2 py-0.5">
                             {repoName(rule.repo_id)}
                           </span>
                         )}
                         {rule.glob && (
-                          <span className="rounded bg-bg-tertiary px-2 py-0.5 font-mono">
+                          <span className="bg-bg-tertiary rounded px-2 py-0.5 font-mono">
                             {rule.glob}
                           </span>
                         )}

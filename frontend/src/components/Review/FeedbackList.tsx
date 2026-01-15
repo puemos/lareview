@@ -108,9 +108,7 @@ export const FeedbackList: React.FC<FeedbackListProps> = ({
               >
                 {feedback.title || 'Untitled Feedback'}
               </h3>
-              {ruleLabel && (
-                <RulePopover rule={rule} ruleId={feedback.rule_id || ''} />
-              )}
+              {ruleLabel && <RulePopover rule={rule} ruleId={feedback.rule_id || ''} />}
             </div>
           </button>
         );

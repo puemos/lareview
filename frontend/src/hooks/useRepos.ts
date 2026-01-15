@@ -9,6 +9,7 @@ interface Repo {
   path: string;
   review_count: number;
   linked_at: string;
+  remotes: string[];
 }
 
 export function useRepos() {

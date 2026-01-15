@@ -15,9 +15,8 @@ const { mockGetReviewRuns, mockDeleteReview, mockUseTauri } = vi.hoisted(() => {
 });
 
 vi.mock('../../../hooks/useTauri', async () => {
-  const actual = await vi.importActual<typeof import('../../../hooks/useTauri')>(
-    '../../../hooks/useTauri'
-  );
+  const actual =
+    await vi.importActual<typeof import('../../../hooks/useTauri')>('../../../hooks/useTauri');
   return {
     ...actual,
     useTauri: mockUseTauri,

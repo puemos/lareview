@@ -247,6 +247,7 @@ export const useTauri = () => {
       path: string;
       review_count: number;
       linked_at: string;
+      remotes: string[];
     }>
   > => {
     return invoke('get_linked_repos');
@@ -270,6 +271,7 @@ export const useTauri = () => {
       runId?: string,
       repoId?: string,
       source?: ReviewSource,
+      useWorktree?: boolean,
       onProgress?: Channel<ProgressEventPayload>
     ): Promise<{ task_count: number; review_id: string; run_id?: string }> => {
       return invoke('generate_review', {
@@ -278,6 +280,7 @@ export const useTauri = () => {
         runId,
         repoId,
         source,
+        useWorktree: useWorktree || false,
         onProgress,
       });
     },
@@ -456,12 +459,9 @@ export const useTauri = () => {
     return invoke('get_review_rules');
   }, []);
 
-  const createReviewRule = useCallback(
-    async (input: ReviewRuleInput): Promise<ReviewRule> => {
-      return invoke('create_review_rule', { input });
-    },
-    []
-  );
+  const createReviewRule = useCallback(async (input: ReviewRuleInput): Promise<ReviewRule> => {
+    return invoke('create_review_rule', { input });
+  }, []);
 
   const updateReviewRule = useCallback(
     async (id: string, input: ReviewRuleInput): Promise<ReviewRule> => {
@@ -565,6 +565,7 @@ export const useTauri = () => {
     deleteReviewRule,
     linkRepo,
     unlinkRepo,
+
     selectRepoFolder,
     getAvailableEditors: useCallback(async (): Promise<EditorCandidate[]> => {
       return invoke('get_available_editors');

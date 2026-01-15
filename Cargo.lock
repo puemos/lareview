@@ -3031,6 +3031,7 @@ dependencies = [
  "ignore",
  "image",
  "lazy_static",
+ "libc",
  "log",
  "lru",
  "once_cell",

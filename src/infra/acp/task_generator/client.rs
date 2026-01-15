@@ -826,6 +826,13 @@ impl agent_client_protocol::Client for LaReviewClient {
                             let _ = tx.send(ProgressEvent::MetadataUpdated);
                         }
                     } else if is_return_task {
+                        if let Some(ref input) = final_input {
+                            self.append_single_task_from_value(input.clone());
+                        }
+                        if let Some(ref output) = final_output {
+                            self.append_single_task_from_value(output.clone());
+                        }
+
                         let task_id = final_input
                             .as_ref()
                             .and_then(|v| v.get("id").and_then(|id| id.as_str()))

@@ -142,6 +142,26 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
       setDiffText(diff.diff_text);
       if (diff.source) {
         setPendingSource(diff.source);
+
+        // Auto-select matching linked repo
+        if (diff.source.type === 'github_pr') {
+          const { owner, repo: prRepoName } = diff.source;
+          const target = `${owner}/${prRepoName}`.toLowerCase();
+
+          // Try matching by remote URL first, then by name
+          let matchingRepo = repos.find(r =>
+            r.remotes.some((url: string) => url.toLowerCase().includes(target))
+          );
+
+          if (!matchingRepo) {
+            // Fallback: match by repo name
+            matchingRepo = repos.find(r => r.name.toLowerCase() === prRepoName.toLowerCase());
+          }
+
+          if (matchingRepo) {
+            setSelectedRepoId(matchingRepo.id);
+          }
+        }
       }
       setParsedDiff(diff);
       setViewMode('diff');
@@ -151,7 +171,15 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     } finally {
       setIsLoadingPr(false);
     }
-  }, [prRef, fetchGithubPR, setParsedDiff, setPendingSource, setViewMode]);
+  }, [
+    prRef,
+    fetchGithubPR,
+    setParsedDiff,
+    setPendingSource,
+    setViewMode,
+    repos,
+    setSelectedRepoId,
+  ]);
 
   const handleClear = useCallback(() => {
     setDiffText('');
