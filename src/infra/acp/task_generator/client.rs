@@ -15,6 +15,20 @@ use std::sync::{Arc, Mutex};
 
 use crate::domain::ReviewTask;
 
+// LaReview MCP tool names - centralized for consistency
+const TOOL_RETURN_TASK: &str = "return_task";
+const TOOL_RETURN_PLANS: &str = "return_plans";
+const TOOL_FINALIZE_REVIEW: &str = "finalize_review";
+const TOOL_ADD_FEEDBACK: &str = "add_feedback";
+
+/// All LaReview tool names that should be auto-approved.
+const LAREVIEW_TOOLS: &[&str] = &[
+    TOOL_RETURN_TASK,
+    TOOL_RETURN_PLANS,
+    TOOL_FINALIZE_REVIEW,
+    TOOL_ADD_FEEDBACK,
+];
+
 struct ReadCheck {
     allowed: bool,
     path_display: String,
@@ -88,21 +102,14 @@ impl LaReviewClient {
     }
 
     fn looks_like_return_tool(&self, tool_title: &str) -> bool {
-        tool_title.contains("return_task")
-            || tool_title.contains("return_plans")
-            || tool_title.contains("finalize_review")
+        LAREVIEW_TOOLS.iter().any(|tool| tool_title.contains(tool))
     }
 
     fn tool_name_from_title(title: &str) -> Option<&'static str> {
-        if title.contains("return_task") {
-            Some("return_task")
-        } else if title.contains("return_plans") {
-            Some("return_plans")
-        } else if title.contains("finalize_review") {
-            Some("finalize_review")
-        } else {
-            None
-        }
+        LAREVIEW_TOOLS
+            .iter()
+            .find(|tool| title.contains(*tool))
+            .copied()
     }
 
     fn tool_name_from_payload(payload: &serde_json::Value) -> Option<String> {
@@ -462,12 +469,12 @@ impl agent_client_protocol::Client for LaReviewClient {
         let raw_input = &args.tool_call.fields.raw_input;
         let tool_name = raw_input.as_ref().and_then(Self::tool_name_from_payload);
 
-        // Check if this looks like a return tool by checking tool name or if it's JSON in title that looks like a task/finalize payload
+        // Check if this looks like a LaReview tool by checking tool name or if it's JSON in title that looks like a task/finalize payload
         let is_return_tool = self.looks_like_return_tool(&tool_title)
-            || matches!(
-                tool_name.as_deref(),
-                Some("return_task") | Some("return_plans") | Some("finalize_review")
-            )
+            || tool_name
+                .as_deref()
+                .map(|name| LAREVIEW_TOOLS.contains(&name))
+                .unwrap_or(false)
             || {
                 // For ToolKind::Other, check if the title is JSON with required streaming fields
                 matches!(tool_kind, Some(ToolKind::Other))
