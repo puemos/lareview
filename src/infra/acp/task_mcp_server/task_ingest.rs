@@ -8,7 +8,7 @@ use crate::infra::diff::index::DiffIndex;
 use anyhow::{Context, Result, anyhow};
 use chrono::Utc;
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Validate raw hunk objects before parsing so we fail fast on malformed payloads.
 fn validate_raw_task_hunks(raw_task: &Value, diff_index: &DiffIndex) -> Result<()> {
@@ -152,6 +152,62 @@ fn validate_task_diagram(task: &ReviewTask) -> Result<()> {
             "Task {} missing diagram. Every task must include a diagram.",
             task.id
         );
+    }
+
+    Ok(())
+}
+
+#[derive(Debug)]
+pub(super) struct MissingCoverageError {
+    pub missing_files: Vec<String>,
+}
+
+impl MissingCoverageError {
+    pub fn message(&self) -> String {
+        format!(
+            "Tasks do not cover all changed files. Missing: {}. Add these files to task.files or include tasks that cover them.",
+            self.missing_files.join(", ")
+        )
+    }
+}
+
+impl std::fmt::Display for MissingCoverageError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message())
+    }
+}
+
+impl std::error::Error for MissingCoverageError {}
+
+pub(super) fn validate_task_coverage(config: &ServerConfig) -> Result<()> {
+    let ctx = load_run_context(config);
+    if ctx.diff_text.trim().is_empty() {
+        return Ok(());
+    }
+
+    let db = open_database(config)?;
+    let tasks = db
+        .get_tasks_by_run(&ctx.run_id)
+        .map_err(|e| anyhow!("load tasks for coverage validation: {e}"))?;
+
+    let changed_files = crate::infra::diff::extract_changed_files(&ctx.diff_text);
+    let mentioned_files: HashSet<String> = tasks
+        .iter()
+        .flat_map(|task| task.files.iter())
+        .map(|f| crate::infra::diff::normalize_task_path(f))
+        .collect();
+
+    let mut missing: Vec<String> = changed_files
+        .difference(&mentioned_files)
+        .cloned()
+        .collect();
+    missing.sort();
+
+    if !missing.is_empty() {
+        return Err(MissingCoverageError {
+            missing_files: missing,
+        }
+        .into());
     }
 
     Ok(())

@@ -135,10 +135,10 @@ pub(super) fn validate_tasks_payload(
         .cloned()
         .collect();
     if !missing.is_empty() {
-        warnings.push(format!(
-            "Tasks do not cover all changed files. Missing: {}",
+        anyhow::bail!(
+            "Tasks do not cover all changed files. Missing: {}. Add these files to task.files or include tasks that cover them.",
             missing.join(", ")
-        ));
+        );
     }
 
     Ok(warnings)

@@ -6,12 +6,18 @@ use std::sync::Arc;
 #[tokio::test]
 async fn test_generate_tasks_with_fake_agent_finalize_only() {
     let agent_path = env!("CARGO_BIN_EXE_fake_acp_agent");
+    let diff_text = "diff --git a/src/a.rs b/src/a.rs\n\
+index 0000000..1111111 100644\n\
+--- a/src/a.rs\n\
++++ b/src/a.rs\n\
+@@ -0,0 +1 @@\n\
++line\n";
     let run_context = RunContext {
         review_id: "review".to_string(),
         run_id: "run".to_string(),
         agent_id: "fake".to_string(),
         input_ref: "diff".to_string(),
-        diff_text: Arc::from("diff"),
+        diff_text: Arc::from(diff_text),
         diff_hash: "hash".to_string(),
         source: ReviewSource::DiffPaste {
             diff_hash: "hash".to_string(),
@@ -35,10 +41,7 @@ async fn test_generate_tasks_with_fake_agent_finalize_only() {
     };
 
     let result = generate_tasks_with_acp(input).await;
-    assert!(result.is_ok());
-    let logs = result.unwrap().logs;
-    assert!(
-        logs.iter()
-            .any(|entry| entry.contains("finalized without returning any tasks"))
-    );
+    let error = result.unwrap_err().to_string();
+    assert!(error.contains("Tasks do not cover all changed files"));
+    assert!(error.contains("src/a.rs"));
 }

@@ -1,7 +1,9 @@
 use super::config::ServerConfig;
 use super::feedback_ingest::save_agent_comment;
 use super::logging::log_to_file;
-use super::task_ingest::{save_task, update_review_metadata};
+use super::task_ingest::{
+    MissingCoverageError, save_task, update_review_metadata, validate_task_coverage,
+};
 use grep::{
     regex::RegexMatcherBuilder,
     searcher::{BinaryDetection, SearcherBuilder, sinks::Lossy},
@@ -119,6 +121,7 @@ pub(super) fn create_finalize_review_tool(config: Arc<ServerConfig>) -> impl Too
             let persist_config = config.clone();
             let persist_args_for_spawn = persist_args.clone(); // Clone before moving into spawn
             let persist_result = tokio::task::spawn_blocking(move || {
+                validate_task_coverage(&persist_config)?;
                 update_review_metadata(&persist_config, persist_args_for_spawn)
             })
             .await;
@@ -168,7 +171,17 @@ pub(super) fn create_finalize_review_tool(config: Arc<ServerConfig>) -> impl Too
                     }
 
                     // Check if this is a DiffIndexError and format appropriately
-                    let error_msg = if let Some(diff_index_err) = err.downcast_ref::<crate::infra::diff::index::DiffIndexError>() {
+                    let error_msg = if let Some(missing) = err.downcast_ref::<MissingCoverageError>() {
+                        let message = missing.message();
+                        serde_json::json!({
+                            "status": "error",
+                            "message": message,
+                            "missing_files": missing.missing_files,
+                        })
+                        .to_string()
+                    } else if let Some(diff_index_err) =
+                        err.downcast_ref::<crate::infra::diff::index::DiffIndexError>()
+                    {
                         // Return structured JSON error for agent parsing
                         diff_index_err.to_json()
                     } else {
