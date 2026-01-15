@@ -59,6 +59,28 @@ pub enum ReviewSource {
         #[serde(default)]
         base_sha: Option<String>,
     },
+    /// Review is derived from a GitLab merge request fetched locally via `glab`.
+    #[serde(rename = "gitlab_mr")]
+    GitLabMr {
+        /// GitLab host (e.g. gitlab.com)
+        host: String,
+        /// GitLab project path (namespace/project)
+        project_path: String,
+        /// Merge request number
+        number: u32,
+        /// Optional canonical URL for the MR
+        #[serde(default)]
+        url: Option<String>,
+        /// Topmost commit SHA of the MR
+        #[serde(default)]
+        head_sha: Option<String>,
+        /// Base commit SHA of the target branch
+        #[serde(default)]
+        base_sha: Option<String>,
+        /// Start commit SHA for the MR diff
+        #[serde(default)]
+        start_sha: Option<String>,
+    },
 }
 
 impl ReviewSource {
@@ -66,6 +88,7 @@ impl ReviewSource {
         match self {
             ReviewSource::DiffPaste { .. } => None,
             ReviewSource::GitHubPr { url, .. } => url.clone(),
+            ReviewSource::GitLabMr { url, .. } => url.clone(),
         }
     }
 
@@ -73,6 +96,15 @@ impl ReviewSource {
         match self {
             ReviewSource::DiffPaste { .. } => None,
             ReviewSource::GitHubPr { head_sha, .. } => head_sha.clone(),
+            ReviewSource::GitLabMr { head_sha, .. } => head_sha.clone(),
+        }
+    }
+
+    pub fn provider_id(&self) -> Option<&str> {
+        match self {
+            ReviewSource::DiffPaste { .. } => None,
+            ReviewSource::GitHubPr { .. } => Some("github"),
+            ReviewSource::GitLabMr { .. } => Some("gitlab"),
         }
     }
 }

@@ -23,6 +23,7 @@ export interface ParsedDiff {
   changed_files?: number;
   hunk_manifest?: string;
   source?: ReviewSource;
+  title?: string | null;
 }
 
 export interface CommentThread {
@@ -158,8 +159,10 @@ export interface Agent {
   available?: boolean;
 }
 
-export interface GitHubStatus {
-  ghPath: string;
+export interface VcsStatus {
+  id: string;
+  name: string;
+  cliPath: string;
   login?: string;
   error?: string;
 }
@@ -217,6 +220,16 @@ export type ReviewSource =
       url?: string;
       head_sha?: string;
       base_sha?: string;
+    }
+  | {
+      type: 'gitlab_mr';
+      host: string;
+      project_path: string;
+      number: number;
+      url?: string;
+      head_sha?: string;
+      base_sha?: string;
+      start_sha?: string;
     };
 
 export type ViewType = 'generate' | 'review' | 'repos' | 'rules' | 'settings';

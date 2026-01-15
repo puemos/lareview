@@ -11,7 +11,8 @@ use crate::infra::acp::{
 };
 use crate::infra::diff::index::DiffIndex;
 use crate::infra::hash::hash_diff;
-use crate::infra::vcs::github;
+use crate::infra::vcs::registry::VcsRegistry;
+use crate::infra::vcs::traits::{FeedbackPushRequest, ReviewPushRequest, VcsStatus};
 use crate::state::{AppState, PendingDiff};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -62,14 +63,6 @@ pub enum ProgressEventPayload {
     Error {
         message: String,
     },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GitHubStatus {
-    pub gh_path: String,
-    pub login: Option<String>,
-    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -339,6 +332,11 @@ async fn generate_review_inner(
         ReviewSource::GitHubPr { repo, number, .. } => {
             format!("PR {}#{}", repo, number)
         }
+        ReviewSource::GitLabMr {
+            project_path,
+            number,
+            ..
+        } => format!("MR {}!{}", project_path, number),
         _ => "AI Review".to_string(),
     };
 
@@ -1146,31 +1144,39 @@ fn generate_markdown_export(
     Ok(md)
 }
 #[tauri::command]
-pub async fn fetch_github_pr(
+pub async fn fetch_remote_pr(
     _state: State<'_, AppState>,
     pr_ref: String,
+    provider_hint: Option<String>,
 ) -> Result<ParsedDiff, String> {
-    let pr_metadata = crate::infra::vcs::github::parse_pr_ref(&pr_ref)
-        .ok_or_else(|| format!("Invalid PR reference: {}", pr_ref))?;
+    let registry = VcsRegistry::default();
+    let provider = if let Some(hint) = provider_hint
+        .as_ref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+    {
+        let hint = hint.to_lowercase();
+        registry
+            .get_provider(&hint)
+            .ok_or_else(|| format!("Unknown VCS provider: {}", hint))?
+    } else {
+        registry
+            .detect_provider(&pr_ref)
+            .ok_or_else(|| format!("Unsupported VCS reference: {}", pr_ref))?
+    };
 
-    let diff_text = crate::infra::vcs::github::fetch_pr_diff(&pr_metadata)
+    let reference = provider
+        .parse_ref(&pr_ref)
+        .ok_or_else(|| format!("Invalid VCS reference: {}", pr_ref))?;
+
+    let data = provider
+        .fetch_pr(reference.as_ref())
         .await
         .map_err(|e| e.to_string())?;
 
-    let metadata = crate::infra::vcs::github::fetch_pr_metadata(&pr_metadata)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let mut parsed = parse_diff(diff_text)?;
-    parsed.title = Some(metadata.title.clone());
-    parsed.source = Some(ReviewSource::GitHubPr {
-        owner: pr_metadata.owner,
-        repo: pr_metadata.repo,
-        number: pr_metadata.number,
-        url: Some(metadata.url),
-        head_sha: metadata.head_sha,
-        base_sha: metadata.base_sha,
-    });
+    let mut parsed = parse_diff(data.diff_text)?;
+    parsed.title = Some(data.title.clone());
+    parsed.source = Some(data.source);
 
     Ok(parsed)
 }
@@ -1246,66 +1252,14 @@ pub fn set_github_token(_token: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn get_github_status() -> Result<GitHubStatus, String> {
-    use crate::infra::shell::find_bin;
-    use std::process::Command;
-
-    let gh_path = find_bin("gh");
-    match gh_path {
-        Some(path) => {
-            let path_str = path.to_string_lossy().to_string();
-            let output = Command::new(&path)
-                .args(["auth", "status"])
-                .output()
-                .map_err(|e| e.to_string())?;
-
-            let combined_output = format!(
-                "{}\n{}",
-                String::from_utf8_lossy(&output.stdout),
-                String::from_utf8_lossy(&output.stderr)
-            );
-
-            if output.status.success() {
-                // Parse login from combined output (gh auth status can print to either)
-                // Examples:
-                // "Logged in to github.com as shyalter..."
-                // "✓ Logged in to github.com account puemos (keyring)"
-                let login = combined_output
-                    .lines()
-                    .find(|line| line.contains("Logged in to github.com"))
-                    .and_then(|line| {
-                        if line.contains(" as ") {
-                            line.split(" as ")
-                                .nth(1)
-                                .map(|s| s.split_whitespace().next().unwrap_or("").to_string())
-                        } else if line.contains(" account ") {
-                            line.split(" account ")
-                                .nth(1)
-                                .map(|s| s.split_whitespace().next().unwrap_or("").to_string())
-                        } else {
-                            None
-                        }
-                    });
-
-                Ok(GitHubStatus {
-                    gh_path: path_str,
-                    login,
-                    error: None,
-                })
-            } else {
-                Ok(GitHubStatus {
-                    gh_path: path_str,
-                    login: None,
-                    error: Some(combined_output),
-                })
-            }
-        }
-        None => Ok(GitHubStatus {
-            gh_path: "gh not found".to_string(),
-            login: None,
-            error: Some("gh executable not found in PATH".to_string()),
-        }),
+pub async fn get_vcs_status() -> Result<Vec<VcsStatus>, String> {
+    let registry = VcsRegistry::default();
+    let mut statuses = Vec::new();
+    for provider in registry.providers() {
+        let status = provider.get_status().await.map_err(|e| e.to_string())?;
+        statuses.push(status);
     }
+    Ok(statuses)
 }
 
 #[tauri::command]
@@ -1752,7 +1706,7 @@ pub async fn export_review_markdown(
 }
 
 #[tauri::command]
-pub async fn push_github_review(
+pub async fn push_remote_review(
     state: State<'_, AppState>,
     review_id: String,
     selected_tasks: Vec<String>,
@@ -1801,135 +1755,34 @@ pub async fn push_github_review(
         }
     };
 
-    let diff_index = DiffIndex::new(&data.run.diff_text).ok();
-    let mut gh_comments = Vec::new();
-
-    // 1. Process Tasks
-    for task_id in &selected_tasks {
-        if let Some(task) = data.tasks.iter().find(|t| t.id == *task_id) {
-            let body = ReviewExporter::render_task_markdown(task);
-
-            // Try to find an anchor for the task
-            let anchor = task.diff_refs.first().and_then(|dr| {
-                let hunk = dr.hunks.first()?;
-                let line_num = if hunk.new_lines > 0 {
-                    hunk.new_start
-                } else {
-                    hunk.old_start
-                };
-                let side = if hunk.new_lines > 0 {
-                    FeedbackSide::New
-                } else {
-                    FeedbackSide::Old
-                };
-
-                diff_index
-                    .as_ref()?
-                    .find_position_in_diff(&dr.file, line_num, side)?;
-                Some(dr.file.clone())
-            });
-
-            if let Some(path) = anchor {
-                let hunk = task.diff_refs.first().unwrap().hunks.first().unwrap();
-                let line_num = if hunk.new_lines > 0 {
-                    hunk.new_start
-                } else {
-                    hunk.old_start
-                };
-                let side = if hunk.new_lines > 0 { "RIGHT" } else { "LEFT" };
-
-                gh_comments.push(github::DraftReviewComment {
-                    path,
-                    position: None,
-                    line: Some(line_num),
-                    side: Some(side.to_string()),
-                    body,
-                });
-            } else {
-                // If no anchor found, we'll append it to the main review body or just skip if it's too large
-                // For now, let's just skip line-level and we might want to handle this better later.
-            }
-        }
-    }
-
-    // 2. Process Feedbacks
-    for feedback_id in &selected_feedbacks {
-        if let Some(feedback) = data.feedbacks.iter().find(|f| f.id == *feedback_id) {
-            let feedback_comments: Vec<_> = data
-                .comments
-                .iter()
-                .filter(|c| c.feedback_id == feedback.id)
-                .cloned()
-                .collect();
-
-            let body =
-                ReviewExporter::render_single_feedback_markdown(feedback, &feedback_comments, None);
-
-            if let Some(anchor) = &feedback.anchor
-                && let (Some(path), Some(line_num)) = (&anchor.file_path, anchor.line_number)
-            {
-                let side_enum = anchor.side.unwrap_or(FeedbackSide::New);
-                let side_str = match side_enum {
-                    FeedbackSide::New => "RIGHT",
-                    FeedbackSide::Old => "LEFT",
-                };
-
-                // Still validate that the line exists in the diff
-                if diff_index
-                    .as_ref()
-                    .and_then(|idx| idx.find_position_in_diff(path, line_num, side_enum))
-                    .is_some()
-                {
-                    gh_comments.push(github::DraftReviewComment {
-                        path: path.clone(),
-                        position: None,
-                        line: Some(line_num),
-                        side: Some(side_str.to_string()),
-                        body,
-                    });
-                    continue;
-                }
-            }
-            // If no anchor or position found, it's just a general comment or we skip line-level
-        }
-    }
-
-    let pr_ref = match &data.review.source {
-        ReviewSource::GitHubPr {
-            owner,
-            repo,
-            number,
-            ..
-        } => github::GitHubPrRef {
-            owner: owner.clone(),
-            repo: repo.clone(),
-            number: *number,
-            url: data.review.source.url().unwrap_or_default(),
-        },
-        _ => return Err("Review must be from a GitHub PR to push".to_string()),
+    let request = ReviewPushRequest {
+        review: data.review,
+        run: data.run,
+        tasks: data.tasks,
+        feedbacks: data.feedbacks,
+        comments: data.comments,
+        selected_tasks,
+        selected_feedbacks,
     };
 
-    let summary_body = format!(
-        "# Review: {}\n\n{}",
-        data.review.title,
-        data.review.summary.as_deref().unwrap_or("")
-    );
+    let provider_id = request
+        .review
+        .source
+        .provider_id()
+        .ok_or_else(|| "Review has no remote provider".to_string())?;
+    let registry = VcsRegistry::default();
+    let provider = registry
+        .get_provider(provider_id)
+        .ok_or_else(|| format!("Unsupported VCS provider: {}", provider_id))?;
 
-    let gh_review = github::create_review(
-        &pr_ref.owner,
-        &pr_ref.repo,
-        pr_ref.number,
-        Some(&summary_body),
-        Some(gh_comments),
-    )
-    .await
-    .map_err(|e| e.to_string())?;
-
-    Ok(gh_review.url.unwrap_or_else(|| "Success".to_string()))
+    provider
+        .push_review(request)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn push_github_feedback(
+pub async fn push_remote_feedback(
     state: State<'_, AppState>,
     feedback_id: String,
 ) -> Result<String, String> {
@@ -1964,61 +1817,27 @@ pub async fn push_github_feedback(
         (feedback, review, review_run, comments)
     };
 
-    let markdown = ReviewExporter::render_single_feedback_markdown(&feedback, &comments, None);
-
-    let pr_ref = match &review.source {
-        ReviewSource::GitHubPr {
-            owner,
-            repo,
-            number,
-            ..
-        } => github::GitHubPrRef {
-            owner: owner.clone(),
-            repo: repo.clone(),
-            number: *number,
-            url: review.source.url().unwrap_or_default(),
-        },
-        _ => return Err("Review must be from a GitHub PR to push".to_string()),
+    let request = FeedbackPushRequest {
+        review,
+        run: review_run,
+        feedback,
+        comments,
     };
 
-    let anchor = feedback
-        .anchor
-        .ok_or_else(|| "Feedback has no anchor".to_string())?;
-    let file_path = anchor
-        .file_path
-        .ok_or_else(|| "Feedback anchor has no file path".to_string())?;
-    let line_number = anchor
-        .line_number
-        .ok_or_else(|| "Feedback anchor has no line number".to_string())?;
-
-    let commit_id = review
+    let provider_id = request
+        .review
         .source
-        .head_sha()
-        .ok_or_else(|| "Could not determine head commit SHA for PR".to_string())?;
+        .provider_id()
+        .ok_or_else(|| "Review has no remote provider".to_string())?;
+    let registry = VcsRegistry::default();
+    let provider = registry
+        .get_provider(provider_id)
+        .ok_or_else(|| format!("Unsupported VCS provider: {}", provider_id))?;
 
-    let diff_index = DiffIndex::new(&review_run.diff_text).map_err(|e| e.to_string())?;
-
-    let position = diff_index
-        .find_position_in_diff(
-            &file_path,
-            line_number,
-            anchor.side.unwrap_or(FeedbackSide::New),
-        )
-        .ok_or_else(|| "Could not find line position in diff".to_string())?;
-
-    let comment = github::create_review_comment(
-        &pr_ref.owner,
-        &pr_ref.repo,
-        pr_ref.number,
-        &markdown,
-        &commit_id,
-        &file_path,
-        position as u32,
-    )
-    .await
-    .map_err(|e| e.to_string())?;
-
-    Ok(comment.url.unwrap_or_else(|| "Success".to_string()))
+    provider
+        .push_feedback(request)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -2095,30 +1914,70 @@ pub fn acquire_diff_from_request(state: State<'_, AppState>) -> Result<PendingRe
 
     let mut review_source: Option<ReviewSource> = None;
 
-    let diff = if diff_request.from.starts_with("https://github.com/")
-        || diff_request.from.contains("/pull/")
+    let diff = if let Ok(remote_ref) = crate::infra::cli::diff::parse_remote_ref(&diff_request.from)
     {
-        let pr_ref = diff_request.from.clone();
-        let (owner, repo, number) =
-            crate::infra::cli::diff::parse_pr_ref(&pr_ref).map_err(|e| e.to_string())?;
+        match remote_ref {
+            crate::infra::cli::diff::RemoteRef::GitHub {
+                owner,
+                repo,
+                number,
+            } => {
+                let pr_url = format!("https://github.com/{}/{}/pull/{}", owner, repo, number);
+                review_source = Some(ReviewSource::GitHubPr {
+                    owner: owner.clone(),
+                    repo: repo.clone(),
+                    number,
+                    url: Some(pr_url),
+                    head_sha: None,
+                    base_sha: None,
+                });
 
-        // Build ReviewSource for PR linking
-        let pr_url = format!("https://github.com/{}/{}/pull/{}", owner, repo, number);
-        review_source = Some(ReviewSource::GitHubPr {
-            owner: owner.clone(),
-            repo: repo.clone(),
-            number,
-            url: Some(pr_url),
-            head_sha: None,
-            base_sha: None,
-        });
+                crate::infra::cli::diff::acquire_diff(
+                    crate::infra::cli::diff::DiffSource::GitHubPr {
+                        owner,
+                        repo,
+                        number,
+                    },
+                )
+                .map_err(|e| e.to_string())?
+            }
+            crate::infra::cli::diff::RemoteRef::GitLab {
+                host,
+                project_path,
+                number,
+            } => {
+                let url = format!("https://{host}/{project_path}/-/merge_requests/{number}");
+                let mr_ref = crate::infra::vcs::gitlab::GitLabMrRef {
+                    host: host.clone(),
+                    project_path: project_path.clone(),
+                    number,
+                    url: url.clone(),
+                };
+                let metadata = tauri::async_runtime::block_on(
+                    crate::infra::vcs::gitlab::fetch_mr_metadata(&mr_ref),
+                )
+                .ok();
 
-        crate::infra::cli::diff::acquire_diff(crate::infra::cli::diff::DiffSource::GitHubPr {
-            owner,
-            repo,
-            number,
-        })
-        .map_err(|e| e.to_string())?
+                review_source = Some(ReviewSource::GitLabMr {
+                    host: host.clone(),
+                    project_path: project_path.clone(),
+                    number,
+                    url: Some(metadata.as_ref().map(|m| m.url.clone()).unwrap_or(url)),
+                    head_sha: metadata.as_ref().and_then(|m| m.head_sha.clone()),
+                    base_sha: metadata.as_ref().and_then(|m| m.base_sha.clone()),
+                    start_sha: metadata.as_ref().and_then(|m| m.start_sha.clone()),
+                });
+
+                crate::infra::cli::diff::acquire_diff(
+                    crate::infra::cli::diff::DiffSource::GitLabMr {
+                        host,
+                        project_path,
+                        number,
+                    },
+                )
+                .map_err(|e| e.to_string())?
+            }
+        }
     } else if diff_request.source == "uncommitted changes" {
         crate::infra::cli::diff::acquire_diff(crate::infra::cli::diff::DiffSource::GitStatus)
             .map_err(|e| e.to_string())?

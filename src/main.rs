@@ -158,14 +158,37 @@ fn process_cli_args(args: &Args) -> Result<(Option<DiffRequest>, Option<PendingD
             }
             Commands::Pr { pr_ref } => {
                 debug_log(&format!("PR command: {}", pr_ref));
-                let (owner, repo, number) = diff::parse_pr_ref(pr_ref)?;
-                debug_log(&format!("Parsed PR: {}/{}#{}", owner, repo, number));
-                diff_req = Some(DiffRequest {
-                    from: format!("{}/{}/pull/{}", owner, repo, number),
-                    to: String::new(),
-                    agent: args.agent.clone(),
-                    source: format!("PR {}", pr_ref),
-                });
+                let remote_ref = diff::parse_remote_ref(pr_ref)?;
+                match remote_ref {
+                    diff::RemoteRef::GitHub {
+                        owner,
+                        repo,
+                        number,
+                    } => {
+                        debug_log(&format!("Parsed PR: {}/{}#{}", owner, repo, number));
+                        diff_req = Some(DiffRequest {
+                            from: format!("{}/{}/pull/{}", owner, repo, number),
+                            to: String::new(),
+                            agent: args.agent.clone(),
+                            source: format!("PR {}", pr_ref),
+                        });
+                    }
+                    diff::RemoteRef::GitLab {
+                        host,
+                        project_path,
+                        number,
+                    } => {
+                        debug_log(&format!("Parsed MR: {}/{}!{}", host, project_path, number));
+                        diff_req = Some(DiffRequest {
+                            from: format!(
+                                "https://{host}/{project_path}/-/merge_requests/{number}"
+                            ),
+                            to: String::new(),
+                            agent: args.agent.clone(),
+                            source: format!("MR {}", pr_ref),
+                        });
+                    }
+                }
             }
             Commands::Status => {
                 diff_req = Some(DiffRequest {
@@ -187,13 +210,33 @@ fn process_cli_args(args: &Args) -> Result<(Option<DiffRequest>, Option<PendingD
             }
         }
     } else if let Some(pr_ref) = &args.pr {
-        let (owner, repo, number) = diff::parse_pr_ref(pr_ref)?;
-        diff_req = Some(DiffRequest {
-            from: format!("{}/{}/pull/{}", owner, repo, number),
-            to: String::new(),
-            agent: args.agent.clone(),
-            source: format!("PR {}", pr_ref),
-        });
+        let remote_ref = diff::parse_remote_ref(pr_ref)?;
+        match remote_ref {
+            diff::RemoteRef::GitHub {
+                owner,
+                repo,
+                number,
+            } => {
+                diff_req = Some(DiffRequest {
+                    from: format!("{}/{}/pull/{}", owner, repo, number),
+                    to: String::new(),
+                    agent: args.agent.clone(),
+                    source: format!("PR {}", pr_ref),
+                });
+            }
+            diff::RemoteRef::GitLab {
+                host,
+                project_path,
+                number,
+            } => {
+                diff_req = Some(DiffRequest {
+                    from: format!("https://{host}/{project_path}/-/merge_requests/{number}"),
+                    to: String::new(),
+                    agent: args.agent.clone(),
+                    source: format!("MR {}", pr_ref),
+                });
+            }
+        }
     } else if args.status {
         diff_req = Some(DiffRequest {
             from: String::new(),
@@ -323,12 +366,12 @@ fn run_gui(initial_req: Option<DiffRequest>, initial_pending: Option<PendingDiff
             lareview::commands::update_feedback_impact,
             lareview::commands::delete_feedback,
             lareview::commands::export_review,
-            lareview::commands::fetch_github_pr,
+            lareview::commands::fetch_remote_pr,
             lareview::commands::get_agents,
             lareview::commands::update_agent_config,
             lareview::commands::get_github_token,
             lareview::commands::set_github_token,
-            lareview::commands::get_github_status,
+            lareview::commands::get_vcs_status,
             lareview::commands::link_repo,
             lareview::commands::unlink_repo,
             lareview::commands::delete_review,
@@ -348,9 +391,9 @@ fn run_gui(initial_req: Option<DiffRequest>, initial_pending: Option<PendingDiff
             lareview::commands::clear_pending_diff,
             lareview::commands::get_diff_request,
             lareview::commands::acquire_diff_from_request,
-            lareview::commands::push_github_review,
+            lareview::commands::push_remote_review,
             lareview::commands::export_review_markdown,
-            lareview::commands::push_github_feedback,
+            lareview::commands::push_remote_feedback,
             lareview::commands::stop_generation,
         ])
         .run(tauri::generate_context!())

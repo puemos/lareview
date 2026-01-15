@@ -13,7 +13,7 @@ import { DiffSkeleton } from './DiffSkeleton';
 import { EmptyState } from './EmptyState';
 import { ErrorState } from './ErrorState';
 import { SelectionModal, ExportFormat } from './SelectionModal';
-import { PushToGitHubModal } from './PushToGitHubModal';
+import { PushToVcsModal } from './PushToGitHubModal';
 import { ConfirmationModal } from '../Common/ConfirmationModal';
 import { useReviews } from '../../hooks/useReviews';
 import { useTauri } from '../../hooks/useTauri';
@@ -55,7 +55,7 @@ export const ReviewView: React.FC = () => {
   const { data: rules = [] } = useRules();
   const { comments, isLoading: isCommentsLoading } = useFeedbackComments(selectedFeedbackId);
   const addCommentMutation = useAddComment();
-  const { exportReviewMarkdown, pushGitHubReview, pushGitHubFeedback, copyToClipboard } =
+  const { exportReviewMarkdown, pushRemoteReview, pushRemoteFeedback, copyToClipboard } =
     useTauri();
   const { data: allReviews = [] } = useReviews();
 
@@ -135,15 +135,17 @@ export const ReviewView: React.FC = () => {
   };
 
   const currentReview = allReviews.find(r => r.id === reviewId);
-  const isGitHubReview =
-    currentReview?.source?.type === 'github_pr' ||
-    (currentReview?.source?.type as string) === 'git_hub_pr';
-
+  const remoteProviderName = currentReview?.source?.type === 'gitlab_mr'
+    ? 'GitLab'
+    : currentReview?.source?.type === 'github_pr' ||
+        (currentReview?.source?.type as string) === 'git_hub_pr'
+      ? 'GitHub'
+      : null;
   console.log('Review Debug:', {
     reviewId,
     found: !!currentReview,
     sourceType: currentReview?.source?.type,
-    isGitHubReview,
+    remoteProviderName,
   });
 
   const handleExport = async (
@@ -159,19 +161,19 @@ export const ReviewView: React.FC = () => {
       // Success alert is handled in SelectionModal or implied by modal closing
       // but we return nothing to keep it generic
     } else {
-      const url = await pushGitHubReview(reviewId, selectedTasks, selectedFeedbacks);
+      const url = await pushRemoteReview(reviewId, selectedTasks, selectedFeedbacks);
       return url;
     }
   };
 
-  const handlePushFeedbackToGitHub = () => {
+  const handlePushFeedbackToRemote = () => {
     if (!selectedFeedbackId) return;
     setIsPushModalOpen(true);
   };
 
   const handleConfirmPush = async () => {
     if (!selectedFeedbackId) return;
-    return await pushGitHubFeedback(selectedFeedbackId);
+    return await pushRemoteFeedback(selectedFeedbackId);
   };
 
   const handleAddGlobalFeedback = () => {
@@ -258,20 +260,21 @@ export const ReviewView: React.FC = () => {
               onRetry={handleRetry}
             />
           ) : sidebarTab === 'feedback' ? (
-            <FeedbackDetail
-              feedback={selectedFeedback}
-              rulesById={rulesById}
-              comments={isCommentsLoading ? [] : comments}
-              onUpdateStatus={handleFeedbackStatusChange}
-              onUpdateImpact={handleFeedbackImpactChange}
-              onDelete={handleDeleteFeedback}
-              onAddComment={handleAddComment}
-              onPushToGitHub={handlePushFeedbackToGitHub}
-              isGitHubReview={isGitHubReview}
-              isUpdatingStatus={isUpdatingFeedbackStatus}
-              isUpdatingImpact={isUpdatingFeedbackImpact}
-              isAddingComment={addCommentMutation.isPending}
-            />
+              <FeedbackDetail
+                feedback={selectedFeedback}
+                rulesById={rulesById}
+                comments={isCommentsLoading ? [] : comments}
+                onUpdateStatus={handleFeedbackStatusChange}
+                onUpdateImpact={handleFeedbackImpactChange}
+                onDelete={handleDeleteFeedback}
+                onAddComment={handleAddComment}
+                onPushToRemote={handlePushFeedbackToRemote}
+                remoteProviderName={remoteProviderName}
+                isUpdatingStatus={isUpdatingFeedbackStatus}
+                isUpdatingImpact={isUpdatingFeedbackImpact}
+                isAddingComment={addCommentMutation.isPending}
+              />
+
           ) : (
             <>
               {selectedTask && parsedDiff ? (
@@ -320,11 +323,12 @@ export const ReviewView: React.FC = () => {
         onConfirm={handleExport}
         tasks={tasks}
         feedbacks={feedbacks}
-        isGitHubAvailable={isGitHubReview}
+        remoteProviderName={remoteProviderName}
       />
 
-      <PushToGitHubModal
+      <PushToVcsModal
         isOpen={isPushModalOpen}
+        providerName={remoteProviderName}
         onClose={() => setIsPushModalOpen(false)}
         onConfirm={handleConfirmPush}
       />

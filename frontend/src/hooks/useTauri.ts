@@ -8,7 +8,7 @@ import type {
   Comment,
   Agent,
   LinkedRepo,
-  GitHubStatus,
+  VcsStatus,
   EditorCandidate,
   EditorConfig,
   CliStatus,
@@ -393,9 +393,12 @@ export const useTauri = () => {
     return invoke('delete_review', { reviewId });
   }, []);
 
-  const fetchGithubPR = useCallback(async (prRef: string): Promise<ParsedDiff> => {
-    return invoke('fetch_github_pr', { prRef });
-  }, []);
+  const fetchRemotePr = useCallback(
+    async (prRef: string, providerHint?: string | null): Promise<ParsedDiff> => {
+      return invoke('fetch_remote_pr', { prRef, providerHint });
+    },
+    []
+  );
 
   const exportReviewMarkdown = useCallback(
     async (
@@ -412,13 +415,13 @@ export const useTauri = () => {
     []
   );
 
-  const pushGitHubReview = useCallback(
+  const pushRemoteReview = useCallback(
     async (
       reviewId: string,
       selectedTasks: string[],
       selectedFeedbacks: string[]
     ): Promise<string> => {
-      return invoke('push_github_review', {
+      return invoke('push_remote_review', {
         reviewId,
         selectedTasks,
         selectedFeedbacks,
@@ -427,8 +430,8 @@ export const useTauri = () => {
     []
   );
 
-  const pushGitHubFeedback = useCallback(async (feedbackId: string): Promise<string> => {
-    return invoke('push_github_feedback', { feedbackId });
+  const pushRemoteFeedback = useCallback(async (feedbackId: string): Promise<string> => {
+    return invoke('push_remote_feedback', { feedbackId });
   }, []);
 
   const openUrl = useCallback(async (url: string): Promise<void> => {
@@ -451,8 +454,8 @@ export const useTauri = () => {
     return invoke('set_github_token', { token });
   }, []);
 
-  const getGitHubStatus = useCallback(async (): Promise<GitHubStatus> => {
-    return invoke('get_github_status');
+  const getVcsStatus = useCallback(async (): Promise<VcsStatus[]> => {
+    return invoke('get_vcs_status');
   }, []);
 
   const getReviewRules = useCallback(async (): Promise<ReviewRule[]> => {
@@ -546,10 +549,10 @@ export const useTauri = () => {
     getFeedbackByReview,
     getFeedbackDiffSnippet,
     exportReview,
-    fetchGithubPR,
+    fetchRemotePr,
     exportReviewMarkdown,
-    pushGitHubReview,
-    pushGitHubFeedback,
+    pushRemoteReview,
+    pushRemoteFeedback,
     openUrl,
     copyToClipboard,
     onProgress,
@@ -558,7 +561,7 @@ export const useTauri = () => {
     updateAgentConfig,
     getGitHubToken,
     setGitHubToken,
-    getGitHubStatus,
+    getVcsStatus,
     getReviewRules,
     createReviewRule,
     updateReviewRule,

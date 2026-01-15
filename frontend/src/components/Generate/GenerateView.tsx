@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { GithubLogo, Trash, X } from '@phosphor-icons/react';
+import { Trash } from '@phosphor-icons/react';
 import { useTauri } from '../../hooks/useTauri';
 import { useAppStore } from '../../store';
 import { useAgents } from '../../hooks/useAgents';
@@ -10,7 +10,7 @@ import { DiffEditorPanel } from './DiffEditorPanel';
 import { AgentConfigPanel } from './AgentConfigPanel';
 import { PlanOverview } from './PlanOverview';
 import { LiveActivityFeed } from './LiveActivityFeed';
-import { PrInput } from './PrInput';
+import { VcsInputCard } from './VcsInputCard';
 import { ViewModeToggle } from './ViewModeToggle';
 import { DiffStats } from './DiffStats';
 import { countAdditions, countDeletions } from './DiffEditorPanel';
@@ -27,7 +27,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
 
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const { fetchGithubPR } = useTauri();
+  const { fetchRemotePr } = useTauri();
   const { startGeneration, stopGeneration } = useGeneration();
   const { data: agents = [] } = useAgents();
   const { data: repos = [] } = useRepos();
@@ -138,7 +138,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
 
     await Promise.resolve();
     try {
-      const diff = await fetchGithubPR(prRef);
+      const diff = await fetchRemotePr(prRef, null);
       setDiffText(diff.diff_text);
       if (diff.source) {
         setPendingSource(diff.source);
@@ -166,14 +166,14 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
       setParsedDiff(diff);
       setViewMode('diff');
     } catch (error) {
-      console.error('Failed to fetch PR:', error);
-      setValidationError(`Failed to fetch PR: ${error}`);
+      console.error('Failed to fetch remote review:', error);
+      setValidationError(`Failed to fetch remote review: ${error}`);
     } finally {
       setIsLoadingPr(false);
     }
   }, [
     prRef,
-    fetchGithubPR,
+    fetchRemotePr,
     setParsedDiff,
     setPendingSource,
     setViewMode,
@@ -228,34 +228,21 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     await stopGeneration();
   }, [stopGeneration]);
 
+
   return (
     <div className="bg-bg-primary flex h-full flex-col">
       <div className="flex flex-1 overflow-hidden">
         <div className="border-border bg-bg-primary relative flex min-w-0 flex-1 flex-col border-r">
           <div className="pointer-events-none absolute top-4 right-4 left-4 z-10 flex items-center gap-3">
-            {pendingSource?.type === 'github_pr' ? (
-              <div className="animate-in fade-in zoom-in-95 pointer-events-auto flex h-8 items-center gap-2 rounded-md border border-green-500/20 bg-green-500/10 px-3 text-xs font-medium text-green-400 shadow-sm backdrop-blur-sm duration-200">
-                <GithubLogo size={14} weight="fill" />
-                <span>
-                  {pendingSource.owner}/{pendingSource.repo}#{pendingSource.number}
-                </span>
-                <div className="mx-1 h-3 w-px bg-green-500/20" />
-                <button
-                  onClick={handleClear}
-                  className="rounded p-0.5 text-green-400/70 transition-colors hover:bg-green-500/20 hover:text-green-400"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ) : (
-              <PrInput
-                prRef={prRef}
-                onPrRefChange={setPrRef}
-                onFetch={handleFetchPr}
-                isLoading={isLoadingPr}
-                disabled={isGenerating}
-              />
-            )}
+            <VcsInputCard
+              pendingSource={pendingSource}
+              prRef={prRef}
+              onPrRefChange={setPrRef}
+              onFetch={handleFetchPr}
+              isLoading={isLoadingPr}
+              disabled={isGenerating}
+              onClear={handleClear}
+            />
 
             <div className="flex-1" />
 

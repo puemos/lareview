@@ -1,5 +1,12 @@
+use crate::application::review::export::ReviewExporter;
+use crate::domain::{FeedbackSide, ReviewSource};
+use crate::infra::diff::index::DiffIndex;
 use crate::infra::shell;
+use crate::infra::vcs::traits::{
+    FeedbackPushRequest, ReviewPushRequest, VcsPrData, VcsProvider, VcsRef, VcsStatus,
+};
 use anyhow::{Context, Result};
+use async_trait::async_trait;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::Deserialize;
@@ -77,6 +84,8 @@ struct GhPrViewJson {
     url: String,
     #[serde(rename = "headRefOid")]
     head_ref_oid: Option<String>,
+    #[serde(rename = "baseRefOid")]
+    base_ref_oid: Option<String>,
 }
 
 pub async fn fetch_pr_metadata(pr: &GitHubPrRef) -> Result<GitHubPrMetadata> {
@@ -87,7 +96,7 @@ pub async fn fetch_pr_metadata(pr: &GitHubPrRef) -> Result<GitHubPrMetadata> {
             "view",
             pr.url.as_str(),
             "--json",
-            "title,url,headRefOid",
+            "title,url,headRefOid,baseRefOid",
         ])
         .output()
         .await
@@ -105,7 +114,7 @@ pub async fn fetch_pr_metadata(pr: &GitHubPrRef) -> Result<GitHubPrMetadata> {
         title: parsed.title,
         url: parsed.url,
         head_sha: parsed.head_ref_oid,
-        base_sha: None,
+        base_sha: parsed.base_ref_oid,
     })
 }
 
@@ -280,6 +289,299 @@ pub async fn create_review(
         .map(|s| s.to_string());
 
     Ok(GitHubReview { id, url })
+}
+
+fn pr_ref_from_source(source: &ReviewSource) -> Result<GitHubPrRef> {
+    match source {
+        ReviewSource::GitHubPr {
+            owner,
+            repo,
+            number,
+            ..
+        } => Ok(GitHubPrRef {
+            owner: owner.clone(),
+            repo: repo.clone(),
+            number: *number,
+            url: source.url().unwrap_or_default(),
+        }),
+        _ => Err(anyhow::anyhow!("Review must be from a GitHub PR to push")),
+    }
+}
+
+pub struct GitHubProvider;
+
+impl GitHubProvider {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl VcsRef for GitHubPrRef {
+    fn provider_id(&self) -> &str {
+        "github"
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+#[async_trait]
+impl VcsProvider for GitHubProvider {
+    fn id(&self) -> &str {
+        "github"
+    }
+
+    fn name(&self) -> &str {
+        "GitHub"
+    }
+
+    fn matches_ref(&self, reference: &str) -> bool {
+        parse_pr_ref(reference).is_some()
+    }
+
+    fn parse_ref(&self, reference: &str) -> Option<Box<dyn VcsRef>> {
+        parse_pr_ref(reference).map(|pr| Box::new(pr) as Box<dyn VcsRef>)
+    }
+
+    async fn fetch_pr(&self, reference: &dyn VcsRef) -> Result<VcsPrData> {
+        let pr = reference
+            .as_any()
+            .downcast_ref::<GitHubPrRef>()
+            .ok_or_else(|| anyhow::anyhow!("Invalid GitHub PR reference"))?;
+        let diff_text = fetch_pr_diff(pr).await?;
+        let metadata = fetch_pr_metadata(pr).await?;
+        Ok(VcsPrData {
+            diff_text,
+            title: metadata.title.clone(),
+            source: ReviewSource::GitHubPr {
+                owner: pr.owner.clone(),
+                repo: pr.repo.clone(),
+                number: pr.number,
+                url: Some(metadata.url),
+                head_sha: metadata.head_sha,
+                base_sha: metadata.base_sha,
+            },
+        })
+    }
+
+    async fn push_review(&self, request: ReviewPushRequest) -> Result<String> {
+        let diff_index = DiffIndex::new(&request.run.diff_text).ok();
+        let mut gh_comments = Vec::new();
+
+        for task_id in &request.selected_tasks {
+            if let Some(task) = request.tasks.iter().find(|t| t.id == *task_id) {
+                let body = ReviewExporter::render_task_markdown(task);
+                let anchor = task.diff_refs.first().and_then(|dr| {
+                    let hunk = dr.hunks.first()?;
+                    let line_num = if hunk.new_lines > 0 {
+                        hunk.new_start
+                    } else {
+                        hunk.old_start
+                    };
+                    let side = if hunk.new_lines > 0 {
+                        FeedbackSide::New
+                    } else {
+                        FeedbackSide::Old
+                    };
+
+                    diff_index
+                        .as_ref()?
+                        .find_position_in_diff(&dr.file, line_num, side)?;
+                    Some(dr.file.clone())
+                });
+
+                if let Some(path) = anchor {
+                    let hunk = task.diff_refs.first().unwrap().hunks.first().unwrap();
+                    let line_num = if hunk.new_lines > 0 {
+                        hunk.new_start
+                    } else {
+                        hunk.old_start
+                    };
+                    let side = if hunk.new_lines > 0 { "RIGHT" } else { "LEFT" };
+
+                    gh_comments.push(DraftReviewComment {
+                        path,
+                        position: None,
+                        line: Some(line_num),
+                        side: Some(side.to_string()),
+                        body,
+                    });
+                }
+            }
+        }
+
+        for feedback_id in &request.selected_feedbacks {
+            if let Some(feedback) = request.feedbacks.iter().find(|f| f.id == *feedback_id) {
+                let feedback_comments: Vec<_> = request
+                    .comments
+                    .iter()
+                    .filter(|c| c.feedback_id == feedback.id)
+                    .cloned()
+                    .collect();
+
+                let body = ReviewExporter::render_single_feedback_markdown(
+                    feedback,
+                    &feedback_comments,
+                    None,
+                );
+
+                if let Some(anchor) = &feedback.anchor
+                    && let (Some(path), Some(line_num)) = (&anchor.file_path, anchor.line_number)
+                {
+                    let side_enum = anchor.side.unwrap_or(FeedbackSide::New);
+                    let side_str = match side_enum {
+                        FeedbackSide::New => "RIGHT",
+                        FeedbackSide::Old => "LEFT",
+                    };
+
+                    if diff_index
+                        .as_ref()
+                        .and_then(|idx| idx.find_position_in_diff(path, line_num, side_enum))
+                        .is_some()
+                    {
+                        gh_comments.push(DraftReviewComment {
+                            path: path.clone(),
+                            position: None,
+                            line: Some(line_num),
+                            side: Some(side_str.to_string()),
+                            body,
+                        });
+                        continue;
+                    }
+                }
+            }
+        }
+
+        let pr_ref = pr_ref_from_source(&request.review.source)?;
+        let summary_body = format!(
+            "# Review: {}\n\n{}",
+            request.review.title,
+            request.review.summary.as_deref().unwrap_or("")
+        );
+
+        let gh_review = create_review(
+            &pr_ref.owner,
+            &pr_ref.repo,
+            pr_ref.number,
+            Some(&summary_body),
+            Some(gh_comments),
+        )
+        .await?;
+
+        Ok(gh_review.url.unwrap_or_else(|| "Success".to_string()))
+    }
+
+    async fn push_feedback(&self, request: FeedbackPushRequest) -> Result<String> {
+        let markdown = ReviewExporter::render_single_feedback_markdown(
+            &request.feedback,
+            &request.comments,
+            None,
+        );
+        let pr_ref = pr_ref_from_source(&request.review.source)?;
+
+        let anchor = request
+            .feedback
+            .anchor
+            .ok_or_else(|| anyhow::anyhow!("Feedback has no anchor"))?;
+        let file_path = anchor
+            .file_path
+            .ok_or_else(|| anyhow::anyhow!("Feedback anchor has no file path"))?;
+        let line_number = anchor
+            .line_number
+            .ok_or_else(|| anyhow::anyhow!("Feedback anchor has no line number"))?;
+
+        let commit_id = request
+            .review
+            .source
+            .head_sha()
+            .ok_or_else(|| anyhow::anyhow!("Could not determine head commit SHA for PR"))?;
+
+        let diff_index = DiffIndex::new(&request.run.diff_text)?;
+
+        let position = diff_index
+            .find_position_in_diff(
+                &file_path,
+                line_number,
+                anchor.side.unwrap_or(FeedbackSide::New),
+            )
+            .ok_or_else(|| anyhow::anyhow!("Could not find line position in diff"))?;
+
+        let comment = create_review_comment(
+            &pr_ref.owner,
+            &pr_ref.repo,
+            pr_ref.number,
+            &markdown,
+            &commit_id,
+            &file_path,
+            position as u32,
+        )
+        .await?;
+
+        Ok(comment.url.unwrap_or_else(|| "Success".to_string()))
+    }
+
+    async fn get_status(&self) -> Result<VcsStatus> {
+        let gh_path = shell::find_bin("gh");
+        match gh_path {
+            Some(path) => {
+                let path_str = path.to_string_lossy().to_string();
+                let output = Command::new(&path)
+                    .args(["auth", "status"])
+                    .output()
+                    .await
+                    .context("run `gh auth status`")?;
+
+                let combined_output = format!(
+                    "{}\n{}",
+                    String::from_utf8_lossy(&output.stdout),
+                    String::from_utf8_lossy(&output.stderr)
+                );
+
+                if output.status.success() {
+                    let login = combined_output
+                        .lines()
+                        .find(|line| line.contains("Logged in to github.com"))
+                        .and_then(|line| {
+                            if line.contains(" as ") {
+                                line.split(" as ")
+                                    .nth(1)
+                                    .map(|s| s.split_whitespace().next().unwrap_or("").to_string())
+                            } else if line.contains(" account ") {
+                                line.split(" account ")
+                                    .nth(1)
+                                    .map(|s| s.split_whitespace().next().unwrap_or("").to_string())
+                            } else {
+                                None
+                            }
+                        });
+
+                    Ok(VcsStatus {
+                        id: self.id().to_string(),
+                        name: self.name().to_string(),
+                        cli_path: path_str,
+                        login,
+                        error: None,
+                    })
+                } else {
+                    Ok(VcsStatus {
+                        id: self.id().to_string(),
+                        name: self.name().to_string(),
+                        cli_path: path_str,
+                        login: None,
+                        error: Some(combined_output),
+                    })
+                }
+            }
+            None => Ok(VcsStatus {
+                id: self.id().to_string(),
+                name: self.name().to_string(),
+                cli_path: "gh not found".to_string(),
+                login: None,
+                error: Some("gh executable not found in PATH".to_string()),
+            }),
+        }
+    }
 }
 
 #[cfg(test)]

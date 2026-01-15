@@ -18,8 +18,8 @@ interface FeedbackDetailProps {
   isUpdatingStatus: boolean;
   isUpdatingImpact: boolean;
   isAddingComment: boolean;
-  onPushToGitHub?: () => void;
-  isGitHubReview?: boolean;
+  onPushToRemote?: () => void;
+  remoteProviderName?: string | null;
 }
 
 const statusOptions = [
@@ -149,14 +149,16 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
   isUpdatingStatus,
   isUpdatingImpact,
   isAddingComment,
-  onPushToGitHub,
-  isGitHubReview,
+  onPushToRemote,
+  remoteProviderName,
 }) => {
   const { getFeedbackDiffSnippet } = useTauri();
   const [replyText, setReplyText] = useState('');
   const [isTitleEditing, setIsTitleEditing] = useState(false);
   const [titleValue, setTitleValue] = useState('');
   const rule = feedback?.rule_id ? rulesById[feedback.rule_id] : null;
+  const remoteLabel = remoteProviderName ?? 'remote';
+  const RemoteIcon = remoteProviderName === 'GitLab' ? ICONS.ICON_GITLAB : ICONS.ICON_GITHUB;
 
   const { data: diffSnippet, isLoading: isDiffLoading } = useQuery<DiffSnippet | null>({
     queryKey: ['feedback-diff', feedback?.id],
@@ -231,14 +233,14 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
             </h2>
           )}
           <div className="ml-2 flex items-center gap-1">
-            {isGitHubReview && onPushToGitHub && (
+            {remoteProviderName && onPushToRemote && (
               <button
-                onClick={onPushToGitHub}
+                onClick={onPushToRemote}
                 className="hover:text-text-primary text-text-tertiary flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors hover:bg-white/5 active:scale-[0.98]"
-                title="Push comment to GitHub"
+                title={`Push comment to ${remoteLabel}`}
               >
-                <ICONS.ICON_GITHUB size={14} />
-                <span>Push Comment</span>
+                <RemoteIcon size={14} />
+                <span>Post Comment</span>
               </button>
             )}
             <button

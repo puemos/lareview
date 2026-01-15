@@ -2,14 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { ICONS } from '../../constants/icons';
 import { useTauri } from '../../hooks/useTauri';
 
-interface PushToGitHubModalProps {
+interface PushToVcsModalProps {
   isOpen: boolean;
+  providerName?: string | null;
   onClose: () => void;
   onConfirm: () => Promise<string | void>;
 }
 
-export const PushToGitHubModal: React.FC<PushToGitHubModalProps> = ({
+export const PushToVcsModal: React.FC<PushToVcsModalProps> = ({
   isOpen,
+  providerName,
   onClose,
   onConfirm,
 }) => {
@@ -17,6 +19,7 @@ export const PushToGitHubModal: React.FC<PushToGitHubModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const RemoteIcon = providerName === 'GitLab' ? ICONS.ICON_GITLAB : ICONS.ICON_GITHUB;
 
   // Reset state when modal opens
   useEffect(() => {
@@ -55,7 +58,7 @@ export const PushToGitHubModal: React.FC<PushToGitHubModalProps> = ({
           </div>
           <h3 className="text-text-primary mb-2 text-xl font-bold">Feedback Pushed!</h3>
           <p className="text-text-secondary mb-8 text-sm leading-relaxed">
-            The feedback has been successfully pushed as a comment to GitHub.
+            The feedback has been posted to your remote review.
           </p>
           <div className="space-y-3">
             <button
@@ -63,7 +66,7 @@ export const PushToGitHubModal: React.FC<PushToGitHubModalProps> = ({
               className="bg-accent hover:bg-accent/90 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]"
             >
               <ICONS.ACTION_OPEN_WINDOW size={16} weight="bold" />
-              Open on GitHub
+              Open remote review
             </button>
             <button
               onClick={onClose}
@@ -83,9 +86,9 @@ export const PushToGitHubModal: React.FC<PushToGitHubModalProps> = ({
         <div className="border-border/50 bg-bg-secondary/30 flex items-center justify-between rounded-t-xl border-b px-5 py-4">
           <div className="flex items-center gap-2.5">
             <div className="bg-accent/10 text-accent rounded-md p-1.5">
-              <ICONS.ICON_GITHUB size={18} />
+              <RemoteIcon size={18} />
             </div>
-            <h3 className="text-text-primary text-sm font-semibold">Push to GitHub</h3>
+            <h3 className="text-text-primary text-sm font-semibold">Post to remote review</h3>
           </div>
           <button
             onClick={onClose}
@@ -103,7 +106,7 @@ export const PushToGitHubModal: React.FC<PushToGitHubModalProps> = ({
             <div>
               <h4 className="text-text-primary mb-1 text-sm font-medium">Confirmation</h4>
               <p className="text-text-secondary text-xs leading-relaxed">
-                Are you sure you want to push this feedback as a comment to the linked GitHub PR?
+                Are you sure you want to post this feedback to the linked review?
               </p>
             </div>
           </div>
@@ -135,8 +138,8 @@ export const PushToGitHubModal: React.FC<PushToGitHubModalProps> = ({
                 </>
               ) : (
                 <>
-                  <ICONS.ICON_GITHUB size={14} weight="bold" />
-                  Push Comment
+                  <RemoteIcon size={14} weight="bold" />
+                  Post Comment
                 </>
               )}
             </button>

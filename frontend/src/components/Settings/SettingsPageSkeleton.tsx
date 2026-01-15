@@ -1,6 +1,6 @@
 import React from 'react';
 import { Gear, User, Terminal, Database, Asterisk, CaretRight } from '@phosphor-icons/react';
-import { GitHubSkeleton } from './SettingsSkeleton';
+import { VcsSkeleton } from './SettingsSkeleton';
 
 export const SettingsPageSkeleton: React.FC = () => {
   return (
@@ -21,7 +21,7 @@ export const SettingsPageSkeleton: React.FC = () => {
               <span className="text-brand">
                 <Gear size={14} />
               </span>
-              <span>GitHub Integration</span>
+              <span>VCS Integration</span>
               <CaretRight size={12} className="text-text-tertiary ml-auto" />
             </div>
 
@@ -59,7 +59,7 @@ export const SettingsPageSkeleton: React.FC = () => {
               <div className="bg-bg-secondary mb-2 h-7 w-48 animate-pulse rounded" />
               <div className="bg-bg-secondary h-4 w-96 animate-pulse rounded" />
             </div>
-            <GitHubSkeleton />
+            <VcsSkeleton />
           </div>
         </div>
       </div>

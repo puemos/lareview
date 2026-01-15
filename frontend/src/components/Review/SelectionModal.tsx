@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import type { ReviewTask, Feedback } from '../../types';
 import { useTauri } from '../../hooks/useTauri';
 
-export type ExportFormat = 'markdown' | 'github';
+export type ExportFormat = 'markdown' | 'remote';
 
 interface SelectionModalProps {
   isOpen: boolean;
@@ -16,7 +16,7 @@ interface SelectionModalProps {
   ) => Promise<string | void>;
   tasks: ReviewTask[];
   feedbacks: Feedback[];
-  isGitHubAvailable: boolean;
+  remoteProviderName?: string | null;
 }
 
 export const SelectionModal: React.FC<SelectionModalProps> = ({
@@ -25,7 +25,7 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
   onConfirm,
   tasks,
   feedbacks,
-  isGitHubAvailable,
+  remoteProviderName,
 }) => {
   const { openUrl } = useTauri();
   const [format, setFormat] = useState<ExportFormat>('markdown');
@@ -35,6 +35,10 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const isRemoteAvailable = Boolean(remoteProviderName);
+  const RemoteIcon = remoteProviderName === 'GitLab' ? ICONS.ICON_GITLAB : ICONS.ICON_GITHUB;
+  const remoteCopyLabel = remoteProviderName ? `${remoteProviderName} review` : 'remote review';
+
   // Initialize selection when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -43,10 +47,10 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
       setResultUrl(null);
       setError(null);
       setIsProcessing(false);
-      // Default to GitHub if available, otherwise Markdown
-      setFormat(isGitHubAvailable ? 'github' : 'markdown');
+      // Default to remote if available, otherwise Markdown
+      setFormat(isRemoteAvailable ? 'remote' : 'markdown');
     }
-  }, [isOpen, tasks, feedbacks, isGitHubAvailable]);
+  }, [isOpen, tasks, feedbacks, isRemoteAvailable]);
 
   if (!isOpen) return null;
 
@@ -73,7 +77,7 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
         Array.from(selectedTasks),
         Array.from(selectedFeedbacks)
       );
-      if (format === 'github' && result) {
+      if (format === 'remote' && result) {
         setResultUrl(result);
       } else if (format === 'markdown') {
         onClose();
@@ -97,7 +101,7 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
           </div>
           <h3 className="text-text-primary mb-2 text-xl font-bold">Review Pushed!</h3>
           <p className="text-text-secondary mb-8 text-sm leading-relaxed">
-            The review has been successfully pushed to GitHub as a PR review.
+            The review has been posted to your remote review.
           </p>
           <div className="space-y-3">
             <button
@@ -105,7 +109,7 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
               className="bg-accent hover:bg-accent/90 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]"
             >
               <ICONS.ACTION_OPEN_WINDOW size={16} weight="bold" />
-              Open on GitHub
+              Open remote review
             </button>
             <button
               onClick={onClose}
@@ -177,39 +181,39 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
               </button>
 
               <button
-                disabled={!isGitHubAvailable}
-                onClick={() => setFormat('github')}
+                disabled={!isRemoteAvailable}
+                onClick={() => setFormat('remote')}
                 className={`group relative flex flex-row items-center gap-3 rounded-lg border px-4 py-3 transition-all ${
-                  !isGitHubAvailable
+                  !isRemoteAvailable
                     ? 'cursor-not-allowed border-dashed opacity-50'
                     : 'cursor-pointer'
                 } ${
-                  format === 'github'
+                  format === 'remote'
                     ? 'border-accent/30 bg-accent/5 text-text-primary shadow-sm'
                     : 'border-border/30 bg-bg-secondary/30 text-text-secondary hover:border-border/50 hover:bg-bg-secondary'
                 }`}
               >
-                {format === 'github' && (
+                {format === 'remote' && (
                   <div className="absolute top-2 right-2 flex items-center justify-center">
                     <div className="bg-accent animate-in fade-in zoom-in-50 h-1.5 w-1.5 rounded-full duration-200" />
                   </div>
                 )}
                 <div
-                  className={`rounded-md p-2 ${format === 'github' ? 'bg-accent/10' : 'bg-bg-tertiary'}`}
+                  className={`rounded-md p-2 ${format === 'remote' ? 'bg-accent/10' : 'bg-bg-tertiary'}`}
                 >
-                  <ICONS.ICON_GITHUB
+                  <RemoteIcon
                     size={20}
                     className={
-                      format === 'github'
+                      format === 'remote'
                         ? 'text-accent'
                         : 'text-text-disabled group-hover:text-text-secondary transition-colors'
                     }
                   />
                 </div>
                 <div className="text-left">
-                  <p className="mb-0.5 text-sm font-medium">GitHub Review</p>
+                  <p className="mb-0.5 text-sm font-medium">Remote Review</p>
                   <p className="text-text-tertiary text-[10px]">
-                    {isGitHubAvailable ? 'Post as PR review' : 'Not a GitHub PR'}
+                    {isRemoteAvailable ? `Post to your ${remoteCopyLabel}` : 'No remote review available'}
                   </p>
                 </div>
               </button>
@@ -396,14 +400,14 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
                 {isProcessing ? (
                   <>
                     <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                    {format === 'github' ? 'Pushing...' : 'Generating...'}
+                    {format === 'remote' ? 'Pushing...' : 'Generating...'}
                   </>
                 ) : (
                   <>
-                    {format === 'github' ? (
+                    {format === 'remote' ? (
                       <>
-                        <ICONS.ICON_GITHUB size={14} weight="bold" />
-                        Push to GitHub
+                        <RemoteIcon size={14} weight="bold" />
+                        Post to remote
                       </>
                     ) : (
                       <>

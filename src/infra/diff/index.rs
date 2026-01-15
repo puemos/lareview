@@ -611,6 +611,48 @@ impl DiffIndex {
         found
     }
 
+    /// Find line location for a given line number and side.
+    pub fn find_line_location(
+        &self,
+        file_path: &str,
+        line_number: u32,
+        side: FeedbackSide,
+    ) -> Option<LineLocation> {
+        let file_index = self.files.get(file_path)?;
+
+        for indexed_hunk in &file_index.all_hunks {
+            let hunk = &indexed_hunk.hunk;
+            let coords = indexed_hunk.coords;
+
+            let mut found = None;
+            Self::walk_hunk_lines(hunk, coords, |pos, line, old_num, new_num| {
+                if found.is_some() {
+                    return;
+                }
+
+                let match_num = match side {
+                    FeedbackSide::Old => old_num,
+                    FeedbackSide::New => new_num,
+                };
+                if match_num == Some(line_number) {
+                    found = Some(LineLocation {
+                        position_in_hunk: pos,
+                        old_line_number: old_num,
+                        new_line_number: new_num,
+                        is_addition: line.line_type.as_str() == unidiff::LINE_TYPE_ADDED,
+                        is_deletion: line.line_type.as_str() == unidiff::LINE_TYPE_REMOVED,
+                    });
+                }
+            });
+
+            if let Some(location) = found {
+                return Some(location);
+            }
+        }
+
+        None
+    }
+
     /// Find the position in the overall diff for a given line in the new file.
     /// This position is used by GitHub for review comments.
     pub fn find_position_in_diff(

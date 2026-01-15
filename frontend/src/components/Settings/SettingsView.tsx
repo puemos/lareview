@@ -17,7 +17,7 @@ import {
 import type {
   ViewType,
   Agent,
-  GitHubStatus as GitHubStatusType,
+  VcsStatus as VcsStatusType,
   EditorCandidate,
   EditorConfig,
   CliStatus,
@@ -25,14 +25,14 @@ import type {
 import { toast } from 'sonner';
 import { useTauri } from '../../hooks/useTauri';
 import { useDelayedLoading } from '../../hooks/useDelayedLoading';
-import { GitHubSkeleton, CliSkeleton, EditorSkeleton, AgentsSkeleton } from './SettingsSkeleton';
+import { VcsSkeleton, CliSkeleton, EditorSkeleton, AgentsSkeleton } from './SettingsSkeleton';
 
 interface SettingsViewProps {
   onNavigate: (view: ViewType) => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = () => {
-  const [activeTab, setActiveTab] = useState<'github' | 'cli' | 'editor' | 'agents'>('github');
+  const [activeTab, setActiveTab] = useState<'vcs' | 'cli' | 'editor' | 'agents'>('vcs');
 
   return (
     <div className="bg-bg-primary flex h-full flex-col">
@@ -50,9 +50,9 @@ export const SettingsView: React.FC<SettingsViewProps> = () => {
           <nav className="flex-1 space-y-1 px-3">
             <TabButton
               icon={<Gear size={14} />}
-              label="GitHub Integration"
-              isActive={activeTab === 'github'}
-              onClick={() => setActiveTab('github')}
+              label="VCS Integration"
+              isActive={activeTab === 'vcs'}
+              onClick={() => setActiveTab('vcs')}
             />
             <TabButton
               icon={<Terminal size={14} />}
@@ -82,7 +82,7 @@ export const SettingsView: React.FC<SettingsViewProps> = () => {
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
           <div className="animate-fade-in max-w-3xl space-y-8 p-8 md:p-12">
-            {activeTab === 'github' && <GitHubSettings />}
+            {activeTab === 'vcs' && <VcsSettings />}
             {activeTab === 'cli' && <CliSettings />}
 
             {activeTab === 'editor' && <EditorSettings />}
@@ -133,24 +133,24 @@ const SectionHeader: React.FC<{ title: string; description: string }> = ({
   </div>
 );
 
-const GitHubSettings: React.FC = () => {
-  const { getGitHubStatus } = useTauri();
-  const [status, setStatus] = useState<GitHubStatusType | null>(null);
+const VcsSettings: React.FC = () => {
+  const { getVcsStatus } = useTauri();
+  const [status, setStatus] = useState<VcsStatusType[]>([]);
   const [isChecking, setIsChecking] = useState(true);
 
   const checkStatus = useCallback(
     async (manual = false) => {
       setIsChecking(true);
       try {
-        const result = await getGitHubStatus();
+        const result = await getVcsStatus();
         setStatus(result);
         if (manual === true) {
           toast('Status Refreshed', {
-            description: 'GitHub connection status updated.',
+            description: 'VCS connection status updated.',
           });
         }
       } catch (error) {
-        console.error('Failed to check GitHub status:', error);
+        console.error('Failed to check VCS status:', error);
         toast('Failed to refresh status', {
           description: error instanceof Error ? error.message : String(error),
         });
@@ -158,22 +158,21 @@ const GitHubSettings: React.FC = () => {
         setIsChecking(false);
       }
     },
-    [getGitHubStatus]
+    [getVcsStatus]
   );
 
   useEffect(() => {
     checkStatus();
   }, [checkStatus]);
 
-  const isReady = status && status.login && !status.error;
-  const shouldShowSkeleton = useDelayedLoading(isChecking && !status);
+  const shouldShowSkeleton = useDelayedLoading(isChecking && status.length === 0);
 
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
         <SectionHeader
-          title="GitHub Integration"
-          description="Connect your GitHub account to enable PR reviews and feedback synchronization."
+          title="VCS Integration"
+          description="Connect your VCS accounts to enable remote reviews and feedback synchronization."
         />
         <div className="flex items-center gap-3">
           {shouldShowSkeleton ? (
@@ -183,7 +182,7 @@ const GitHubSettings: React.FC = () => {
               <ArrowsClockwise size={12} className="animate-spin" />
               Checking...
             </span>
-          ) : isReady ? (
+          ) : status.some(item => item.login && !item.error) ? (
             <span className="text-status-done bg-status-done/10 border-status-done/20 flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-medium">
               <Check size={12} weight="bold" />
               Ready
@@ -198,126 +197,91 @@ const GitHubSettings: React.FC = () => {
       </div>
 
       {shouldShowSkeleton ? (
-        <GitHubSkeleton />
+        <VcsSkeleton />
       ) : (
         <div className="space-y-6">
-          <div className="bg-bg-secondary/40 border-border space-y-6 rounded-lg border p-6">
-            <div className="grid grid-cols-[120px_1fr] items-center gap-x-8 gap-y-4">
-              <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
-                Connection
-              </span>
-              <div className="flex items-center gap-2">
-                {isChecking ? (
-                  <div className="text-text-tertiary flex items-center gap-2">
-                    <ArrowsClockwise size={14} className="animate-spin" />
-                    <span className="text-xs">Checking status...</span>
-                  </div>
-                ) : status?.login ? (
+          {status.map(item => {
+            const isReady = item.login && !item.error;
+            return (
+              <div
+                key={item.id}
+                className="bg-bg-secondary/40 border-border space-y-6 rounded-lg border p-6"
+              >
+                <div className="grid grid-cols-[120px_1fr] items-center gap-x-8 gap-y-4">
+                  <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
+                    Provider
+                  </span>
+                  <span className="text-text-secondary text-xs font-medium">{item.name}</span>
+
+                  <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
+                    Connection
+                  </span>
                   <div className="flex items-center gap-2">
-                    <span className="text-status-done text-xs font-medium">Connected</span>
-                    <span className="text-text-tertiary font-mono text-xs">(@{status.login})</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="text-status-in_progress text-xs font-medium">
-                      Disconnected
-                    </span>
-                    {status?.error && (
-                      <span className="text-text-tertiary text-[10px]">
-                        (Error: {status.error})
-                      </span>
+                    {isChecking ? (
+                      <div className="text-text-tertiary flex items-center gap-2">
+                        <ArrowsClockwise size={14} className="animate-spin" />
+                        <span className="text-xs">Checking status...</span>
+                      </div>
+                    ) : item.login ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-status-done text-xs font-medium">Connected</span>
+                        <span className="text-text-tertiary font-mono text-xs">(@{item.login})</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-status-in_progress text-xs font-medium">
+                          Disconnected
+                        </span>
+                        {item.error && (
+                          <span className="text-text-tertiary text-[10px]">
+                            (Error: {item.error})
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
 
-              {status?.ghPath && (
-                <>
+                  {item.cliPath && (
+                    <>
+                      <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
+                        Executable
+                      </span>
+                      <span className="text-text-secondary truncate font-mono text-xs">
+                        {item.cliPath}
+                      </span>
+                    </>
+                  )}
+
                   <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
-                    Executable
+                    Status
                   </span>
-                  <span className="text-text-secondary truncate font-mono text-xs">
-                    {status.ghPath}
+                  <span
+                    className={`text-xs font-medium ${
+                      isReady ? 'text-status-done' : 'text-status-in_progress'
+                    }`}
+                  >
+                    {isReady ? 'Ready' : 'Needs setup'}
                   </span>
-                </>
-              )}
-            </div>
-
-            <div className="pt-2">
-              <button
-                onClick={() => checkStatus(true)}
-                disabled={isChecking}
-                className="bg-bg-tertiary text-text-primary hover:bg-bg-secondary border-border inline-flex items-center gap-2 rounded-md border px-4 py-2 text-xs font-medium shadow-sm transition-colors disabled:opacity-50"
-              >
-                <ArrowsClockwise size={14} className={isChecking ? 'animate-spin' : ''} />
-                Refresh Status
-              </button>
-            </div>
-          </div>
-
-          {(!isReady || status?.error) && (
-            <div className="animate-in fade-in slide-in-from-top-2 space-y-4 duration-500">
-              <div className="text-text-secondary mb-2 flex items-center gap-2">
-                <h3 className="text-xs font-bold tracking-widest uppercase">Setup Instructions</h3>
-                <div className="bg-border/50 h-px flex-1" />
-              </div>
-
-              <div className="bg-bg-secondary/40 border-border overflow-hidden rounded-lg border">
-                <div className="space-y-4 p-4">
-                  <div>
-                    <h4 className="text-text-primary mb-2 flex items-center gap-2 text-xs font-medium">
-                      <span className="bg-bg-tertiary border-border flex h-5 w-5 items-center justify-center rounded-full border text-[10px]">
-                        1
-                      </span>
-                      Install via Homebrew
-                    </h4>
-                    <div className="bg-bg-primary border-border group flex items-center justify-between rounded border p-2">
-                      <code className="text-brand font-mono text-[11px]">brew install gh</code>
-                      <button
-                        className="text-text-tertiary hover:text-text-primary p-1.5 opacity-0 transition-colors group-hover:opacity-100"
-                        onClick={() => navigator.clipboard.writeText('brew install gh')}
-                      >
-                        <Plus size={14} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="text-text-primary mb-2 flex items-center gap-2 text-xs font-medium">
-                      <span className="bg-bg-tertiary border-border flex h-5 w-5 items-center justify-center rounded-full border text-[10px]">
-                        2
-                      </span>
-                      Authenticate
-                    </h4>
-                    <div className="bg-bg-primary border-border group flex items-center justify-between rounded border p-2">
-                      <code className="text-brand font-mono text-[11px]">gh auth login</code>
-                      <button
-                        className="text-text-tertiary hover:text-text-primary p-1.5 opacity-0 transition-colors group-hover:opacity-100"
-                        onClick={() => navigator.clipboard.writeText('gh auth login')}
-                      >
-                        <Plus size={14} />
-                      </button>
-                    </div>
-                  </div>
                 </div>
-                <div className="bg-bg-tertiary/50 border-border flex items-center gap-2 border-t px-4 py-3">
-                  <Warning size={14} className="text-status-in_progress" />
-                  <p className="text-text-tertiary text-[10px] leading-relaxed">
-                    The GitHub CLI (
-                    <code className="bg-bg-secondary border-border/50 rounded border px-1 py-0.5">
-                      gh
-                    </code>
-                    ) is required to fetch PR details and sync feedback.
-                  </p>
+
+                <div className="pt-2">
+                  <button
+                    onClick={() => checkStatus(true)}
+                    className="bg-bg-tertiary hover:bg-bg-secondary flex items-center gap-2 rounded-md px-4 py-2 text-xs font-medium transition-colors"
+                  >
+                    <ArrowsClockwise size={14} />
+                    Refresh Status
+                  </button>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })}
         </div>
       )}
     </div>
   );
 };
+
 
 const CliSettings: React.FC = () => {
   const { getCliStatus, installCli, getVersion } = useTauri();
@@ -425,7 +389,8 @@ const CliSettings: React.FC = () => {
             </div>
             <div className="bg-bg-primary text-text-secondary space-y-2 p-4 font-mono text-xs">
               <CommandLine cmd="lareview diff <from> <to>" desc="Review changes between commits" />
-              <CommandLine cmd="lareview pr <owner/repo#number>" desc="Review a GitHub PR" />
+              <CommandLine cmd="lareview pr <owner/repo#number>" desc="Review a GitHub change" />
+              <CommandLine cmd="lareview pr <group/project!number>" desc="Review a GitLab change" />
               <CommandLine cmd="lareview status" desc="Review uncommitted changes" />
             </div>
           </div>

@@ -1,6 +1,6 @@
 import React from 'react';
 
-export const GitHubSkeleton: React.FC = () => {
+export const VcsSkeleton: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="bg-bg-secondary/40 border-border animate-pulse space-y-6 rounded-lg border p-6">
