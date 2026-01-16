@@ -46,7 +46,7 @@ export const PrInput: React.FC<PrInputProps> = ({
 
   return (
     <>
-      <div className="text-text-disabled relative flex flex-shrink-0 items-center border-r border-white/5 px-2">
+      <div className="text-text-disabled relative flex w-8 flex-shrink-0 items-center justify-center border-r border-white/5">
         <AnimatePresence mode="wait">
           <motion.span
             key={iconKey}
@@ -54,19 +54,25 @@ export const PrInput: React.FC<PrInputProps> = ({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 6 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
+            className="flex items-center justify-center"
           >
             <Icon size={14} />
           </motion.span>
         </AnimatePresence>
       </div>
-      <input
-        type="text"
-        value={prRef}
-        onChange={e => onPrRefChange(e.target.value)}
-        placeholder="Paste a remote link or shorthand..."
-        className="text-text-primary placeholder-text-disabled min-w-0 flex-1 bg-transparent px-3 py-1.5 font-mono text-xs focus:outline-none"
-        disabled={isLoading}
-      />
+      <div className="grid min-w-0 max-w-[400px] flex-shrink">
+        <input
+          type="text"
+          value={prRef}
+          onChange={e => onPrRefChange(e.target.value)}
+          placeholder="Paste a remote link or shorthand..."
+          className="col-start-1 row-start-1 text-text-primary placeholder-text-disabled bg-transparent px-3 py-1.5 font-mono text-xs focus:outline-none"
+          disabled={isLoading}
+        />
+        <span className="col-start-1 row-start-1 pointer-events-none invisible truncate whitespace-pre px-3 py-1.5 font-mono text-xs">
+          {prRef || 'Paste a remote link or shorthand...'}
+        </span>
+      </div>
       <div className="flex h-[14px] flex-shrink-0 items-center border-l border-white/5"></div>
       <button
         onClick={onFetch}

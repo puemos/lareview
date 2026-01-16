@@ -41,7 +41,7 @@ export const VcsInputCard: React.FC<VcsInputCardProps> = ({
 
   return (
     <div
-      className={`ring-border pointer-events-auto flex h-8 w-full max-w-xl min-w-[300px] flex-1 items-center overflow-hidden rounded-md border text-xs font-medium backdrop-blur-md transition-colors duration-200 ${
+      className={`ring-border pointer-events-auto flex h-8 w-fit max-w-full min-w-52 items-center overflow-hidden rounded-md border text-xs font-medium backdrop-blur-md transition-colors duration-200 ${
         hasRemoteSource
           ? 'border-green-500/20 bg-green-500/10 text-green-400 shadow-sm'
           : 'border-border bg-bg-secondary/90 text-text-primary shadow-lg shadow-black/20'
@@ -52,11 +52,14 @@ export const VcsInputCard: React.FC<VcsInputCardProps> = ({
           <div className="flex flex-shrink-0 items-center border-r border-green-500/20 px-2">
             {vcsSourceIcon}
           </div>
-          <span className="min-w-0 flex-1 px-3 font-mono text-xs">{vcsSourceLabel}</span>
+          <span className="max-w-[400px] min-w-0 truncate px-3 font-mono text-xs">
+            {vcsSourceLabel}
+          </span>
+          <div className="flex-1" />
           <div className="flex h-[14px] flex-shrink-0 items-center border-l border-green-500/20" />
           <button
             onClick={onClear}
-            className="flex min-w-[48px] flex-shrink-0 items-center justify-center px-3 py-1.5 text-[10px] font-medium opacity-80 transition-colors hover:opacity-100"
+            className="flex flex-shrink-0 items-center justify-center px-3 py-1.5 text-[10px] font-medium opacity-80 transition-colors hover:opacity-100"
           >
             <X size={12} />
           </button>
