@@ -76,16 +76,14 @@ path = "src/lib.rs"
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
-test-utils = []
 
 [[bin]]
 name = "lareview"
 path = "src/main.rs"
 
-[[bin]]
+[[example]]
 name = "fake_acp_agent"
-path = "src/bin/fake_acp_agent.rs"
-required-features = ["test-utils"]
+path = "examples/fake_acp_agent.rs"
 
 [dev-dependencies]
 

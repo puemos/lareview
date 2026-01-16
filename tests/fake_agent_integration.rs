@@ -5,7 +5,21 @@ use std::sync::Arc;
 
 #[tokio::test]
 async fn test_generate_tasks_with_fake_agent_finalize_only() {
-    let agent_path = env!("CARGO_BIN_EXE_fake_acp_agent");
+    let mut agent_path = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("examples/fake_acp_agent");
+    if !agent_path.exists() {
+        agent_path = std::env::current_exe()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("examples/fake_acp_agent");
+    }
+    let agent_path = agent_path.to_str().unwrap();
     let diff_text = "diff --git a/src/a.rs b/src/a.rs\n\
 index 0000000..1111111 100644\n\
 --- a/src/a.rs\n\

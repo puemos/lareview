@@ -98,10 +98,10 @@ jobs:
           touch frontend/dist/index.html
 
       - name: Build helper agent
-        run: cargo build --bin fake_acp_agent --features test-utils
+        run: cargo build --example fake_acp_agent
 
       - name: Run tests
-        run: cargo test --features test-utils --verbose
+        run: cargo test --verbose
 
   build:
     name: Build Check
