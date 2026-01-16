@@ -89,7 +89,7 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
 
   React.useEffect(() => {
     if (filteredFiles.length > 0) {
-      if (activeTab === 'diff' || !selectedFile) {
+      if (activeTab === 'diff' && !selectedFile) {
         onSelectFile(filteredFiles[0]);
       }
     }

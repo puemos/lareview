@@ -329,7 +329,6 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     await stopGeneration();
   }, [stopGeneration]);
 
-
   return (
     <div className="bg-bg-primary flex h-full flex-col">
       <div className="flex flex-1 overflow-hidden">
@@ -379,7 +378,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
                   <button
                     onClick={handleCloneAndLink}
                     disabled={isGenerating || isRepoLinking}
-                    className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 rounded px-2 py-1 text-[10px] font-semibold transition-colors disabled:opacity-60 flex items-center gap-1"
+                    className="flex items-center gap-1 rounded bg-amber-500/20 px-2 py-1 text-[10px] font-semibold text-amber-100 transition-colors hover:bg-amber-500/30 disabled:opacity-60"
                   >
                     {isRepoLinking ? <Spinner size={12} className="animate-spin" /> : null}
                     <span>Clone &amp; Link</span>

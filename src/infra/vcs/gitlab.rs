@@ -304,6 +304,12 @@ impl GitLabProvider {
     }
 }
 
+impl Default for GitLabProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VcsRef for GitLabMrRef {
     fn provider_id(&self) -> &str {
         "gitlab"

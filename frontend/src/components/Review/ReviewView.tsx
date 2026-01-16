@@ -135,12 +135,13 @@ export const ReviewView: React.FC = () => {
   };
 
   const currentReview = allReviews.find(r => r.id === reviewId);
-  const remoteProviderName = currentReview?.source?.type === 'gitlab_mr'
-    ? 'GitLab'
-    : currentReview?.source?.type === 'github_pr' ||
-        (currentReview?.source?.type as string) === 'git_hub_pr'
-      ? 'GitHub'
-      : null;
+  const remoteProviderName =
+    currentReview?.source?.type === 'gitlab_mr'
+      ? 'GitLab'
+      : currentReview?.source?.type === 'github_pr' ||
+          (currentReview?.source?.type as string) === 'git_hub_pr'
+        ? 'GitHub'
+        : null;
   console.log('Review Debug:', {
     reviewId,
     found: !!currentReview,
@@ -260,21 +261,20 @@ export const ReviewView: React.FC = () => {
               onRetry={handleRetry}
             />
           ) : sidebarTab === 'feedback' ? (
-              <FeedbackDetail
-                feedback={selectedFeedback}
-                rulesById={rulesById}
-                comments={isCommentsLoading ? [] : comments}
-                onUpdateStatus={handleFeedbackStatusChange}
-                onUpdateImpact={handleFeedbackImpactChange}
-                onDelete={handleDeleteFeedback}
-                onAddComment={handleAddComment}
-                onPushToRemote={handlePushFeedbackToRemote}
-                remoteProviderName={remoteProviderName}
-                isUpdatingStatus={isUpdatingFeedbackStatus}
-                isUpdatingImpact={isUpdatingFeedbackImpact}
-                isAddingComment={addCommentMutation.isPending}
-              />
-
+            <FeedbackDetail
+              feedback={selectedFeedback}
+              rulesById={rulesById}
+              comments={isCommentsLoading ? [] : comments}
+              onUpdateStatus={handleFeedbackStatusChange}
+              onUpdateImpact={handleFeedbackImpactChange}
+              onDelete={handleDeleteFeedback}
+              onAddComment={handleAddComment}
+              onPushToRemote={handlePushFeedbackToRemote}
+              remoteProviderName={remoteProviderName}
+              isUpdatingStatus={isUpdatingFeedbackStatus}
+              isUpdatingImpact={isUpdatingFeedbackImpact}
+              isAddingComment={addCommentMutation.isPending}
+            />
           ) : (
             <>
               {selectedTask && parsedDiff ? (

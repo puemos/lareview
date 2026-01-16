@@ -224,7 +224,9 @@ const VcsSettings: React.FC = () => {
                     ) : item.login ? (
                       <div className="flex items-center gap-2">
                         <span className="text-status-done text-xs font-medium">Connected</span>
-                        <span className="text-text-tertiary font-mono text-xs">(@{item.login})</span>
+                        <span className="text-text-tertiary font-mono text-xs">
+                          (@{item.login})
+                        </span>
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
@@ -280,7 +282,6 @@ const VcsSettings: React.FC = () => {
     </div>
   );
 };
-
 
 const CliSettings: React.FC = () => {
   const { getCliStatus, installCli, getVersion } = useTauri();

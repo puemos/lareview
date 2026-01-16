@@ -29,6 +29,7 @@ const LAREVIEW_TOOLS: &[&str] = &[
     TOOL_ADD_FEEDBACK,
 ];
 
+#[allow(dead_code)]
 struct ReadCheck {
     allowed: bool,
     path_display: String,
@@ -300,18 +301,10 @@ impl LaReviewClient {
             return None;
         }
         for token in tokens {
-            if token.contains('/') || token.contains('\\') {
-                let path = PathBuf::from(token);
-                let name = path.file_name()?.to_str()?;
-                if name.contains('.') && !name.starts_with('.') {
-                    return Some(path);
-                }
-            } else {
-                let path = PathBuf::from(token);
-                let name = path.file_name()?.to_str()?;
-                if name.contains('.') && !name.starts_with('.') {
-                    return Some(path);
-                }
+            let path = PathBuf::from(token);
+            let name = path.file_name()?.to_str()?;
+            if name.contains('.') && !name.starts_with('.') {
+                return Some(path);
             }
         }
         None
@@ -362,7 +355,7 @@ impl LaReviewClient {
     fn check_read_request(
         &self,
         raw_input: &Option<serde_json::Value>,
-        tool_title: &str,
+        _tool_title: &str,
         locations: Option<&[agent_client_protocol::ToolCallLocation]>,
     ) -> ReadCheck {
         let Some(root) = self.repo_root.as_ref() else {
@@ -386,25 +379,19 @@ impl LaReviewClient {
             }
         };
 
-        if let Some(input) = raw_input.as_ref() {
-            if let Some((path, line)) = Self::extract_path_from_raw_input(input) {
-                return self.validate_candidate_path(&path, &root_canon, line, "raw_input");
-            }
+        if let Some(input) = raw_input.as_ref()
+            && let Some((path, line)) = Self::extract_path_from_raw_input(input)
+        {
+            return self.validate_candidate_path(&path, &root_canon, line, "raw_input");
         }
 
-        if let Some(locs) = locations {
-            if let Some((path, line)) = Self::extract_path_from_locations(locs) {
-                return self.validate_candidate_path(&path, &root_canon, line, "locations");
-            }
-            return ReadCheck {
-                allowed: false,
-                path_display: "<none>".to_string(),
-                reason: "missing path; provide path in raw_input or ToolCall locations".to_string(),
-                line: None,
-            };
+        if let Some(locs) = locations
+            && let Some((path, line)) = Self::extract_path_from_locations(locs)
+        {
+            return self.validate_candidate_path(&path, &root_canon, line, "locations");
         }
 
-        if let Some(path) = Self::extract_path_from_title(tool_title) {
+        if let Some(path) = Self::extract_path_from_title(_tool_title) {
             return self.validate_candidate_path(&path, &root_canon, None, "title");
         }
 

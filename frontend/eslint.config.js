@@ -39,6 +39,7 @@ export default [
       'react-hooks/rules-of-hooks': 'off',
       'react/display-name': 'off',
       'no-empty': 'off',
+      'react/prop-types': 'off',
     },
     settings: {
       react: { version: '19.0' },

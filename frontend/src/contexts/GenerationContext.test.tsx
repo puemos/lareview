@@ -66,7 +66,7 @@ describe('GenerationContext', () => {
       });
     });
 
-    expect(useAppStore.getState().isGenerating).toBe(true);
+    await waitFor(() => expect(useAppStore.getState().isGenerating).toBe(true));
   });
 
   it('stops generating when Completed event is received', async () => {
@@ -95,7 +95,7 @@ describe('GenerationContext', () => {
 
     expect(useAppStore.getState().isGenerating).toBe(true);
 
-    act(() => {
+    await act(async () => {
       channelInstance?.onmessage?.({ event: 'Completed', data: { task_count: 5 } });
     });
 

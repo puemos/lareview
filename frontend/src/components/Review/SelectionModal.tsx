@@ -213,7 +213,9 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
                 <div className="text-left">
                   <p className="mb-0.5 text-sm font-medium">Remote Review</p>
                   <p className="text-text-tertiary text-[10px]">
-                    {isRemoteAvailable ? `Post to your ${remoteCopyLabel}` : 'No remote review available'}
+                    {isRemoteAvailable
+                      ? `Post to your ${remoteCopyLabel}`
+                      : 'No remote review available'}
                   </p>
                 </div>
               </button>

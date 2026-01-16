@@ -317,6 +317,12 @@ impl GitHubProvider {
     }
 }
 
+impl Default for GitHubProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VcsRef for GitHubPrRef {
     fn provider_id(&self) -> &str {
         "github"
