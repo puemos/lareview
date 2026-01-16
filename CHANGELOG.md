@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.24] - 2026-01-16
+
+### Added
+
+- **Generation**: Implement 'always allow snapshot' preference for smoother agent workflow.
+
+### Changed
+
+- **Plan**: Simplified plan management to strictly follow ACP compliance, removing redundant frontend logic.
+
+### Fixed
+
+- **UI**: Fixed `PrInput` layout and sizing issues in the Generate view.
+- **UI**: Respect manual plan panel collapse state across plan updates.
+
+### VCS
+
+- **VCS**: Ensure git fetch is performed before snapshot creation to handle remote-only commits.
+
 ## [0.0.23] - 2026-01-16
 
 ### Added
