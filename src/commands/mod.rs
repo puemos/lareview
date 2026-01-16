@@ -1269,6 +1269,17 @@ pub async fn get_vcs_status() -> Result<Vec<VcsStatus>, String> {
     Ok(statuses)
 }
 
+#[tauri::command]
+pub async fn get_single_vcs_status(provider_id: String) -> Result<VcsStatus, String> {
+    let registry = VcsRegistry::default();
+    let provider = registry
+        .get_provider(&provider_id)
+        .ok_or_else(|| format!("Provider {} not found", provider_id))?;
+
+    let status = provider.get_status().await.map_err(|e| e.to_string())?;
+    Ok(status)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CloneRepoRequest {
     pub provider: String,

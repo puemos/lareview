@@ -458,6 +458,13 @@ export const useTauri = () => {
     return invoke('get_vcs_status');
   }, []);
 
+  const getSingleVcsStatus = useCallback(
+    async (providerId: string): Promise<VcsStatus> => {
+      return invoke('get_single_vcs_status', { providerId });
+    },
+    []
+  );
+
   const getReviewRules = useCallback(async (): Promise<ReviewRule[]> => {
     return invoke('get_review_rules');
   }, []);
@@ -581,6 +588,7 @@ export const useTauri = () => {
     getGitHubToken,
     setGitHubToken,
     getVcsStatus,
+    getSingleVcsStatus,
     getReviewRules,
     createReviewRule,
     updateReviewRule,

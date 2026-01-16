@@ -136,32 +136,43 @@ const SectionHeader: React.FC<{ title: string; description: string }> = ({
 );
 
 const VcsSettings: React.FC = () => {
-  const { getVcsStatus } = useTauri();
+  const { getVcsStatus, getSingleVcsStatus } = useTauri();
   const [status, setStatus] = useState<VcsStatusType[]>([]);
   const [isChecking, setIsChecking] = useState(true);
+  const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
 
-  const checkStatus = useCallback(
-    async (manual = false) => {
-      setIsChecking(true);
-      try {
-        const result = await getVcsStatus();
-        setStatus(result);
-        if (manual === true) {
-          toast('Status Refreshed', {
-            description: 'VCS connection status updated.',
-          });
-        }
-      } catch (error) {
-        console.error('Failed to check VCS status:', error);
-        toast('Failed to refresh status', {
-          description: error instanceof Error ? error.message : String(error),
-        });
-      } finally {
-        setIsChecking(false);
-      }
-    },
-    [getVcsStatus]
-  );
+  const checkStatus = useCallback(async () => {
+    setIsChecking(true);
+    try {
+      const result = await getVcsStatus();
+      setStatus(result);
+    } catch (error) {
+      console.error('Failed to check VCS status:', error);
+      toast('Failed to refresh status', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setIsChecking(false);
+    }
+  }, [getVcsStatus]);
+
+  const refreshSingle = async (id: string, name: string) => {
+    setLoadingMap(prev => ({ ...prev, [id]: true }));
+    try {
+      const updatedStatus = await getSingleVcsStatus(id);
+      setStatus(prev => prev.map(item => (item.id === id ? updatedStatus : item)));
+      toast('Status Refreshed', {
+        description: `${name} connection status updated.`,
+      });
+    } catch (error) {
+      console.error(`Failed to refresh ${name} status:`, error);
+      toast('Failed to refresh status', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setLoadingMap(prev => ({ ...prev, [id]: false }));
+    }
+  };
 
   useEffect(() => {
     checkStatus();
@@ -204,6 +215,8 @@ const VcsSettings: React.FC = () => {
         <div className="space-y-6">
           {status.map(item => {
             const isReady = item.login && !item.error;
+            const isLoading = loadingMap[item.id] || false;
+
             return (
               <div
                 key={item.id}
@@ -223,7 +236,7 @@ const VcsSettings: React.FC = () => {
                     <h3 className="text-text-primary text-sm font-medium">{item.name}</h3>
                     <p className="text-text-tertiary text-xs">
                       {item.id === 'github' && 'Integration via gh CLI'}
-                      {item.id === 'gitlab' && 'Integration via glab dynamic CLI'}
+                      {item.id === 'gitlab' && 'Integration via glab CLI'}
                       {item.id !== 'github' && item.id !== 'gitlab' && 'VCS Provider'}
                     </p>
                   </div>
@@ -234,7 +247,7 @@ const VcsSettings: React.FC = () => {
                     Connection
                   </span>
                   <div className="flex items-center gap-2">
-                    {isChecking ? (
+                    {isLoading ? (
                       <div className="text-text-tertiary flex items-center gap-2">
                         <ArrowsClockwise size={14} className="animate-spin" />
                         <span className="text-xs">Checking status...</span>
@@ -285,10 +298,11 @@ const VcsSettings: React.FC = () => {
 
                 <div className="pt-2">
                   <button
-                    onClick={() => checkStatus(true)}
-                    className="bg-bg-tertiary hover:bg-bg-secondary flex items-center gap-2 rounded-md px-4 py-2 text-xs font-medium transition-colors"
+                    onClick={() => refreshSingle(item.id, item.name)}
+                    disabled={isLoading}
+                    className="bg-bg-tertiary hover:bg-bg-secondary flex items-center gap-2 rounded-md px-4 py-2 text-xs font-medium transition-colors disabled:opacity-50"
                   >
-                    <ArrowsClockwise size={14} />
+                    <ArrowsClockwise size={14} className={isLoading ? 'animate-spin' : ''} />
                     Refresh Status
                   </button>
                 </div>

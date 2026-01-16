@@ -4,6 +4,14 @@ export const VcsSkeleton: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="bg-bg-secondary/40 border-border animate-pulse space-y-6 rounded-lg border p-6">
+        <div className="flex items-center gap-4 border-b border-border pb-4 mb-4">
+          <div className="bg-bg-tertiary h-10 w-10 rounded-lg" />
+          <div className="space-y-2">
+            <div className="bg-bg-tertiary h-4 w-24 rounded" />
+            <div className="bg-bg-tertiary h-3 w-40 rounded" />
+          </div>
+        </div>
+
         <div className="grid grid-cols-[120px_1fr] items-center gap-x-8 gap-y-4">
           <div className="bg-bg-tertiary h-4 w-24 rounded" />
           <div className="bg-bg-tertiary h-5 w-32 rounded" />
