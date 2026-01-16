@@ -119,7 +119,7 @@ interface MockTauriReturn {
       runId?: string,
       repoId?: string,
       source?: ReviewSource,
-      useWorktree?: boolean,
+      useSnapshot?: boolean,
       onProgress?: Channel<ProgressEventPayload>
     ) => Promise<{ task_count: number; review_id: string; run_id?: string }>
   >;

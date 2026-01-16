@@ -271,7 +271,7 @@ export const useTauri = () => {
       runId?: string,
       repoId?: string,
       source?: ReviewSource,
-      useWorktree?: boolean,
+      useSnapshot?: boolean,
       onProgress?: Channel<ProgressEventPayload>
     ): Promise<{ task_count: number; review_id: string; run_id?: string }> => {
       return invoke('generate_review', {
@@ -280,7 +280,7 @@ export const useTauri = () => {
         runId,
         repoId,
         source,
-        useWorktree: useWorktree || false,
+        useSnapshot: useSnapshot || false,
         onProgress,
       });
     },

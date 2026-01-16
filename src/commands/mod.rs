@@ -232,7 +232,7 @@ pub async fn generate_review(
     run_id: Option<String>,
     repo_id: Option<String>,
     source: Option<ReviewSource>,
-    use_worktree: bool,
+    use_snapshot: bool,
     on_progress: Channel<ProgressEventPayload>,
 ) -> Result<ReviewGenerationResult, String> {
     generate_review_inner(
@@ -242,7 +242,7 @@ pub async fn generate_review(
         run_id,
         repo_id,
         source,
-        use_worktree,
+        use_snapshot,
         on_progress,
     )
     .await
@@ -256,7 +256,7 @@ async fn generate_review_inner(
     run_id: Option<String>,
     repo_id: Option<String>,
     source: Option<ReviewSource>,
-    use_worktree: bool,
+    use_snapshot: bool,
     on_progress: Channel<ProgressEventPayload>,
 ) -> Result<ReviewGenerationResult, String> {
     let diff_hash = hash_diff(&diff_text);
@@ -268,7 +268,7 @@ async fn generate_review_inner(
     });
 
     // Create snapshot if requested and applicable
-    let snapshot_path = if use_worktree {
+    let snapshot_path = if use_snapshot {
         let repo_id_ref = &repo_id;
         let head_sha = match &source {
             ReviewSource::GitHubPr {

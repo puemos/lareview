@@ -620,7 +620,10 @@ mod policy_tests {
     }
 
     #[tokio::test(flavor = "current_thread")]
-    async fn permission_denies_title_outside_repo() {
+    async fn permission_defers_validation_for_title_path_without_extension() {
+        // When title contains a path WITHOUT a file extension (like /etc/passwd),
+        // extract_path_from_title doesn't extract it. Permission is deferred,
+        // but security is still enforced at layer 2 (read_text_file).
         let root = tempfile::tempdir().expect("root");
         std::fs::write(root.path().join("inside.txt"), "hi").expect("write");
 
@@ -649,14 +652,19 @@ mod policy_tests {
             )
             .await
             .unwrap();
+        // Permission is allowed because path can't be extracted (no extension)
+        // Security is enforced at layer 2: read_text_file will block /etc/passwd
         assert!(matches!(
             resp.outcome,
-            agent_client_protocol::RequestPermissionOutcome::Cancelled
+            agent_client_protocol::RequestPermissionOutcome::Selected(_)
         ));
     }
 
     #[tokio::test(flavor = "current_thread")]
-    async fn permission_denies_title_escape_sequence() {
+    async fn permission_defers_validation_for_title_with_traversal_no_extension() {
+        // When title contains traversal path WITHOUT a file extension,
+        // extract_path_from_title doesn't extract it. Permission is deferred,
+        // but security is still enforced at layer 2 (read_text_file).
         let root = tempfile::tempdir().expect("root");
         std::fs::write(root.path().join("inside.txt"), "hi").expect("write");
 
@@ -685,9 +693,11 @@ mod policy_tests {
             )
             .await
             .unwrap();
+        // Permission is allowed because path can't be extracted (no extension)
+        // Security is enforced at layer 2: read_text_file will block traversal paths
         assert!(matches!(
             resp.outcome,
-            agent_client_protocol::RequestPermissionOutcome::Cancelled
+            agent_client_protocol::RequestPermissionOutcome::Selected(_)
         ));
     }
 
@@ -807,5 +817,121 @@ mod policy_tests {
             )
             .is_err()
         );
+    }
+
+    // --- Deferred Path Security Tests ---
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn permission_allows_read_with_deferred_path_when_repo_enabled() {
+        let root = tempfile::tempdir().expect("root");
+
+        let client = crate::infra::acp::task_generator::client::LaReviewClient::new(
+            None,
+            "run-1",
+            Some(root.path().to_path_buf()),
+        );
+        // Empty raw_input simulates ACP sending permission request before parameters
+        let fields = agent_client_protocol::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::ToolKind::Read)
+            .title("read")
+            .raw_input(serde_json::json!({}));
+        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::PermissionOption::new(
+            "allow",
+            "Allow",
+            agent_client_protocol::PermissionOptionKind::AllowOnce,
+        )];
+        let req = agent_client_protocol::RequestPermissionRequest::new(
+            agent_client_protocol::SessionId::new("s1"),
+            tool_call,
+            options,
+        );
+        let resp =
+            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
+                &client, req,
+            )
+            .await
+            .unwrap();
+        // Should be allowed because repo access is enabled (deferred validation)
+        assert!(matches!(
+            resp.outcome,
+            agent_client_protocol::RequestPermissionOutcome::Selected(_)
+        ));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn permission_denies_read_with_deferred_path_when_no_repo_access() {
+        let client =
+            crate::infra::acp::task_generator::client::LaReviewClient::new(None, "run-1", None);
+        // Empty raw_input with no repo access should be denied
+        let fields = agent_client_protocol::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::ToolKind::Read)
+            .title("read")
+            .raw_input(serde_json::json!({}));
+        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::PermissionOption::new(
+            "allow",
+            "Allow",
+            agent_client_protocol::PermissionOptionKind::AllowOnce,
+        )];
+        let req = agent_client_protocol::RequestPermissionRequest::new(
+            agent_client_protocol::SessionId::new("s1"),
+            tool_call,
+            options,
+        );
+        let resp =
+            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
+                &client, req,
+            )
+            .await
+            .unwrap();
+        // Should be denied because no repo access
+        assert!(matches!(
+            resp.outcome,
+            agent_client_protocol::RequestPermissionOutcome::Cancelled
+        ));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn read_text_file_denies_path_outside_repo_root() {
+        let root = tempfile::tempdir().expect("root");
+        std::fs::write(root.path().join("inside.txt"), "hi").expect("write");
+
+        let client = crate::infra::acp::task_generator::client::LaReviewClient::new(
+            None,
+            "run-1",
+            Some(root.path().to_path_buf()),
+        );
+        let session_id = agent_client_protocol::SessionId::new("s1");
+        let read_req = agent_client_protocol::ReadTextFileRequest::new(session_id, "/etc/passwd");
+        let result =
+            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::read_text_file(
+                &client, read_req,
+            )
+            .await;
+        // Should be denied by read_text_file's resolve_repo_path
+        assert!(result.is_err());
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn read_text_file_denies_traversal_attack() {
+        let root = tempfile::tempdir().expect("root");
+        std::fs::write(root.path().join("inside.txt"), "hi").expect("write");
+
+        let client = crate::infra::acp::task_generator::client::LaReviewClient::new(
+            None,
+            "run-1",
+            Some(root.path().to_path_buf()),
+        );
+        let session_id = agent_client_protocol::SessionId::new("s1");
+        let read_req =
+            agent_client_protocol::ReadTextFileRequest::new(session_id, "../../../etc/passwd");
+        let result =
+            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::read_text_file(
+                &client, read_req,
+            )
+            .await;
+        // Should be denied by read_text_file's resolve_repo_path
+        assert!(result.is_err());
     }
 }

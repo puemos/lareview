@@ -168,7 +168,7 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         };
 
         // Check if we should create a worktree for GitHub/GitLab PRs
-        let useWorktree = false;
+        let useSnapshot = false;
 
         if (
           repoId &&
@@ -193,7 +193,7 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               });
 
               if (shouldCreate) {
-                useWorktree = true;
+                useSnapshot = true;
               }
             }
           } catch (err) {
@@ -207,7 +207,7 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           currentRunId,
           repoId,
           source || undefined,
-          useWorktree,
+          useSnapshot,
           onProgress
         );
 

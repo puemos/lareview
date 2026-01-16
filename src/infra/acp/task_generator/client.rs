@@ -395,10 +395,13 @@ impl LaReviewClient {
             return self.validate_candidate_path(&path, &root_canon, None, "title");
         }
 
+        // When repo access is enabled but path is not yet known (common with ACP
+        // protocol where permission is requested before parameters arrive), allow
+        // the request. Security is enforced by read_text_file() via resolve_repo_path().
         ReadCheck {
-            allowed: false,
-            path_display: "<none>".to_string(),
-            reason: "missing path; provide path in raw_input, ToolCall locations, or a clear path in title".to_string(),
+            allowed: true,
+            path_display: "<deferred>".to_string(),
+            reason: "path validation deferred to read_text_file (repo access enabled)".to_string(),
             line: None,
         }
     }
@@ -550,6 +553,12 @@ impl agent_client_protocol::Client for LaReviewClient {
         &self,
         args: RequestPermissionRequest,
     ) -> agent_client_protocol::Result<RequestPermissionResponse> {
+        debug!(
+            target: "acp",
+            "request_permission called: tool_kind={:?}, title={:?}",
+            args.tool_call.fields.kind,
+            args.tool_call.fields.title
+        );
         let tool_kind = args.tool_call.fields.kind;
         let tool_title = args.tool_call.fields.title.clone().unwrap_or_default();
         let raw_input = &args.tool_call.fields.raw_input;
@@ -613,10 +622,23 @@ impl agent_client_protocol::Client for LaReviewClient {
                 None
             }
         } else if matches!(tool_kind, Some(ToolKind::Read)) {
+            debug!(
+                target: "acp",
+                "permission check: Read tool, has_repo_access={}, repo_root={:?}",
+                self.has_repo_access,
+                self.repo_root.as_ref().map(|p| p.display().to_string())
+            );
             let check = self.check_read_request(
                 raw_input,
                 &tool_title,
                 args.tool_call.fields.locations.as_deref(),
+            );
+            debug!(
+                target: "acp",
+                "permission check result: allowed={}, path={}, reason={}",
+                check.allowed,
+                check.path_display,
+                check.reason
             );
             let tool_label = if tool_title.is_empty() {
                 "fs/read_text_file"
@@ -641,6 +663,20 @@ impl agent_client_protocol::Client for LaReviewClient {
             } else {
                 None
             }
+        } else if tool_title.contains("external_directory") && self.has_repo_access {
+            // Some agents request "external_directory" permission to read outside their sandbox.
+            // When repo access is enabled, allow this as the snapshot directory is external.
+            debug!(
+                target: "acp",
+                "allowing external_directory permission (repo access enabled)"
+            );
+            self.emit_log("repo access: allow external_directory (snapshot access)".to_string());
+            args.options.iter().find(|opt| {
+                matches!(
+                    opt.kind,
+                    PermissionOptionKind::AllowOnce | PermissionOptionKind::AllowAlways
+                )
+            })
         } else {
             None
         };
