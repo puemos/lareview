@@ -6,12 +6,16 @@ All notable changes to this project will be documented here. This project follow
 
 ### Added
 
+- **Diagrams**: Enhanced zoom, fullscreen, and error handling with sanitization.
+- **Settings**: GitLab branding and granular refresh.
+- **UI**: Gutter menu with 'open in editor' and UX improvements.
 - **VCS**: Support for GitLab Merge Requests alongside GitHub PRs.
 - **Repos**: Allow cloning and linking GitLab repositories for MR reviews.
 - **Generation**: Let agents read code via temporary snapshots with user consent.
 
 ### Changed
 
+- **Review**: Remove task tab slide-in animations.
 - **Tasks**: Enforce full file coverage by failing finalize when changes are uncovered.
 - **Generation**: Rename worktree to snapshot and safely defer repo read permissions.
 - **Internal**: Centralize LaReview tool names for consistent auto-approval.
@@ -19,6 +23,8 @@ All notable changes to this project will be documented here. This project follow
 
 ### Fixed
 
+- **Tests**: Prevent `fake_acp_agent` from being included in the release bundle.
+- **UI**: Improve feedback button hit area and styling.
 - **Frontend**: Resolve lint warnings and stabilize async generation tests.
 
 ## [0.0.22] - 2026-01-10
