@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.23] - 2026-01-16
+
+### Added
+
+- **VCS**: Support for GitLab Merge Requests alongside GitHub PRs.
+- **Repos**: Allow cloning and linking GitLab repositories for MR reviews.
+- **Generation**: Let agents read code via temporary snapshots with user consent.
+
+### Changed
+
+- **Tasks**: Enforce full file coverage by failing finalize when changes are uncovered.
+- **Generation**: Rename worktree to snapshot and safely defer repo read permissions.
+- **Internal**: Centralize LaReview tool names for consistent auto-approval.
+- **Feedback**: Standardize progress events from comment to feedback terminology.
+
+### Fixed
+
+- **Frontend**: Resolve lint warnings and stabilize async generation tests.
+
 ## [0.0.22] - 2026-01-10
 
 ### Added

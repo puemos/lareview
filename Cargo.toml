@@ -1,6 +1,6 @@
 [package]
 name = "lareview"
-version = "0.0.22"
+version = "0.0.23"
 edition = "2024"
 default-run = "lareview"
 license = "MIT OR Apache-2.0"
