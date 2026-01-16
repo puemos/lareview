@@ -48,6 +48,8 @@ import {
   Microscope,
   Info,
   Gavel,
+  MagnifyingGlassPlus,
+  MagnifyingGlassMinus,
 } from '@phosphor-icons/react';
 
 /**
@@ -98,6 +100,8 @@ export const ICONS = {
   ACTION_SAVE: FloppyDisk,
   ACTION_SEARCH: MagnifyingGlass,
   ACTION_LOADING: Spinner,
+  ACTION_ZOOM_IN: MagnifyingGlassPlus,
+  ACTION_ZOOM_OUT: MagnifyingGlassMinus,
 
   // --- Symbols ---
   ICON_PLAN: ListChecks,

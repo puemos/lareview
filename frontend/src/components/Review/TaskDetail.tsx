@@ -195,17 +195,13 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
                 </span>
               }
             />
-            {task.diagram && (
-              <>
-                <div className="bg-border/50 mx-0.5 h-3 w-px" />
-                <TabButton
-                  active={activeTab === 'diagram'}
-                  onClick={() => onTabChange('diagram')}
-                  icon={ICONS.TAB_DIAGRAM as IconComponent}
-                  label="Diagram"
-                />
-              </>
-            )}
+            <div className="bg-border/50 mx-0.5 h-3 w-px" />
+            <TabButton
+              active={activeTab === 'diagram'}
+              onClick={() => onTabChange('diagram')}
+              icon={ICONS.TAB_DIAGRAM as IconComponent}
+              label="Diagram"
+            />
           </div>
           <Select
             value={task.status}
@@ -248,11 +244,18 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
               </div>
             )}
 
-            {activeTab === 'diagram' && task.diagram && (
-              <div className="custom-scrollbar bg-bg-secondary/20 flex h-full flex-col items-center overflow-y-auto p-8">
-                <div className="animate-fade-in w-full max-w-4xl">
-                  <Mermaid chart={task.diagram} className="border-border border shadow-sm" />
-                </div>
+            {activeTab === 'diagram' && (
+              <div className="flex h-full w-full flex-col bg-bg-secondary/20">
+                {task.diagram ? (
+                  <Mermaid chart={task.diagram} className="h-full w-full" />
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center gap-3 text-text-disabled">
+                    <div className="bg-bg-secondary flex h-16 w-16 items-center justify-center rounded-2xl">
+                      <ICONS.ICON_EMPTY size={32} weight="duotone" />
+                    </div>
+                    <p className="text-sm font-medium">No diagram available</p>
+                  </div>
+                )}
               </div>
             )}
           </motion.div>
