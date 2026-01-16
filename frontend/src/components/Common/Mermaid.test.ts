@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cleanMermaidChart } from './Mermaid';
+import { cleanMermaidChart } from '../../utils/mermaidUtils';
 
 describe('cleanMermaidChart', () => {
   it('unquotes double-encoded JSON strings', () => {

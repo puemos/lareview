@@ -1,5 +1,7 @@
 import React, { useState, useEffect, Suspense, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
+
 import { DiffViewer } from '../DiffViewer/DiffViewer';
 import { useReview } from '../../hooks/useReview';
 import { useParsedDiff } from '../../hooks/useParsedDiff';
@@ -55,9 +57,18 @@ export const ReviewView: React.FC = () => {
   const { data: rules = [] } = useRules();
   const { comments, isLoading: isCommentsLoading } = useFeedbackComments(selectedFeedbackId);
   const addCommentMutation = useAddComment();
-  const { exportReviewMarkdown, pushRemoteReview, pushRemoteFeedback, copyToClipboard } =
+  const { exportReviewMarkdown, pushRemoteReview, pushRemoteFeedback, copyToClipboard, getRepoRootForReview } =
     useTauri();
   const { data: allReviews = [] } = useReviews();
+
+  // Fetch the local repository root for this review (matched via remote URL)
+  const { data: repoRoot } = useQuery<string | null>({
+    queryKey: ['repo-root', reviewId],
+    queryFn: () => (reviewId ? getRepoRootForReview(reviewId) : Promise.resolve(null)),
+    enabled: !!reviewId,
+    staleTime: Infinity, // Repo root doesn't change during a session
+  });
+
 
   const [activeTab, setActiveTab] = useState<'diff' | 'description' | 'diagram'>('description');
   const [sidebarTab, setSidebarTab] = useState<'tasks' | 'feedback'>('tasks');
@@ -297,7 +308,9 @@ export const ReviewView: React.FC = () => {
                   onStatusChange={handleStatusChange}
                   isUpdatingStatus={isUpdatingStatus}
                   onAddFeedback={handleAddLineFeedback}
+                  repoRoot={repoRoot}
                 />
+
               ) : parsedDiff ? (
                 <div className="flex flex-1 flex-col">
                   <div className="border-border bg-bg-primary h-10 border-b" />
@@ -307,7 +320,9 @@ export const ReviewView: React.FC = () => {
                       selectedFile={selectedFile}
                       onSelectFile={selectFile}
                       onAddFeedback={handleAddLineFeedback}
+                      repoRoot={repoRoot}
                     />
+
                   </div>
                 </div>
               ) : (

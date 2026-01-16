@@ -226,26 +226,27 @@ select:disabled {
 }
 
 .add-feedback-gutter-icon::before {
-  content: '+';
+  content: '\2261';
+
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  color: #1e1e2e;
+  color: var(--color-text-primary);
   font-weight: bold;
   font-size: 14px;
   display: flex !important;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
-  background-color: #cba6f7;
-  border-radius: 50%;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  width: 18px;
+  height: 18px;
+  background-color: var(--color-border);
+  border-radius: 4px;
   opacity: 0.8;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  line-height: 16px;
+  line-height: 18px;
   text-align: center;
+  padding-bottom: 2px;
 }
 
 .add-feedback-gutter-icon:hover::before {

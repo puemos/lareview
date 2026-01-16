@@ -607,9 +607,16 @@ export const useTauri = () => {
     updateEditorConfig: useCallback(async (editorId: string): Promise<void> => {
       return invoke('update_editor_config', { editorId });
     }, []),
-    openInEditor: useCallback(async (filePath: string, lineNumber: number): Promise<void> => {
-      return invoke('open_in_editor', { filePath, lineNumber });
+    openInEditor: useCallback(
+      async (filePath: string, lineNumber: number, repoRoot?: string): Promise<void> => {
+        return invoke('open_in_editor', { filePath, lineNumber, repoRoot });
+      },
+      []
+    ),
+    getRepoRootForReview: useCallback(async (reviewId: string): Promise<string | null> => {
+      return invoke('get_repo_root_for_review', { reviewId });
     }, []),
+
     getCliStatus: useCallback(async (): Promise<CliStatus> => {
       return invoke('get_cli_status');
     }, []),

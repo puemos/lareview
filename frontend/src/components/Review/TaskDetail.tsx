@@ -26,7 +26,9 @@ interface TaskDetailProps {
   onStatusChange?: (status: string) => void;
   isUpdatingStatus?: boolean;
   onAddFeedback?: (file: DiffFile, line: number, side: 'old' | 'new') => void;
+  repoRoot?: string | null;
 }
+
 
 type IconComponent = React.ComponentType<{ size: number; className?: string }>;
 
@@ -40,7 +42,9 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
   onStatusChange,
   isUpdatingStatus,
   onAddFeedback,
+  repoRoot,
 }) => {
+
   if (!task) {
     return (
       <div className="text-text-disabled flex flex-1 items-center justify-center">
@@ -221,7 +225,9 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
               onSelectFile={onSelectFile}
               highlightedHunks={highlightedHunks}
               onAddFeedback={onAddFeedback}
+              repoRoot={repoRoot}
             />
+
           )}
 
           {activeTab === 'description' && (

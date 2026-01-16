@@ -1645,10 +1645,14 @@ fn build_review_rule(
 }
 
 #[tauri::command]
-pub fn open_in_editor(file_path: String, line_number: usize) -> Result<(), String> {
+pub fn open_in_editor(
+    file_path: String,
+    line_number: usize,
+    repo_root: Option<String>,
+) -> Result<(), String> {
     use crate::infra::app_config::load_config;
     use crate::infra::editor::{editor_command_for_open, is_editor_available};
-    use std::path::Path;
+    use std::path::PathBuf;
     use std::process::Command;
 
     let config = load_config();
@@ -1660,8 +1664,15 @@ pub fn open_in_editor(file_path: String, line_number: usize) -> Result<(), Strin
         return Err(format!("Editor '{}' is not available", editor_id));
     }
 
-    let path = Path::new(&file_path);
-    if let Some((cmd_path, args)) = editor_command_for_open(&editor_id, path, line_number) {
+    // Resolve absolute path if repo_root is provided
+    let resolved_path = if let Some(root) = repo_root {
+        PathBuf::from(root).join(&file_path)
+    } else {
+        PathBuf::from(&file_path)
+    };
+
+    if let Some((cmd_path, args)) = editor_command_for_open(&editor_id, &resolved_path, line_number)
+    {
         Command::new(cmd_path)
             .args(args)
             .spawn()
@@ -1673,6 +1684,63 @@ pub fn open_in_editor(file_path: String, line_number: usize) -> Result<(), Strin
             editor_id
         ))
     }
+}
+
+/// Gets the local repository path for a given review by matching the review's source
+/// (GitHub PR or GitLab MR) to a linked local repository via remote URLs.
+#[tauri::command]
+pub fn get_repo_root_for_review(
+    state: State<'_, AppState>,
+    review_id: String,
+) -> Result<Option<String>, String> {
+    use crate::domain::ReviewSource;
+
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+
+    // Get the review to access its source
+    let review = db
+        .get_review(&review_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("Review not found: {}", review_id))?;
+
+    // Build the expected remote URL pattern based on source type
+    let expected_patterns: Vec<String> = match &review.source {
+        ReviewSource::GitHubPr { owner, repo, .. } => {
+            vec![
+                format!("github.com/{}/{}", owner, repo),
+                format!("github.com:{}/{}", owner, repo),
+            ]
+        }
+        ReviewSource::GitLabMr {
+            host, project_path, ..
+        } => {
+            vec![
+                format!("{}/{}", host, project_path),
+                format!("{}:{}", host, project_path),
+            ]
+        }
+
+        ReviewSource::DiffPaste { .. } => {
+            // For pasted diffs, we can't auto-match to a repo
+            return Ok(None);
+        }
+    };
+
+    // Get all linked repos and search for a match
+    let repos = db.get_linked_repos().map_err(|e| e.to_string())?;
+    for repo in repos {
+        for remote in &repo.remotes {
+            // Normalize the remote URL for comparison
+            let remote_lower = remote.to_lowercase();
+            for pattern in &expected_patterns {
+                if remote_lower.contains(&pattern.to_lowercase()) {
+                    return Ok(Some(repo.path));
+                }
+            }
+        }
+    }
+
+    Ok(None)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

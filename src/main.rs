@@ -385,6 +385,7 @@ fn run_gui(initial_req: Option<DiffRequest>, initial_pending: Option<PendingDiff
             lareview::commands::update_review_rule,
             lareview::commands::delete_review_rule,
             lareview::commands::open_in_editor,
+            lareview::commands::get_repo_root_for_review,
             lareview::commands::get_cli_status,
             lareview::commands::install_cli,
             lareview::commands::get_pending_review_from_state,

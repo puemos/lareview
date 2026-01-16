@@ -4,6 +4,8 @@ import { DiffEditor } from '@monaco-editor/react';
 import type { DiffFile } from '../../types';
 import { useTauri } from '../../hooks/useTauri';
 import { getLanguageFromPath } from '../../utils/languages';
+import { GutterMenu } from './GutterMenu';
+
 
 interface DiffViewerProps {
   files: DiffFile[];
@@ -18,7 +20,9 @@ interface DiffViewerProps {
   }>;
   viewMode?: 'unified' | 'split';
   onAddFeedback?: (file: DiffFile, line: number, side: 'old' | 'new') => void;
+  repoRoot?: string | null;
 }
+
 
 export const DiffViewer: React.FC<DiffViewerProps> = ({
   files,
@@ -27,6 +31,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
   highlightedHunks = [],
   viewMode = 'split',
   onAddFeedback,
+  repoRoot,
 }) => {
   return (
     <div className="bg-bg-primary flex h-full">
@@ -40,7 +45,9 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
             )}
             viewMode={viewMode}
             onAddFeedback={onAddFeedback}
+            repoRoot={repoRoot}
           />
+
         ) : (
           <div className="text-text-disabled flex flex-1 items-center justify-center">
             <div className="text-center">
@@ -139,12 +146,17 @@ interface DiffContentProps {
   }>;
   viewMode: 'unified' | 'split';
   onAddFeedback?: (file: DiffFile, line: number, side: 'old' | 'new') => void;
+  repoRoot?: string | null;
 }
 
-const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAddFeedback }) => {
+const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAddFeedback, repoRoot }) => {
+
   const { openInEditor } = useTauri();
   const path = file.name || file.new_path || 'unknown';
   const language = getLanguageFromPath(path);
+  // Ref to store diff editor instance
+  const diffEditorRef = React.useRef<import('monaco-editor').editor.IDiffEditor | null>(null);
+
 
   // Auto-detect new files (all additions, no deletions) or purely deleted files
   // If it's a new file, we might want to default to 'unified' or just ensure side-by-side looks good.
@@ -153,19 +165,63 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
   const handleOpenInEditor = async () => {
     try {
       const lineNumber = highlightedHunks.length > 0 ? highlightedHunks[0].newStart : 1;
-      await openInEditor(path, lineNumber);
+      await openInEditor(path, lineNumber, repoRoot || undefined);
     } catch (error) {
       console.error('Failed to open file in editor:', error);
     }
   };
 
-  const { original, modified } = useMemo(() => {
+
+
+  const [menuState, setMenuState] = useState<{
+    x: number;
+    y: number;
+    file: DiffFile;
+    line: number;
+    side: 'old' | 'new';
+  } | null>(null);
+  
+  // Ref to track menu state inside stable callbacks
+  const menuStateRef = React.useRef(menuState);
+  React.useEffect(() => {
+    menuStateRef.current = menuState;
+  }, [menuState]);
+
+
+  const closeMenu = () => setMenuState(null);
+
+
+  const handleMenuAddFeedback = () => {
+    if (menuState && onAddFeedback) {
+      onAddFeedback(menuState.file, menuState.line, menuState.side);
+    }
+  };
+
+  const handleMenuOpenInEditor = async () => {
+    if (menuState) {
+      try {
+        await openInEditor(path, menuState.line, repoRoot || undefined);
+      } catch (error) {
+        console.error('Failed to open file in editor:', error);
+      }
+    }
+  };
+
+
+
+  // Build original and modified content strings along with line number mappings
+  // originalLineMap[i] = actual file line number for Monaco line i+1
+  const { original, modified, originalLineMap, modifiedLineMap } = useMemo(() => {
     const originalLines: string[] = [];
     const modifiedLines: string[] = [];
+    const origLineMap: number[] = [];
+    const modLineMap: number[] = [];
 
     file.hunks.forEach(hunk => {
       const content = hunk.content || '';
       const contentLines = content.split('\n');
+      let origLine = hunk.old_start;
+      let modLine = hunk.new_start;
 
       for (let i = 0; i < contentLines.length; i++) {
         const line = contentLines[i];
@@ -177,14 +233,22 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
         if (line.startsWith('-') && !line.startsWith('---')) {
           // Deletion: add to original only
           originalLines.push(line.slice(1));
+          origLineMap.push(origLine);
+          origLine++;
         } else if (line.startsWith('+') && !line.startsWith('+++')) {
           // Addition: add to modified only
           modifiedLines.push(line.slice(1));
+          modLineMap.push(modLine);
+          modLine++;
         } else {
           // Context line: add to both (strip leading space if present)
           const contextLine = line.startsWith(' ') ? line.slice(1) : line;
           originalLines.push(contextLine);
           modifiedLines.push(contextLine);
+          origLineMap.push(origLine);
+          modLineMap.push(modLine);
+          origLine++;
+          modLine++;
         }
       }
     });
@@ -192,30 +256,72 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
     return {
       original: originalLines.join('\n'),
       modified: modifiedLines.join('\n'),
+      originalLineMap: origLineMap,
+      modifiedLineMap: modLineMap,
     };
   }, [file.hunks]);
 
-  const handleEditorDidMount = (editor: unknown, monaco: typeof import('monaco-editor')) => {
-    monaco.editor.defineTheme('lareview-dark', {
-      base: 'vs-dark',
-      inherit: true,
-      rules: [],
-      colors: {
-        'editor.background': '#1e1e2e',
-        'editor.lineHighlightBackground': '#313244',
-      },
-    });
-    monaco.editor.setTheme('lareview-dark');
 
+  // Ensure line numbers are updated when maps or editor changes
+  React.useEffect(() => {
+    if (diffEditorRef.current) {
+      const originalEditor = diffEditorRef.current.getOriginalEditor();
+      const modifiedEditor = diffEditorRef.current.getModifiedEditor();
+
+      originalEditor.updateOptions({
+        lineNumbers: (lineNumber: number) => {
+          const actualLine = originalLineMap[lineNumber - 1];
+          return actualLine !== undefined ? String(actualLine) : String(lineNumber);
+        },
+      });
+
+      modifiedEditor.updateOptions({
+        lineNumbers: (lineNumber: number) => {
+          const actualLine = modifiedLineMap[lineNumber - 1];
+          return actualLine !== undefined ? String(actualLine) : String(lineNumber);
+        },
+      });
+    }
+  }, [originalLineMap, modifiedLineMap]);
+
+
+
+
+
+  const handleEditorDidMount = (editor: unknown, monaco: typeof import('monaco-editor')) => {
     const diffEditor = editor as import('monaco-editor').editor.IDiffEditor;
+    diffEditorRef.current = diffEditor;
     const originalEditor = diffEditor.getOriginalEditor();
     const modifiedEditor = diffEditor.getModifiedEditor();
 
-    let hoverDecorations: string[] = [];
+    // Initial configuration of line numbers
+    originalEditor.updateOptions({
+
+      lineNumbers: (lineNumber: number) => {
+        const actualLine = originalLineMap[lineNumber - 1];
+        return actualLine !== undefined ? String(actualLine) : String(lineNumber);
+      },
+    });
+
+    modifiedEditor.updateOptions({
+      lineNumbers: (lineNumber: number) => {
+        const actualLine = modifiedLineMap[lineNumber - 1];
+        return actualLine !== undefined ? String(actualLine) : String(lineNumber);
+      },
+    });
+
 
     [originalEditor, modifiedEditor].forEach(ed => {
+      // Decoration tracking per editor to prevent stuck icons
+      let hoverDecorations: string[] = [];
+
+
       // Show + icon on hover anywhere in the line or gutter
       ed.onMouseMove(e => {
+        // Lock the button if menu is open
+        if (menuStateRef.current) return;
+
+
         const line = e.target.position?.lineNumber;
         if (line) {
           hoverDecorations = ed.deltaDecorations(hoverDecorations, [
@@ -233,21 +339,42 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
         }
       });
 
-      ed.onMouseLeave(() => {
-        hoverDecorations = ed.deltaDecorations(hoverDecorations, []);
-      });
-
-      // Handle click on + icon
+      // Handle click on + icon (now hamburger menu)
       ed.onMouseDown(e => {
         if (e.target.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
           const line = e.target.position?.lineNumber;
-          if (line && onAddFeedback) {
-            const side = ed === originalEditor ? 'old' : 'new';
-            onAddFeedback(file, line, side);
+          if (line) {
+            // Prevent default editor behavior like selection changes if needed
+            e.event.preventDefault();
+
+            // Calculate actual line number
+            const isOriginal = ed === originalEditor;
+            const lineMap = isOriginal ? originalLineMap : modifiedLineMap;
+            const actualLine = lineMap[line - 1];
+
+            if (actualLine !== undefined) {
+              setMenuState({
+                x: e.event.posx,
+                y: e.event.posy,
+                file,
+                line: actualLine,
+                side: isOriginal ? 'old' : 'new',
+              });
+            }
           }
         }
       });
+
+
+
+      // Close menu on scroll to prevent detachment
+      ed.onDidScrollChange(() => {
+        if (menuStateRef.current) {
+          setMenuState(null);
+        }
+      });
     });
+
   };
 
   // Check if file is "new" (added)
@@ -310,8 +437,10 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
             codeLens: false,
             folding: true,
             glyphMargin: true,
-            lineNumbers: 'on' as const,
+            // lineNumbers handled by useEffect/onMount to allow custom function
+
             renderIndicators: true,
+
             // Premium DX/UX enhancements
             diffAlgorithm: 'advanced',
             experimental: {
@@ -320,6 +449,7 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
             hideUnchangedRegions: {
               enabled: true,
               contextLineCount: 3,
+
               minimumLineCount: 15, // Slightly lowered for better hiding
               revealLineCount: 5,
             },
@@ -337,6 +467,12 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
           }}
         />
       </div>
+      <GutterMenu
+        position={menuState ? { x: menuState.x, y: menuState.y } : null}
+        onClose={closeMenu}
+        onAddFeedback={handleMenuAddFeedback}
+        onOpenInEditor={handleMenuOpenInEditor}
+      />
     </div>
   );
 };
