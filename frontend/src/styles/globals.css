@@ -223,7 +223,6 @@ select:disabled {
   position: relative;
   cursor: pointer;
   z-index: 10;
-  transform: translateX(10px);
 }
 
 .add-feedback-gutter-icon::before {
@@ -232,7 +231,7 @@ select:disabled {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  color: #1e1e2e; /* --color-brand-fg */
+  color: #1e1e2e;
   font-weight: bold;
   font-size: 14px;
   display: flex !important;
@@ -240,16 +239,15 @@ select:disabled {
   justify-content: center;
   width: 16px;
   height: 16px;
-  background-color: #cba6f7; /* --color-brand */
+  background-color: #cba6f7;
   border-radius: 50%;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  opacity: 0.9;
+  opacity: 0.8;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  padding-bottom: 1px; /* Visual centering adjustment for the + */
+  line-height: 16px;
+  text-align: center;
 }
 
 .add-feedback-gutter-icon:hover::before {
   opacity: 1;
-  transform: translate(-50%, -50%) scale(1.1);
-  box-shadow: 0 0 8px #cba6f7;
 }
