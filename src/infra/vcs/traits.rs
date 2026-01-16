@@ -3,6 +3,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -19,6 +20,18 @@ pub struct VcsPrData {
     pub diff_text: String,
     pub title: String,
     pub source: ReviewSource,
+}
+
+#[derive(Debug, Clone)]
+pub struct VcsCloneRequest {
+    pub repo: String,
+    pub dest_path: PathBuf,
+    pub host: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct VcsCloneResult {
+    pub path: PathBuf,
 }
 
 pub trait VcsRef: Send + Sync {
@@ -54,5 +67,6 @@ pub trait VcsProvider: Send + Sync {
     async fn fetch_pr(&self, reference: &dyn VcsRef) -> Result<VcsPrData>;
     async fn push_review(&self, request: ReviewPushRequest) -> Result<String>;
     async fn push_feedback(&self, request: FeedbackPushRequest) -> Result<String>;
+    async fn clone_repo(&self, request: VcsCloneRequest) -> Result<VcsCloneResult>;
     async fn get_status(&self) -> Result<VcsStatus>;
 }

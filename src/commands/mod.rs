@@ -12,7 +12,9 @@ use crate::infra::acp::{
 use crate::infra::diff::index::DiffIndex;
 use crate::infra::hash::hash_diff;
 use crate::infra::vcs::registry::VcsRegistry;
-use crate::infra::vcs::traits::{FeedbackPushRequest, ReviewPushRequest, VcsStatus};
+use crate::infra::vcs::traits::{
+    FeedbackPushRequest, ReviewPushRequest, VcsCloneRequest, VcsStatus,
+};
 use crate::state::{AppState, PendingDiff};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -268,14 +270,19 @@ async fn generate_review_inner(
     // Create snapshot if requested and applicable
     let snapshot_path = if use_worktree {
         let repo_id_ref = &repo_id;
-        if let (
-            Some(rid),
+        let head_sha = match &source {
             ReviewSource::GitHubPr {
                 head_sha: Some(head_sha),
                 ..
-            },
-        ) = (repo_id_ref, &source)
-        {
+            } => Some(head_sha.as_str()),
+            ReviewSource::GitLabMr {
+                head_sha: Some(head_sha),
+                ..
+            } => Some(head_sha.as_str()),
+            _ => None,
+        };
+
+        if let (Some(rid), Some(head_sha)) = (repo_id_ref, head_sha) {
             let repos = {
                 let db = state.db.lock().map_err(|e| e.to_string())?;
                 db.get_linked_repos().map_err(|e| e.to_string())?
@@ -1262,8 +1269,15 @@ pub async fn get_vcs_status() -> Result<Vec<VcsStatus>, String> {
     Ok(statuses)
 }
 
-#[tauri::command]
-pub fn link_repo(state: State<'_, AppState>, path: String) -> Result<LinkedRepo, String> {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CloneRepoRequest {
+    pub provider: String,
+    pub repo: String,
+    pub host: Option<String>,
+    pub dest_dir: String,
+}
+
+fn link_repo_impl(state: &AppState, path: String) -> Result<LinkedRepo, String> {
     let id = Uuid::new_v4().to_string();
     let name = path.split('/').next_back().unwrap_or(&path).to_string();
     let linked_at = chrono::Utc::now().to_rfc3339();
@@ -1287,6 +1301,60 @@ pub fn link_repo(state: State<'_, AppState>, path: String) -> Result<LinkedRepo,
         name,
         linked_at,
     })
+}
+
+#[tauri::command]
+pub fn link_repo(state: State<'_, AppState>, path: String) -> Result<LinkedRepo, String> {
+    link_repo_impl(state.inner(), path)
+}
+
+#[tauri::command]
+pub async fn clone_and_link_repo(
+    state: State<'_, AppState>,
+    request: CloneRepoRequest,
+) -> Result<LinkedRepo, String> {
+    let provider = request.provider.trim().to_lowercase();
+    let repo = request.repo.trim();
+    let dest_dir = request.dest_dir.trim();
+
+    if repo.is_empty() {
+        return Err("Repository identifier is required".to_string());
+    }
+
+    if dest_dir.is_empty() {
+        return Err("Destination directory is required".to_string());
+    }
+
+    let repo_name = repo.split('/').next_back().unwrap_or(repo);
+    let dest_root = std::path::PathBuf::from(dest_dir);
+    std::fs::create_dir_all(&dest_root)
+        .map_err(|e| format!("Failed to create destination directory: {e}"))?;
+
+    let target_path = dest_root.join(repo_name);
+    if target_path.exists() {
+        return Err(format!(
+            "Destination already exists: {}",
+            target_path.display()
+        ));
+    }
+
+    let registry = VcsRegistry::default();
+    let provider = registry
+        .get_provider(&provider)
+        .ok_or_else(|| format!("Unsupported provider: {}", request.provider))?;
+
+    let clone_request = VcsCloneRequest {
+        repo: repo.to_string(),
+        dest_path: target_path.clone(),
+        host: request.host.clone(),
+    };
+
+    provider
+        .clone_repo(clone_request)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    link_repo_impl(state.inner(), target_path.to_string_lossy().to_string())
 }
 
 #[tauri::command]

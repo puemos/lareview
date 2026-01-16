@@ -88,8 +88,10 @@ export const DiffEditorPanel: React.FC<DiffEditorPanelProps> = ({
 
   const language = selectedFile ? getLanguageFromPath(selectedFile.new_path) : 'plaintext';
 
+  const paddingClass = 'pt-4';
+
   return (
-    <div className="relative flex flex-1 overflow-hidden pt-16">
+    <div className={`relative flex flex-1 overflow-hidden ${paddingClass}`}>
       {viewMode === 'diff' && parsedDiff && parsedDiff.files && (
         <div className="border-border bg-bg-secondary/30 flex w-64 flex-col border-r">
           <div

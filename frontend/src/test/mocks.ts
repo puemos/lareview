@@ -96,6 +96,15 @@ interface MockTauriReturn {
   updateTaskStatus: Mock<(taskId: string, status: string) => Promise<void>>;
   getAgents: Mock<() => Promise<Agent[]>>;
   linkRepo: Mock<(path: string) => Promise<LinkedRepo>>;
+  cloneAndLinkRepo: Mock<
+    (input: {
+      provider: 'github' | 'gitlab';
+      repo: string;
+      host?: string;
+      destDir: string;
+    }) => Promise<LinkedRepo>
+  >;
+  selectRepoFolder: Mock<() => Promise<string | null>>;
   saveFeedback: Mock<(feedback: Feedback) => Promise<string>>;
   updateFeedbackStatus: Mock<(feedbackId: string, status: string) => Promise<void>>;
   updateFeedbackImpact: Mock<(feedbackId: string, impact: string) => Promise<void>>;
@@ -137,6 +146,16 @@ function createMockTauri(): MockTauriReturn {
         linked_at: new Date().toISOString(),
       })
     ),
+    cloneAndLinkRepo: vi.fn().mockImplementation((input: { destDir: string; repo: string }) => {
+      const repoName = input.repo.split('/').pop() || input.repo;
+      return Promise.resolve({
+        id: 'repo-2',
+        path: `${input.destDir}/${repoName}`,
+        name: repoName,
+        linked_at: new Date().toISOString(),
+      });
+    }),
+    selectRepoFolder: vi.fn().mockResolvedValue('/tmp'),
     saveFeedback: vi.fn().mockResolvedValue('feedback-1'),
     updateFeedbackStatus: vi.fn().mockResolvedValue(undefined),
     updateFeedbackImpact: vi.fn().mockResolvedValue(undefined),

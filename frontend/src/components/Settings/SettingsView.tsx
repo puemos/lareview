@@ -12,7 +12,6 @@ import {
   ArrowsClockwise,
   Check,
   X,
-  Plus,
 } from '@phosphor-icons/react';
 import type {
   ViewType,

@@ -76,8 +76,8 @@ describe('GenerationContext', () => {
 
     let channelInstance: MockChannel | null = null;
 
-    vi.mocked(mockTauri.generateReview).mockImplementation(async (...args) => {
-      channelInstance = args[6];
+    vi.mocked(mockTauri.generateReview).mockImplementation(async (...args: unknown[]) => {
+      channelInstance = (args[6] as MockChannel | undefined) || null;
       // Keep the promise pending until we send the Completed event
       return new Promise(() => {});
     });
@@ -110,8 +110,8 @@ describe('GenerationContext', () => {
 
     let channelInstance: MockChannel | null = null;
 
-    vi.mocked(mockTauri.generateReview).mockImplementation(async (...args) => {
-      channelInstance = args[6];
+    vi.mocked(mockTauri.generateReview).mockImplementation(async (...args: unknown[]) => {
+      channelInstance = (args[6] as MockChannel | undefined) || null;
       return new Promise(() => {});
     });
 

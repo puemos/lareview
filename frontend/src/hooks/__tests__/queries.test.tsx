@@ -252,6 +252,7 @@ describe('useRepos', () => {
         name: 'repo',
         path: '/path/to/repo',
         linked_at: new Date().toISOString(),
+        remotes: ['https://github.com/test/repo'],
       },
     ]);
 
@@ -271,6 +272,7 @@ describe('useRepos', () => {
       name: 'new',
       path: '/new',
       linked_at: new Date().toISOString(),
+      remotes: ['https://github.com/test/new'],
     });
 
     const { result } = renderHook(() => useRepos(), {

@@ -167,10 +167,15 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           }
         };
 
-        // Check if we should create a worktree for GitHub PRs
+        // Check if we should create a worktree for GitHub/GitLab PRs
         let useWorktree = false;
 
-        if (source?.type === 'github_pr' && source.head_sha && repoId) {
+        if (
+          repoId &&
+          source &&
+          'head_sha' in source &&
+          (source.type === 'github_pr' || source.type === 'gitlab_mr')
+        ) {
           // Check if we have a linked repo that matches
           try {
             const linkedRepos = await getLinkedRepos();
@@ -304,7 +309,7 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         title="Enable Code Access"
         message={
           worktreeRequest
-            ? `Create a temporary snapshot of "${worktreeRequest.repoName}" at commit ${worktreeRequest.commitSha.slice(0, 7)}? This lets the agent read the PR's source code for better analysis.`
+            ? `Create a temporary snapshot of "${worktreeRequest.repoName}" at commit ${worktreeRequest.commitSha.slice(0, 7)}? This lets the agent read the PR/MR source code for better analysis.`
             : ''
         }
         confirmLabel="Create Snapshot"

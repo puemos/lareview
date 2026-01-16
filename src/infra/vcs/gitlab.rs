@@ -3,7 +3,8 @@ use crate::domain::{FeedbackSide, ReviewSource};
 use crate::infra::diff::index::{DiffIndex, LineLocation};
 use crate::infra::shell;
 use crate::infra::vcs::traits::{
-    FeedbackPushRequest, ReviewPushRequest, VcsPrData, VcsProvider, VcsRef, VcsStatus,
+    FeedbackPushRequest, ReviewPushRequest, VcsCloneRequest, VcsCloneResult, VcsPrData,
+    VcsProvider, VcsRef, VcsStatus,
 };
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -473,7 +474,7 @@ impl VcsProvider for GitLabProvider {
     async fn push_feedback(&self, request: FeedbackPushRequest) -> Result<String> {
         let mr_ref = mr_ref_from_source(&request.review.source)?;
         let (head_sha, base_sha, start_sha) = diff_refs_from_source(&request.review.source)?;
-
+        let diff_index = DiffIndex::new(&request.run.diff_text).ok();
         let markdown = ReviewExporter::render_single_feedback_markdown(
             &request.feedback,
             &request.comments,
@@ -483,19 +484,28 @@ impl VcsProvider for GitLabProvider {
         let anchor = request
             .feedback
             .anchor
-            .ok_or_else(|| anyhow::anyhow!("Feedback has no anchor"))?;
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Feedback missing anchor"))?;
+
         let file_path = anchor
             .file_path
-            .ok_or_else(|| anyhow::anyhow!("Feedback anchor has no file path"))?;
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("Feedback missing file path"))?;
+
         let line_number = anchor
             .line_number
-            .ok_or_else(|| anyhow::anyhow!("Feedback anchor has no line number"))?;
-        let side = anchor.side.unwrap_or(FeedbackSide::New);
+            .ok_or_else(|| anyhow::anyhow!("Feedback missing line number"))?;
 
-        let diff_index = DiffIndex::new(&request.run.diff_text)?;
         let location = diff_index
-            .find_line_location(&file_path, line_number, side)
-            .ok_or_else(|| anyhow::anyhow!("Could not find line location in diff"))?;
+            .as_ref()
+            .and_then(|idx| {
+                idx.find_line_location(
+                    &file_path,
+                    line_number,
+                    anchor.side.unwrap_or(FeedbackSide::New),
+                )
+            })
+            .ok_or_else(|| anyhow::anyhow!("Could not find line position in diff"))?;
 
         let position =
             build_gitlab_position(&file_path, &location, &base_sha, &start_sha, &head_sha)?;
@@ -517,6 +527,42 @@ impl VcsProvider for GitLabProvider {
             .unwrap_or_else(|| "Success".to_string());
 
         Ok(url)
+    }
+
+    async fn clone_repo(&self, request: VcsCloneRequest) -> Result<VcsCloneResult> {
+        let host = request
+            .host
+            .clone()
+            .unwrap_or_else(|| "gitlab.com".to_string());
+        let dest = request.dest_path.to_string_lossy().to_string();
+        let (command_path, args) = if let Some(glab_path) = shell::find_bin("glab") {
+            let mut args = vec!["repo".to_string(), "clone".to_string(), request.repo, dest];
+            if host != "gitlab.com" {
+                args.push("--hostname".to_string());
+                args.push(host);
+            }
+            (glab_path, args)
+        } else {
+            let git_path = shell::find_bin("git").context("resolve `git` path for cloning")?;
+            let url = format!("https://{host}/{}.git", request.repo);
+            let args = vec!["clone".to_string(), url, dest];
+            (git_path, args)
+        };
+
+        let output = Command::new(&command_path)
+            .args(args)
+            .output()
+            .await
+            .context("run clone command")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!("Clone failed: {stderr}"));
+        }
+
+        Ok(VcsCloneResult {
+            path: request.dest_path,
+        })
     }
 
     async fn get_status(&self) -> Result<VcsStatus> {

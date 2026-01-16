@@ -481,6 +481,25 @@ export const useTauri = () => {
     return invoke('link_repo', { path });
   }, []);
 
+  const cloneAndLinkRepo = useCallback(
+    async (request: {
+      provider: 'github' | 'gitlab';
+      repo: string;
+      host?: string;
+      destDir: string;
+    }): Promise<LinkedRepo> => {
+      return invoke('clone_and_link_repo', {
+        request: {
+          provider: request.provider,
+          repo: request.repo,
+          host: request.host,
+          dest_dir: request.destDir,
+        },
+      });
+    },
+    []
+  );
+
   const unlinkRepo = useCallback(async (repoId: string): Promise<void> => {
     return invoke('unlink_repo', { repoId });
   }, []);
@@ -567,6 +586,7 @@ export const useTauri = () => {
     updateReviewRule,
     deleteReviewRule,
     linkRepo,
+    cloneAndLinkRepo,
     unlinkRepo,
 
     selectRepoFolder,

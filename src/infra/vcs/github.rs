@@ -3,7 +3,8 @@ use crate::domain::{FeedbackSide, ReviewSource};
 use crate::infra::diff::index::DiffIndex;
 use crate::infra::shell;
 use crate::infra::vcs::traits::{
-    FeedbackPushRequest, ReviewPushRequest, VcsPrData, VcsProvider, VcsRef, VcsStatus,
+    FeedbackPushRequest, ReviewPushRequest, VcsCloneRequest, VcsCloneResult, VcsPrData,
+    VcsProvider, VcsRef, VcsStatus,
 };
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -473,31 +474,38 @@ impl VcsProvider for GitHubProvider {
     }
 
     async fn push_feedback(&self, request: FeedbackPushRequest) -> Result<String> {
+        let pr_ref = pr_ref_from_source(&request.review.source)?;
+        let diff_index = DiffIndex::new(&request.run.diff_text)
+            .context("Could not build diff index from review run diff")?;
+
+        let anchor = request
+            .feedback
+            .anchor
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Feedback missing anchor"))?;
+
+        let file_path = anchor
+            .file_path
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("Feedback missing file path"))?;
+
+        let line_number = anchor
+            .line_number
+            .ok_or_else(|| anyhow::anyhow!("Feedback missing line number"))?;
+
         let markdown = ReviewExporter::render_single_feedback_markdown(
             &request.feedback,
             &request.comments,
             None,
         );
-        let pr_ref = pr_ref_from_source(&request.review.source)?;
 
-        let anchor = request
-            .feedback
-            .anchor
-            .ok_or_else(|| anyhow::anyhow!("Feedback has no anchor"))?;
-        let file_path = anchor
-            .file_path
-            .ok_or_else(|| anyhow::anyhow!("Feedback anchor has no file path"))?;
-        let line_number = anchor
-            .line_number
-            .ok_or_else(|| anyhow::anyhow!("Feedback anchor has no line number"))?;
-
-        let commit_id = request
-            .review
-            .source
-            .head_sha()
-            .ok_or_else(|| anyhow::anyhow!("Could not determine head commit SHA for PR"))?;
-
-        let diff_index = DiffIndex::new(&request.run.diff_text)?;
+        let commit_id = pr_ref
+            .clone()
+            .url
+            .split("/")
+            .last()
+            .unwrap_or("")
+            .to_string();
 
         let position = diff_index
             .find_position_in_diff(
@@ -519,6 +527,34 @@ impl VcsProvider for GitHubProvider {
         .await?;
 
         Ok(comment.url.unwrap_or_else(|| "Success".to_string()))
+    }
+
+    async fn clone_repo(&self, request: VcsCloneRequest) -> Result<VcsCloneResult> {
+        let dest = request.dest_path.to_string_lossy().to_string();
+        let (command_path, args) = if let Some(gh_path) = shell::find_bin("gh") {
+            let args = vec!["repo".to_string(), "clone".to_string(), request.repo, dest];
+            (gh_path, args)
+        } else {
+            let git_path = shell::find_bin("git").context("resolve `git` path for cloning")?;
+            let url = format!("https://github.com/{}.git", request.repo);
+            let args = vec!["clone".to_string(), url, dest];
+            (git_path, args)
+        };
+
+        let output = Command::new(&command_path)
+            .args(args)
+            .output()
+            .await
+            .context("run clone command")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!("Clone failed: {stderr}"));
+        }
+
+        Ok(VcsCloneResult {
+            path: request.dest_path,
+        })
     }
 
     async fn get_status(&self) -> Result<VcsStatus> {

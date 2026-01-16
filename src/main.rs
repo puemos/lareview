@@ -373,6 +373,7 @@ fn run_gui(initial_req: Option<DiffRequest>, initial_pending: Option<PendingDiff
             lareview::commands::set_github_token,
             lareview::commands::get_vcs_status,
             lareview::commands::link_repo,
+            lareview::commands::clone_and_link_repo,
             lareview::commands::unlink_repo,
             lareview::commands::delete_review,
             lareview::commands::get_available_editors,

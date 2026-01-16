@@ -362,6 +362,43 @@ mod policy_tests {
     }
 
     #[tokio::test(flavor = "current_thread")]
+    async fn permission_allows_file_path_input() {
+        let root = tempfile::tempdir().expect("root");
+        std::fs::write(root.path().join("test.ex"), "hi").expect("write");
+
+        let client = crate::infra::acp::task_generator::client::LaReviewClient::new(
+            None,
+            "run-1",
+            Some(root.path().to_path_buf()),
+        );
+        let fields = agent_client_protocol::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::ToolKind::Read)
+            .title("fs/read_text_file")
+            .raw_input(serde_json::json!({ "filePath": "test.ex" }));
+        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::PermissionOption::new(
+            "allow",
+            "Allow",
+            agent_client_protocol::PermissionOptionKind::AllowOnce,
+        )];
+        let req = agent_client_protocol::RequestPermissionRequest::new(
+            agent_client_protocol::SessionId::new("s1"),
+            tool_call,
+            options,
+        );
+        let resp =
+            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
+                &client, req,
+            )
+            .await
+            .unwrap();
+        assert!(matches!(
+            resp.outcome,
+            agent_client_protocol::RequestPermissionOutcome::Selected(_)
+        ));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
     async fn permission_allows_missing_file_under_repo_root() {
         let root = tempfile::tempdir().expect("root");
         let client = crate::infra::acp::task_generator::client::LaReviewClient::new(
@@ -466,6 +503,224 @@ mod policy_tests {
             resp.outcome,
             agent_client_protocol::RequestPermissionOutcome::Cancelled
         ));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn permission_allows_locations_input() {
+        let root = tempfile::tempdir().expect("root");
+        std::fs::write(root.path().join("test.txt"), "hi").expect("write");
+
+        let client = crate::infra::acp::task_generator::client::LaReviewClient::new(
+            None,
+            "run-1",
+            Some(root.path().to_path_buf()),
+        );
+        let fields = agent_client_protocol::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::ToolKind::Read)
+            .title("fs/read_text_file")
+            .locations(vec![agent_client_protocol::ToolCallLocation::new(
+                "test.txt",
+            )]);
+        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::PermissionOption::new(
+            "allow",
+            "Allow",
+            agent_client_protocol::PermissionOptionKind::AllowOnce,
+        )];
+        let req = agent_client_protocol::RequestPermissionRequest::new(
+            agent_client_protocol::SessionId::new("s1"),
+            tool_call,
+            options,
+        );
+        let resp =
+            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
+                &client, req,
+            )
+            .await
+            .unwrap();
+        assert!(matches!(
+            resp.outcome,
+            agent_client_protocol::RequestPermissionOutcome::Selected(_)
+        ));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn permission_allows_title_fallback() {
+        let root = tempfile::tempdir().expect("root");
+        std::fs::write(root.path().join("test.txt"), "hi").expect("write");
+
+        let client = crate::infra::acp::task_generator::client::LaReviewClient::new(
+            None,
+            "run-1",
+            Some(root.path().to_path_buf()),
+        );
+        let fields = agent_client_protocol::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::ToolKind::Read)
+            .title("Read test.txt");
+        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::PermissionOption::new(
+            "allow",
+            "Allow",
+            agent_client_protocol::PermissionOptionKind::AllowOnce,
+        )];
+        let req = agent_client_protocol::RequestPermissionRequest::new(
+            agent_client_protocol::SessionId::new("s1"),
+            tool_call,
+            options,
+        );
+        let resp =
+            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
+                &client, req,
+            )
+            .await
+            .unwrap();
+        assert!(matches!(
+            resp.outcome,
+            agent_client_protocol::RequestPermissionOutcome::Selected(_)
+        ));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn permission_denies_locations_outside_repo() {
+        let root = tempfile::tempdir().expect("root");
+        std::fs::write(root.path().join("inside.txt"), "hi").expect("write");
+
+        let client = crate::infra::acp::task_generator::client::LaReviewClient::new(
+            None,
+            "run-1",
+            Some(root.path().to_path_buf()),
+        );
+        let fields = agent_client_protocol::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::ToolKind::Read)
+            .title("fs/read_text_file")
+            .locations(vec![agent_client_protocol::ToolCallLocation::new(
+                "/etc/passwd",
+            )]);
+        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::PermissionOption::new(
+            "allow",
+            "Allow",
+            agent_client_protocol::PermissionOptionKind::AllowOnce,
+        )];
+        let req = agent_client_protocol::RequestPermissionRequest::new(
+            agent_client_protocol::SessionId::new("s1"),
+            tool_call,
+            options,
+        );
+        let resp =
+            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
+                &client, req,
+            )
+            .await
+            .unwrap();
+        assert!(matches!(
+            resp.outcome,
+            agent_client_protocol::RequestPermissionOutcome::Cancelled
+        ));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn permission_denies_title_outside_repo() {
+        let root = tempfile::tempdir().expect("root");
+        std::fs::write(root.path().join("inside.txt"), "hi").expect("write");
+
+        let client = crate::infra::acp::task_generator::client::LaReviewClient::new(
+            None,
+            "run-1",
+            Some(root.path().to_path_buf()),
+        );
+        let fields = agent_client_protocol::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::ToolKind::Read)
+            .title("Read /etc/passwd");
+        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::PermissionOption::new(
+            "allow",
+            "Allow",
+            agent_client_protocol::PermissionOptionKind::AllowOnce,
+        )];
+        let req = agent_client_protocol::RequestPermissionRequest::new(
+            agent_client_protocol::SessionId::new("s1"),
+            tool_call,
+            options,
+        );
+        let resp =
+            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
+                &client, req,
+            )
+            .await
+            .unwrap();
+        assert!(matches!(
+            resp.outcome,
+            agent_client_protocol::RequestPermissionOutcome::Cancelled
+        ));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn permission_denies_title_escape_sequence() {
+        let root = tempfile::tempdir().expect("root");
+        std::fs::write(root.path().join("inside.txt"), "hi").expect("write");
+
+        let client = crate::infra::acp::task_generator::client::LaReviewClient::new(
+            None,
+            "run-1",
+            Some(root.path().to_path_buf()),
+        );
+        let fields = agent_client_protocol::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::ToolKind::Read)
+            .title("Read ../../etc/passwd");
+        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::PermissionOption::new(
+            "allow",
+            "Allow",
+            agent_client_protocol::PermissionOptionKind::AllowOnce,
+        )];
+        let req = agent_client_protocol::RequestPermissionRequest::new(
+            agent_client_protocol::SessionId::new("s1"),
+            tool_call,
+            options,
+        );
+        let resp =
+            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
+                &client, req,
+            )
+            .await
+            .unwrap();
+        assert!(matches!(
+            resp.outcome,
+            agent_client_protocol::RequestPermissionOutcome::Cancelled
+        ));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn read_text_file_rejects_empty_path() {
+        let root = tempfile::tempdir().expect("root");
+        std::fs::write(root.path().join("test.txt"), "hi").expect("write");
+
+        let client = crate::infra::acp::task_generator::client::LaReviewClient::new(
+            None,
+            "run-1",
+            Some(root.path().to_path_buf()),
+        );
+        let session_id = agent_client_protocol::SessionId::new("s1");
+        let read_req = agent_client_protocol::ReadTextFileRequest::new(session_id, "");
+        let result =
+            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::read_text_file(
+                &client, read_req,
+            )
+            .await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        let data = &err.data;
+        let has_reason = data
+            .as_ref()
+            .and_then(|v| v.as_object())
+            .and_then(|d| d.get("reason"))
+            .is_some_and(|r| r.as_str().is_some_and(|s| s.contains("path")));
+        assert!(
+            has_reason,
+            "Error should contain 'path' in reason: {:?}",
+            data
+        );
     }
 
     #[test]

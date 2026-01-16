@@ -13,7 +13,7 @@ interface Repo {
 }
 
 export function useRepos() {
-  const { getLinkedRepos, linkRepo, unlinkRepo, selectRepoFolder } = useTauri();
+  const { getLinkedRepos, linkRepo, cloneAndLinkRepo, unlinkRepo, selectRepoFolder } = useTauri();
   const queryClient = useQueryClient();
 
   const query = useQuery({
@@ -32,6 +32,27 @@ export function useRepos() {
     onError: (error: Error) => {
       console.error('Failed to add repo:', error);
       toast('Failed to link repository', {
+        description: error.message,
+      });
+    },
+  });
+
+  const cloneRepo = useMutation({
+    mutationFn: (input: {
+      provider: 'github' | 'gitlab';
+      repo: string;
+      host?: string;
+      destDir: string;
+    }) => cloneAndLinkRepo(input),
+    onSuccess: result => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.repos });
+      toast('Repository Cloned', {
+        description: `${result.name} is now linked.`,
+      });
+    },
+    onError: (error: Error) => {
+      console.error('Failed to clone repo:', error);
+      toast('Failed to clone repository', {
         description: error.message,
       });
     },
@@ -71,6 +92,7 @@ export function useRepos() {
   return {
     ...query,
     addRepo,
+    cloneRepo,
     removeRepo,
     selectRepoFolder,
   };

@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Trash } from '@phosphor-icons/react';
+import { Trash, Spinner } from '@phosphor-icons/react';
 import { useTauri } from '../../hooks/useTauri';
 import { useAppStore } from '../../store';
 import { useAgents } from '../../hooks/useAgents';
 import { useRepos } from '../../hooks/useRepos';
-import type { ViewType } from '../../types';
+import type { ReviewSource, ViewType } from '../../types';
 import { useGeneration } from '../../contexts/useGeneration';
 import { DiffEditorPanel } from './DiffEditorPanel';
 import { AgentConfigPanel } from './AgentConfigPanel';
@@ -19,6 +19,18 @@ interface GenerateViewProps {
   onNavigate: (view: ViewType) => void;
 }
 
+interface RepoLinkCallout {
+  provider: 'github' | 'gitlab';
+  repo: string;
+  host?: string;
+  label: string;
+}
+
+const isVcsSource = (
+  source: ReviewSource | null
+): source is Extract<ReviewSource, { type: 'github_pr' | 'gitlab_mr' }> =>
+  !!source && (source.type === 'github_pr' || source.type === 'gitlab_mr');
+
 export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavigate }) => {
   const [diffText, setDiffText] = useState('');
   const lastAutoSwitchedTextRef = React.useRef('');
@@ -30,7 +42,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   const { fetchRemotePr } = useTauri();
   const { startGeneration, stopGeneration } = useGeneration();
   const { data: agents = [] } = useAgents();
-  const { data: repos = [] } = useRepos();
+  const { data: repos = [], addRepo, cloneRepo, selectRepoFolder } = useRepos();
 
   const setDiffTextStore = useAppStore(state => state.setDiffText);
   const agentId = useAppStore(state => state.agentId);
@@ -52,6 +64,8 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   const setPlanItems = useAppStore(state => state.setPlanItems);
   const isPlanExpanded = useAppStore(state => state.isPlanExpanded);
   const setIsPlanExpanded = useAppStore(state => state.setIsPlanExpanded);
+
+  const [repoLinkCallout, setRepoLinkCallout] = useState<RepoLinkCallout | null>(null);
 
   const globalDiffText = useAppStore(state => state.diffText);
 
@@ -98,6 +112,96 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     }
   }, [diffText, viewMode, isDiffValid, setViewMode]);
 
+  const findMatchingRepo = useCallback(
+    (source: Extract<ReviewSource, { type: 'github_pr' | 'gitlab_mr' }>) => {
+      if (source.type === 'github_pr') {
+        const target = `${source.owner}/${source.repo}`.toLowerCase();
+        let matchingRepo = repos.find(r =>
+          r.remotes.some((url: string) => url.toLowerCase().includes(target))
+        );
+
+        if (!matchingRepo) {
+          matchingRepo = repos.find(r => r.name.toLowerCase() === source.repo.toLowerCase());
+        }
+
+        return matchingRepo || null;
+      }
+
+      const targetHost = source.host.toLowerCase();
+      const targetPath = source.project_path.toLowerCase();
+      let matchingRepo = repos.find(r =>
+        r.remotes.some((url: string) => {
+          const lower = url.toLowerCase();
+          return lower.includes(targetHost) && lower.includes(targetPath);
+        })
+      );
+
+      if (!matchingRepo) {
+        const repoName = source.project_path.split('/').pop() || source.project_path;
+        matchingRepo = repos.find(r => r.name.toLowerCase() === repoName.toLowerCase());
+      }
+
+      return matchingRepo || null;
+    },
+    [repos]
+  );
+
+  const buildRepoLinkCallout = useCallback(
+    (source: Extract<ReviewSource, { type: 'github_pr' | 'gitlab_mr' }>): RepoLinkCallout => {
+      if (source.type === 'github_pr') {
+        const repo = `${source.owner}/${source.repo}`;
+        return {
+          provider: 'github',
+          repo,
+          label: repo,
+        };
+      }
+
+      const label = `${source.host}/${source.project_path}`;
+      return {
+        provider: 'gitlab',
+        repo: source.project_path,
+        host: source.host,
+        label,
+      };
+    },
+    []
+  );
+
+  const isRepoLinking = addRepo.isPending || cloneRepo.isPending;
+
+  const handleCloneAndLink = useCallback(async () => {
+    if (!repoLinkCallout) return;
+    const destDir = await selectRepoFolder();
+    if (!destDir) return;
+
+    try {
+      const linked = await cloneRepo.mutateAsync({
+        provider: repoLinkCallout.provider,
+        repo: repoLinkCallout.repo,
+        host: repoLinkCallout.host,
+        destDir,
+      });
+      setSelectedRepoId(linked.id);
+      setRepoLinkCallout(null);
+    } catch (error) {
+      console.error('Failed to clone repo:', error);
+    }
+  }, [cloneRepo, repoLinkCallout, selectRepoFolder, setSelectedRepoId]);
+
+  const handleLinkExisting = useCallback(async () => {
+    const path = await selectRepoFolder();
+    if (!path) return;
+
+    try {
+      const linked = await addRepo.mutateAsync(path);
+      setSelectedRepoId(linked.id);
+      setRepoLinkCallout(null);
+    } catch (error) {
+      console.error('Failed to link repo:', error);
+    }
+  }, [addRepo, selectRepoFolder, setSelectedRepoId]);
+
   const handleGenerate = useCallback(async () => {
     setValidationError(null);
 
@@ -143,25 +247,20 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
       if (diff.source) {
         setPendingSource(diff.source);
 
-        // Auto-select matching linked repo
-        if (diff.source.type === 'github_pr') {
-          const { owner, repo: prRepoName } = diff.source;
-          const target = `${owner}/${prRepoName}`.toLowerCase();
-
-          // Try matching by remote URL first, then by name
-          let matchingRepo = repos.find(r =>
-            r.remotes.some((url: string) => url.toLowerCase().includes(target))
-          );
-
-          if (!matchingRepo) {
-            // Fallback: match by repo name
-            matchingRepo = repos.find(r => r.name.toLowerCase() === prRepoName.toLowerCase());
-          }
+        if (isVcsSource(diff.source)) {
+          const matchingRepo = findMatchingRepo(diff.source);
 
           if (matchingRepo) {
             setSelectedRepoId(matchingRepo.id);
+            setRepoLinkCallout(null);
+          } else {
+            setRepoLinkCallout(buildRepoLinkCallout(diff.source));
           }
+        } else {
+          setRepoLinkCallout(null);
         }
+      } else {
+        setRepoLinkCallout(null);
       }
       setParsedDiff(diff);
       setViewMode('diff');
@@ -177,7 +276,8 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     setParsedDiff,
     setPendingSource,
     setViewMode,
-    repos,
+    findMatchingRepo,
+    buildRepoLinkCallout,
     setSelectedRepoId,
   ]);
 
@@ -191,6 +291,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     setViewMode('raw');
     setPlanItems([]);
     setIsPlanExpanded(false);
+    setRepoLinkCallout(null);
   }, [
     setDiffTextStore,
     setParsedDiff,
@@ -233,32 +334,73 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     <div className="bg-bg-primary flex h-full flex-col">
       <div className="flex flex-1 overflow-hidden">
         <div className="border-border bg-bg-primary relative flex min-w-0 flex-1 flex-col border-r">
-          <div className="pointer-events-none absolute top-4 right-4 left-4 z-10 flex items-center gap-3">
-            <VcsInputCard
-              pendingSource={pendingSource}
-              prRef={prRef}
-              onPrRefChange={setPrRef}
-              onFetch={handleFetchPr}
-              isLoading={isLoadingPr}
-              disabled={isGenerating}
-              onClear={handleClear}
-            />
+          <div className="flex flex-col gap-2 p-4 pb-0">
+            <div className="flex items-center gap-3">
+              <VcsInputCard
+                pendingSource={pendingSource}
+                prRef={prRef}
+                onPrRefChange={setPrRef}
+                onFetch={handleFetchPr}
+                isLoading={isLoadingPr}
+                disabled={isGenerating}
+                onClear={handleClear}
+              />
 
-            <div className="flex-1" />
+              <div className="flex-1" />
 
-            <div className="pointer-events-auto flex gap-2">
-              {(diffText.trim() || prRef.trim()) && (
-                <button
-                  onClick={handleClear}
-                  className="bg-bg-secondary/90 hover:bg-bg-tertiary text-text-secondary hover:text-text-primary ring-border flex h-8 items-center gap-1.5 rounded-md px-3 text-[10px] font-medium shadow-sm ring-1 backdrop-blur-sm transition-all"
-                >
-                  <Trash size={13} />
-                  <span>Clear</span>
-                </button>
-              )}
+              <div className="pointer-events-auto flex gap-2">
+                {(diffText.trim() || prRef.trim()) && (
+                  <button
+                    onClick={handleClear}
+                    className="bg-bg-secondary/90 hover:bg-bg-tertiary text-text-secondary hover:text-text-primary ring-border flex h-8 items-center gap-1.5 rounded-md px-3 text-[10px] font-medium shadow-sm ring-1 backdrop-blur-sm transition-all"
+                  >
+                    <Trash size={13} />
+                    <span>Clear</span>
+                  </button>
+                )}
 
-              <ViewModeToggle mode={viewMode} onChange={setViewMode} disabled={!diffText.trim()} />
+                <ViewModeToggle
+                  mode={viewMode}
+                  onChange={setViewMode}
+                  disabled={!diffText.trim()}
+                />
+              </div>
             </div>
+
+            {repoLinkCallout && (
+              <div className="pointer-events-auto flex items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200 shadow-sm">
+                <div className="min-w-0">
+                  <div className="font-medium text-amber-100">No linked repo found</div>
+                  <div className="truncate text-amber-200/80">
+                    Link or clone {repoLinkCallout.label} to enable snapshots.
+                  </div>
+                </div>
+                <div className="flex flex-shrink-0 items-center gap-2">
+                  <button
+                    onClick={handleCloneAndLink}
+                    disabled={isGenerating || isRepoLinking}
+                    className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 rounded px-2 py-1 text-[10px] font-semibold transition-colors disabled:opacity-60 flex items-center gap-1"
+                  >
+                    {isRepoLinking ? <Spinner size={12} className="animate-spin" /> : null}
+                    <span>Clone &amp; Link</span>
+                  </button>
+                  <button
+                    onClick={handleLinkExisting}
+                    disabled={isGenerating || isRepoLinking}
+                    className="bg-bg-secondary/80 hover:bg-bg-tertiary text-text-primary rounded px-2 py-1 text-[10px] font-semibold transition-colors disabled:opacity-60"
+                  >
+                    Link Existing
+                  </button>
+                  <button
+                    onClick={() => setRepoLinkCallout(null)}
+                    disabled={isRepoLinking}
+                    className="text-text-tertiary hover:text-text-primary px-1 text-[10px] font-semibold transition-colors disabled:opacity-60"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <DiffEditorPanel

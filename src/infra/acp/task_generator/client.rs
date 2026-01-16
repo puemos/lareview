@@ -33,24 +33,7 @@ struct ReadCheck {
     allowed: bool,
     path_display: String,
     reason: String,
-}
-
-impl ReadCheck {
-    fn allow(path_display: impl Into<String>, reason: impl Into<String>) -> Self {
-        Self {
-            allowed: true,
-            path_display: path_display.into(),
-            reason: reason.into(),
-        }
-    }
-
-    fn deny(path_display: impl Into<String>, reason: impl Into<String>) -> Self {
-        Self {
-            allowed: false,
-            path_display: path_display.into(),
-            reason: reason.into(),
-        }
-    }
+    line: Option<u32>,
 }
 
 type PendingToolCallValue = (String, String, Option<serde_json::Value>);
@@ -289,6 +272,51 @@ impl LaReviewClient {
             .join("\n")
     }
 
+    fn extract_path_from_raw_input(input: &serde_json::Value) -> Option<(PathBuf, Option<u32>)> {
+        let path = input
+            .get("path")
+            .and_then(|v| v.as_str())
+            .or_else(|| input.get("filePath").and_then(|v| v.as_str()))?;
+        let line = input
+            .get("line")
+            .and_then(|v| v.as_u64())
+            .and_then(|n| u32::try_from(n).ok());
+        Some((PathBuf::from(path), line))
+    }
+
+    fn extract_path_from_locations(
+        locations: &[agent_client_protocol::ToolCallLocation],
+    ) -> Option<(PathBuf, Option<u32>)> {
+        locations.first().map(|loc| (loc.path.clone(), loc.line))
+    }
+
+    fn extract_path_from_title(title: &str) -> Option<PathBuf> {
+        let trimmed = title.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        let tokens: Vec<&str> = trimmed.split_whitespace().collect();
+        if tokens.is_empty() {
+            return None;
+        }
+        for token in tokens {
+            if token.contains('/') || token.contains('\\') {
+                let path = PathBuf::from(token);
+                let name = path.file_name()?.to_str()?;
+                if name.contains('.') && !name.starts_with('.') {
+                    return Some(path);
+                }
+            } else {
+                let path = PathBuf::from(token);
+                let name = path.file_name()?.to_str()?;
+                if name.contains('.') && !name.starts_with('.') {
+                    return Some(path);
+                }
+            }
+        }
+        None
+    }
+
     fn resolve_repo_path(&self, requested: &Path) -> Result<PathBuf, Error> {
         let Some(root) = self.repo_root.as_ref() else {
             return Err(Error::invalid_params().data(json!({
@@ -331,61 +359,132 @@ impl LaReviewClient {
         Ok(resolved)
     }
 
-    fn check_read_request(&self, raw_input: &Option<serde_json::Value>) -> ReadCheck {
+    fn check_read_request(
+        &self,
+        raw_input: &Option<serde_json::Value>,
+        tool_title: &str,
+        locations: Option<&[agent_client_protocol::ToolCallLocation]>,
+    ) -> ReadCheck {
         let Some(root) = self.repo_root.as_ref() else {
-            return ReadCheck::deny("<none>", "repo access disabled");
-        };
-        let Some(input) = raw_input.as_ref() else {
-            return ReadCheck::deny("<missing>", "missing tool input");
-        };
-        let Some(path_str) = input.get("path").and_then(|v| v.as_str()) else {
-            return ReadCheck::deny("<missing>", "missing `path` in tool input");
+            return ReadCheck {
+                allowed: false,
+                path_display: "<none>".to_string(),
+                reason: "repo access disabled".to_string(),
+                line: None,
+            };
         };
 
         let root_canon = match root.canonicalize() {
             Ok(path) => path,
             Err(err) => {
-                return ReadCheck::deny(
-                    path_str,
-                    format!("repo root not accessible: {} ({err})", root.display()),
-                );
+                return ReadCheck {
+                    allowed: false,
+                    path_display: "<root>".to_string(),
+                    reason: format!("repo root not accessible: {} ({err})", root.display()),
+                    line: None,
+                };
             }
         };
 
-        let requested = Path::new(path_str);
-        let joined = if requested.is_absolute() {
-            requested.to_path_buf()
-        } else {
-            root_canon.join(requested)
-        };
-
-        let normalized = Self::normalize_path(&joined);
-        if !normalized.starts_with(&root_canon) {
-            return ReadCheck::deny(
-                path_str,
-                format!("path outside repo root: {}", normalized.display()),
-            );
-        }
-
-        if let Ok(resolved) = joined.canonicalize() {
-            if !resolved.starts_with(&root_canon) {
-                return ReadCheck::deny(
-                    path_str,
-                    format!("path resolves outside repo root: {}", resolved.display()),
-                );
+        if let Some(input) = raw_input.as_ref() {
+            if let Some((path, line)) = Self::extract_path_from_raw_input(input) {
+                return self.validate_candidate_path(&path, &root_canon, line, "raw_input");
             }
-            return ReadCheck::allow(path_str, format!("read allowed: {}", resolved.display()));
         }
 
-        let note = if joined.exists() {
-            "non-canonical path"
+        if let Some(locs) = locations {
+            if let Some((path, line)) = Self::extract_path_from_locations(locs) {
+                return self.validate_candidate_path(&path, &root_canon, line, "locations");
+            }
+            return ReadCheck {
+                allowed: false,
+                path_display: "<none>".to_string(),
+                reason: "missing path; provide path in raw_input or ToolCall locations".to_string(),
+                line: None,
+            };
+        }
+
+        if let Some(path) = Self::extract_path_from_title(tool_title) {
+            return self.validate_candidate_path(&path, &root_canon, None, "title");
+        }
+
+        ReadCheck {
+            allowed: false,
+            path_display: "<none>".to_string(),
+            reason: "missing path; provide path in raw_input, ToolCall locations, or a clear path in title".to_string(),
+            line: None,
+        }
+    }
+
+    fn validate_candidate_path(
+        &self,
+        path: &Path,
+        root_canon: &Path,
+        line: Option<u32>,
+        source: &str,
+    ) -> ReadCheck {
+        let requested = if path.is_absolute() {
+            path.to_path_buf()
         } else {
-            "path not found"
+            root_canon.join(path)
         };
-        ReadCheck::allow(
-            path_str,
-            format!("read allowed ({note}): {}", normalized.display()),
-        )
+
+        let normalized = Self::normalize_path(&requested);
+        if !normalized.starts_with(root_canon) {
+            return ReadCheck {
+                allowed: false,
+                path_display: normalized.display().to_string(),
+                reason: format!(
+                    "path from {} outside repo root: {}",
+                    source,
+                    normalized.display()
+                ),
+                line: None,
+            };
+        }
+
+        if let Ok(resolved) = requested.canonicalize() {
+            if !resolved.starts_with(root_canon) {
+                return ReadCheck {
+                    allowed: false,
+                    path_display: resolved.display().to_string(),
+                    reason: format!(
+                        "path from {} resolves outside repo root: {}",
+                        source,
+                        resolved.display()
+                    ),
+                    line: None,
+                };
+            }
+            let note = if !normalized.exists() {
+                " (path not found)"
+            } else {
+                ""
+            };
+            return ReadCheck {
+                allowed: true,
+                path_display: format!("{}{}", resolved.display(), note),
+                reason: format!("read allowed via {}: {}", source, resolved.display()),
+                line,
+            };
+        }
+
+        let note = if requested.exists() {
+            " (non-canonical path)"
+        } else {
+            " (path not found)"
+        };
+        ReadCheck {
+            allowed: true,
+            path_display: format!("{}{}", normalized.display(), note),
+            reason: format!(
+                "read allowed via {} ({}): {}",
+                source,
+                note,
+                normalized.display()
+            ),
+            line,
+        }
     }
 
     /// Handle task submission via extension payloads.
@@ -527,7 +626,11 @@ impl agent_client_protocol::Client for LaReviewClient {
                 None
             }
         } else if matches!(tool_kind, Some(ToolKind::Read)) {
-            let check = self.check_read_request(raw_input);
+            let check = self.check_read_request(
+                raw_input,
+                &tool_title,
+                args.tool_call.fields.locations.as_deref(),
+            );
             let tool_label = if tool_title.is_empty() {
                 "fs/read_text_file"
             } else {
@@ -570,6 +673,11 @@ impl agent_client_protocol::Client for LaReviewClient {
         &self,
         args: ReadTextFileRequest,
     ) -> agent_client_protocol::Result<ReadTextFileResponse> {
+        if args.path.as_os_str().is_empty() {
+            return Err(Error::invalid_params().data(json!({
+                "reason": "fs/read_text_file requires 'path'; provide path in request (e.g., {\"path\": \"src/foo.rs\", \"line\": 10, \"limit\": 40})"
+            })));
+        }
         let resolved = self.resolve_repo_path(&args.path)?;
         let content = std::fs::read_to_string(&resolved).map_err(|err| {
             if err.kind() == std::io::ErrorKind::NotFound {
