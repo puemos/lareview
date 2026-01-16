@@ -31,14 +31,12 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const setParsedDiff = useAppStore(state => state.setParsedDiff);
   const setIsGeneratingStore = useAppStore(state => state.setIsGenerating);
   const handleServerUpdate = useAppStore(state => state.handleServerUpdate);
-  const updatePlanItemStatus = useAppStore(state => state.updatePlanItemStatus);
   const addProgressMessage = useAppStore(state => state.addProgressMessage);
   const clearProgressMessages = useAppStore(state => state.clearProgressMessages);
   const setReviewId = useAppStore(state => state.setReviewId);
   const setRunId = useAppStore(state => state.setRunId);
   const runId = useAppStore(state => state.runId);
   const setTasks = useAppStore(state => state.setTasks);
-  const setPlanItems = useAppStore(state => state.setPlanItems);
 
   const isGeneratingRef = useRef(false);
   const currentTaskTitleRef = useRef<string | null>(null);
@@ -50,7 +48,6 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       isGeneratingRef.current = true;
       setIsGeneratingStore(true);
       clearProgressMessages();
-      setPlanItems([]);
 
       setDiffTextStore(diffText);
       setAgentIdStore(agentId);
@@ -141,15 +138,10 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               const title = (payload.data as { title: string }).title;
               currentTaskTitleRef.current = title;
               addProgressMessage('task_started', title);
-              updatePlanItemStatus(title, 'in_progress');
-              setPlanItems(prev => (prev.includes(title) ? prev : [...prev, title]));
               break;
             }
             case 'TaskCompleted':
               addProgressMessage('task_added', 'Task completed');
-              if (currentTaskTitleRef.current) {
-                updatePlanItemStatus(currentTaskTitleRef.current, 'completed');
-              }
               break;
             case 'Completed':
               addProgressMessage('completed', 'Review generation complete!');
@@ -257,11 +249,9 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setDiffTextStore,
       setIsGeneratingStore,
       setParsedDiff,
-      setPlanItems,
       setReviewId,
       setRunId,
       setTasks,
-      updatePlanItemStatus,
     ]
   );
 

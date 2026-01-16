@@ -1,14 +1,14 @@
 import { create } from 'zustand';
 import { persist, devtools } from 'zustand/middleware';
-import type {
-  ParsedDiff,
+import {
+  Plan,
+  ReviewSource,
+  Feedback,
   DiffFile,
   CommentThread,
   ReviewTask,
-  Plan,
-  Feedback,
   DiffComment,
-  ReviewSource,
+  ParsedDiff,
 } from '../types';
 import { PERSIST_CONFIG, STORAGE_KEYS } from '../constants/query-config';
 import type { AvailableCommand, SessionUpdate } from '../hooks/useTauri';
@@ -21,12 +21,15 @@ import {
   isAvailableCommandsUpdate,
 } from '../hooks/useTauri';
 
+
+
 interface ProgressMessage {
   type: string;
   message: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data?: any;
   timestamp: number;
+  id?: string;
 }
 
 interface AppStore {
@@ -71,11 +74,9 @@ interface AppStore {
   handleServerUpdate: (update: SessionUpdate | Plan) => void;
   clearProgressMessages: () => void;
   setPendingSource: (source: ReviewSource | null) => void;
-  updatePlanItemStatus: (content: string, status: string) => void;
   setSelectedRepoId: (repoId: string) => void;
   setPrRef: (prRef: string) => void;
   setViewMode: (mode: 'raw' | 'diff') => void;
-  setPlanItems: (items: string[] | ((items: string[]) => string[])) => void;
   setIsPlanExpanded: (isExpanded: boolean) => void;
   reset: () => void;
 }
@@ -184,7 +185,7 @@ export const useAppStore = create<AppStore>()(
 
             if ('entries' in update) {
               return {
-                plan: update,
+                plan: update, // ACP: Client MUST replace the current plan completely
                 progressMessages: [
                   ...msgs,
                   {
@@ -331,22 +332,9 @@ export const useAppStore = create<AppStore>()(
 
         setPendingSource: source => set({ pendingSource: source }),
 
-        updatePlanItemStatus: (content, status) =>
-          set(state => {
-            if (!state.plan) return {};
-            const newEntries = state.plan.entries.map(entry =>
-              entry.content === content ? { ...entry, status } : entry
-            );
-            return { plan: { ...state.plan, entries: newEntries } };
-          }),
-
         setSelectedRepoId: repoId => set({ selectedRepoId: repoId }),
         setPrRef: prRef => set({ prRef }),
         setViewMode: mode => set({ viewMode: mode }),
-        setPlanItems: items =>
-          set(state => ({
-            planItems: typeof items === 'function' ? items(state.planItems) : items,
-          })),
         setIsPlanExpanded: isExpanded => set({ isPlanExpanded: isExpanded }),
 
         reset: () =>

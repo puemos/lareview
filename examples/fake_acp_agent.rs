@@ -42,6 +42,48 @@ impl Agent for FakeAgent {
 
     async fn prompt(&self, _args: PromptRequest) -> agent_client_protocol::Result<PromptResponse> {
         let session_id = self.session_id.lock().unwrap().clone();
+
+        if std::env::var("PLAN_STRESS").is_ok() {
+            // Send initial plan
+            let plan1: agent_client_protocol::Plan = serde_json::from_value(serde_json::json!({
+                "entries": [
+                    {
+                        "content": "Task 1",
+                        "priority": "medium",
+                        "status": "pending"
+                    }
+                ]
+            }))
+            .unwrap();
+
+            let _ = self.notifications.send(SessionNotification::new(
+                session_id.clone(),
+                SessionUpdate::Plan(plan1),
+            ));
+
+            // Send update that preserves Task 1 and adds Task 2
+            let plan2: agent_client_protocol::Plan = serde_json::from_value(serde_json::json!({
+                "entries": [
+                    {
+                        "content": "Task 1",
+                        "priority": "medium",
+                        "status": "in_progress"
+                    },
+                    {
+                        "content": "Task 2",
+                        "priority": "low",
+                        "status": "pending"
+                    }
+                ]
+            }))
+            .unwrap();
+
+            let _ = self.notifications.send(SessionNotification::new(
+                session_id.clone(),
+                SessionUpdate::Plan(plan2),
+            ));
+        }
+
         let tool_call_id = ToolCallId::new("finalize_review");
 
         let tool_call = ToolCall::new(tool_call_id.clone(), "finalize_review");

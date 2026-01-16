@@ -41,7 +41,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const { fetchRemotePr } = useTauri();
-  const { startGeneration, stopGeneration } = useGeneration();
+  const { startGeneration } = useGeneration();
   const { data: agents = [] } = useAgents();
   const { data: repos = [], addRepo, cloneRepo, selectRepoFolder } = useRepos();
 
@@ -61,8 +61,6 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   const setPrRef = useAppStore(state => state.setPrRef);
   const viewMode = useAppStore(state => state.viewMode);
   const setViewMode = useAppStore(state => state.setViewMode);
-  const planItems = useAppStore(state => state.planItems);
-  const setPlanItems = useAppStore(state => state.setPlanItems);
   const isPlanExpanded = useAppStore(state => state.isPlanExpanded);
   const setIsPlanExpanded = useAppStore(state => state.setIsPlanExpanded);
 
@@ -290,7 +288,6 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     setPrRef('');
     setValidationError(null);
     setViewMode('raw');
-    setPlanItems([]);
     setIsPlanExpanded(false);
     hasAutoExpandedRef.current = false;
     setRepoLinkCallout(null);
@@ -300,26 +297,15 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     setPendingSource,
     setPrRef,
     setViewMode,
-    setPlanItems,
     setIsPlanExpanded,
   ]);
 
   const planItemsToRender = useMemo(() => {
-    const items =
-      plan?.entries.map(e => ({
-        content: e.content,
-        status: e.status || 'pending',
-      })) || [];
-
-    // Add any ad-hoc tasks that aren't in the plan
-    planItems.forEach(content => {
-      if (!items.find(i => i.content === content)) {
-        items.push({ content, status: 'completed' });
-      }
-    });
-
-    return items;
-  }, [plan, planItems]);
+    return plan?.entries.map(e => ({
+      content: e.content,
+      status: e.status || 'pending',
+    })) || [];
+  }, [plan]);
 
   useEffect(() => {
     if (planItemsToRender.length > 0 && !hasAutoExpandedRef.current) {
@@ -328,9 +314,6 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     }
   }, [planItemsToRender.length, setIsPlanExpanded]);
 
-  const handleStop = useCallback(async () => {
-    await stopGeneration();
-  }, [stopGeneration]);
 
   return (
     <div className="bg-bg-primary flex h-full flex-col">
@@ -429,7 +412,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
             onRepoSelect={setSelectedRepoId}
             isGenerating={isGenerating}
             onGenerate={handleGenerate}
-            onStop={handleStop}
+            onStop={() => {}}
             isDiffValid={isDiffValid}
           />
 

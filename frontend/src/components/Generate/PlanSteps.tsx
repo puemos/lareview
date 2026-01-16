@@ -24,7 +24,7 @@ export const PlanSteps: React.FC<PlanStepsProps> = ({ steps, className }) => {
 
   return (
     <div className={clsx('space-y-1', className)}>
-      {steps.map((step, idx) => {
+      {steps.map(step => {
         const status = (step.status || 'pending').toLowerCase();
         const isDone = status === 'completed' || status === 'done';
         const isInProgress = status === 'in_progress' || status === 'inprogress';
@@ -50,7 +50,10 @@ export const PlanSteps: React.FC<PlanStepsProps> = ({ steps, className }) => {
         }
 
         return (
-          <div key={idx} className="animate-fade-in group flex items-start gap-3 text-xs">
+          <div
+            key={step.content}
+            className="animate-fade-in group flex items-start gap-3 text-xs"
+          >
             {Icon}
             <span
               className={clsx(
