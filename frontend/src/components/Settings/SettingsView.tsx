@@ -12,6 +12,9 @@ import {
   ArrowsClockwise,
   Check,
   X,
+  GithubLogo,
+  GitlabLogo,
+  GitDiff,
 } from '@phosphor-icons/react';
 import type {
   ViewType,
@@ -206,12 +209,27 @@ const VcsSettings: React.FC = () => {
                 key={item.id}
                 className="bg-bg-secondary/40 border-border space-y-6 rounded-lg border p-6"
               >
-                <div className="grid grid-cols-[120px_1fr] items-center gap-x-8 gap-y-4">
-                  <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
-                    Provider
-                  </span>
-                  <span className="text-text-secondary text-xs font-medium">{item.name}</span>
+                <div className="flex items-center gap-4 border-b border-border pb-4 mb-4">
+                  <div className="bg-bg-tertiary border-border text-text-primary flex h-10 w-10 items-center justify-center rounded-lg border">
+                    {item.id === 'github' ? (
+                      <GithubLogo size={20} weight="fill" />
+                    ) : item.id === 'gitlab' ? (
+                      <GitlabLogo size={20} weight="fill" />
+                    ) : (
+                      <GitDiff size={20} weight="fill" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-text-primary text-sm font-medium">{item.name}</h3>
+                    <p className="text-text-tertiary text-xs">
+                      {item.id === 'github' && 'Integration via gh CLI'}
+                      {item.id === 'gitlab' && 'Integration via glab dynamic CLI'}
+                      {item.id !== 'github' && item.id !== 'gitlab' && 'VCS Provider'}
+                    </p>
+                  </div>
+                </div>
 
+                <div className="grid grid-cols-[120px_1fr] items-center gap-x-8 gap-y-4">
                   <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
                     Connection
                   </span>

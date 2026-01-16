@@ -3,7 +3,9 @@ name = "lareview"
 version = "0.0.23"
 edition = "2024"
 default-run = "lareview"
+
 license = "MIT OR Apache-2.0"
+autobins = false
 description = "LaReview is a desktop code review companion that generates intent-driven review plans with AI."
 repository = "https://github.com/puemos/lareview"
 homepage = "https://github.com/puemos/lareview"
@@ -74,10 +76,16 @@ path = "src/lib.rs"
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
+test-utils = []
 
 [[bin]]
 name = "lareview"
 path = "src/main.rs"
+
+[[bin]]
+name = "fake_acp_agent"
+path = "src/bin/fake_acp_agent.rs"
+required-features = ["test-utils"]
 
 [dev-dependencies]
 

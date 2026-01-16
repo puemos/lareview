@@ -97,8 +97,11 @@ jobs:
           mkdir -p frontend/dist
           touch frontend/dist/index.html
 
+      - name: Build helper agent
+        run: cargo build --bin fake_acp_agent --features test-utils
+
       - name: Run tests
-        run: cargo test --verbose
+        run: cargo test --features test-utils --verbose
 
   build:
     name: Build Check
