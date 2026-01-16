@@ -1,6 +1,6 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { SHARED_LAYOUT_TRANSITION, CONTENT_TRANSITION } from '../../constants/animations';
+import { motion } from 'framer-motion';
+import { SHARED_LAYOUT_TRANSITION } from '../../constants/animations';
 import ReactMarkdown from 'react-markdown';
 import { Mermaid } from '../Common/Mermaid';
 import { DiffViewer } from '../DiffViewer/DiffViewer';
@@ -213,53 +213,44 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
       </div>
 
       <div className="relative flex-1 overflow-hidden">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -2 }}
-            transition={CONTENT_TRANSITION}
-            className="absolute inset-0"
-          >
-            {activeTab === 'diff' && (
-              <DiffViewer
-                files={filteredFiles}
-                selectedFile={selectedFile}
-                onSelectFile={onSelectFile}
-                highlightedHunks={highlightedHunks}
-                onAddFeedback={onAddFeedback}
-              />
-            )}
+        <div className="absolute inset-0">
+          {activeTab === 'diff' && (
+            <DiffViewer
+              files={filteredFiles}
+              selectedFile={selectedFile}
+              onSelectFile={onSelectFile}
+              highlightedHunks={highlightedHunks}
+              onAddFeedback={onAddFeedback}
+            />
+          )}
 
-            {activeTab === 'description' && (
-              <div className="custom-scrollbar h-full overflow-y-auto p-8">
-                <div className="animate-fade-in mx-auto max-w-3xl space-y-6">
-                  <TaskDescription description={task.description} />
+          {activeTab === 'description' && (
+            <div className="custom-scrollbar h-full overflow-y-auto p-8">
+              <div className="animate-fade-in mx-auto max-w-3xl space-y-6">
+                <TaskDescription description={task.description} />
 
-                  {task.insight && <TaskInsight insight={task.insight} />}
+                {task.insight && <TaskInsight insight={task.insight} />}
 
-                  <TaskFiles files={task.files} />
-                </div>
+                <TaskFiles files={task.files} />
               </div>
-            )}
+            </div>
+          )}
 
-            {activeTab === 'diagram' && (
-              <div className="flex h-full w-full flex-col bg-bg-secondary/20">
-                {task.diagram ? (
-                  <Mermaid chart={task.diagram} className="h-full w-full" />
-                ) : (
-                  <div className="flex h-full flex-col items-center justify-center gap-3 text-text-disabled">
-                    <div className="bg-bg-secondary flex h-16 w-16 items-center justify-center rounded-2xl">
-                      <ICONS.ICON_EMPTY size={32} weight="duotone" />
-                    </div>
-                    <p className="text-sm font-medium">No diagram available</p>
+          {activeTab === 'diagram' && (
+            <div className="flex h-full w-full flex-col bg-bg-secondary/20">
+              {task.diagram ? (
+                <Mermaid chart={task.diagram} className="h-full w-full" />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-3 text-text-disabled">
+                  <div className="bg-bg-secondary flex h-16 w-16 items-center justify-center rounded-2xl">
+                    <ICONS.ICON_EMPTY size={32} weight="duotone" />
                   </div>
-                )}
-              </div>
-            )}
-          </motion.div>
-        </AnimatePresence>
+                  <p className="text-sm font-medium">No diagram available</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
