@@ -71,7 +71,7 @@ pub enum ProgressEvent {
     /// A new task has been successfully persisted by the MCP server.
     TaskAdded(String),
     /// A new comment has been successfully persisted by the MCP server.
-    CommentAdded,
+    FeedbackAdded,
     /// Review metadata (title/summary) has been updated by the MCP server.
     MetadataUpdated,
 }

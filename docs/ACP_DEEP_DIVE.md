@@ -132,7 +132,7 @@ pub enum ProgressEvent {
     /// A new task has been persisted
     TaskAdded(String),
     /// A comment has been persisted
-    CommentAdded,
+    FeedbackAdded,
     /// Review metadata has been updated
     MetadataUpdated,
 }

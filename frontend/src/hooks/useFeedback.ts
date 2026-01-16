@@ -196,7 +196,7 @@ export function useAddComment() {
       queryClient.invalidateQueries({
         queryKey: ['feedback-comments', feedbackId],
       });
-      toast('Comment Added', {
+      toast('Feedback Added', {
         description: 'Your reply has been posted successfully.',
       });
     },

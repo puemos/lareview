@@ -943,7 +943,7 @@ impl agent_client_protocol::Client for LaReviewClient {
                             let _ = tx.send(ProgressEvent::TaskAdded(task_id.unwrap_or_default()));
                         }
                     } else if is_add_feedback && let Some(tx) = &self.progress {
-                        let _ = tx.send(ProgressEvent::CommentAdded);
+                        let _ = tx.send(ProgressEvent::FeedbackAdded);
                     }
                 } else if is_failed {
                     // Emit ToolCallComplete with failed status

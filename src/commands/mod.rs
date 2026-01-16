@@ -464,8 +464,8 @@ async fn generate_review_inner(
                     ProgressEventPayload::TaskStarted { task_id: id, title }
                 }
                 ProgressEvent::TaskAdded(id) => ProgressEventPayload::TaskCompleted { task_id: id },
-                ProgressEvent::CommentAdded => {
-                    ProgressEventPayload::Log("Comment added".to_string())
+                ProgressEvent::FeedbackAdded => {
+                    ProgressEventPayload::Log("Feedback added".to_string())
                 }
                 ProgressEvent::MetadataUpdated => {
                     ProgressEventPayload::Log("Metadata updated".to_string())
