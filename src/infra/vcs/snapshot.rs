@@ -53,6 +53,34 @@ impl SnapshotManager {
         let index_file = tempfile::NamedTempFile::new().context("create temp index file")?;
         let index_path = index_file.path().to_string_lossy().to_string();
 
+        // Try to fetch specific commit from origin first
+        // This is faster and works for unadvertised commits if allowed by server
+        let fetch_specific = Command::new("git")
+            .args(["-C", &self.repo_path.to_string_lossy()])
+            .args(["fetch", "origin", commit_sha])
+            .output()
+            .await;
+
+        match fetch_specific {
+            Ok(output) if output.status.success() => {
+                log::debug!("Successfully fetched specific commit {}", commit_sha);
+            }
+            _ => {
+                // Fallback to general fetch
+                let fetch_all = Command::new("git")
+                    .args(["-C", &self.repo_path.to_string_lossy()])
+                    .args(["fetch"])
+                    .output()
+                    .await
+                    .context("run git fetch")?;
+
+                if !fetch_all.status.success() {
+                    let stderr = String::from_utf8_lossy(&fetch_all.stderr);
+                    log::warn!("git fetch failed: {}", stderr);
+                }
+            }
+        }
+
         let read_tree = Command::new("git")
             .args(["-C", &self.repo_path.to_string_lossy()])
             .args(["read-tree", commit_sha])
@@ -82,7 +110,6 @@ impl SnapshotManager {
 
         Ok(snapshot_path)
     }
-
     /// Remove a snapshot and clean up.
     pub async fn remove(&self, snapshot_path: &Path) -> Result<()> {
         if snapshot_path.exists() {
@@ -93,3 +120,7 @@ impl SnapshotManager {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "snapshot_test.rs"]
+mod tests;
