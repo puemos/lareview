@@ -57,8 +57,13 @@ export const ReviewView: React.FC = () => {
   const { data: rules = [] } = useRules();
   const { comments, isLoading: isCommentsLoading } = useFeedbackComments(selectedFeedbackId);
   const addCommentMutation = useAddComment();
-  const { exportReviewMarkdown, pushRemoteReview, pushRemoteFeedback, copyToClipboard, getRepoRootForReview } =
-    useTauri();
+  const {
+    exportReviewMarkdown,
+    pushRemoteReview,
+    pushRemoteFeedback,
+    copyToClipboard,
+    getRepoRootForReview,
+  } = useTauri();
   const { data: allReviews = [] } = useReviews();
 
   // Fetch the local repository root for this review (matched via remote URL)
@@ -68,7 +73,6 @@ export const ReviewView: React.FC = () => {
     enabled: !!reviewId,
     staleTime: Infinity, // Repo root doesn't change during a session
   });
-
 
   const [activeTab, setActiveTab] = useState<'diff' | 'description' | 'diagram'>('description');
   const [sidebarTab, setSidebarTab] = useState<'tasks' | 'feedback'>('tasks');
@@ -310,7 +314,6 @@ export const ReviewView: React.FC = () => {
                   onAddFeedback={handleAddLineFeedback}
                   repoRoot={repoRoot}
                 />
-
               ) : parsedDiff ? (
                 <div className="flex flex-1 flex-col">
                   <div className="border-border bg-bg-primary h-10 border-b" />
@@ -322,7 +325,6 @@ export const ReviewView: React.FC = () => {
                       onAddFeedback={handleAddLineFeedback}
                       repoRoot={repoRoot}
                     />
-
                   </div>
                 </div>
               ) : (

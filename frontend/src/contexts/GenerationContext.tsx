@@ -21,10 +21,12 @@ interface WorktreeRequest {
 }
 
 export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { generateReview, parseDiff, stop_generation, getLinkedRepos } = useTauri();
+  const { generateReview, parseDiff, stop_generation, getLinkedRepos, setRepoSnapshotAccess } =
+    useTauri();
   const queryClient = useQueryClient();
 
   const [worktreeRequest, setWorktreeRequest] = useState<WorktreeRequest | null>(null);
+  const [worktreeRemember, setWorktreeRemember] = useState(false);
 
   const setDiffTextStore = useAppStore(state => state.setDiffText);
   const setAgentIdStore = useAppStore(state => state.setAgentId);
@@ -174,18 +176,24 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             const matchingRepo = linkedRepos.find(r => r.id === repoId);
 
             if (matchingRepo) {
-              // Show modal and wait for user response
-              const shouldCreate = await new Promise<boolean>(resolve => {
-                setWorktreeRequest({
-                  repoId,
-                  repoName: matchingRepo.name,
-                  commitSha: source.head_sha!,
-                  resolve,
-                });
-              });
-
-              if (shouldCreate) {
+              if (matchingRepo.allow_snapshot_access) {
                 useSnapshot = true;
+                addProgressMessage('log', 'Using existing snapshot preference: Allowed');
+              } else {
+                // Show modal and wait for user response
+                setWorktreeRemember(false); // Reset default
+                const shouldCreate = await new Promise<boolean>(resolve => {
+                  setWorktreeRequest({
+                    repoId,
+                    repoName: matchingRepo.name,
+                    commitSha: source.head_sha!,
+                    resolve,
+                  });
+                });
+
+                if (shouldCreate) {
+                  useSnapshot = true;
+                }
               }
             }
           } catch (err) {
@@ -275,12 +283,23 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     [startGeneration, stopGeneration]
   );
 
-  const handleWorktreeConfirm = useCallback(() => {
+  const handleWorktreeConfirm = useCallback(async () => {
     if (worktreeRequest) {
+      if (worktreeRemember) {
+        try {
+          await setRepoSnapshotAccess(worktreeRequest.repoId, true);
+          queryClient.invalidateQueries({ queryKey: ['repos'] });
+          toast.success('Snapshot preference saved');
+        } catch (err) {
+          console.error('Failed to save snapshot preference:', err);
+          toast.error('Failed to save preference');
+        }
+      }
+
       worktreeRequest.resolve(true);
       setWorktreeRequest(null);
     }
-  }, [worktreeRequest]);
+  }, [worktreeRequest, worktreeRemember, setRepoSnapshotAccess, queryClient]);
 
   const handleWorktreeCancel = useCallback(() => {
     if (worktreeRequest) {
@@ -304,7 +323,20 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         }
         confirmLabel="Create Snapshot"
         confirmVariant="brand"
-      />
+      >
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="worktreeRemember"
+            checked={worktreeRemember}
+            onChange={e => setWorktreeRemember(e.target.checked)}
+            className="border-border text-brand focus:ring-brand h-4 w-4 rounded"
+          />
+          <label htmlFor="worktreeRemember" className="text-text-secondary text-sm select-none">
+            Always allow snapshots for this repository
+          </label>
+        </div>
+      </ConfirmationModal>
     </GenerationContext.Provider>
   );
 };

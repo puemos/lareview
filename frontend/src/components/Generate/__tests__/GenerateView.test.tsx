@@ -40,7 +40,9 @@ vi.mock('../PlanOverview', () => ({
     <div data-testid="plan-overview">
       <span data-testid="plan-count">{items.length}</span>
       <span data-testid="plan-is-expanded">{isExpanded ? 'true' : 'false'}</span>
-      <button data-testid="plan-toggle" onClick={onToggle}>Toggle</button>
+      <button data-testid="plan-toggle" onClick={onToggle}>
+        Toggle
+      </button>
     </div>
   ),
 }));
@@ -50,7 +52,9 @@ vi.mock('../LiveActivityFeed', () => ({
 vi.mock('../VcsInputCard', () => ({
   VcsInputCard: ({ onClear }: any) => (
     <div data-testid="vcs-input-card">
-      <button data-testid="clear-button" onClick={onClear}>Clear</button>
+      <button data-testid="clear-button" onClick={onClear}>
+        Clear
+      </button>
     </div>
   ),
 }));
@@ -122,7 +126,7 @@ describe('GenerateView Plan Expansion', () => {
     store.plan = { entries: [{ content: 'Task 1', status: 'pending' }] };
     rerender(<GenerateView onNavigate={vi.fn()} />);
     expect(store.setIsPlanExpanded).toHaveBeenCalledWith(true);
-    
+
     // Reset call count for clarity
     store.setIsPlanExpanded.mockClear();
 
@@ -155,12 +159,12 @@ describe('GenerateView Plan Expansion', () => {
     // Trigger clear
     const clearButton = screen.getByTestId('clear-button');
     fireEvent.click(clearButton);
-    
+
     // Simulate what handleClear does to the store (the mock functions don't actually update our 'store' object)
     store.plan = null;
     store.planItems = [];
     rerender(<GenerateView onNavigate={vi.fn()} />);
-    
+
     store.setIsPlanExpanded.mockClear();
 
     // Simulate new generation starting with items

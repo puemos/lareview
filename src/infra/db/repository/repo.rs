@@ -19,12 +19,13 @@ impl RepoRepository {
             .lock()
             .expect("RepoRepository: failed to acquire database lock");
         conn.execute(
-            "INSERT OR REPLACE INTO repos (id, name, path, created_at) VALUES (?1, ?2, ?3, ?4)",
+            "INSERT OR REPLACE INTO repos (id, name, path, created_at, allow_snapshot_access) VALUES (?1, ?2, ?3, ?4, ?5)",
             (
                 &repo.id,
                 &repo.name,
                 repo.path.to_string_lossy().as_ref(),
                 &repo.created_at,
+                &repo.allow_snapshot_access,
             ),
         )?;
 
@@ -47,19 +48,21 @@ impl RepoRepository {
             .conn
             .lock()
             .expect("RepoRepository: failed to acquire database lock");
-        let mut stmt = conn.prepare("SELECT id, name, path, created_at FROM repos")?;
+        let mut stmt =
+            conn.prepare("SELECT id, name, path, created_at, allow_snapshot_access FROM repos")?;
         let rows = stmt.query_map([], |row| {
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
                 row.get::<_, String>(2)?,
                 row.get::<_, String>(3)?,
+                row.get::<_, Option<bool>>(4)?.unwrap_or(false),
             ))
         })?;
 
         let mut repos = Vec::new();
         for row in rows {
-            let (id, name, path_str, created_at) = row?;
+            let (id, name, path_str, created_at, allow_snapshot_access) = row?;
 
             // Fetch remotes for this repo
             let mut remote_stmt =
@@ -76,6 +79,7 @@ impl RepoRepository {
                 path: std::path::PathBuf::from(path_str),
                 remotes,
                 created_at,
+                allow_snapshot_access,
             });
         }
         Ok(repos)
@@ -87,6 +91,18 @@ impl RepoRepository {
             .lock()
             .expect("RepoRepository: failed to acquire database lock");
         conn.execute("DELETE FROM repos WHERE id = ?1", [id])?;
+        Ok(())
+    }
+
+    pub fn update_snapshot_access(&self, repo_id: &str, allowed: bool) -> Result<()> {
+        let conn = self
+            .conn
+            .lock()
+            .expect("RepoRepository: failed to acquire database lock");
+        conn.execute(
+            "UPDATE repos SET allow_snapshot_access = ?1 WHERE id = ?2",
+            rusqlite::params![allowed, repo_id],
+        )?;
         Ok(())
     }
 
@@ -102,19 +118,21 @@ impl RepoRepository {
         if let Some(row) = rows.next()? {
             let repo_id: String = row.get(0)?;
             // Reuse find_all-like logic but for a single ID
-            let mut repo_stmt =
-                conn.prepare("SELECT id, name, path, created_at FROM repos WHERE id = ?1")?;
+            let mut repo_stmt = conn.prepare(
+                "SELECT id, name, path, created_at, allow_snapshot_access FROM repos WHERE id = ?1",
+            )?;
             let mut repo_rows = repo_stmt.query_map([&repo_id], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
                     row.get::<_, String>(2)?,
                     row.get::<_, String>(3)?,
+                    row.get::<_, Option<bool>>(4)?.unwrap_or(false),
                 ))
             })?;
 
             if let Some(repo_row) = repo_rows.next() {
-                let (id, name, path_str, created_at) = repo_row?;
+                let (id, name, path_str, created_at, allow_snapshot_access) = repo_row?;
                 let mut remote_stmt =
                     conn.prepare("SELECT url FROM repo_remotes WHERE repo_id = ?1")?;
                 let remote_rows = remote_stmt.query_map([&id], |r| r.get::<_, String>(0))?;
@@ -129,6 +147,7 @@ impl RepoRepository {
                     path: std::path::PathBuf::from(path_str),
                     remotes,
                     created_at,
+                    allow_snapshot_access,
                 }));
             }
         }

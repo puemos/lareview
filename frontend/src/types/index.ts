@@ -126,6 +126,7 @@ export interface LinkedRepo {
   linked_at?: string;
   remotes: string[];
   review_count?: number;
+  allow_snapshot_access: boolean;
 }
 
 export interface WorktreeSession {

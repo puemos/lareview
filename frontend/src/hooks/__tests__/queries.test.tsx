@@ -253,6 +253,7 @@ describe('useRepos', () => {
         path: '/path/to/repo',
         linked_at: new Date().toISOString(),
         remotes: ['https://github.com/test/repo'],
+        allow_snapshot_access: false,
       },
     ]);
 
@@ -273,6 +274,7 @@ describe('useRepos', () => {
       path: '/new',
       linked_at: new Date().toISOString(),
       remotes: ['https://github.com/test/new'],
+      allow_snapshot_access: false,
     });
 
     const { result } = renderHook(() => useRepos(), {

@@ -4,7 +4,6 @@ import { ICONS } from '../../constants/icons';
 import { cleanMermaidChart } from '../../utils/mermaidUtils';
 import { Modal } from './Modal';
 
-
 mermaid.initialize({
   startOnLoad: false,
   theme: 'dark',
@@ -17,8 +16,6 @@ interface MermaidProps {
   className?: string;
 }
 
-
-
 export const Mermaid: React.FC<MermaidProps> = ({ chart, className }) => {
   const [svg, setSvg] = useState<string>('');
   const [scale, setScale] = useState(1);
@@ -28,7 +25,7 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showRaw, setShowRaw] = useState(false);
-  
+
   const containerRef = useRef<HTMLDivElement>(null);
   const idRef = useRef<string>(`mermaid-${Math.random().toString(36).substring(2, 11)}`);
 
@@ -99,18 +96,18 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className }) => {
 
   const handleWheel = (e: React.WheelEvent) => {
     // Only zoom when ctrl key is pressed (common pattern) or always?
-    // User requested "mouse wheel/trackpad zoom". 
+    // User requested "mouse wheel/trackpad zoom".
     // Usually trackpad pinch triggers wheel event with ctrlKey=true on some browsers, or just wheel.
     // To avoid interfering with page scroll (though fullscreen is fixed), let's just zoom.
     // In fullscreen we definitely want zoom. Inline maybe dangerous if it captures scroll.
-    
+
     // For now, let's enable it always but prevent default only if we are zooming.
     // Actually, simply zooming on wheel is fine for this component if it's the specific intention.
-    
+
     e.preventDefault();
     e.stopPropagation();
-    
-    const delta = -e.deltaY; 
+
+    const delta = -e.deltaY;
     const factor = 0.1;
     const newScale = Math.min(Math.max(scale + (delta > 0 ? factor : -factor), 0.2), 5);
     setScale(newScale);
@@ -118,24 +115,26 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className }) => {
 
   if (error) {
     return (
-      <div className={`flex flex-col items-center justify-center gap-4 rounded-lg border border-red-500/20 bg-red-500/5 p-8 text-center ${className}`}>
+      <div
+        className={`flex flex-col items-center justify-center gap-4 rounded-lg border border-red-500/20 bg-red-500/5 p-8 text-center ${className}`}
+      >
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10 text-red-500">
           <ICONS.ICON_WARNING size={24} />
         </div>
         <div className="space-y-1">
           <h3 className="text-sm font-medium text-red-400">Failed to render diagram</h3>
-          <p className="text-xs text-text-disabled">The diagram content contains syntax errors</p>
+          <p className="text-text-disabled text-xs">The diagram content contains syntax errors</p>
         </div>
-        
+
         <button
           onClick={() => setShowRaw(!showRaw)}
-          className="text-xs font-medium text-text-secondary hover:text-text-primary underline"
+          className="text-text-secondary hover:text-text-primary text-xs font-medium underline"
         >
           {showRaw ? 'Hide Code' : 'Show Code'}
         </button>
 
         {showRaw && (
-          <pre className="mt-2 text-left text-[10px] w-full max-w-lg overflow-auto rounded bg-bg-surface p-4 font-mono text-text-secondary border border-border">
+          <pre className="bg-bg-surface text-text-secondary border-border mt-2 w-full max-w-lg overflow-auto rounded border p-4 text-left font-mono text-[10px]">
             {chart}
           </pre>
         )}
@@ -148,36 +147,36 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className }) => {
   }
 
   const controls = (
-    <div className="absolute bottom-4 right-4 flex items-center gap-1 rounded-lg border border-border bg-bg-surface/90 p-1 shadow-lg backdrop-blur-sm z-50">
+    <div className="border-border bg-bg-surface/90 absolute right-4 bottom-4 z-50 flex items-center gap-1 rounded-lg border p-1 shadow-lg backdrop-blur-sm">
       <button
         onClick={handleZoomOut}
-        className="rounded p-1.5 text-text-secondary hover:bg-bg-secondary hover:text-text-primary transition-colors"
+        className="text-text-secondary hover:bg-bg-secondary hover:text-text-primary rounded p-1.5 transition-colors"
         title="Zoom Out"
       >
         <ICONS.ACTION_ZOOM_OUT size={16} />
       </button>
-      <span className="min-w-[3rem] text-center text-xs font-medium text-text-secondary">
+      <span className="text-text-secondary min-w-[3rem] text-center text-xs font-medium">
         {Math.round(scale * 100)}%
       </span>
       <button
         onClick={handleZoomIn}
-        className="rounded p-1.5 text-text-secondary hover:bg-bg-secondary hover:text-text-primary transition-colors"
+        className="text-text-secondary hover:bg-bg-secondary hover:text-text-primary rounded p-1.5 transition-colors"
         title="Zoom In"
       >
         <ICONS.ACTION_ZOOM_IN size={16} />
       </button>
-      <div className="mx-1 h-4 w-px bg-border/50" />
+      <div className="bg-border/50 mx-1 h-4 w-px" />
       <button
         onClick={handleReset}
-        className="rounded p-1.5 text-text-secondary hover:bg-bg-secondary hover:text-text-primary transition-colors"
+        className="text-text-secondary hover:bg-bg-secondary hover:text-text-primary rounded p-1.5 transition-colors"
         title="Reset View"
       >
         <ICONS.ACTION_REFRESH size={16} />
       </button>
       <button
         onClick={toggleFullscreen}
-        className="rounded p-1.5 text-text-secondary hover:bg-bg-secondary hover:text-text-primary transition-colors"
-        title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+        className="text-text-secondary hover:bg-bg-secondary hover:text-text-primary rounded p-1.5 transition-colors"
+        title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
       >
         {isFullscreen ? <ICONS.ACTION_COLLAPSE size={16} /> : <ICONS.ACTION_EXPAND size={16} />}
       </button>
@@ -187,7 +186,7 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className }) => {
   const closeButton = isFullscreen ? (
     <button
       onClick={toggleFullscreen}
-      className="absolute top-4 left-4 z-50 rounded-lg bg-bg-surface p-2 text-text-tertiary shadow-lg transition-colors hover:bg-bg-secondary hover:text-text-primary border border-border/50"
+      className="bg-bg-surface text-text-tertiary hover:bg-bg-secondary hover:text-text-primary border-border/50 absolute top-4 left-4 z-50 rounded-lg border p-2 shadow-lg transition-colors"
       title="Close Fullscreen"
     >
       <ICONS.ACTION_CLOSE size={20} />
@@ -196,7 +195,7 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className }) => {
 
   const renderContent = (fullscreen: boolean) => (
     <div
-      className={`relative overflow-hidden bg-bg-secondary/20 select-none ${
+      className={`bg-bg-secondary/20 relative overflow-hidden select-none ${
         fullscreen ? 'h-full w-full' : `rounded-lg ${className}`
       }`}
       ref={containerRef}
@@ -229,13 +228,17 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className }) => {
     return (
       <>
         {/* Placeholder to keep layout stability when docked if needed, or just render modal */}
-         <div className={`mermaid-container flex justify-center items-center rounded-lg p-4 bg-bg-secondary/20 text-text-disabled text-xs border border-dashed border-border ${className}`}>
-            Diagram is open in full screen
-             <button onClick={toggleFullscreen} className="ml-2 text-brand hover:underline">Reopen here</button>
+        <div
+          className={`mermaid-container bg-bg-secondary/20 text-text-disabled border-border flex items-center justify-center rounded-lg border border-dashed p-4 text-xs ${className}`}
+        >
+          Diagram is open in full screen
+          <button onClick={toggleFullscreen} className="text-brand ml-2 hover:underline">
+            Reopen here
+          </button>
         </div>
 
         <Modal isOpen={isFullscreen} onClose={toggleFullscreen} hideCloseButton>
-            {renderContent(true)}
+          {renderContent(true)}
         </Modal>
       </>
     );

@@ -50,10 +50,7 @@ export const PlanSteps: React.FC<PlanStepsProps> = ({ steps, className }) => {
         }
 
         return (
-          <div
-            key={step.content}
-            className="animate-fade-in group flex items-start gap-3 text-xs"
-          >
+          <div key={step.content} className="animate-fade-in group flex items-start gap-3 text-xs">
             {Icon}
             <span
               className={clsx(

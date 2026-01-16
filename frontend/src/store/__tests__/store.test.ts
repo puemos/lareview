@@ -75,5 +75,4 @@ describe('AppStore - Plan Merging', () => {
     expect(plan?.entries[0].content).toBe('refactor code.');
     expect(plan?.entries[0].status).toBe('in_progress');
   });
-
 });

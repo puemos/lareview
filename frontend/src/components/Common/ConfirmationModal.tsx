@@ -10,6 +10,7 @@ interface ConfirmationModalProps {
   confirmLabel?: string;
   confirmVariant?: 'danger' | 'brand' | 'accent';
   isProcessing?: boolean;
+  children?: React.ReactNode;
 }
 
 export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
@@ -21,6 +22,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   confirmLabel = 'Confirm',
   confirmVariant = 'danger',
   isProcessing = false,
+  children,
 }) => {
   if (!isOpen) return null;
 
@@ -65,6 +67,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
         <div className="p-6">
           <p className="text-text-secondary mb-6 text-sm leading-relaxed">{message}</p>
+          {children && <div className="mb-6">{children}</div>}
 
           <div className="flex justify-end gap-3">
             <button

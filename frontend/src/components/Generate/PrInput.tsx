@@ -60,16 +60,16 @@ export const PrInput: React.FC<PrInputProps> = ({
           </motion.span>
         </AnimatePresence>
       </div>
-      <div className="grid min-w-0 max-w-[400px] flex-shrink">
+      <div className="grid max-w-[400px] min-w-0 flex-shrink">
         <input
           type="text"
           value={prRef}
           onChange={e => onPrRefChange(e.target.value)}
           placeholder="Paste a remote link or shorthand..."
-          className="col-start-1 row-start-1 text-text-primary placeholder-text-disabled bg-transparent px-3 py-1.5 font-mono text-xs focus:outline-none"
+          className="text-text-primary placeholder-text-disabled col-start-1 row-start-1 bg-transparent px-3 py-1.5 font-mono text-xs focus:outline-none"
           disabled={isLoading}
         />
-        <span className="col-start-1 row-start-1 pointer-events-none invisible truncate whitespace-pre px-3 py-1.5 font-mono text-xs">
+        <span className="pointer-events-none invisible col-start-1 row-start-1 truncate px-3 py-1.5 font-mono text-xs whitespace-pre">
           {prRef || 'Paste a remote link or shorthand...'}
         </span>
       </div>

@@ -43,7 +43,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-bg-primary/95 backdrop-blur-sm animate-in fade-in duration-200"
+      className="bg-bg-primary/95 animate-in fade-in fixed inset-0 z-[100] flex items-center justify-center backdrop-blur-sm duration-200"
       ref={overlayRef}
       onClick={e => {
         if (e.target === overlayRef.current) onClose();
@@ -52,11 +52,11 @@ export const Modal: React.FC<ModalProps> = ({
       <div className={`relative flex h-full w-full flex-col ${className}`}>
         {(title || !hideCloseButton) && (
           <div className="absolute top-4 right-4 z-50 flex items-center gap-4">
-            {title && <h2 className="text-lg font-semibold text-text-primary">{title}</h2>}
+            {title && <h2 className="text-text-primary text-lg font-semibold">{title}</h2>}
             {!hideCloseButton && (
               <button
                 onClick={onClose}
-                className="rounded-lg bg-bg-surface p-2 text-text-tertiary shadow-lg transition-colors hover:bg-bg-secondary hover:text-text-primary border border-border/50"
+                className="bg-bg-surface text-text-tertiary hover:bg-bg-secondary hover:text-text-primary border-border/50 rounded-lg border p-2 shadow-lg transition-colors"
               >
                 <ICONS.ACTION_CLOSE size={20} />
               </button>

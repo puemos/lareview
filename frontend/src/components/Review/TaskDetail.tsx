@@ -29,7 +29,6 @@ interface TaskDetailProps {
   repoRoot?: string | null;
 }
 
-
 type IconComponent = React.ComponentType<{ size: number; className?: string }>;
 
 export const TaskDetail: React.FC<TaskDetailProps> = ({
@@ -44,7 +43,6 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
   onAddFeedback,
   repoRoot,
 }) => {
-
   if (!task) {
     return (
       <div className="text-text-disabled flex flex-1 items-center justify-center">
@@ -227,7 +225,6 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
               onAddFeedback={onAddFeedback}
               repoRoot={repoRoot}
             />
-
           )}
 
           {activeTab === 'description' && (
@@ -243,11 +240,11 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
           )}
 
           {activeTab === 'diagram' && (
-            <div className="flex h-full w-full flex-col bg-bg-secondary/20">
+            <div className="bg-bg-secondary/20 flex h-full w-full flex-col">
               {task.diagram ? (
                 <Mermaid chart={task.diagram} className="h-full w-full" />
               ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-3 text-text-disabled">
+                <div className="text-text-disabled flex h-full flex-col items-center justify-center gap-3">
                   <div className="bg-bg-secondary flex h-16 w-16 items-center justify-center rounded-2xl">
                     <ICONS.ICON_EMPTY size={32} weight="duotone" />
                   </div>

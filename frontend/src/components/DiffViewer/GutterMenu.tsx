@@ -19,27 +19,28 @@ export const GutterMenu: React.FC<GutterMenuProps> = ({
 
   // Create a virtual element for positioning based on coordinates
   const virtualElement = {
-    getBoundingClientRect: () => ({
-      width: 0,
-      height: 0,
-      top: position.y,
-      left: position.x,
-      right: position.x,
-      bottom: position.y,
-      x: position.x,
-      y: position.y,
-    } as DOMRect),
+    getBoundingClientRect: () =>
+      ({
+        width: 0,
+        height: 0,
+        top: position.y,
+        left: position.x,
+        right: position.x,
+        bottom: position.y,
+        x: position.x,
+        y: position.y,
+      }) as DOMRect,
   };
 
   // We need a ref object for Radix
   const virtualRef = { current: virtualElement };
 
   return (
-    <Popover.Root open={!!position} onOpenChange={(open) => !open && onClose()}>
+    <Popover.Root open={!!position} onOpenChange={open => !open && onClose()}>
       <Popover.Anchor virtualRef={virtualRef} />
       <Popover.Portal>
         <Popover.Content
-          className="bg-bg-elevated border-border shadow-custom z-50 min-w-[160px] rounded-lg border p-1 animate-in fade-in zoom-in-95 duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
+          className="bg-bg-elevated border-border shadow-custom animate-in fade-in zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2 z-50 min-w-[160px] rounded-lg border p-1 duration-100"
           side="bottom"
           align="start"
           sideOffset={5}
@@ -50,8 +51,7 @@ export const GutterMenu: React.FC<GutterMenuProps> = ({
                 onAddFeedback();
                 onClose();
               }}
-              className="text-text-primary hover:bg-bg-tertiary flex items-center gap-2 rounded px-2 py-1.5 text-xs transition-colors text-left"
-
+              className="text-text-primary hover:bg-bg-tertiary flex items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors"
             >
               <Chat size={16} className="text-text-secondary" />
               Add Feedback
@@ -61,8 +61,7 @@ export const GutterMenu: React.FC<GutterMenuProps> = ({
                 onOpenInEditor();
                 onClose();
               }}
-              className="text-text-primary hover:bg-bg-tertiary flex items-center gap-2 rounded px-2 py-1.5 text-xs transition-colors text-left"
-
+              className="text-text-primary hover:bg-bg-tertiary flex items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors"
             >
               <ArrowSquareOut size={16} className="text-text-secondary" />
               Open in Editor

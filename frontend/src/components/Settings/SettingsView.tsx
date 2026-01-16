@@ -222,7 +222,7 @@ const VcsSettings: React.FC = () => {
                 key={item.id}
                 className="bg-bg-secondary/40 border-border space-y-6 rounded-lg border p-6"
               >
-                <div className="flex items-center gap-4 border-b border-border pb-4 mb-4">
+                <div className="border-border mb-4 flex items-center gap-4 border-b pb-4">
                   <div className="bg-bg-tertiary border-border text-text-primary flex h-10 w-10 items-center justify-center rounded-lg border">
                     {item.id === 'github' ? (
                       <GithubLogo size={20} weight="fill" />

@@ -41,7 +41,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const { fetchRemotePr } = useTauri();
-  const { startGeneration } = useGeneration();
+  const { startGeneration, stopGeneration } = useGeneration();
   const { data: agents = [] } = useAgents();
   const { data: repos = [], addRepo, cloneRepo, selectRepoFolder } = useRepos();
 
@@ -291,20 +291,15 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     setIsPlanExpanded(false);
     hasAutoExpandedRef.current = false;
     setRepoLinkCallout(null);
-  }, [
-    setDiffTextStore,
-    setParsedDiff,
-    setPendingSource,
-    setPrRef,
-    setViewMode,
-    setIsPlanExpanded,
-  ]);
+  }, [setDiffTextStore, setParsedDiff, setPendingSource, setPrRef, setViewMode, setIsPlanExpanded]);
 
   const planItemsToRender = useMemo(() => {
-    return plan?.entries.map(e => ({
-      content: e.content,
-      status: e.status || 'pending',
-    })) || [];
+    return (
+      plan?.entries.map(e => ({
+        content: e.content,
+        status: e.status || 'pending',
+      })) || []
+    );
   }, [plan]);
 
   useEffect(() => {
@@ -313,7 +308,6 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
       hasAutoExpandedRef.current = true;
     }
   }, [planItemsToRender.length, setIsPlanExpanded]);
-
 
   return (
     <div className="bg-bg-primary flex h-full flex-col">
@@ -412,7 +406,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
             onRepoSelect={setSelectedRepoId}
             isGenerating={isGenerating}
             onGenerate={handleGenerate}
-            onStop={() => {}}
+            onStop={stopGeneration}
             isDiffValid={isDiffValid}
           />
 

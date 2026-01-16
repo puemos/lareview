@@ -6,7 +6,6 @@ import { useTauri } from '../../hooks/useTauri';
 import { getLanguageFromPath } from '../../utils/languages';
 import { GutterMenu } from './GutterMenu';
 
-
 interface DiffViewerProps {
   files: DiffFile[];
   selectedFile: DiffFile | null;
@@ -22,7 +21,6 @@ interface DiffViewerProps {
   onAddFeedback?: (file: DiffFile, line: number, side: 'old' | 'new') => void;
   repoRoot?: string | null;
 }
-
 
 export const DiffViewer: React.FC<DiffViewerProps> = ({
   files,
@@ -47,7 +45,6 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
             onAddFeedback={onAddFeedback}
             repoRoot={repoRoot}
           />
-
         ) : (
           <div className="text-text-disabled flex flex-1 items-center justify-center">
             <div className="text-center">
@@ -149,14 +146,17 @@ interface DiffContentProps {
   repoRoot?: string | null;
 }
 
-const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAddFeedback, repoRoot }) => {
-
+const DiffContent: React.FC<DiffContentProps> = ({
+  file,
+  highlightedHunks,
+  onAddFeedback,
+  repoRoot,
+}) => {
   const { openInEditor } = useTauri();
   const path = file.name || file.new_path || 'unknown';
   const language = getLanguageFromPath(path);
   // Ref to store diff editor instance
   const diffEditorRef = React.useRef<import('monaco-editor').editor.IDiffEditor | null>(null);
-
 
   // Auto-detect new files (all additions, no deletions) or purely deleted files
   // If it's a new file, we might want to default to 'unified' or just ensure side-by-side looks good.
@@ -171,8 +171,6 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
     }
   };
 
-
-
   const [menuState, setMenuState] = useState<{
     x: number;
     y: number;
@@ -180,16 +178,14 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
     line: number;
     side: 'old' | 'new';
   } | null>(null);
-  
+
   // Ref to track menu state inside stable callbacks
   const menuStateRef = React.useRef(menuState);
   React.useEffect(() => {
     menuStateRef.current = menuState;
   }, [menuState]);
 
-
   const closeMenu = () => setMenuState(null);
-
 
   const handleMenuAddFeedback = () => {
     if (menuState && onAddFeedback) {
@@ -206,8 +202,6 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
       }
     }
   };
-
-
 
   // Build original and modified content strings along with line number mappings
   // originalLineMap[i] = actual file line number for Monaco line i+1
@@ -261,7 +255,6 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
     };
   }, [file.hunks]);
 
-
   // Ensure line numbers are updated when maps or editor changes
   React.useEffect(() => {
     if (diffEditorRef.current) {
@@ -284,10 +277,6 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
     }
   }, [originalLineMap, modifiedLineMap]);
 
-
-
-
-
   const handleEditorDidMount = (editor: unknown, monaco: typeof import('monaco-editor')) => {
     const diffEditor = editor as import('monaco-editor').editor.IDiffEditor;
     diffEditorRef.current = diffEditor;
@@ -296,7 +285,6 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
 
     // Initial configuration of line numbers
     originalEditor.updateOptions({
-
       lineNumbers: (lineNumber: number) => {
         const actualLine = originalLineMap[lineNumber - 1];
         return actualLine !== undefined ? String(actualLine) : String(lineNumber);
@@ -310,17 +298,14 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
       },
     });
 
-
     [originalEditor, modifiedEditor].forEach(ed => {
       // Decoration tracking per editor to prevent stuck icons
       let hoverDecorations: string[] = [];
-
 
       // Show + icon on hover anywhere in the line or gutter
       ed.onMouseMove(e => {
         // Lock the button if menu is open
         if (menuStateRef.current) return;
-
 
         const line = e.target.position?.lineNumber;
         if (line) {
@@ -365,8 +350,6 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
         }
       });
 
-
-
       // Close menu on scroll to prevent detachment
       ed.onDidScrollChange(() => {
         if (menuStateRef.current) {
@@ -374,7 +357,6 @@ const DiffContent: React.FC<DiffContentProps> = ({ file, highlightedHunks, onAdd
         }
       });
     });
-
   };
 
   // Check if file is "new" (added)

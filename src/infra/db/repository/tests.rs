@@ -78,6 +78,7 @@ fn test_repo_repository() -> anyhow::Result<()> {
         path: PathBuf::from("/tmp/test"),
         remotes: vec!["https://github.com/test/repo".into()],
         created_at: "now".into(),
+        allow_snapshot_access: false,
     };
 
     repo.save(&linked)?;

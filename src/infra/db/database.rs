@@ -100,7 +100,8 @@ impl Database {
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 path TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                allow_snapshot_access INTEGER DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS repo_remotes (
@@ -242,6 +243,20 @@ impl Database {
             "CREATE INDEX IF NOT EXISTS idx_review_runs_status ON review_runs(status)",
             [],
         )?;
+
+        // Migration: Add allow_snapshot_access to repos if it doesn't exist
+        let has_snapshot_access = conn
+            .prepare(
+                "SELECT 1 FROM pragma_table_info('repos') WHERE name = 'allow_snapshot_access'",
+            )?
+            .exists([])?;
+
+        if !has_snapshot_access {
+            conn.execute(
+                "ALTER TABLE repos ADD COLUMN allow_snapshot_access INTEGER DEFAULT 0",
+                [],
+            )?;
+        }
 
         Ok(())
     }
@@ -580,20 +595,21 @@ impl Database {
     pub fn get_linked_repos(&self) -> Result<Vec<LinkedRepoState>, rusqlite::Error> {
         let conn = self.conn.lock().expect("Failed to acquire database lock");
         let mut stmt =
-            conn.prepare("SELECT id, name, path, created_at FROM repos ORDER BY created_at DESC")?;
+            conn.prepare("SELECT id, name, path, created_at, allow_snapshot_access FROM repos ORDER BY created_at DESC")?;
 
         let rows = stmt.query_map([], |row| {
             let id: String = row.get(0)?;
             let name: String = row.get(1)?;
             let path: String = row.get(2)?;
             let linked_at: String = row.get(3)?;
+            let allow_snapshot_access: bool = row.get::<_, Option<bool>>(4)?.unwrap_or(false);
 
-            Ok((id, name, path, linked_at))
+            Ok((id, name, path, linked_at, allow_snapshot_access))
         })?;
 
         let mut repos = Vec::new();
         for row in rows {
-            let (id, name, path, linked_at) = row?;
+            let (id, name, path, linked_at, allow_snapshot_access) = row?;
 
             // Fetch remotes
             let mut remote_stmt =
@@ -611,6 +627,7 @@ impl Database {
                 review_count: 0,
                 linked_at,
                 remotes,
+                allow_snapshot_access,
             });
         }
         Ok(repos)

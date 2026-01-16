@@ -8,4 +8,6 @@ pub struct LinkedRepo {
     pub path: PathBuf,
     pub remotes: Vec<String>,
     pub created_at: String,
+    #[serde(default)]
+    pub allow_snapshot_access: bool,
 }

@@ -21,8 +21,6 @@ import {
   isAvailableCommandsUpdate,
 } from '../hooks/useTauri';
 
-
-
 interface ProgressMessage {
   type: string;
   message: string;

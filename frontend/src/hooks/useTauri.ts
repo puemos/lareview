@@ -248,6 +248,7 @@ export const useTauri = () => {
       review_count: number;
       linked_at: string;
       remotes: string[];
+      allow_snapshot_access: boolean;
     }>
   > => {
     return invoke('get_linked_repos');
@@ -458,12 +459,9 @@ export const useTauri = () => {
     return invoke('get_vcs_status');
   }, []);
 
-  const getSingleVcsStatus = useCallback(
-    async (providerId: string): Promise<VcsStatus> => {
-      return invoke('get_single_vcs_status', { providerId });
-    },
-    []
-  );
+  const getSingleVcsStatus = useCallback(async (providerId: string): Promise<VcsStatus> => {
+    return invoke('get_single_vcs_status', { providerId });
+  }, []);
 
   const getReviewRules = useCallback(async (): Promise<ReviewRule[]> => {
     return invoke('get_review_rules');
@@ -644,6 +642,9 @@ export const useTauri = () => {
     }, []),
     stop_generation: useCallback(async (runId: string): Promise<void> => {
       return invoke('stop_generation', { runId });
+    }, []),
+    setRepoSnapshotAccess: useCallback(async (repoId: string, allowed: boolean): Promise<void> => {
+      return invoke('set_repo_snapshot_access', { repoId, allowed });
     }, []),
   };
 };

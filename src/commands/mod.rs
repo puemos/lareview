@@ -738,6 +738,19 @@ pub fn get_linked_repos(state: State<'_, AppState>) -> Result<Vec<LinkedRepoStat
 }
 
 #[tauri::command]
+pub fn set_repo_snapshot_access(
+    state: State<'_, AppState>,
+    repo_id: String,
+    allowed: bool,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.repo_repo()
+        .update_snapshot_access(&repo_id, allowed)
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn update_task_status(
     state: State<'_, AppState>,
     task_id: String,
@@ -1299,6 +1312,7 @@ fn link_repo_impl(state: &AppState, path: String) -> Result<LinkedRepo, String> 
         path: std::path::PathBuf::from(path.clone()),
         remotes: detect_remotes(&path),
         created_at: linked_at.clone(),
+        allow_snapshot_access: false,
     };
 
     let db = state.db.lock().map_err(|e| e.to_string())?;
@@ -1472,6 +1486,7 @@ pub struct LinkedRepoState {
     pub review_count: usize,
     pub linked_at: String,
     pub remotes: Vec<String>,
+    pub allow_snapshot_access: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
