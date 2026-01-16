@@ -34,6 +34,7 @@ const isVcsSource = (
 export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavigate }) => {
   const [diffText, setDiffText] = useState('');
   const lastAutoSwitchedTextRef = React.useRef('');
+  const hasAutoExpandedRef = React.useRef(false);
 
   const [isLoadingPr, setIsLoadingPr] = useState(false);
 
@@ -291,6 +292,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     setViewMode('raw');
     setPlanItems([]);
     setIsPlanExpanded(false);
+    hasAutoExpandedRef.current = false;
     setRepoLinkCallout(null);
   }, [
     setDiffTextStore,
@@ -320,8 +322,9 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   }, [plan, planItems]);
 
   useEffect(() => {
-    if (planItemsToRender.length > 0) {
+    if (planItemsToRender.length > 0 && !hasAutoExpandedRef.current) {
       setIsPlanExpanded(true);
+      hasAutoExpandedRef.current = true;
     }
   }, [planItemsToRender.length, setIsPlanExpanded]);
 
