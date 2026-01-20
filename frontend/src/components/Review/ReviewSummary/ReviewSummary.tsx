@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ICONS } from '../../../constants/icons';
 import { TaskFlow } from './TaskFlow';
 import { IssueChecklist } from './IssueChecklist';
 import { KeyFeedback } from './KeyFeedback';
 import { FilesHeatmap } from './FilesHeatmap';
+import { UncoveredFiles } from './UncoveredFiles';
 import { useIssueChecks } from '../../../hooks/useIssueChecks';
 import type { ReviewTask, Feedback, ParsedDiff, Review, ReviewSource } from '../../../types';
 
@@ -60,6 +61,12 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
   onStartReview,
 }) => {
   const { data: issueChecks = [], isLoading: isChecksLoading } = useIssueChecks(runId);
+
+  const uncoveredFiles = useMemo(() => {
+    const allDiffFiles = parsedDiff?.files?.map(f => f.new_path) ?? [];
+    const coveredFiles = new Set(tasks.flatMap(t => t.files));
+    return allDiffFiles.filter(f => !coveredFiles.has(f));
+  }, [parsedDiff, tasks]);
 
   const blockingCount =
     feedbacks.filter(f => f.impact === 'blocking').length +
@@ -134,6 +141,11 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
           />
           <KeyFeedback feedbacks={feedbacks} onSelectFeedback={onSelectFeedback} />
         </div>
+
+        {/* Uncovered Files */}
+        {uncoveredFiles.length > 0 && (
+          <UncoveredFiles uncoveredFiles={uncoveredFiles} onSelectFile={onSelectFile} />
+        )}
       </div>
     </div>
   );
