@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.25] - 2026-01-20
+
+### Added
+
+- **Prompt**: Strategic review analysis section (change type, blast radius, author intent).
+- **Prompt**: Explicit "don't comment on" guidance to reduce low-value feedback noise.
+
+### Changed
+
+- **Prompt**: Restructured review process into understand→organize→review→submit phases.
+- **Prompt**: Simplified and consolidated redundant sections for clarity.
+- **Prompt**: Updated examples to use `line_id` instead of deprecated `line_content`.
+- **Tasks**: Removed mandatory task coverage enforcement (all files no longer required to be covered).
+
+### Fixed
+
+- **Prompt**: Typo `ai_insignt_format` → `ai_insight_format`.
+- **Prompt**: Inconsistent terminology ("diagram JSON" → "mermaid diagram").
+
 ## [0.0.24] - 2026-01-16
 
 ### Added
