@@ -94,9 +94,13 @@ export interface Feedback {
   task_id: string | null;
   rule_id?: string | null;
   finding_id?: string | null;
+  /** Category ID from issue check (e.g., "test-coverage", "security") */
+  category?: string | null;
   title: string;
   status: 'todo' | 'in_progress' | 'done' | 'ignored';
   impact: 'blocking' | 'nice_to_have' | 'nitpick';
+  /** Confidence score (0.0-1.0) indicating how certain the AI is this is a real issue */
+  confidence: number;
   anchor: FeedbackAnchor | null;
   author: string;
   created_at: string;
@@ -297,7 +301,7 @@ export type ReviewSource =
       start_sha?: string;
     };
 
-export type ViewType = 'generate' | 'review' | 'repos' | 'rules' | 'settings';
+export type ViewType = 'generate' | 'review' | 'repos' | 'rules' | 'settings' | 'learning';
 
 export interface Plan {
   entries: PlanEntry[];
@@ -309,4 +313,39 @@ export interface PlanEntry {
   priority?: string | number;
   status: string;
   meta?: Record<string, unknown>;
+}
+
+// Learning System Types
+export interface LearnedPattern {
+  id: string;
+  pattern_text: string;
+  category: string | null;
+  file_extension: string | null;
+  source_count: number;
+  is_edited: boolean;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LearnedPatternInput {
+  pattern_text: string;
+  category?: string | null;
+  file_extension?: string | null;
+  enabled?: boolean;
+}
+
+export interface LearningStatus {
+  pending_rejections: number;
+  last_compaction_at: string | null;
+  pattern_count: number;
+  enabled_pattern_count: number;
+  compaction_threshold: number;
+}
+
+export interface LearningCompactionResult {
+  rejections_processed: number;
+  patterns_created: number;
+  patterns_updated: number;
+  errors: string[];
 }

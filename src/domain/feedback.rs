@@ -95,12 +95,18 @@ pub struct Feedback {
     /// Links to an IssueFinding if created from rule check
     #[serde(default)]
     pub finding_id: Option<String>,
+    /// Category ID from issue check (e.g., "test-coverage", "security")
+    #[serde(default)]
+    pub category: Option<String>,
     /// Brief title/summary of the feedback
     pub title: String,
     /// Current status of the feedback
     pub status: ReviewStatus,
     /// Impact/severity of the feedback
     pub impact: FeedbackImpact,
+    /// Confidence score (0.0-1.0) indicating how certain the AI is about this feedback
+    #[serde(default = "default_confidence")]
+    pub confidence: f64,
     /// Location of the feedback in the code
     #[serde(default)]
     pub anchor: Option<FeedbackAnchor>,
@@ -147,4 +153,9 @@ pub struct FeedbackLink {
     pub provider_root_comment_id: String,
     /// Last sync timestamp
     pub last_synced_at: String,
+}
+
+/// Default confidence score (1.0 = high confidence)
+fn default_confidence() -> f64 {
+    1.0
 }

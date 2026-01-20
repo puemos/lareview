@@ -32,10 +32,10 @@ impl FeedbackRepository {
         conn.execute(
             r#"
             INSERT OR REPLACE INTO feedback (
-                id, review_id, task_id, rule_id, finding_id, title, status, impact,
+                id, review_id, task_id, rule_id, finding_id, category, title, status, impact, confidence,
                 anchor_file_path, anchor_line, anchor_side, anchor_hunk_ref, anchor_head_sha,
                 author, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
             "#,
             rusqlite::params![
                 feedback.id,
@@ -43,9 +43,11 @@ impl FeedbackRepository {
                 feedback.task_id,
                 feedback.rule_id,
                 feedback.finding_id,
+                feedback.category,
                 feedback.title,
                 feedback.status.to_string(),
                 feedback.impact.to_string(),
+                feedback.confidence,
                 anchor.and_then(|a| a.file_path.clone()),
                 anchor.and_then(|a| a.line_number.map(|n| n as i32)),
                 anchor.and_then(|a| a.side).map(|s| match s {
@@ -117,7 +119,7 @@ impl FeedbackRepository {
             .expect("FeedbackRepository: failed to acquire database lock");
         let mut stmt = conn.prepare(
             r#"
-            SELECT id, review_id, task_id, rule_id, finding_id, title, status, impact,
+            SELECT id, review_id, task_id, rule_id, finding_id, category, title, status, impact, confidence,
                    anchor_file_path, anchor_line, anchor_side, anchor_hunk_ref, anchor_head_sha,
                    author, created_at, updated_at
             FROM feedback
@@ -140,7 +142,7 @@ impl FeedbackRepository {
             .expect("FeedbackRepository: failed to acquire database lock");
         let mut stmt = conn.prepare(
             r#"
-            SELECT id, review_id, task_id, rule_id, finding_id, title, status, impact,
+            SELECT id, review_id, task_id, rule_id, finding_id, category, title, status, impact, confidence,
                    anchor_file_path, anchor_line, anchor_side, anchor_hunk_ref, anchor_head_sha,
                    author, created_at, updated_at
             FROM feedback
@@ -176,13 +178,14 @@ impl FeedbackRepository {
     }
 
     fn row_to_feedback(row: &Row) -> rusqlite::Result<Feedback> {
-        let status: String = row.get(6)?;
-        let impact: String = row.get(7)?;
-        let anchor_file_path: Option<String> = row.get(8)?;
-        let anchor_line: Option<i32> = row.get(9)?;
-        let anchor_side: Option<String> = row.get(10)?;
-        let anchor_hunk_ref: Option<String> = row.get(11)?;
-        let anchor_head_sha: Option<String> = row.get(12)?;
+        let status: String = row.get(7)?;
+        let impact: String = row.get(8)?;
+        let confidence: f64 = row.get::<_, Option<f64>>(9)?.unwrap_or(1.0);
+        let anchor_file_path: Option<String> = row.get(10)?;
+        let anchor_line: Option<i32> = row.get(11)?;
+        let anchor_side: Option<String> = row.get(12)?;
+        let anchor_hunk_ref: Option<String> = row.get(13)?;
+        let anchor_head_sha: Option<String> = row.get(14)?;
 
         let anchor = if anchor_file_path.is_some()
             || anchor_line.is_some()
@@ -219,13 +222,15 @@ impl FeedbackRepository {
             task_id: row.get(2)?,
             rule_id: row.get(3)?,
             finding_id: row.get(4)?,
-            title: row.get(5)?,
+            category: row.get(5)?,
+            title: row.get(6)?,
             status: ReviewStatus::from_str(&status).unwrap_or_default(),
             impact: FeedbackImpact::from_str(&impact).unwrap_or_default(),
+            confidence,
             anchor,
-            author: row.get(13)?,
-            created_at: row.get(14)?,
-            updated_at: row.get(15)?,
+            author: row.get(15)?,
+            created_at: row.get(16)?,
+            updated_at: row.get(17)?,
         })
     }
 }

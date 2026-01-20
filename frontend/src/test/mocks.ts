@@ -68,6 +68,7 @@ const createMockFeedback = (overrides = {}): Feedback => ({
   title: 'Test Feedback',
   status: 'todo',
   impact: 'nice_to_have',
+  confidence: 1.0,
   anchor: { file_path: 'src/test.ts', line_number: 10, side: 'new' },
   author: 'test-user',
   created_at: new Date().toISOString(),

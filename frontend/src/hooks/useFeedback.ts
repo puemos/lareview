@@ -54,6 +54,7 @@ export function useFeedback(reviewId: string | null): UseFeedbackResult {
         ...f,
         status: f.status as Feedback['status'],
         impact: f.impact as Feedback['impact'],
+        confidence: f.confidence ?? 1.0,
         anchor: f.anchor
           ? {
               ...f.anchor,
