@@ -1,9 +1,7 @@
 use super::config::ServerConfig;
 use super::feedback_ingest::save_agent_comment;
 use super::logging::log_to_file;
-use super::task_ingest::{
-    MissingCoverageError, save_task, update_review_metadata, validate_task_coverage,
-};
+use super::task_ingest::{save_task, update_review_metadata};
 use grep::{
     regex::RegexMatcherBuilder,
     searcher::{BinaryDetection, SearcherBuilder, sinks::Lossy},
@@ -121,7 +119,6 @@ pub(super) fn create_finalize_review_tool(config: Arc<ServerConfig>) -> impl Too
             let persist_config = config.clone();
             let persist_args_for_spawn = persist_args.clone(); // Clone before moving into spawn
             let persist_result = tokio::task::spawn_blocking(move || {
-                validate_task_coverage(&persist_config)?;
                 update_review_metadata(&persist_config, persist_args_for_spawn)
             })
             .await;
@@ -171,15 +168,7 @@ pub(super) fn create_finalize_review_tool(config: Arc<ServerConfig>) -> impl Too
                     }
 
                     // Check if this is a DiffIndexError and format appropriately
-                    let error_msg = if let Some(missing) = err.downcast_ref::<MissingCoverageError>() {
-                        let message = missing.message();
-                        serde_json::json!({
-                            "status": "error",
-                            "message": message,
-                            "missing_files": missing.missing_files,
-                        })
-                        .to_string()
-                    } else if let Some(diff_index_err) =
+                    let error_msg = if let Some(diff_index_err) =
                         err.downcast_ref::<crate::infra::diff::index::DiffIndexError>()
                     {
                         // Return structured JSON error for agent parsing
@@ -251,17 +240,22 @@ pub(super) fn create_add_feedback_tool(config: Arc<ServerConfig>) -> impl ToolHa
         })
     })
     .with_description(
-        "Add inline feedback on a specific line in the diff.\n\n\
-         **Preferred format (simple, always works):**\n\
+        "Add feedback on the diff—inline (specific line) or general (cross-cutting).\n\n\
+         **Format:**\n\
          ```json\n\
          {\n\
            \"hunk_id\": \"src/auth.rs#H1\",\n\
            \"line_id\": \"L3\",\n\
-           \"body\": \"Your comment here\"\n\
+           \"body\": \"Your comment here\",\n\
+           \"impact\": \"blocking\"\n\
          }\n\
          ```\n\n\
-         Copy the `hunk_id` from the manifest header, and `line_id` (L1, L2, etc.) from the line listing.\n\n\
-         **Optional fields:** title, impact (nitpick|blocking|nice_to_have), side (old|new), task_id",
+         **Impact levels:**\n\
+         - `blocking`: Must fix before merge (security, correctness, data integrity)\n\
+         - `nice_to_have`: Should fix, improves quality (missing tests, naming, tech debt)\n\
+         - `nitpick`: Optional polish (style, minor typos)\n\n\
+         **General feedback:** For cross-cutting concerns, anchor to the most representative hunk and prefix body with \"**General feedback:**\"\n\n\
+         **Optional fields:** title, impact (default: nitpick), side (old|new, default: new), task_id",
     )
     .with_schema(add_feedback_schema())
 }
