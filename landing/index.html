@@ -141,15 +141,15 @@
                         <h2
                             class="font-display text-4xl md:text-5xl leading-tight mb-6 font-light"
                         >
-                            The IDE for <br />
+                            The Code Review <br />
                             <span class="font-medium italic"
-                                >Code Review.</span
+                                >Workbench.</span
                             >
                         </h2>
                         <p
                             class="text-velura-gray max-w-md text-lg leading-relaxed mb-8"
                         >
-                            Stop doom-scrolling. LaReview is a local-first workbench that turns diffs into structured plans, diagrams, and architectural insights.
+                            Turn code changes into a clear review plan and high-signal feedback, without comment spam. Works with your existing AI coding agent.
                         </p>
 
                         <div class="flex flex-wrap gap-4">
@@ -346,18 +346,18 @@
                     <div class="flex-1">
                         <h2 class="font-display text-4xl mb-6">Not Another Bot.</h2>
                         <p class="text-lg text-velura-gray mb-8 leading-relaxed">
-                            Most AI tools are <b>bots</b> that race to find bugs.
+                            Most AI tools are <b>bots</b> that post comment spam.
                             <br><br>
-                            LaReview is a <b>workbench</b> designed to help you understand them. We don't just lint your code; we visualize architecture, map complex logic, and give you the tools to review with the depth of a staff engineer.
+                            LaReview is a <b>reviewer-first workbench</b>. We help you understand the change, plan your review, and ship feedback that matters.
                         </p>
                         <ul class="space-y-4 font-mono text-sm">
                             <li class="flex items-center gap-3">
                                 <i class="ph-bold ph-check text-green-600"></i>
-                                <span><b>Active Engagement</b> vs Passive Scrolling</span>
+                                <span><b>Plan First</b> vs Comment Dump</span>
                             </li>
                             <li class="flex items-center gap-3">
                                 <i class="ph-bold ph-check text-green-600"></i>
-                                <span><b>Architectural Insight</b> vs Line-by-Line Nitpicks</span>
+                                <span><b>Flow-Based Review</b> vs File-by-File</span>
                             </li>
                             <li class="flex items-center gap-3">
                                 <i class="ph-bold ph-check text-green-600"></i>
@@ -393,7 +393,7 @@
                             AI-Powered Planning
                         </h3>
                         <p class="text-velura-gray max-w-lg mx-auto min-h-12">
-                            Input a PR or diff. LaReview acts as a staff engineer, analyzing intent and building a structured review plan to guide your attention.
+                            Input a PR (GitHub/GitLab) or diff. LaReview acts as a staff engineer, looking for flows and hazards to build a structured review plan.
                         </p>
                     </div>
                     <div
@@ -423,7 +423,7 @@
                             Task-Focused Diffs
                         </h3>
                         <p class="text-velura-gray min-h-12">
-                            Focus on one logical change at a time. The workbench isolates relevant code hunks for each task, eliminating noise.
+                            Review one logical concern at a time. The workbench isolates relevant code hunks for each task, eliminating noise.
                         </p>
                     </div>
                     <div class="mt-8 border border-theme p-2 bg-stone-200">
@@ -446,12 +446,10 @@
                             >03</span
                         >
                         <h3 class="text-2xl font-bold uppercase mb-2">
-                            Agent Feedback
+                            High-Signal Framework
                         </h3>
                         <p class="text-velura-gray min-h-12">
-                            The AI proactively identifies bugs and style issues,
-                            creating feedback threads anchored to specific lines
-                            of code automatically.
+                            The AI proactively identifies bugs and authenticates them against your rules. No comment spam—just focused feedback threads anchored to specific lines.
                         </p>
                     </div>
                     <div class="mt-8 border border-theme p-2 bg-stone-200">
@@ -475,7 +473,7 @@
                             Local Context
                         </h3>
                         <p class="text-velura-gray min-h-12">
-                            Link local Git repos to give the agent full access to search your codebase without upload. Zero data leaks.
+                            Link local Git repos to give the agent full access to search your codebase without upload. Works with your existing AI coding agent.
                         </p>
                     </div>
                     <div class="mt-8 border border-theme p-2 bg-stone-200">
@@ -498,10 +496,10 @@
                             >05</span
                         >
                         <h3 class="text-2xl font-bold uppercase mb-2">
-                            GitHub Sync
+                            Git Host Sync
                         </h3>
                         <p class="text-velura-gray min-h-12">
-                            Submit your review feedback directly to GitHub PRs
+                            Submit your review feedback directly to GitHub/GitLab PRs
                             with automatic summary generation.
                         </p>
                     </div>
@@ -581,7 +579,7 @@
                     <div class="mb-auto">
                         <span
                             class="block text-5xl font-display font-light mb-4"
-                            >07</span
+                            >06</span
                         >
                         <h3 class="text-2xl font-bold uppercase mb-2">
                             Visual Diagrams
@@ -625,7 +623,7 @@
                         </span>
                         <h4 class="text-xl font-bold">Input</h4>
                         <p class="text-sm text-velura-gray">
-                            Paste a unified diff or a GitHub PR URL (e.g.,
+                            Paste a unified diff or a GitHub/GitLab PR URL (e.g.,
                             owner/repo#123).
                         </p>
                     </div>
@@ -639,8 +637,8 @@
                         </span>
                         <h4 class="text-xl font-bold">Fetch</h4>
                         <p class="text-sm text-velura-gray">
-                            LaReview fetches data locally via the GitHub CLI
-                            (`gh`). No intermediate servers.
+                            LaReview fetches data locally via the GitHub/GitLab CLI
+                            (`gh`/`glab`). No intermediate servers.
                         </p>
                     </div>
 
@@ -653,7 +651,7 @@
                         </span>
                         <h4 class="text-xl font-bold">Generate</h4>
                         <p class="text-sm text-velura-gray">
-                            Your chosen coding agent (opencode, claude code,
+                            Your chosen AI coding agent (opencode, claude code,
                             codex, etc.) analyzes intent and builds a task tree.
                         </p>
                     </div>

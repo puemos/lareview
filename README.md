@@ -8,7 +8,7 @@
 
 <h1 align="center">La Review</h1>
 
-<p align="center"><b>The IDE for Code Review.</b></p>
+<p align="center"><b>The Code Review Workbench.</b></p>
 
 <p align="center">
   <a href="https://github.com/puemos/lareview/actions/workflows/ci.yml"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/puemos/lareview/ci.yml?style=flat-square" /></a>
@@ -21,9 +21,9 @@
 
 ---
 
-LaReview is a **code review workbench** for senior engineers. It turns a PR or diff into a structured plan, visualizing architecture and breaking down complex logic so you can review with depth and understanding.
+LaReview is a **reviewer-first code review workbench** for complex changes. It turns a PR or diff into a structured review plan, grouped by flows and ordered by risk, so you can review with depth and understanding.
 
-Unlike auto-review bots that race to find bugs, LaReview is a local-first tool designed for active engagement—giving you the insights of a staff engineer without your code ever leaving your machine.
+Unlike auto-review bots that post comment spam, LaReview is a local-first tool that works with your existing AI coding agent to help you ship high-signal feedback.
 
 ## Demo
 
@@ -33,31 +33,32 @@ https://github.com/user-attachments/assets/28abaf1e-9100-4484-b6a5-18d8dfec427e
 
 LaReview is designed for a local-first, secure, and focused review experience.
 
-| Screenshot                                                                                    | Feature                                                                                                                                                                                                                                                            |
-| :-------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <img src="assets/screenshots/generate.webp" width="400" alt="Plan Generation View" />         | **AI-Powered Planning**<br>Input a PR or diff. LaReview acts as a staff engineer, analyzing intent and building a structured review plan to guide your attention.                                                                                                  |
-| <img src="assets/screenshots/review-changes.webp" width="400" alt="Structured Review Tree" /> | **Structured Task Tree**<br>Navigate the review as a hierarchical tree. Mark tasks as **To Do**, **In Progress**, or **Done**. Attach contextual notes to specific tasks or lines of code to keep track of your thoughts.                                          |
-| <img src="assets/screenshots/review-changes.webp" width="400" alt="Task-focused Diff" />      | **Task-Focused Diffs**<br>Focus on one logical change at a time. The workbench isolates relevant code hunks for each task, eliminating noise.                                                                                                                      |
-| <img src="assets/screenshots/review-feedback-item.webp" width="400" alt="Feedback Items" />   | **Agent Feedback**<br>The AI proactively identifies bugs and style issues, creating feedback threads anchored to specific lines of code automatically.                                                                                                             |
-| <img src="assets/screenshots/repos.webp" width="400" alt="Linked Repositories" />             | **Local Context (Zero Data Leaks)**<br>Link local Git repos to give the agent full access to search your codebase without upload. Your code stays on your machine.                                                                                                 |
-| <img src="assets/screenshots/review-diagram.webp" width="400" alt="Diagram Viewer" />         | **Visual Diagrams**<br>Visualize the flow. Automatically generate diagrams to see architectural changes before you read a single line of code. (Requires D2).                                                                                                      |
-| <img src="assets/screenshots/settings.webp" width="400" alt="Settings View" />                | **Agent Settings**<br>Configure per-agent executables, environment variables, and custom ACP agents.                                                                                                                                                               |
-| <img src="assets/screenshots/export-github.webp" width="400" alt="GitHub Sync" />             | **GitHub Push**<br>Submit your review feedback directly to GitHub PRs with automatic summary generation.                                                                                                                                                           |
-| <img src="assets/screenshots/export-github.webp" width="400" alt="Export & Share" />          | **Export & Share**<br>Export your review summary to Markdown with diagrams and code insights. Copy to clipboard or save to file.                                                                                                                                   |
-| <img src="assets/screenshots/generate.webp" width="400" alt="CLI Support" />                  | **CLI Support**<br>Launch reviews from the terminal: `lareview`, `lareview pr owner/repo#123`, `git diff &#124; lareview`, or `lareview --agent claude`.                                                                                                           |
+| Screenshot                                                                                    | Feature                                                                                                                                                                                                                   |
+| :-------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| <img src="assets/screenshots/generate.webp" width="400" alt="Plan Generation View" />         | **AI-Powered Planning**<br>Input a PR (GitHub/GitLab) or diff. LaReview acts as a staff engineer, looking for flows (e.g. auth, api) and risks to build a structured review plan.                                         |
+| <img src="assets/screenshots/review-changes.webp" width="400" alt="Structured Review Tree" /> | **Structured Task Tree**<br>Navigate the review as a hierarchical tree. Mark tasks as **To Do**, **In Progress**, or **Done**. Attach contextual notes to specific tasks or lines of code to keep track of your thoughts. |
+| <img src="assets/screenshots/review-changes.webp" width="400" alt="Task-focused Diff" />      | **Task-Focused Diffs**<br>Review one logical concern at a time. The workbench isolates relevant code hunks for each task, eliminating noise.                                                                              |
+| <img src="assets/screenshots/review-feedback-item.webp" width="400" alt="Feedback Items" />   | **High-Signal Framework**<br>The AI proactively identifies bugs and authenticates them against your rules. No comment spam—just focused feedback threads anchored to specific lines.                                      |
+| <img src="assets/screenshots/repos.webp" width="400" alt="Linked Repositories" />             | **Local Context (Zero Data Leaks)**<br>Link local Git repos to give the agent full access to search your codebase. Works with your existing AI coding agent (Claude, etc) and keeps data on your machine.                 |
+| <img src="assets/screenshots/review-diagram.webp" width="400" alt="Diagram Viewer" />         | **Visual Diagrams**<br>Visualize the flow. Automatically generate diagrams to see architectural changes before you read a single line of code. (Requires D2).                                                             |
+| <img src="assets/screenshots/settings.webp" width="400" alt="Settings View" />                | **Team Rules**<br>Define rules like "DB queries must have timeouts" or "API changes need a migration note" to enforce standards automatically.                                                                            |
+| <img src="assets/screenshots/export-github.webp" width="400" alt="GitHub Sync" />             | **Git Host Sync**<br>Submit your review feedback directly to GitHub or GitLab PRs with automatic summary generation.                                                                                                      |
+| <img src="assets/screenshots/export-github.webp" width="400" alt="Export & Share" />          | **Export & Share**<br>Export your review summary to Markdown with diagrams and code insights. Copy to clipboard or save to file.                                                                                          |
+| <img src="assets/screenshots/generate.webp" width="400" alt="CLI Support" />                  | **CLI Support**<br>Launch reviews from the terminal: `lareview`, `lareview pr owner/repo#123`, `git diff &#124; lareview`, or `lareview --agent claude`.                                                                  |
 
 ## How it works
 
 1. **Input**
    - Run `lareview` from terminal (opens GUI with current repo linked), or
    - Paste a unified diff, or
-   - Paste a GitHub PR reference: `owner/repo#123` or a PR URL
+   - Paste a code review link from GitHub or GitLab, or a PR URL
 2. **Fetch (for PRs)**
-   - LaReview fetches data locally via the GitHub CLI (`gh`). No intermediate servers.
+   - LaReview fetches the change locally and prepares the review workspace. No intermediate servers.
 3. **Generate a review plan**
-   - The review plan is generated by an AI agent you run via ACP (Agent Client Protocol)
+   - AI generates a review plan grouped by flows and ordered by risk. You can customize the agent (Claude, OpenAI, etc).
 4. **Review**
-   - Work task-by-task, add notes, track status, and optionally clean completed tasks
+   - Review task by task with your AI coding agent.
+   - Ship focused feedback that authors can act on, without comment spam.
 
 ## Terminal Workflow
 
@@ -73,7 +74,7 @@ lareview main feature
 # Pipe a diff directly to the GUI
 git diff HEAD | lareview
 
-# Review a GitHub PR
+# Review a GitHub/GitLab PR
 lareview pr owner/repo#123
 
 # Specify an agent
@@ -90,15 +91,18 @@ The CLI launches the GUI in the background and passes your diff/repo info seamle
 ## Requirements
 
 - **Rust nightly** (see `rust-toolchain.toml`)
-- **GitHub CLI** if you want to load PRs:
+- **GitHub CLI** (optional):
   - Install: `brew install gh` (or your OS package manager)
   - Auth: `gh auth login`
+- **GitLab CLI** (optional):
+  - Install: `brew install glab` (or your OS package manager)
+  - Auth: `glab auth login`
 - **D2** (optional): For visual diagram rendering. Install: `brew install d2` (or see [d2lang.com](https://d2lang.com/install))
-- **ACP agent** configured on your machine
+- **AI agent** configured on your machine
   - Learn more: https://agentclientprotocol.com/overview/introduction
 
 > [!NOTE]
-> LaReview does not require a custom LaReview server. Your PR data is fetched locally via `gh`, and plan generation runs via your chosen ACP agent.
+> LaReview does not require a custom LaReview server. Your PR data is fetched locally via `gh` or `glab`, and plan generation runs via your chosen AI agent.
 
 ## Installation
 
@@ -183,23 +187,24 @@ sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev
    ```
 
 2. Open **GENERATE**
-   - Paste a unified diff, or a GitHub PR like `owner/repo#123` (or a PR URL)
+   - Paste a unified diff, or a GitHub/GitLab PR like `owner/repo#123` (or a PR URL)
    - Or use the terminal: `lareview pr owner/repo#123`
 3. Pick an agent and click generate
 4. Switch to **REVIEW**
    - Work through tasks, add notes, and track status
 
 > [!TIP]
-> If PR loading fails, run `gh auth status` and then `gh auth login`.
+> If PR loading fails, run `gh auth status` or `glab auth status` and then login.
 
 ## Usage examples
 
-### Review a GitHub PR
+### Review a GitHub/GitLab PR
 
 Input:
 
 - `owner/repo#123`
-- or `https://github.com/owner/repo/pull/123`
+- `https://github.com/owner/repo/pull/123`
+- `https://gitlab.com/owner/repo/-/merge_requests/123`
 
 ### Review a unified diff
 
@@ -248,13 +253,11 @@ Wipe local state:
   ### CLI Reference
 
 - Checks:
-
   - `cargo fmt -- --check`
   - `cargo clippy --all-targets --all-features -- -D warnings`
   - `cargo test`
 
 - Logging:
-
   - LaReview uses the `log` crate with `env_logger`.
   - Set `RUST_LOG` to control log levels:
     - `RUST_LOG=debug cargo run` - Full debug output
@@ -263,7 +266,6 @@ Wipe local state:
   - Logs appear in the terminal when running from source.
 
 - Tests:
-
   - Unit tests: Located alongside modules in `src/` (usually as `tests.rs`)
   - Integration tests: Located in the root `tests/` directory
   - Run all tests: `cargo test`
