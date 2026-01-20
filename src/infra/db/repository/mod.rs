@@ -6,6 +6,8 @@ mod comment;
 mod feedback;
 mod feedback_link;
 mod issue_check;
+mod learned_patterns;
+mod rejections;
 mod repo;
 mod review;
 mod review_run;
@@ -16,6 +18,10 @@ pub use comment::CommentRepository;
 pub use feedback::FeedbackRepository;
 pub use feedback_link::FeedbackLinkRepository;
 pub use issue_check::IssueCheckRepository;
+pub use learned_patterns::{LearnedPatternRepository, LearningStateRepository};
+pub use rejections::{
+    AgentRejectionStats, FeedbackRejection, FeedbackRejectionRepository, RuleRejectionStats,
+};
 pub use repo::RepoRepository;
 pub use review::ReviewRepository;
 pub use review_run::ReviewRunRepository;
