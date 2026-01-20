@@ -754,13 +754,15 @@ mod policy_tests {
         );
 
         let missing = vec![sample_task("T1", &[]), sample_task("T2", &[])];
+        let warnings = crate::infra::acp::task_generator::validation::validate_tasks_payload(
+            &missing,
+            Some(&raw),
+            diff
+        )
+        .expect("should succeed with warnings");
         assert!(
-            crate::infra::acp::task_generator::validation::validate_tasks_payload(
-                &missing,
-                Some(&raw),
-                diff
-            )
-            .is_err()
+            warnings.iter().any(|w| w.contains("Tasks do not cover all changed files")),
+            "Expected warning about missing file coverage"
         );
     }
 
