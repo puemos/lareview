@@ -15,6 +15,10 @@ import {
   GithubLogo,
   GitlabLogo,
   GitDiff,
+  Funnel,
+  Eye,
+  ShieldCheck,
+  Target,
 } from '@phosphor-icons/react';
 import type {
   ViewType,
@@ -27,6 +31,7 @@ import type {
 import { toast } from 'sonner';
 import { useTauri } from '../../hooks/useTauri';
 import { useDelayedLoading } from '../../hooks/useDelayedLoading';
+import { useFeedbackFilterConfig } from '../../hooks/useSettings';
 import { VcsSkeleton, CliSkeleton, EditorSkeleton, AgentsSkeleton } from './SettingsSkeleton';
 
 interface SettingsViewProps {
@@ -34,7 +39,7 @@ interface SettingsViewProps {
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = () => {
-  const [activeTab, setActiveTab] = useState<'vcs' | 'cli' | 'editor' | 'agents'>('vcs');
+  const [activeTab, setActiveTab] = useState<'vcs' | 'cli' | 'editor' | 'feedback' | 'agents'>('vcs');
 
   return (
     <div className="bg-bg-primary flex h-full flex-col">
@@ -69,6 +74,12 @@ export const SettingsView: React.FC<SettingsViewProps> = () => {
               isActive={activeTab === 'editor'}
               onClick={() => setActiveTab('editor')}
             />
+            <TabButton
+              icon={<Funnel size={14} />}
+              label="Feedback Filters"
+              isActive={activeTab === 'feedback'}
+              onClick={() => setActiveTab('feedback')}
+            />
             <div className="pt-3 pb-1">
               <div className="bg-border/50 mx-2 h-px" />
             </div>
@@ -86,8 +97,8 @@ export const SettingsView: React.FC<SettingsViewProps> = () => {
           <div className="animate-fade-in max-w-3xl space-y-8 p-8 md:p-12">
             {activeTab === 'vcs' && <VcsSettings />}
             {activeTab === 'cli' && <CliSettings />}
-
             {activeTab === 'editor' && <EditorSettings />}
+            {activeTab === 'feedback' && <FeedbackFilterSettings />}
             {activeTab === 'agents' && <AgentsSettings />}
           </div>
         </div>
@@ -541,6 +552,190 @@ const EditorSettings: React.FC = () => {
           )}
         </div>
       )}
+    </div>
+  );
+};
+
+const FeedbackFilterSettings: React.FC = () => {
+  const { config, updateThreshold, isUpdating } = useFeedbackFilterConfig();
+  const [localThreshold, setLocalThreshold] = useState<string>('');
+
+  useEffect(() => {
+    if (config.confidenceThreshold != null) {
+      setLocalThreshold(String(Math.round(config.confidenceThreshold * 100)));
+    } else {
+      setLocalThreshold('');
+    }
+  }, [config.confidenceThreshold]);
+
+  const handleThresholdChange = (value: string) => {
+    setLocalThreshold(value);
+  };
+
+  const handleThresholdSave = () => {
+    const numValue = localThreshold === '' ? null : parseInt(localThreshold, 10) / 100;
+    if (numValue != null && (numValue < 0 || numValue > 1)) {
+      toast.error('Invalid threshold', {
+        description: 'Threshold must be between 0 and 100',
+      });
+      return;
+    }
+    updateThreshold(numValue, {
+      onSuccess: () => {
+        toast('Threshold Updated', {
+          description:
+            numValue == null
+              ? 'Showing all feedback regardless of confidence.'
+              : `Feedback with confidence below ${Math.round(numValue * 100)}% will be hidden.`,
+        });
+      },
+      onError: (error: Error) => {
+        toast.error('Failed to update threshold', {
+          description: error.message,
+        });
+      },
+    });
+  };
+
+  const presetOptions = [
+    { label: 'Show All', value: null, description: 'No filtering applied', icon: <Eye size={18} /> },
+    { label: 'Medium+', value: 0.7, description: 'Hide low confidence', icon: <ShieldCheck size={18} /> },
+    { label: 'High Only', value: 0.9, description: 'Most confident items only', icon: <Target size={18} /> },
+  ];
+
+  return (
+    <div>
+      <SectionHeader
+        title="Feedback Filters"
+        description="Control which feedback items are shown based on AI confidence level. Lower confidence feedback may contain more false positives."
+      />
+
+      <div className="space-y-6">
+        <div className="bg-bg-secondary/40 border-border rounded-lg border p-6">
+          <label className="text-text-disabled mb-3 block text-[10px] font-bold tracking-wider uppercase">
+            Confidence Threshold
+          </label>
+          <p className="text-text-tertiary mb-4 text-xs">
+            Hide feedback with confidence below this threshold. Higher thresholds reduce noise but
+            may hide valid issues.
+          </p>
+
+          <div className="mb-4 flex flex-wrap gap-2">
+            {presetOptions.map(option => {
+              const isSelected =
+                (option.value === null && config.confidenceThreshold == null) ||
+                (option.value != null && config.confidenceThreshold === option.value);
+              return (
+                <button
+                  key={option.label}
+                  onClick={() => {
+                    setLocalThreshold(option.value == null ? '' : String(Math.round(option.value * 100)));
+                    updateThreshold(option.value);
+                  }}
+                  className={`group relative flex flex-1 flex-col items-center gap-3 rounded-xl border p-4 text-center transition-all ${
+                    isSelected
+                      ? 'border-brand bg-brand/10 text-text-primary shadow-lg ring-1 ring-brand/30'
+                      : 'border-border bg-bg-tertiary text-text-secondary hover:border-brand/40 hover:bg-bg-secondary/60'
+                  }`}
+                >
+                  <div
+                    className={`flex h-10 w-10 items-center justify-center rounded-lg border transition-all ${
+                      isSelected
+                        ? 'bg-brand text-bg-primary border-brand'
+                        : 'bg-bg-secondary text-text-tertiary border-border group-hover:border-brand/30 group-hover:text-text-secondary'
+                    }`}
+                  >
+                    {option.icon}
+                  </div>
+                  <div>
+                    <span className="block text-xs font-semibold">{option.label}</span>
+                    <span className="text-text-tertiary text-[10px] line-clamp-1">{option.description}</span>
+                  </div>
+                  {isSelected && (
+                    <div className="bg-brand absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full text-white shadow-sm">
+                      <Check size={12} weight="bold" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex-1">
+              <div className="mb-4 flex items-center justify-between">
+                <label className="text-text-tertiary block text-[10px] font-medium uppercase tracking-wider">
+                  Adjust Threshold
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-text-primary text-sm font-semibold">
+                    {localThreshold || '0'}
+                  </span>
+                  <span className="text-text-tertiary text-xs">%</span>
+                </div>
+              </div>
+
+              <div className="relative mb-8 h-6 w-full px-2">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={localThreshold || '0'}
+                  onChange={e => handleThresholdChange(e.target.value)}
+                  onMouseUp={handleThresholdSave}
+                  onTouchEnd={handleThresholdSave}
+                  className="accent-brand bg-bg-tertiary h-1.5 w-full cursor-pointer appearance-none rounded-full outline-none"
+                />
+                <div className="text-text-disabled mt-2 flex justify-between text-[10px]">
+                  <span>0%</span>
+                  <span>25%</span>
+                  <span>50%</span>
+                  <span>75%</span>
+                  <span>100%</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <label className="text-text-tertiary mb-1.5 block text-[10px]">
+                    Custom threshold
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={localThreshold}
+                      onChange={e => handleThresholdChange(e.target.value)}
+                      placeholder="e.g. 70"
+                      className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand w-24 rounded-md border px-3 py-2 text-xs transition-all focus:outline-none"
+                    />
+                    <span className="text-text-tertiary text-xs">%</span>
+                    <button
+                      onClick={handleThresholdSave}
+                      disabled={isUpdating}
+                      className="bg-brand text-bg-primary hover:bg-brand/90 flex items-center gap-1.5 rounded-md px-4 py-2 text-xs font-medium transition-all disabled:opacity-50"
+                    >
+                      {isUpdating ? <ArrowsClockwise size={14} className="animate-spin" /> : <Check size={14} weight="bold" />}
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {config.confidenceThreshold != null && (
+            <p className="text-text-tertiary mt-4 text-[10px]">
+              Currently hiding feedback with confidence below{' '}
+              <span className="text-text-secondary font-medium">
+                {Math.round(config.confidenceThreshold * 100)}%
+              </span>
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

@@ -19,6 +19,10 @@ pub struct AppConfig {
     pub agent_args_overrides: HashMap<String, Vec<String>>,
     pub agent_envs: HashMap<String, HashMap<String, String>>,
     pub preferred_editor_id: Option<String>,
+    /// Minimum confidence threshold for displaying feedback (0.0-1.0)
+    /// None means show all feedback (default behavior)
+    #[serde(default)]
+    pub feedback_confidence_threshold: Option<f64>,
 }
 
 pub fn load_config() -> AppConfig {
@@ -121,6 +125,7 @@ mod tests {
             agent_args_overrides: args_overrides,
             agent_envs,
             preferred_editor_id: Some("vscode".into()),
+            feedback_confidence_threshold: None,
         };
 
         let tmp_file = NamedTempFile::new().unwrap();
