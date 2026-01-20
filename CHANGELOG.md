@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.26] - 2026-01-20
+
+### Added
+
+- **Rules**: Rule library with curated review rules to import into reviews.
+- **Review**: Issue checks system and summary dashboard (FilesHeatmap, IssueChecklist, KeyFeedback, TaskFlow).
+
+### Changed
+
+- **UI**: Improved loading states with dedicated view skeletons and smoother data transitions.
+
+### Fixed
+
+- **UI**: Minor React warnings and quote escaping issues.
+
 ## [0.0.25] - 2026-01-20
 
 ### Added
