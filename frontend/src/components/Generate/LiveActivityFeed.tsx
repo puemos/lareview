@@ -49,8 +49,8 @@ interface TimelineProps {
 const Timeline: React.FC<TimelineProps> = ({ messages }) => {
   return (
     <div className="space-y-1 p-3">
-      {messages.map((msg, index) => (
-        <TimelineItem key={index} message={msg} />
+      {messages.map(msg => (
+        <TimelineItem key={`${msg.timestamp}-${msg.type}`} message={msg} />
       ))}
     </div>
   );

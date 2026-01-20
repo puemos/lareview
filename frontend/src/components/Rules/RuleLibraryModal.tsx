@@ -183,7 +183,7 @@ export const RuleLibraryModal: React.FC<RuleLibraryModalProps> = ({ isOpen, onCl
             <div className="mb-3 flex items-center gap-2">
               <ICONS.ICON_PLUS size={14} className="text-brand" />
               <span className="text-text-primary text-sm font-medium">
-                Add "{addingRule.name}" to your rules
+                Add &quot;{addingRule.name}&quot; to your rules
               </span>
             </div>
             <div className="flex items-center gap-3">

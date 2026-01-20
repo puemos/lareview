@@ -131,7 +131,10 @@ impl IssueCheckRepository {
     }
 
     /// Get checks with their findings for a run
-    pub fn find_checks_with_findings(&self, run_id: &str) -> Result<Vec<(IssueCheck, Vec<IssueFinding>)>> {
+    pub fn find_checks_with_findings(
+        &self,
+        run_id: &str,
+    ) -> Result<Vec<(IssueCheck, Vec<IssueFinding>)>> {
         let checks = self.find_by_run(run_id)?;
         let mut result = Vec::new();
         for check in checks {

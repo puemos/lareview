@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { useTauri } from '../hooks/useTauri';
 import { useMemo } from 'react';
 
@@ -33,6 +33,7 @@ export function useReview(reviewId: string | null): UseReviewResult {
     queryFn: () => (reviewId ? getReviewRuns(reviewId) : Promise.resolve<ReviewRunData[]>([])),
     enabled: !!reviewId,
     staleTime: 30000,
+    placeholderData: keepPreviousData,
   });
 
   const result = useMemo((): UseReviewResult => {

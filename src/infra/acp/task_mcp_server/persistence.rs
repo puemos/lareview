@@ -44,7 +44,7 @@ pub fn save_issue_check(config: &ServerConfig, args: Value) -> Result<String> {
     let rule_id = args
         .get("rule_id")
         .and_then(|v| v.as_str())
-        .map(|s| normalize_rule_id(s));
+        .map(normalize_rule_id);
 
     let display_name = args
         .get("display_name")
@@ -89,7 +89,12 @@ pub fn save_issue_check(config: &ServerConfig, args: Value) -> Result<String> {
                 .with_context(|| format!("save finding for check {}", check_id))?;
 
             // Create a Feedback entry for this finding so it can be pushed to VCS
-            let feedback = create_feedback_from_finding(&finding, &ctx.review_id, check.rule_id.as_deref(), &now);
+            let feedback = create_feedback_from_finding(
+                &finding,
+                &ctx.review_id,
+                check.rule_id.as_deref(),
+                &now,
+            );
             feedback_repo
                 .save(&feedback)
                 .with_context(|| format!("save feedback for finding {}", finding.id))?;
@@ -185,8 +190,7 @@ fn parse_finding(value: &Value, check_id: &str, idx: usize, now: &str) -> Result
         .and_then(|v| v.as_str())
         .ok_or_else(|| anyhow::anyhow!("finding {} missing required field: impact", idx))?;
 
-    let impact = FeedbackImpact::from_str(impact_str)
-        .unwrap_or(FeedbackImpact::Nitpick);
+    let impact = FeedbackImpact::from_str(impact_str).unwrap_or(FeedbackImpact::Nitpick);
 
     let file_path = value
         .get("file_path")

@@ -13,6 +13,13 @@ import { ICONS } from './constants/icons';
 import { GenerationProvider } from './contexts/GenerationContext';
 
 import { SettingsPageSkeleton } from './components/Settings/SettingsPageSkeleton';
+import { ReviewViewSkeleton } from './components/Review/ReviewViewSkeleton';
+
+const PageSkeleton = () => (
+  <div className="bg-bg-primary flex h-full animate-pulse items-center justify-center">
+    <div className="bg-bg-tertiary h-8 w-8 rounded-full" />
+  </div>
+);
 
 const GenerateView = lazy(() =>
   import('./components/Generate/GenerateView').then(module => ({
@@ -126,8 +133,14 @@ function App() {
     })();
 
     const getFallback = () => {
-      if (currentView === 'settings') return <SettingsPageSkeleton />;
-      return <div className="bg-bg-primary h-full" />;
+      switch (currentView) {
+        case 'settings':
+          return <SettingsPageSkeleton />;
+        case 'review':
+          return <ReviewViewSkeleton />;
+        default:
+          return <PageSkeleton />;
+      }
     };
 
     return <Suspense fallback={getFallback()}>{viewContent}</Suspense>;

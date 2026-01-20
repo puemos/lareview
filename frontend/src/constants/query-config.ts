@@ -2,7 +2,7 @@ export const QUERY_CONFIG = {
   staleTime: 30 * 1000,
   gcTime: 60 * 60 * 1000,
   retry: 0,
-  refetchOnWindowFocus: true,
+  refetchOnWindowFocus: false,
   feedbackStaleTime: 30 * 1000,
 } as const;
 
