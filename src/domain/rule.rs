@@ -36,6 +36,8 @@ pub struct ReviewRule {
     pub scope: RuleScope,
     pub repo_id: Option<String>,
     pub glob: Option<String>,
+    /// Category name for rules (e.g., "security", "breaking-changes")
+    pub category: Option<String>,
     pub text: String,
     pub enabled: bool,
     pub created_at: String,
@@ -48,6 +50,7 @@ pub struct ResolvedRule {
     pub scope: RuleScope,
     pub repo_id: Option<String>,
     pub glob: Option<String>,
+    pub category: Option<String>,
     pub text: String,
     #[serde(default)]
     pub matched_files: Vec<String>,

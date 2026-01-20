@@ -184,14 +184,43 @@ impl Database {
 
             CREATE TABLE IF NOT EXISTS review_rules (
                 id TEXT PRIMARY KEY,
+                rule_type TEXT NOT NULL DEFAULT 'guideline',
                 scope TEXT NOT NULL,
                 repo_id TEXT,
                 glob TEXT,
+                category TEXT,
                 text TEXT NOT NULL,
                 enabled INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 FOREIGN KEY(repo_id) REFERENCES repos(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS issue_checks (
+                id TEXT PRIMARY KEY,
+                run_id TEXT NOT NULL,
+                rule_id TEXT,
+                category TEXT NOT NULL,
+                display_name TEXT NOT NULL,
+                status TEXT NOT NULL,
+                confidence TEXT NOT NULL,
+                summary TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(run_id) REFERENCES review_runs(id) ON DELETE CASCADE,
+                FOREIGN KEY(rule_id) REFERENCES review_rules(id) ON DELETE SET NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS issue_findings (
+                id TEXT PRIMARY KEY,
+                check_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                evidence TEXT NOT NULL,
+                file_path TEXT,
+                line_number INTEGER,
+                impact TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(check_id) REFERENCES issue_checks(id) ON DELETE CASCADE
             );
 
             CREATE INDEX IF NOT EXISTS idx_feedback_task_id ON feedback(task_id);
@@ -201,6 +230,9 @@ impl Database {
             CREATE INDEX IF NOT EXISTS idx_comments_feedback_created_at ON comments(feedback_id, created_at);
             CREATE INDEX IF NOT EXISTS idx_review_rules_repo_id ON review_rules(repo_id);
             CREATE INDEX IF NOT EXISTS idx_review_rules_scope ON review_rules(scope);
+            CREATE INDEX IF NOT EXISTS idx_issue_checks_run_id ON issue_checks(run_id);
+            CREATE INDEX IF NOT EXISTS idx_issue_checks_category ON issue_checks(category);
+            CREATE INDEX IF NOT EXISTS idx_issue_findings_check_id ON issue_findings(check_id);
 
             "#,
         )?;
@@ -254,6 +286,40 @@ impl Database {
         if !has_snapshot_access {
             conn.execute(
                 "ALTER TABLE repos ADD COLUMN allow_snapshot_access INTEGER DEFAULT 0",
+                [],
+            )?;
+        }
+
+        // Migration: Add rule_type to review_rules if it doesn't exist
+        let has_rule_type = conn
+            .prepare("SELECT 1 FROM pragma_table_info('review_rules') WHERE name = 'rule_type'")?
+            .exists([])?;
+
+        if !has_rule_type {
+            conn.execute(
+                "ALTER TABLE review_rules ADD COLUMN rule_type TEXT DEFAULT 'guideline' NOT NULL",
+                [],
+            )?;
+        }
+
+        // Migration: Add category to review_rules if it doesn't exist
+        let has_category = conn
+            .prepare("SELECT 1 FROM pragma_table_info('review_rules') WHERE name = 'category'")?
+            .exists([])?;
+
+        if !has_category {
+            conn.execute("ALTER TABLE review_rules ADD COLUMN category TEXT", [])?;
+        }
+
+        // Migration: Add finding_id to feedback if it doesn't exist
+        let has_finding_id = conn
+            .prepare("SELECT 1 FROM pragma_table_info('feedback') WHERE name = 'finding_id'")?
+            .exists([])?;
+
+        if !has_finding_id {
+            conn.execute("ALTER TABLE feedback ADD COLUMN finding_id TEXT", [])?;
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_feedback_finding_id ON feedback(finding_id)",
                 [],
             )?;
         }
@@ -464,6 +530,10 @@ impl Database {
 
     pub fn repo_repo(&self) -> crate::infra::db::repository::RepoRepository {
         crate::infra::db::repository::RepoRepository::new(self.connection())
+    }
+
+    pub fn issue_check_repo(&self) -> crate::infra::db::repository::IssueCheckRepository {
+        crate::infra::db::repository::IssueCheckRepository::new(self.connection())
     }
 
     pub fn get_pending_reviews(&self) -> Result<Vec<PendingReviewState>, rusqlite::Error> {

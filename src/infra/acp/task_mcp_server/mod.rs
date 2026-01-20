@@ -46,6 +46,10 @@ pub async fn run_task_mcp_server() -> pmcp::Result<()> {
             "add_feedback",
             tool::create_add_feedback_tool(config.clone()),
         )
+        .tool(
+            "report_issue_check",
+            tool::create_report_issue_check_tool(config.clone()),
+        )
         .build()?;
 
     logging::log_to_file(&config, "running task MCP server on stdio (line-delimited)");

@@ -32,16 +32,17 @@ impl FeedbackRepository {
         conn.execute(
             r#"
             INSERT OR REPLACE INTO feedback (
-                id, review_id, task_id, rule_id, title, status, impact,
+                id, review_id, task_id, rule_id, finding_id, title, status, impact,
                 anchor_file_path, anchor_line, anchor_side, anchor_hunk_ref, anchor_head_sha,
                 author, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
             "#,
             rusqlite::params![
                 feedback.id,
                 feedback.review_id,
                 feedback.task_id,
                 feedback.rule_id,
+                feedback.finding_id,
                 feedback.title,
                 feedback.status.to_string(),
                 feedback.impact.to_string(),
@@ -116,7 +117,7 @@ impl FeedbackRepository {
             .expect("FeedbackRepository: failed to acquire database lock");
         let mut stmt = conn.prepare(
             r#"
-            SELECT id, review_id, task_id, rule_id, title, status, impact,
+            SELECT id, review_id, task_id, rule_id, finding_id, title, status, impact,
                    anchor_file_path, anchor_line, anchor_side, anchor_hunk_ref, anchor_head_sha,
                    author, created_at, updated_at
             FROM feedback
@@ -139,7 +140,7 @@ impl FeedbackRepository {
             .expect("FeedbackRepository: failed to acquire database lock");
         let mut stmt = conn.prepare(
             r#"
-            SELECT id, review_id, task_id, rule_id, title, status, impact,
+            SELECT id, review_id, task_id, rule_id, finding_id, title, status, impact,
                    anchor_file_path, anchor_line, anchor_side, anchor_hunk_ref, anchor_head_sha,
                    author, created_at, updated_at
             FROM feedback
@@ -175,13 +176,13 @@ impl FeedbackRepository {
     }
 
     fn row_to_feedback(row: &Row) -> rusqlite::Result<Feedback> {
-        let status: String = row.get(5)?;
-        let impact: String = row.get(6)?;
-        let anchor_file_path: Option<String> = row.get(7)?;
-        let anchor_line: Option<i32> = row.get(8)?;
-        let anchor_side: Option<String> = row.get(9)?;
-        let anchor_hunk_ref: Option<String> = row.get(10)?;
-        let anchor_head_sha: Option<String> = row.get(11)?;
+        let status: String = row.get(6)?;
+        let impact: String = row.get(7)?;
+        let anchor_file_path: Option<String> = row.get(8)?;
+        let anchor_line: Option<i32> = row.get(9)?;
+        let anchor_side: Option<String> = row.get(10)?;
+        let anchor_hunk_ref: Option<String> = row.get(11)?;
+        let anchor_head_sha: Option<String> = row.get(12)?;
 
         let anchor = if anchor_file_path.is_some()
             || anchor_line.is_some()
@@ -217,13 +218,14 @@ impl FeedbackRepository {
             review_id: row.get(1)?,
             task_id: row.get(2)?,
             rule_id: row.get(3)?,
-            title: row.get(4)?,
+            finding_id: row.get(4)?,
+            title: row.get(5)?,
             status: ReviewStatus::from_str(&status).unwrap_or_default(),
             impact: FeedbackImpact::from_str(&impact).unwrap_or_default(),
             anchor,
-            author: row.get(12)?,
-            created_at: row.get(13)?,
-            updated_at: row.get(14)?,
+            author: row.get(13)?,
+            created_at: row.get(14)?,
+            updated_at: row.get(15)?,
         })
     }
 }

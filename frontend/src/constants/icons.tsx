@@ -50,6 +50,11 @@ import {
   Gavel,
   MagnifyingGlassPlus,
   MagnifyingGlassMinus,
+  WarningCircle,
+  MinusCircle,
+  File,
+  ShieldCheck,
+  SkipForward,
 } from '@phosphor-icons/react';
 
 /**
@@ -125,4 +130,16 @@ export const ICONS = {
   IMPACT_NICE_TO_HAVE: Lightbulb,
   IMPACT_NITPICK: Microscope,
   ICON_INFO: Info,
+
+  // --- Issue Checklist ---
+  STATUS_ISSUES: WarningCircle,
+  STATUS_ERROR: XCircle,
+  STATUS_INFO: Info,
+  STATUS_SUCCESS: CheckCircle,
+  STATUS_WARNING: Warning,
+  STATUS_SKIPPED: SkipForward,
+  CHECK: CheckCircle,
+  MINUS: MinusCircle,
+  FILE: File,
+  SHIELD_CHECK: ShieldCheck,
 } as const;

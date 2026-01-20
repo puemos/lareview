@@ -21,14 +21,15 @@ impl ReviewRuleRepository {
         conn.execute(
             r#"
             INSERT OR REPLACE INTO review_rules
-                (id, scope, repo_id, glob, text, enabled, created_at, updated_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                (id, scope, repo_id, glob, category, text, enabled, created_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
             "#,
             params![
                 rule.id,
                 rule.scope.to_string(),
                 rule.repo_id,
                 rule.glob,
+                rule.category,
                 rule.text,
                 if rule.enabled { 1 } else { 0 },
                 rule.created_at,
@@ -43,7 +44,7 @@ impl ReviewRuleRepository {
         let conn = self.conn.lock().expect("Failed to acquire database lock");
         let mut stmt = conn.prepare(
             r#"
-            SELECT id, scope, repo_id, glob, text, enabled, created_at, updated_at
+            SELECT id, scope, repo_id, glob, category, text, enabled, created_at, updated_at
             FROM review_rules
             ORDER BY created_at DESC
             "#,
@@ -60,7 +61,7 @@ impl ReviewRuleRepository {
         let conn = self.conn.lock().expect("Failed to acquire database lock");
         let mut stmt = conn.prepare(
             r#"
-            SELECT id, scope, repo_id, glob, text, enabled, created_at, updated_at
+            SELECT id, scope, repo_id, glob, category, text, enabled, created_at, updated_at
             FROM review_rules
             WHERE enabled = 1
             ORDER BY created_at DESC
@@ -78,7 +79,7 @@ impl ReviewRuleRepository {
         let conn = self.conn.lock().expect("Failed to acquire database lock");
         let mut stmt = conn.prepare(
             r#"
-            SELECT id, scope, repo_id, glob, text, enabled, created_at, updated_at
+            SELECT id, scope, repo_id, glob, category, text, enabled, created_at, updated_at
             FROM review_rules
             WHERE id = ?1
             "#,
@@ -99,16 +100,17 @@ impl ReviewRuleRepository {
     fn row_to_rule(row: &Row<'_>) -> rusqlite::Result<ReviewRule> {
         let scope_str: String = row.get(1)?;
         let scope = RuleScope::from_str(&scope_str).unwrap_or(RuleScope::Global);
-        let enabled: i64 = row.get(5)?;
+        let enabled: i64 = row.get(6)?;
         Ok(ReviewRule {
             id: row.get(0)?,
             scope,
             repo_id: row.get(2)?,
             glob: row.get(3)?,
-            text: row.get(4)?,
+            category: row.get(4)?,
+            text: row.get(5)?,
             enabled: enabled != 0,
-            created_at: row.get(6)?,
-            updated_at: row.get(7)?,
+            created_at: row.get(7)?,
+            updated_at: row.get(8)?,
         })
     }
 }

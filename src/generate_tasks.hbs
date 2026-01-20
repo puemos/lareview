@@ -84,15 +84,69 @@
 
   {{#if has_rules}}
   <review_rules>
-    Additional review rules (apply strictly). Each rule includes an ID.
+    **MANDATORY: You MUST verify each rule and report your findings.**
+
+    For each rule below, you MUST call `lareview-tasks_report_issue_check` with:
+    - `category`: The category ID (in brackets)
+    - `status`: One of `found`, `not_found`, `not_applicable`, `skipped`
+    - `confidence`: `high`, `medium`, or `low`
+    - `summary`: Brief explanation of your findings
+    - `findings`: Array of specific issues found (if status is `found`)
+
     When you add feedback because of a rule, include `rule_id` with the rule's ID (the bracketed value, no scope prefix) in the add_feedback payload.
+
+    **Rules to verify:**
     {{#each rules}}
-    - [{{id}}] {{text}}
+    - [{{category}}] **{{display_name}}**: {{text}}
       (scope: {{scope}})
-      {{#if glob}}(glob: {{glob}}){{/if}}
-      {{#if has_matches}}(matched: {{#each matched_files}}`{{this}}` {{/each}}){{/if}}
+      {{#if glob}}(applies to: {{glob}}){{/if}}
+      {{#if has_matches}}(files: {{#each matched_files}}`{{this}}` {{/each}}){{/if}}
+      {{#if rule_id}}(rule_id: {{rule_id}}){{/if}}
     {{/each}}
+
+    **How to report:**
+    - `found`: Issues detected - include detailed findings array
+    - `not_found`: Checked thoroughly, no issues found
+    - `not_applicable`: Rule doesn't apply to this PR (e.g., no DB changes for data integrity)
+    - `skipped`: Could not fully check due to missing context
+
+    **Example report:**
+    ```json
+    {
+      "category": "security",
+      "rule_id": "rule-123",
+      "status": "found",
+      "confidence": "high",
+      "summary": "Found potential SQL injection vulnerability",
+      "findings": [
+        {
+          "title": "SQL injection risk in user query",
+          "description": "User input is concatenated directly into SQL query without sanitization",
+          "evidence": "Line 45: `query = 'SELECT * FROM users WHERE id=' + user_id`",
+          "file_path": "src/db/users.rs",
+          "line_number": 45,
+          "impact": "blocking"
+        }
+      ]
+    }
+    ```
+
+    **You MUST report on ALL rules before calling finalize_review.**
   </review_rules>
+  {{/if}}
+
+  {{#if has_default_categories}}
+  <default_issue_categories>
+    **Built-in issue categories to verify (unless disabled):**
+
+    These are standard categories you should check even without explicit rules:
+    {{#each default_categories}}
+    - **{{name}}** [{{id}}]: {{description}}
+      Examples: {{#each examples}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
+    {{/each}}
+
+    Report findings for each applicable category using `lareview-tasks_report_issue_check`.
+  </default_issue_categories>
   {{/if}}
 
   <repo_access>
@@ -121,11 +175,13 @@
     - `lareview-tasks_repo_list_files` to scan repository structure
     - `lareview-tasks_return_task` to submit individual review tasks
     - `lareview-tasks_add_feedback` to submit inline comments
+    - `lareview-tasks_report_issue_check` to report issue checklist verification results
     - `lareview-tasks_finalize_review` to submit the final review
     {{else}}
     Rules:
     - Use `lareview-tasks_return_task` for each task
     - Use `lareview-tasks_add_feedback` for feedback
+    - Use `lareview-tasks_report_issue_check` to report rule verification{{#if has_rules}} (MANDATORY){{/if}}
     - Use `lareview-tasks_finalize_review` at the end
     {{/if}}
 
@@ -133,6 +189,10 @@
     - Verify hunk_ids exist in the manifest
     - For add_feedback, use `line_id` (L1, L2, etc.) from the manifest
     - If validation fails, read the error message for valid values
+
+    {{#if has_rules}}
+    **IMPORTANT**: You MUST call `lareview-tasks_report_issue_check` for each rule before finalizing the review.
+    {{/if}}
   </tool_policy>
 
   <hunk_accuracy>

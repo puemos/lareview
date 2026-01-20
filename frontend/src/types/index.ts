@@ -93,6 +93,7 @@ export interface Feedback {
   review_id: string;
   task_id: string | null;
   rule_id?: string | null;
+  finding_id?: string | null;
   title: string;
   status: 'todo' | 'in_progress' | 'done' | 'ignored';
   impact: 'blocking' | 'nice_to_have' | 'nitpick';
@@ -144,10 +145,73 @@ export interface ReviewRule {
   scope: RuleScope;
   repo_id?: string | null;
   glob?: string | null;
+  category?: string | null;
   text: string;
   enabled: boolean;
   created_at: string;
   updated_at: string;
+}
+
+// Issue Checklist Types
+export type CheckStatus = 'found' | 'not_found' | 'not_applicable' | 'skipped';
+export type Confidence = 'high' | 'medium' | 'low';
+
+export interface IssueCheck {
+  id: string;
+  run_id: string;
+  rule_id?: string | null;
+  category: string;
+  display_name: string;
+  status: CheckStatus;
+  confidence: Confidence;
+  summary?: string | null;
+  created_at: string;
+}
+
+export interface IssueFinding {
+  id: string;
+  check_id: string;
+  title: string;
+  description: string;
+  evidence: string;
+  file_path?: string | null;
+  line_number?: number | null;
+  impact: 'blocking' | 'nice_to_have' | 'nitpick';
+  created_at: string;
+}
+
+export interface IssueCheckWithFindings extends IssueCheck {
+  findings: IssueFinding[];
+}
+
+// Rule Library Types
+export type LibraryCategory =
+  | 'security'
+  | 'code_quality'
+  | 'testing'
+  | 'documentation'
+  | 'performance'
+  | 'api_design'
+  | 'language_specific'
+  | 'framework_specific';
+
+export interface LibraryRule {
+  id: string;
+  name: string;
+  library_category: LibraryCategory;
+  category?: string | null;
+  description: string;
+  text: string;
+  glob?: string | null;
+  tags: string[];
+}
+
+export interface DefaultIssueCategory {
+  id: string;
+  name: string;
+  description: string;
+  examples: string[];
+  enabled_by_default: boolean;
 }
 
 export interface Agent {

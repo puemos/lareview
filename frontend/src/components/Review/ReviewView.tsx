@@ -24,6 +24,8 @@ import type { ReviewTask, Feedback, ReviewRule } from '../../types';
 import { ReviewViewSkeleton } from './ReviewViewSkeleton';
 import { AddFeedbackModal } from './AddFeedbackModal';
 import type { DiffFile } from '../../types';
+import { ReviewSummary } from './ReviewSummary';
+import type { SidebarTab } from './ReviewSidebar';
 
 export const ReviewView: React.FC = () => {
   const selectedFile = useAppStore(state => state.selectedFile);
@@ -33,6 +35,8 @@ export const ReviewView: React.FC = () => {
   const selectedFeedbackId = useAppStore(state => state.selectedFeedbackId);
   const selectFeedback = useAppStore(state => state.selectFeedback);
   const reviewId = useAppStore(state => state.reviewId);
+  const reviewViewMode = useAppStore(state => state.reviewViewMode);
+  const setReviewViewMode = useAppStore(state => state.setReviewViewMode);
 
   const { runId, firstRun, error: reviewError, isLoading: isReviewLoading } = useReview(reviewId);
   const { data: parsedDiff, error: diffError } = useParsedDiff(runId, firstRun?.diff_text ?? null);
@@ -75,7 +79,7 @@ export const ReviewView: React.FC = () => {
   });
 
   const [activeTab, setActiveTab] = useState<'diff' | 'description' | 'diagram'>('description');
-  const [sidebarTab, setSidebarTab] = useState<'tasks' | 'feedback'>('tasks');
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('tasks');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPushModalOpen, setIsPushModalOpen] = useState(false);
   const [isDeleteFeedbackModalOpen, setIsDeleteFeedbackModalOpen] = useState(false);
@@ -90,10 +94,45 @@ export const ReviewView: React.FC = () => {
   }>({ type: 'global' });
 
   useEffect(() => {
-    if (tasks.length > 0 && !selectedTaskId && !isTasksLoading && sidebarTab === 'tasks') {
+    if (tasks.length > 0 && !selectedTaskId && !isTasksLoading && reviewViewMode === 'review' && sidebarTab === 'tasks') {
       selectTask(tasks[0].id);
     }
-  }, [tasks, selectedTaskId, isTasksLoading, selectTask, sidebarTab]);
+  }, [tasks, selectedTaskId, isTasksLoading, selectTask, reviewViewMode, sidebarTab]);
+
+  const handleStartReview = () => {
+    setReviewViewMode('review');
+    setSidebarTab('tasks');
+    if (tasks.length > 0) {
+      selectTask(tasks[0].id);
+    }
+  };
+
+  const handleSelectTaskFromSummary = (taskId: string) => {
+    selectTask(taskId);
+    setReviewViewMode('review');
+    setSidebarTab('tasks');
+  };
+
+  const handleBackToSummary = () => {
+    setReviewViewMode('summary');
+    selectTask(null);
+    selectFeedback(null);
+  };
+
+  const handleSelectFileFromSummary = (fileName: string) => {
+    const file = parsedDiff?.files?.find(f => f.name === fileName || f.new_path === fileName);
+    if (file) {
+      selectFile(file);
+      setReviewViewMode('review');
+      setSidebarTab('tasks');
+    }
+  };
+
+  const handleSelectFeedbackFromSummary = (feedbackId: string) => {
+    selectFeedback(feedbackId);
+    setReviewViewMode('review');
+    setSidebarTab('feedback');
+  };
 
   const selectedTask = tasks.find((t: ReviewTask) => t.id === selectedTaskId);
   const selectedFeedback: Feedback | null =
@@ -249,6 +288,44 @@ export const ReviewView: React.FC = () => {
     return <ErrorState error={reviewError} onRetry={handleRetry} />;
   }
 
+  // Summary mode - full width, no sidebar
+  if (reviewViewMode === 'summary') {
+    return (
+      <div className="bg-bg-primary flex h-full flex-col">
+        <Suspense fallback={<DiffSkeleton />}>
+          {diffError ? (
+            <ErrorState
+              error={diffError instanceof Error ? diffError : new Error(String(diffError))}
+              onRetry={handleRetry}
+            />
+          ) : (
+            <ReviewSummary
+              runId={runId ?? undefined}
+              tasks={tasks}
+              feedbacks={feedbacks}
+              parsedDiff={parsedDiff ?? null}
+              review={currentReview ?? null}
+              onSelectFeedback={handleSelectFeedbackFromSummary}
+              onSelectFile={handleSelectFileFromSummary}
+              onSelectTask={handleSelectTaskFromSummary}
+              onStartReview={handleStartReview}
+            />
+          )}
+        </Suspense>
+
+        <SelectionModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onConfirm={handleExport}
+          tasks={tasks}
+          feedbacks={feedbacks}
+          remoteProviderName={remoteProviderName}
+        />
+      </div>
+    );
+  }
+
+  // Review mode - sidebar + content
   return (
     <div className="bg-bg-primary flex h-full">
       <ReviewSidebar
@@ -265,6 +342,7 @@ export const ReviewView: React.FC = () => {
         onSelectFeedback={selectFeedback}
         onOpenExportModal={() => setIsModalOpen(true)}
         onAddGlobalFeedback={handleAddGlobalFeedback}
+        onBackToSummary={handleBackToSummary}
         rulesById={rulesById}
       />
 

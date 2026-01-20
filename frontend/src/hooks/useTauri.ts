@@ -14,6 +14,10 @@ import type {
   CliStatus,
   ReviewSource,
   ReviewRule,
+  IssueCheckWithFindings,
+  LibraryRule,
+  DefaultIssueCategory,
+  LibraryCategory,
 } from '../types';
 import { useCallback } from 'react';
 
@@ -94,6 +98,7 @@ interface ReviewRuleInput {
   scope: 'global' | 'repo';
   repo_id?: string | null;
   glob?: string | null;
+  category?: string | null;
   text: string;
   enabled: boolean;
 }
@@ -645,6 +650,34 @@ export const useTauri = () => {
     }, []),
     setRepoSnapshotAccess: useCallback(async (repoId: string, allowed: boolean): Promise<void> => {
       return invoke('set_repo_snapshot_access', { repoId, allowed });
+    }, []),
+
+    // Issue checks
+    getIssueChecksForRun: useCallback(async (runId: string): Promise<IssueCheckWithFindings[]> => {
+      return invoke('get_issue_checks_for_run', { runId });
+    }, []),
+
+    // Rule library
+    getRuleLibrary: useCallback(async (): Promise<LibraryRule[]> => {
+      return invoke('get_rule_library');
+    }, []),
+    getRuleLibraryByCategory: useCallback(async (category: LibraryCategory): Promise<LibraryRule[]> => {
+      return invoke('get_rule_library_by_category', { category });
+    }, []),
+    getRuleLibraryChecklists: useCallback(async (): Promise<LibraryRule[]> => {
+      return invoke('get_rule_library_checklists');
+    }, []),
+    getRuleLibraryGuidelines: useCallback(async (): Promise<LibraryRule[]> => {
+      return invoke('get_rule_library_guidelines');
+    }, []),
+    addRuleFromLibrary: useCallback(
+      async (libraryRuleId: string, scope: 'global' | 'repo', repoId?: string): Promise<ReviewRule> => {
+        return invoke('add_rule_from_library', { libraryRuleId, scope, repoId });
+      },
+      []
+    ),
+    getDefaultIssueCategories: useCallback(async (): Promise<DefaultIssueCategory[]> => {
+      return invoke('get_default_issue_categories');
     }, []),
   };
 };

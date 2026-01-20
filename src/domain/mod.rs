@@ -3,17 +3,21 @@
 
 pub mod error;
 pub mod feedback;
+pub mod issue_check;
 pub mod repo;
 pub mod review;
 pub mod rule;
+pub mod rule_library;
 pub mod snapshot;
 pub mod task;
 
 pub use error::*;
 pub use feedback::*;
+pub use issue_check::*;
 pub use repo::*;
 pub use review::*;
 pub use rule::*;
+pub use rule_library::*;
 pub use snapshot::*;
 pub use task::*;
 

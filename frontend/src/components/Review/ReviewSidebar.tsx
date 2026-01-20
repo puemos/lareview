@@ -1,13 +1,16 @@
 import React, { Suspense } from 'react';
 import { motion } from 'framer-motion';
+import { ArrowLeft } from '@phosphor-icons/react';
 import { SHARED_LAYOUT_TRANSITION } from '../../constants/animations';
 import type { ReviewTask, Feedback, ReviewRule } from '../../types';
 import { TaskList, TaskListSkeleton } from './TaskList';
 import { FeedbackList } from './FeedbackList';
 import { ICONS } from '../../constants/icons';
 
+export type SidebarTab = 'tasks' | 'feedback';
+
 interface ReviewSidebarProps {
-  sidebarTab: 'tasks' | 'feedback';
+  sidebarTab: SidebarTab;
   tasks: ReviewTask[];
   feedbacks: Feedback[];
   rulesById: Record<string, ReviewRule>;
@@ -16,11 +19,12 @@ interface ReviewSidebarProps {
   isTasksLoading: boolean;
   isTasksFetching: boolean;
   isFeedbacksLoading: boolean;
-  onSidebarTabChange: (tab: 'tasks' | 'feedback') => void;
+  onSidebarTabChange: (tab: SidebarTab) => void;
   onSelectTask: (taskId: string | null) => void;
   onSelectFeedback: (feedbackId: string | null) => void;
   onOpenExportModal: () => void;
   onAddGlobalFeedback: () => void;
+  onBackToSummary: () => void;
 }
 
 export const ReviewSidebar: React.FC<ReviewSidebarProps> = ({
@@ -38,8 +42,9 @@ export const ReviewSidebar: React.FC<ReviewSidebarProps> = ({
   onSelectFeedback,
   onOpenExportModal,
   onAddGlobalFeedback,
+  onBackToSummary,
 }) => {
-  const handleTabChange = (tab: 'tasks' | 'feedback') => {
+  const handleTabChange = (tab: SidebarTab) => {
     onSidebarTabChange(tab);
     if (tab === 'tasks') {
       onSelectFeedback(null);
@@ -57,6 +62,15 @@ export const ReviewSidebar: React.FC<ReviewSidebarProps> = ({
   return (
     <div className="border-border bg-bg-secondary/30 flex w-[300px] flex-col border-r">
       <div className="border-border bg-bg-secondary/50 border-b p-3">
+        {/* Back to Summary link */}
+        <button
+          onClick={onBackToSummary}
+          className="text-text-secondary hover:text-text-primary mb-3 flex w-full items-center gap-1.5 text-xs transition-colors"
+        >
+          <ArrowLeft size={14} weight="bold" />
+          <span>Summary</span>
+        </button>
+
         <div className="mb-3 flex">
           <div
             className={`flex items-center overflow-hidden transition-all duration-300 ease-in-out ${
@@ -131,7 +145,7 @@ interface TabButtonProps {
   onClick: () => void;
   icon: React.ElementType;
   label: string;
-  count: number;
+  count?: number;
 }
 
 const TabButton: React.FC<TabButtonProps> = ({ active, onClick, icon: Icon, label, count }) => (
@@ -151,7 +165,7 @@ const TabButton: React.FC<TabButtonProps> = ({ active, onClick, icon: Icon, labe
     <div className="relative z-10 flex items-center gap-1.5">
       <Icon size={12} />
       {label}
-      {count > 0 && <span className="text-[10px] opacity-60">({count})</span>}
+      {count !== undefined && count > 0 && <span className="text-[10px] opacity-60">({count})</span>}
     </div>
   </button>
 );

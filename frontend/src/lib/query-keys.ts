@@ -10,6 +10,9 @@ export const queryKeys = {
   repos: ['repos'] as const,
   agents: ['agents'] as const,
   rules: ['rules'] as const,
+  issueChecks: (runId: string) => ['issueChecks', runId] as const,
+  ruleLibrary: ['ruleLibrary'] as const,
+  defaultIssueCategories: ['defaultIssueCategories'] as const,
 };
 
 export type QueryKeyType = typeof queryKeys;

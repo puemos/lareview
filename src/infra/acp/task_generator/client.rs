@@ -20,6 +20,7 @@ const TOOL_RETURN_TASK: &str = "return_task";
 const TOOL_RETURN_PLANS: &str = "return_plans";
 const TOOL_FINALIZE_REVIEW: &str = "finalize_review";
 const TOOL_ADD_FEEDBACK: &str = "add_feedback";
+const TOOL_REPORT_ISSUE_CHECK: &str = "report_issue_check";
 
 /// All LaReview tool names that should be auto-approved.
 const LAREVIEW_TOOLS: &[&str] = &[
@@ -27,6 +28,7 @@ const LAREVIEW_TOOLS: &[&str] = &[
     TOOL_RETURN_PLANS,
     TOOL_FINALIZE_REVIEW,
     TOOL_ADD_FEEDBACK,
+    TOOL_REPORT_ISSUE_CHECK,
 ];
 
 #[allow(dead_code)]

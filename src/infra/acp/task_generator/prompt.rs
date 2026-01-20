@@ -1,10 +1,23 @@
-use crate::domain::ResolvedRule;
+use crate::domain::{DefaultIssueCategory, ResolvedRule};
 use crate::infra::acp::task_mcp_server::RunContext;
 use crate::prompts;
 use agent_client_protocol::{ClientCapabilities, FileSystemCapability, Meta};
 use anyhow::Context;
 use serde_json::json;
 use std::path::PathBuf;
+
+/// Rule item structure for the template
+#[derive(serde::Serialize)]
+struct RuleItem {
+    category: String,
+    display_name: String,
+    text: String,
+    glob: Option<String>,
+    scope: String,
+    has_matches: bool,
+    matched_files: Vec<String>,
+    rule_id: Option<String>,
+}
 
 pub(super) fn build_prompt(
     run: &RunContext,
@@ -20,6 +33,28 @@ pub(super) fn build_prompt(
         Err(_) => String::new(),
     };
 
+    // Convert all rules to rule items for the template
+    let rule_items: Vec<RuleItem> = rules
+        .iter()
+        .map(|rule| RuleItem {
+            category: rule.category.clone().unwrap_or_else(|| rule.id.clone()),
+            display_name: rule
+                .category
+                .as_ref()
+                .map(|c| format_category_name(c))
+                .unwrap_or_else(|| "Custom Rule".to_string()),
+            text: rule.text.clone(),
+            glob: rule.glob.clone(),
+            scope: rule.scope.to_string(),
+            has_matches: rule.has_matches,
+            matched_files: rule.matched_files.clone(),
+            rule_id: Some(rule.id.clone()),
+        })
+        .collect();
+
+    // Get default issue categories (could be filtered by user settings in the future)
+    let default_categories = DefaultIssueCategory::defaults();
+
     prompts::render(
         "generate_tasks",
         &json!({
@@ -31,11 +66,30 @@ pub(super) fn build_prompt(
             "has_repo_access": has_repo_access,
             "repo_root": repo_root.map(|p| p.display().to_string()),
             "repo_access_note": if has_repo_access { "read-only" } else { "none" },
-            "has_rules": !rules.is_empty(),
-            "rules": rules
+            // All rules are treated equally - verified by AI
+            "has_rules": !rule_items.is_empty(),
+            "rules": rule_items,
+            // Default categories (built-in)
+            "has_default_categories": !default_categories.is_empty(),
+            "default_categories": default_categories,
         }),
     )
     .context("failed to render generate_tasks prompt")
+}
+
+/// Format a category ID into a display name
+fn format_category_name(category: &str) -> String {
+    category
+        .split('-')
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(first) => first.to_uppercase().chain(chars).collect(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 pub(super) fn build_client_capabilities(has_repo_access: bool) -> ClientCapabilities {

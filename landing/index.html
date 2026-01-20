@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>LaReview — The Code Review Workbench</title>
+        <title>LaReview - The Code Review Workbench</title>
         <link
             rel="icon"
             type="image/svg+xml"
@@ -21,7 +21,7 @@
         <meta property="og:description" content="Stop doom-scrolling. LaReview is a local-first workbench that uses AI to generate structured review plans and diagrams.">
         <meta property="og:type" content="website">
         <meta property="og:url" content="https://lareview.dev/">
-        <meta property="og:image" content="./assets/og-image.png">
+        <meta property="og:image" content="./assets/og-image.jpg">
         <meta property="og:site_name" content="LaReview">
 
         <!-- Twitter -->
@@ -29,7 +29,7 @@
         <meta name="twitter:site" content="@puemos">
         <meta name="twitter:title" content="LaReview: The Code Review Workbench">
         <meta name="twitter:description" content="Turn diffs into structured review tasks with local-first AI. Privacy-focused, depth-oriented.">
-        <meta name="twitter:image" content="./assets/og-image.png">
+        <meta name="twitter:image" content="./assets/og-image.jpg">
 
         <!-- Structured Data -->
         <script type="application/ld+json">
@@ -47,11 +47,14 @@
           "description": "Code review workbench that transforms diffs into structured review tasks using local coding agents.",
           "featureList": [
             "AI-powered planning",
+            "Review Summary with Issue Checklist",
             "Task-focused diffs",
-            "Architectural Diagrams",
+            "High-signal feedback",
+            "Custom rules",
             "Local context",
-            "GitHub sync",
+            "GitHub/GitLab sync",
             "CLI support",
+            "Architectural Diagrams",
             "Export to Markdown"
           ],
           "author": {
@@ -380,9 +383,9 @@
 
         <section id="features" aria-labelledby="features-heading" class="w-full">
             <h2 id="features-heading" class="sr-only">Features</h2>
-            <div class="grid grid-cols-1">
+            <div class="grid grid-cols-1 md:grid-cols-2">
                 <div
-                    class="border-b border-theme p-8 md:p-12 flex flex-col items-center text-center"
+                    class="border-b border-r-0 md:border-r border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
                 >
                     <div class="mb-auto">
                         <span
@@ -392,44 +395,14 @@
                         <h3 class="text-2xl font-bold uppercase mb-2">
                             AI-Powered Planning
                         </h3>
-                        <p class="text-velura-gray max-w-lg mx-auto min-h-12">
-                            Input a PR (GitHub/GitLab) or diff. LaReview acts as a staff engineer, looking for flows and hazards to build a structured review plan.
-                        </p>
-                    </div>
-                    <div
-                        class="mt-8 border border-theme p-2 bg-stone-200 w-full max-w-xl"
-                    >
-                        <img
-                            src="./assets/screenshots/generate.webp"
-                            alt="LaReview's AI planning interface showing a generated review checklist"
-                            class="w-full cursor-zoom-in lightbox-trigger"
-                            loading="lazy"
-                            decoding="async"
-                        />
-                    </div>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2">
-                <div
-                    class="border-b border-r-0 md:border-r border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
-                >
-                    <div class="mb-auto">
-                        <span
-                            class="block text-5xl font-display font-light mb-4"
-                            >02</span
-                        >
-                        <h3 class="text-2xl font-bold uppercase mb-2">
-                            Task-Focused Diffs
-                        </h3>
                         <p class="text-velura-gray min-h-12">
-                            Review one logical concern at a time. The workbench isolates relevant code hunks for each task, eliminating noise.
+                            Input a PR (GitHub/GitLab) or diff. LaReview acts as a staff engineer, looking for flows and hazards to build a structured review plan.
                         </p>
                     </div>
                     <div class="mt-8 border border-theme p-2 bg-stone-200">
                         <img
-                            src="./assets/screenshots/review-changes.webp"
-                            alt="Task-focused diff viewer isolating relevant code hunks for step-by-step review"
+                            src="./assets/screenshots/generate.webp"
+                            alt="LaReview's AI planning interface showing a generated review checklist"
                             class="w-full cursor-zoom-in lightbox-trigger"
                             loading="lazy"
                             decoding="async"
@@ -443,13 +416,39 @@
                     <div class="mb-auto">
                         <span
                             class="block text-5xl font-display font-light mb-4"
+                            >02</span
+                        >
+                        <h3 class="text-2xl font-bold uppercase mb-2">
+                            Task-Focused Review
+                        </h3>
+                        <p class="text-velura-gray min-h-12">
+                            See all your review tasks at a glance, grouped by flow and ordered by risk. Track progress, view feedback items, and navigate the change with a files heatmap.
+                        </p>
+                    </div>
+                    <div class="mt-8 border border-theme p-2 bg-stone-200">
+                        <img
+                            src="./assets/screenshots/review.webp"
+                            alt="Task-focused review view with tasks grouped by flow and files heatmap"
+                            class="w-full cursor-zoom-in lightbox-trigger"
+                            loading="lazy"
+                            decoding="async"
+                        />
+                    </div>
+                </div>
+
+                <div
+                    class="border-b border-r-0 md:border-r border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                >
+                    <div class="mb-auto">
+                        <span
+                            class="block text-5xl font-display font-light mb-4"
                             >03</span
                         >
                         <h3 class="text-2xl font-bold uppercase mb-2">
                             High-Signal Framework
                         </h3>
                         <p class="text-velura-gray min-h-12">
-                            The AI proactively identifies bugs and authenticates them against your rules. No comment spam—just focused feedback threads anchored to specific lines.
+                            The AI proactively identifies bugs and authenticates them against your rules. No comment spam, just focused feedback threads anchored to specific lines.
                         </p>
                     </div>
                     <div class="mt-8 border border-theme p-2 bg-stone-200">
@@ -462,12 +461,38 @@
                 </div>
 
                 <div
-                    class="border-b border-r-0 md:border-r border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                    class="border-b border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
                 >
                     <div class="mb-auto">
                         <span
                             class="block text-5xl font-display font-light mb-4"
                             >04</span
+                        >
+                        <h3 class="text-2xl font-bold uppercase mb-2">
+                            Custom Rules
+                        </h3>
+                        <p class="text-velura-gray min-h-12">
+                            Define rules like "DB queries must have timeouts" or "API changes need a migration note" to enforce standards automatically.
+                        </p>
+                    </div>
+                    <div class="mt-8 border border-theme p-2 bg-stone-200">
+                        <img
+                            src="./assets/screenshots/rules.webp"
+                            alt="Rules configuration interface for defining custom standards"
+                            class="w-full cursor-zoom-in lightbox-trigger"
+                            loading="lazy"
+                            decoding="async"
+                        />
+                    </div>
+                </div>
+
+                <div
+                    class="border-b border-r-0 md:border-r border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                >
+                    <div class="mb-auto">
+                        <span
+                            class="block text-5xl font-display font-light mb-4"
+                            >05</span
                         >
                         <h3 class="text-2xl font-bold uppercase mb-2">
                             Local Context
@@ -493,7 +518,7 @@
                     <div class="mb-auto">
                         <span
                             class="block text-5xl font-display font-light mb-4"
-                            >05</span
+                            >06</span
                         >
                         <h3 class="text-2xl font-bold uppercase mb-2">
                             Git Host Sync
@@ -520,7 +545,33 @@
                     <div class="mb-auto">
                         <span
                             class="block text-5xl font-display font-light mb-4"
-                            >06</span
+                            >07</span
+                        >
+                        <h3 class="text-2xl font-bold uppercase mb-2">
+                            Visual Diagrams
+                        </h3>
+                        <p class="text-velura-gray min-h-12">
+                            Visualize the flow. Automatically generate diagrams to see architectural changes before you read a single line of code.
+                        </p>
+                    </div>
+                    <div class="mt-8 border border-theme p-2 bg-stone-200">
+                        <img
+                            src="./assets/screenshots/review-diagram.webp"
+                            alt="Visual diagram showing code architecture and flow changes"
+                            class="w-full cursor-zoom-in lightbox-trigger"
+                            loading="lazy"
+                            decoding="async"
+                        />
+                    </div>
+                </div>
+
+                <div
+                    class="border-b border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                >
+                    <div class="mb-auto">
+                        <span
+                            class="block text-5xl font-display font-light mb-4"
+                            >08</span
                         >
                         <h3 class="text-2xl font-bold uppercase mb-2">
                             CLI Support
@@ -572,32 +623,6 @@
                         </div>
                     </div>
                 </div>
-
-                <div
-                    class="border-b border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
-                >
-                    <div class="mb-auto">
-                        <span
-                            class="block text-5xl font-display font-light mb-4"
-                            >06</span
-                        >
-                        <h3 class="text-2xl font-bold uppercase mb-2">
-                            Visual Diagrams
-                        </h3>
-                        <p class="text-velura-gray">
-                            Visualize the flow. Automatically generate diagrams to see architectural changes before you read a single line of code.
-                        </p>
-                    </div>
-                    <div class="mt-8 border border-theme p-2 bg-stone-200">
-                        <img
-                            src="./assets/screenshots/review-diagram.webp"
-                            alt="Visual diagram showing code architecture and flow changes"
-                            class="w-full cursor-zoom-in lightbox-trigger"
-                            loading="lazy"
-                            decoding="async"
-                        />
-                    </div>
-                </div>
             </div>
         </section>
 
@@ -613,7 +638,7 @@
                     Workflow
                 </h2>
 
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-8">
                     <div class="flex flex-col gap-4 group">
                         <div class="h-px w-full bg-velura-dark"></div>
                         <span
@@ -669,6 +694,19 @@
                             export to Markdown.
                         </p>
                     </div>
+
+                    <div class="flex flex-col gap-4 group">
+                        <div class="h-px w-full bg-velura-dark"></div>
+                        <span
+                            class="font-mono text-sm text-velura-gray flex items-center gap-2"
+                        >
+                            <i class="ph-bold ph-number-five"></i> PUSH
+                        </span>
+                        <h4 class="text-xl font-bold">Push</h4>
+                        <p class="text-sm text-velura-gray">
+                            Submit your review directly to GitHub or GitLab with auto-generated summaries.
+                        </p>
+                    </div>
                 </div>
             </div>
         </section>
@@ -690,7 +728,7 @@
 
                 <div class="flex flex-col items-center gap-8">
                     <!-- Primary Hero Command -->
-                    <div class="relative group cursor-pointer w-full max-w-2xl mx-auto" 
+                    <div class="relative group cursor-pointer w-full max-w-2xl mx-auto"
                          onclick="navigator.clipboard.writeText('brew install --cask puemos/tap/lareview'); const el = this.querySelector('.copy-feedback'); el.classList.remove('opacity-0'); setTimeout(() => el.classList.add('opacity-0'), 2000);">
                         <div class="bg-velura-dark text-velura-bg px-6 md:px-10 py-6 rounded-md font-mono text-sm md:text-lg shadow-xl flex items-center justify-between gap-4 hover:-translate-y-1 transition-transform border border-transparent">
                             <div class="flex items-center gap-3 md:gap-4 overflow-x-auto scrollbar-hide">
@@ -703,10 +741,10 @@
                             Copied to clipboard!
                         </div>
                     </div>
-            
+
                     <!-- Divider / Or -->
                     <div class="text-velura-gray font-mono text-xs tracking-widest uppercase">or download binary</div>
-            
+
                     <!-- Secondary Buttons -->
                     <div class="flex flex-col md:flex-row justify-center gap-4 w-full">
                         <a href="https://github.com/puemos/lareview/releases" class="bg-transparent text-velura-dark px-8 py-4 text-sm font-bold tracking-widest border border-theme flex items-center justify-center gap-2 hover:-translate-y-1 transition-transform">
@@ -716,9 +754,9 @@
                             <i class="ph-bold ph-linux-logo text-lg"></i> Linux
                         </a>
                     </div>
-                    
+
                     <!-- Tertiary options -->
-                    <div class="mt-2 font-mono text-xs text-velura-gray group cursor-pointer" 
+                    <div class="mt-2 font-mono text-xs text-velura-gray group cursor-pointer"
                          onclick="navigator.clipboard.writeText('git diff | lareview'); this.classList.add('text-green-600'); setTimeout(() => this.classList.remove('text-green-600'), 1000);"
                          title="Click to copy">
                          Pipe from git: <code class="bg-gray-200 px-2 py-1 rounded transition-colors group-hover:bg-gray-300">git diff | lareview</code>

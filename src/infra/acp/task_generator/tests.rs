@@ -115,16 +115,17 @@ mod policy_tests {
             scope: RuleScope::Global,
             repo_id: None,
             glob: Some("src/**/*.rs".into()),
+            category: None,
             text: "Prioritize auth checks".into(),
             matched_files: vec!["src/a.rs".into()],
             has_matches: true,
         }];
         let prompt =
             crate::infra::acp::task_generator::prompt::build_prompt(&run, None, &rules).unwrap();
-        assert!(prompt.contains("Additional review rules"));
+        assert!(prompt.contains("<review_rules>"));
         assert!(prompt.contains("Prioritize auth checks"));
-        assert!(prompt.contains("[rule-1]"));
-        assert!(!prompt.contains("[global|rule-1]"));
+        assert!(prompt.contains("[rule-1]")); // category defaults to rule id when None
+        assert!(prompt.contains("(rule_id: rule-1)"));
         assert!(prompt.contains("src/**/*.rs"));
     }
 

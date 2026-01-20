@@ -49,6 +49,7 @@ interface AppStore {
   selectedRepoId: string;
   prRef: string;
   viewMode: 'raw' | 'diff';
+  reviewViewMode: 'summary' | 'review';
   planItems: string[];
   isPlanExpanded: boolean;
 
@@ -75,6 +76,7 @@ interface AppStore {
   setSelectedRepoId: (repoId: string) => void;
   setPrRef: (prRef: string) => void;
   setViewMode: (mode: 'raw' | 'diff') => void;
+  setReviewViewMode: (mode: 'summary' | 'review') => void;
   setIsPlanExpanded: (isExpanded: boolean) => void;
   reset: () => void;
 }
@@ -101,6 +103,7 @@ export const useAppStore = create<AppStore>()(
         selectedRepoId: '',
         prRef: '',
         viewMode: 'raw',
+        reviewViewMode: 'summary',
         planItems: [],
         isPlanExpanded: false,
 
@@ -333,6 +336,7 @@ export const useAppStore = create<AppStore>()(
         setSelectedRepoId: repoId => set({ selectedRepoId: repoId }),
         setPrRef: prRef => set({ prRef }),
         setViewMode: mode => set({ viewMode: mode }),
+        setReviewViewMode: mode => set({ reviewViewMode: mode }),
         setIsPlanExpanded: isExpanded => set({ isPlanExpanded: isExpanded }),
 
         reset: () =>
@@ -354,6 +358,7 @@ export const useAppStore = create<AppStore>()(
             selectedRepoId: '',
             prRef: '',
             viewMode: 'raw',
+            reviewViewMode: 'summary',
             planItems: [],
             isPlanExpanded: false,
           }),

@@ -260,6 +260,79 @@ pub(super) fn create_add_feedback_tool(config: Arc<ServerConfig>) -> impl ToolHa
     .with_schema(add_feedback_schema())
 }
 
+/// Create the report_issue_check tool for reporting issue checklist verification results.
+pub(super) fn create_report_issue_check_tool(config: Arc<ServerConfig>) -> impl ToolHandler {
+    SimpleTool::new("report_issue_check", move |args: Value, _extra| {
+        let config = config.clone();
+        Box::pin(async move {
+            log_to_file(&config, "report_issue_check called");
+            let persist_args = args.clone();
+
+            let persist_config = config.clone();
+            let persist_result = tokio::task::spawn_blocking(move || {
+                super::persistence::save_issue_check(&persist_config, persist_args)
+            })
+            .await;
+
+            match persist_result {
+                Ok(Ok(check_id)) => {
+                    log_to_file(
+                        &config,
+                        &format!("ReportIssueCheckTool persisted check: {}", check_id),
+                    );
+                    Ok(json!({ "status": "ok", "message": "Issue check reported successfully", "check_id": check_id }))
+                },
+                Ok(Err(err)) => {
+                    log_to_file(
+                        &config,
+                        &format!("ReportIssueCheckTool failed to save check: {err:?}"),
+                    );
+                    Err(pmcp::Error::Validation(format!("invalid report_issue_check payload: {err}")))
+                }
+                Err(join_err) => {
+                    log_to_file(
+                        &config,
+                        &format!("ReportIssueCheckTool task join error: {join_err}"),
+                    );
+                    Err(pmcp::Error::Internal(format!(
+                        "report_issue_check persistence join error: {join_err}"
+                    )))
+                }
+            }
+        })
+    })
+    .with_description(
+        "Report the verification result for an issue checklist category.\n\n\
+         **MANDATORY**: You must call this for every checklist item before finalizing the review.\n\n\
+         **Format:**\n\
+         ```json\n\
+         {\n\
+           \"category\": \"security\",\n\
+           \"status\": \"found\",\n\
+           \"confidence\": \"high\",\n\
+           \"summary\": \"Found SQL injection vulnerability\",\n\
+           \"findings\": [\n\
+             {\n\
+               \"title\": \"SQL injection in user query\",\n\
+               \"description\": \"User input concatenated directly into SQL\",\n\
+               \"evidence\": \"Line 45: query = 'SELECT * FROM users WHERE id=' + user_id\",\n\
+               \"file_path\": \"src/db/users.rs\",\n\
+               \"line_number\": 45,\n\
+               \"impact\": \"blocking\"\n\
+             }\n\
+           ]\n\
+         }\n\
+         ```\n\n\
+         **Status values:**\n\
+         - `found`: Issues detected in this category\n\
+         - `not_found`: Checked thoroughly, no issues\n\
+         - `not_applicable`: Category doesn't apply to this PR\n\
+         - `skipped`: Could not fully check\n\n\
+         **Confidence:** `high`, `medium`, or `low`",
+    )
+    .with_schema(report_issue_check_schema())
+}
+
 #[derive(Debug, Deserialize)]
 struct RepoSearchArgs {
     query: String,
@@ -824,6 +897,76 @@ fn add_feedback_schema() -> Value {
             }
         },
         "required": ["body"]
+    })
+}
+
+fn report_issue_check_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "category": {
+                "type": "string",
+                "description": "The category being checked (e.g., 'security', 'breaking-changes', 'performance'). Use the ID from the checklist."
+            },
+            "rule_id": {
+                "type": "string",
+                "description": "Optional rule ID if this check is for a custom checklist rule."
+            },
+            "display_name": {
+                "type": "string",
+                "description": "Human-readable name for the category (e.g., 'Security', 'Breaking Changes')."
+            },
+            "status": {
+                "type": "string",
+                "enum": ["found", "not_found", "not_applicable", "skipped"],
+                "description": "Result of the check: found (issues detected), not_found (no issues), not_applicable (category doesn't apply), skipped (couldn't check)."
+            },
+            "confidence": {
+                "type": "string",
+                "enum": ["high", "medium", "low"],
+                "description": "Confidence level in the assessment."
+            },
+            "summary": {
+                "type": "string",
+                "description": "Brief explanation of findings or why the category is N/A."
+            },
+            "findings": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "title": {
+                            "type": "string",
+                            "description": "Brief title of the finding."
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Detailed description of the issue."
+                        },
+                        "evidence": {
+                            "type": "string",
+                            "description": "Code snippet or reasoning supporting the finding."
+                        },
+                        "file_path": {
+                            "type": "string",
+                            "description": "Path to the file where the issue was found."
+                        },
+                        "line_number": {
+                            "type": "integer",
+                            "description": "Line number where the issue occurs."
+                        },
+                        "impact": {
+                            "type": "string",
+                            "enum": ["blocking", "nice_to_have", "nitpick"],
+                            "description": "Severity of the finding."
+                        }
+                    },
+                    "required": ["title", "description", "evidence", "impact"]
+                },
+                "description": "Array of specific issues found (required if status is 'found')."
+            }
+        },
+        "required": ["category", "status", "confidence"]
     })
 }
 

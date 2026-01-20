@@ -3,12 +3,14 @@ import { Asterisk, Check, PencilSimple, Trash } from '@phosphor-icons/react';
 import { ICONS } from '../../constants/icons';
 import { useRules, type ReviewRuleInput } from '../../hooks/useRules';
 import { useRepos } from '../../hooks/useRepos';
+import { RuleLibraryModal } from './RuleLibraryModal';
 import type { LinkedRepo, ReviewRule, RuleScope } from '../../types';
 
 interface RuleDraft {
   scope: RuleScope;
   repo_id: string;
   glob: string;
+  category: string;
   text: string;
   enabled: boolean;
 }
@@ -17,6 +19,7 @@ const emptyDraft: RuleDraft = {
   scope: 'global',
   repo_id: '',
   glob: '',
+  category: '',
   text: '',
   enabled: true,
 };
@@ -27,6 +30,7 @@ export const RulesView: React.FC = () => {
 
   const [draft, setDraft] = useState<RuleDraft>(emptyDraft);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState<RuleDraft>(emptyDraft);
 
@@ -46,6 +50,7 @@ export const RulesView: React.FC = () => {
     scope: state.scope,
     repo_id: state.scope === 'repo' ? state.repo_id || null : null,
     glob: state.glob.trim() ? state.glob.trim() : null,
+    category: state.category.trim() ? state.category.trim() : null,
     text: state.text.trim(),
     enabled: state.enabled,
   });
@@ -66,6 +71,7 @@ export const RulesView: React.FC = () => {
       scope: rule.scope,
       repo_id: rule.repo_id || '',
       glob: rule.glob || '',
+      category: rule.category || '',
       text: rule.text,
       enabled: rule.enabled,
     });
@@ -88,6 +94,7 @@ export const RulesView: React.FC = () => {
         scope: rule.scope,
         repo_id: rule.repo_id || null,
         glob: rule.glob || null,
+        category: rule.category || null,
         text: rule.text,
         enabled: !rule.enabled,
       },
@@ -108,20 +115,30 @@ export const RulesView: React.FC = () => {
             Rules
           </h1>
         </div>
-        <button
-          onClick={openAddModal}
-          className="bg-brand text-bg-primary shadow-custom flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[10px] font-bold transition-all hover:brightness-110"
-        >
-          <ICONS.ICON_PLUS size={12} weight="bold" />
-          Add Rule
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsLibraryOpen(true)}
+            className="bg-bg-tertiary text-text-secondary hover:text-text-primary border-border flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-[10px] font-bold transition-all hover:brightness-110"
+          >
+            <ICONS.ICON_PLAN size={12} />
+            Library
+          </button>
+          <button
+            onClick={openAddModal}
+            className="bg-brand text-bg-primary shadow-custom flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[10px] font-bold transition-all hover:brightness-110"
+          >
+            <ICONS.ICON_PLUS size={12} weight="bold" />
+            Add Rule
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-8">
         <div className="mx-auto max-w-5xl space-y-6">
           <div className="text-text-tertiary text-xs leading-relaxed">
-            Rules shape how the agent reviews changes. Apply them globally or scope them to a
-            repository and optional glob pattern.
+            Rules define what the AI should verify during code review. Each rule is checked and
+            findings are reported. Apply them globally or scope them to a repository and optional
+            glob pattern.
           </div>
 
           <RuleSection
@@ -166,6 +183,12 @@ export const RulesView: React.FC = () => {
         onSubmit={handleCreate}
         isSubmitting={createRule.isPending}
         canSubmit={canSubmit(draft)}
+      />
+
+      <RuleLibraryModal
+        isOpen={isLibraryOpen}
+        onClose={() => setIsLibraryOpen(false)}
+        repos={repos}
       />
     </div>
   );
@@ -294,18 +317,33 @@ const RuleForm: React.FC<RuleFormProps> = ({
         </div>
       )}
 
-      <label className="space-y-1">
-        <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
-          Glob Pattern (Optional)
-        </span>
-        <input
-          type="text"
-          value={draft.glob}
-          onChange={e => onChange({ ...draft, glob: e.target.value })}
-          placeholder="src/**/*.rs"
-          className="bg-bg-tertiary border-border text-text-primary focus:border-brand focus:ring-brand/20 w-full rounded-md border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none"
-        />
-      </label>
+      <div className="grid gap-4 md:grid-cols-2">
+        <label className="space-y-1">
+          <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
+            Category (Optional)
+          </span>
+          <input
+            type="text"
+            value={draft.category}
+            onChange={e => onChange({ ...draft, category: e.target.value })}
+            placeholder="e.g., security, performance"
+            className="bg-bg-tertiary border-border text-text-primary focus:border-brand focus:ring-brand/20 w-full rounded-md border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none"
+          />
+        </label>
+
+        <label className="space-y-1">
+          <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
+            Glob Pattern (Optional)
+          </span>
+          <input
+            type="text"
+            value={draft.glob}
+            onChange={e => onChange({ ...draft, glob: e.target.value })}
+            placeholder="src/**/*.rs"
+            className="bg-bg-tertiary border-border text-text-primary focus:border-brand focus:ring-brand/20 w-full rounded-md border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none"
+          />
+        </label>
+      </div>
 
       <label className="space-y-1">
         <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
@@ -315,7 +353,7 @@ const RuleForm: React.FC<RuleFormProps> = ({
           value={draft.text}
           onChange={e => onChange({ ...draft, text: e.target.value })}
           rows={4}
-          placeholder="Explain the review focus in plain language."
+          placeholder="Describe what the AI should check for and report on."
           className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand focus:ring-brand/20 w-full resize-none rounded-md border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none"
         />
       </label>
@@ -418,6 +456,11 @@ const RuleSection: React.FC<RuleSectionProps> = ({
                         {rule.scope === 'repo' && (
                           <span className="bg-bg-tertiary rounded px-2 py-0.5">
                             {repoName(rule.repo_id)}
+                          </span>
+                        )}
+                        {rule.category && (
+                          <span className="bg-bg-tertiary rounded px-2 py-0.5">
+                            {rule.category}
                           </span>
                         )}
                         {rule.glob && (

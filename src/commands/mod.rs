@@ -796,6 +796,7 @@ pub fn save_feedback(
         review_id: feedback.review_id,
         task_id: feedback.task_id,
         rule_id: feedback.rule_id,
+        finding_id: None,
         title: feedback.title,
         status: ReviewStatus::Todo,
         impact,
@@ -1558,6 +1559,7 @@ pub struct ReviewRuleInput {
     pub scope: String,
     pub repo_id: Option<String>,
     pub glob: Option<String>,
+    pub category: Option<String>,
     pub text: String,
     pub enabled: bool,
 }
@@ -1629,6 +1631,14 @@ fn build_review_rule(
             Some(trimmed.to_string())
         }
     });
+    let category = input.category.and_then(|value| {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    });
     let text = input.text.trim().to_string();
     if text.is_empty() {
         return Err("Rule text cannot be empty".to_string());
@@ -1652,6 +1662,7 @@ fn build_review_rule(
         scope,
         repo_id,
         glob,
+        category,
         text,
         enabled: input.enabled,
         created_at,
@@ -2199,3 +2210,103 @@ pub struct DiffRequestState {
     pub agent: Option<String>,
     pub source: String,
 }
+
+// ============================================================================
+// Issue Check Commands
+// ============================================================================
+
+/// Get issue checks for a review run
+#[tauri::command]
+pub fn get_issue_checks_for_run(
+    state: State<'_, AppState>,
+    run_id: String,
+) -> Result<Vec<IssueCheckWithFindings>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let checks_with_findings = db
+        .issue_check_repo()
+        .find_checks_with_findings(&run_id)
+        .map_err(|e| e.to_string())?;
+
+    Ok(checks_with_findings
+        .into_iter()
+        .map(|(check, findings)| IssueCheckWithFindings { check, findings })
+        .collect())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IssueCheckWithFindings {
+    #[serde(flatten)]
+    pub check: IssueCheck,
+    pub findings: Vec<IssueFinding>,
+}
+
+use crate::domain::{IssueCheck, IssueFinding};
+
+// ============================================================================
+// Rule Library Commands
+// ============================================================================
+
+/// Get all rules from the library
+#[tauri::command]
+pub fn get_rule_library() -> Vec<LibraryRule> {
+    LibraryRule::all()
+}
+
+/// Get library rules filtered by category
+#[tauri::command]
+pub fn get_rule_library_by_category(category: String) -> Vec<LibraryRule> {
+    let category = match category.to_lowercase().as_str() {
+        "security" => LibraryCategory::Security,
+        "code_quality" | "codequality" => LibraryCategory::CodeQuality,
+        "testing" => LibraryCategory::Testing,
+        "documentation" => LibraryCategory::Documentation,
+        "performance" => LibraryCategory::Performance,
+        "api_design" | "apidesign" => LibraryCategory::ApiDesign,
+        "language_specific" | "languagespecific" => LibraryCategory::LanguageSpecific,
+        "framework_specific" | "frameworkspecific" => LibraryCategory::FrameworkSpecific,
+        _ => return Vec::new(),
+    };
+    LibraryRule::by_category(category)
+}
+
+/// Add a rule from the library to the user's rules
+#[tauri::command]
+pub fn add_rule_from_library(
+    state: State<'_, AppState>,
+    library_rule_id: String,
+    scope: String,
+    repo_id: Option<String>,
+) -> Result<ReviewRule, String> {
+    // Find the library rule
+    let library_rule = LibraryRule::all()
+        .into_iter()
+        .find(|r| r.id == library_rule_id)
+        .ok_or_else(|| format!("Library rule not found: {}", library_rule_id))?;
+
+    let now = chrono::Utc::now().to_rfc3339();
+    let rule_id = Uuid::new_v4().to_string();
+
+    let input = ReviewRuleInput {
+        scope,
+        repo_id,
+        glob: library_rule.glob.clone(),
+        category: library_rule.category.clone(),
+        text: library_rule.text.clone(),
+        enabled: true,
+    };
+
+    let rule = build_review_rule(rule_id, now.clone(), now, input)?;
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.rule_repo().save(&rule).map_err(|e| e.to_string())?;
+    Ok(rule)
+}
+
+use crate::domain::{LibraryCategory, LibraryRule};
+
+/// Get default issue categories
+#[tauri::command]
+pub fn get_default_issue_categories() -> Vec<DefaultIssueCategory> {
+    DefaultIssueCategory::defaults()
+}
+
+use crate::domain::DefaultIssueCategory;

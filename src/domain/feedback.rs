@@ -92,6 +92,9 @@ pub struct Feedback {
     /// Optional rule ID that inspired this feedback
     #[serde(default)]
     pub rule_id: Option<String>,
+    /// Links to an IssueFinding if created from rule check
+    #[serde(default)]
+    pub finding_id: Option<String>,
     /// Brief title/summary of the feedback
     pub title: String,
     /// Current status of the feedback

@@ -17,11 +17,11 @@
   <a href="https://www.rust-lang.org"><img alt="Rust" src="https://img.shields.io/badge/rust-nightly-orange?style=flat-square" /></a>
 </p>
 
-[![LaReview hero screenshot](assets/screenshots/generate.webp)](assets/screenshots/generate.webp)
+[![LaReview hero screenshot](assets/screenshots/review.webp)](assets/screenshots/review.webp)
 
 ---
 
-LaReview is a **reviewer-first code review workbench** for complex changes. It turns a PR or diff into a structured review plan, grouped by flows and ordered by risk, so you can review with depth and understanding.
+LaReview is a **dev-first code review workbench** for complex changes. It turns a PR or diff into a structured review plan, grouped by flows and ordered by risk, so you can review with depth and understanding.
 
 Unlike auto-review bots that post comment spam, LaReview is a local-first tool that works with your existing AI coding agent to help you ship high-signal feedback.
 
@@ -36,12 +36,13 @@ LaReview is designed for a local-first, secure, and focused review experience.
 | Screenshot                                                                                    | Feature                                                                                                                                                                                                                   |
 | :-------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | <img src="assets/screenshots/generate.webp" width="400" alt="Plan Generation View" />         | **AI-Powered Planning**<br>Input a PR (GitHub/GitLab) or diff. LaReview acts as a staff engineer, looking for flows (e.g. auth, api) and risks to build a structured review plan.                                         |
+| <img src="assets/screenshots/review.webp" width="400" alt="Review Summary View" />             | **Review Summary**<br>Get a bird's-eye view of your review with Issue Checklist, Feedback items, Review Tasks grouped by flow, and a Files Heatmap showing risk distribution.                                             |
 | <img src="assets/screenshots/review-changes.webp" width="400" alt="Structured Review Tree" /> | **Structured Task Tree**<br>Navigate the review as a hierarchical tree. Mark tasks as **To Do**, **In Progress**, or **Done**. Attach contextual notes to specific tasks or lines of code to keep track of your thoughts. |
 | <img src="assets/screenshots/review-changes.webp" width="400" alt="Task-focused Diff" />      | **Task-Focused Diffs**<br>Review one logical concern at a time. The workbench isolates relevant code hunks for each task, eliminating noise.                                                                              |
 | <img src="assets/screenshots/review-feedback-item.webp" width="400" alt="Feedback Items" />   | **High-Signal Framework**<br>The AI proactively identifies bugs and authenticates them against your rules. No comment spam—just focused feedback threads anchored to specific lines.                                      |
 | <img src="assets/screenshots/repos.webp" width="400" alt="Linked Repositories" />             | **Local Context (Zero Data Leaks)**<br>Link local Git repos to give the agent full access to search your codebase. Works with your existing AI coding agent (Claude, etc) and keeps data on your machine.                 |
 | <img src="assets/screenshots/review-diagram.webp" width="400" alt="Diagram Viewer" />         | **Visual Diagrams**<br>Visualize the flow. Automatically generate diagrams to see architectural changes before you read a single line of code. (Requires D2).                                                             |
-| <img src="assets/screenshots/settings.webp" width="400" alt="Settings View" />                | **Team Rules**<br>Define rules like "DB queries must have timeouts" or "API changes need a migration note" to enforce standards automatically.                                                                            |
+| <img src="assets/screenshots/rules.webp" width="400" alt="Rules View" />                      | **Team Rules**<br>Define rules like "DB queries must have timeouts" or "API changes need a migration note" to enforce standards automatically.                                                                            |
 | <img src="assets/screenshots/export-github.webp" width="400" alt="GitHub Sync" />             | **Git Host Sync**<br>Submit your review feedback directly to GitHub or GitLab PRs with automatic summary generation.                                                                                                      |
 | <img src="assets/screenshots/export-github.webp" width="400" alt="Export & Share" />          | **Export & Share**<br>Export your review summary to Markdown with diagrams and code insights. Copy to clipboard or save to file.                                                                                          |
 | <img src="assets/screenshots/generate.webp" width="400" alt="CLI Support" />                  | **CLI Support**<br>Launch reviews from the terminal: `lareview`, `lareview pr owner/repo#123`, `git diff &#124; lareview`, or `lareview --agent claude`.                                                                  |

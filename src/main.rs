@@ -399,6 +399,13 @@ fn run_gui(initial_req: Option<DiffRequest>, initial_pending: Option<PendingDiff
             lareview::commands::push_remote_feedback,
             lareview::commands::stop_generation,
             lareview::commands::set_repo_snapshot_access,
+            // Issue checks
+            lareview::commands::get_issue_checks_for_run,
+            // Rule library
+            lareview::commands::get_rule_library,
+            lareview::commands::get_rule_library_by_category,
+            lareview::commands::add_rule_from_library,
+            lareview::commands::get_default_issue_categories,
         ])
         .run(tauri::generate_context!())
         .map_err(|e| anyhow::anyhow!("{}", e))

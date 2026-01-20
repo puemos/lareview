@@ -8,6 +8,7 @@ export interface ReviewRuleInput {
   scope: RuleScope;
   repo_id?: string | null;
   glob?: string | null;
+  category?: string | null;
   text: string;
   enabled: boolean;
 }
