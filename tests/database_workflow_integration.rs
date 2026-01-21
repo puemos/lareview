@@ -92,6 +92,7 @@ fn test_full_database_workflow() -> anyhow::Result<()> {
         title: "Feedback".into(),
         status: ReviewStatus::Todo,
         impact: FeedbackImpact::Nitpick,
+        confidence: 1.0,
         anchor: None,
         author: "me".into(),
         created_at: "now".into(),

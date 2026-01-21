@@ -797,9 +797,11 @@ pub fn save_feedback(
         task_id: feedback.task_id,
         rule_id: feedback.rule_id,
         finding_id: None,
+        category: None,
         title: feedback.title,
         status: ReviewStatus::Todo,
         impact,
+        confidence: 1.0, // User-created feedback is high confidence
         anchor,
         author: "user".to_string(),
         created_at: chrono::Utc::now().to_rfc3339(),
@@ -852,6 +854,51 @@ pub fn update_feedback_status(
 ) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let review_status = ReviewStatus::from_str(&status).unwrap_or(ReviewStatus::Todo);
+
+    // If status is being set to "ignored", record the rejection
+    if review_status == ReviewStatus::Ignored {
+        // Fetch feedback details for rejection tracking
+        if let Ok(Some(feedback)) = db.feedback_repo().find_by_id(&feedback_id) {
+            let rejection_repo = db.rejection_repo();
+
+            // Only record if not already recorded
+            if !rejection_repo
+                .rejection_exists(&feedback_id)
+                .unwrap_or(false)
+            {
+                // Extract agent_id from author (format: "agent:agent_id")
+                let agent_id = feedback
+                    .author
+                    .strip_prefix("agent:")
+                    .unwrap_or(&feedback.author)
+                    .to_string();
+
+                // Extract file extension from anchor if available
+                let file_extension = feedback
+                    .anchor
+                    .as_ref()
+                    .and_then(|a| a.file_path.as_ref())
+                    .and_then(|p| {
+                        std::path::Path::new(p)
+                            .extension()
+                            .and_then(|e| e.to_str())
+                            .map(|s| s.to_string())
+                    });
+
+                let _ = rejection_repo.record_rejection(
+                    &feedback_id,
+                    &feedback.review_id,
+                    feedback.rule_id.as_deref(),
+                    &agent_id,
+                    &feedback.impact.to_string(),
+                    feedback.confidence,
+                    file_extension.as_deref(),
+                    &feedback.title,
+                );
+            }
+        }
+    }
+
     db.update_feedback_status(&feedback_id, review_status)
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -1555,6 +1602,29 @@ pub fn update_editor_config(editor_id: String) -> Result<(), String> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FeedbackFilterConfig {
+    pub confidence_threshold: Option<f64>,
+}
+
+#[tauri::command]
+pub fn get_feedback_filter_config() -> FeedbackFilterConfig {
+    use crate::infra::app_config::load_config;
+    let config = load_config();
+    FeedbackFilterConfig {
+        confidence_threshold: config.feedback_confidence_threshold,
+    }
+}
+
+#[tauri::command]
+pub fn update_feedback_filter_config(threshold: Option<f64>) -> Result<(), String> {
+    use crate::infra::app_config::{load_config, save_config};
+    let mut config = load_config();
+    // Clamp to valid range
+    config.feedback_confidence_threshold = threshold.map(|t| t.clamp(0.0, 1.0));
+    save_config(&config).map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReviewRuleInput {
     pub scope: String,
     pub repo_id: Option<String>,
@@ -1840,7 +1910,11 @@ pub async fn export_review_markdown(
 
         let feedbacks = db
             .get_feedback_by_review(&review_id)
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| e.to_string())?
+            // Filter out ignored feedbacks from export
+            .into_iter()
+            .filter(|f| f.status != ReviewStatus::Ignored)
+            .collect::<Vec<_>>();
 
         let mut comments = Vec::new();
         for f in &feedbacks {
@@ -1909,7 +1983,11 @@ pub async fn push_remote_review(
 
         let feedbacks = db
             .get_feedback_by_review(&review_id)
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| e.to_string())?
+            // Filter out ignored feedbacks from push to remote
+            .into_iter()
+            .filter(|f| f.status != ReviewStatus::Ignored)
+            .collect::<Vec<_>>();
 
         let mut comments = Vec::new();
         for f in &feedbacks {
@@ -2310,3 +2388,192 @@ pub fn get_default_issue_categories() -> Vec<DefaultIssueCategory> {
 }
 
 use crate::domain::DefaultIssueCategory;
+
+// ============================================================================
+// Rule Effectiveness / Analytics Commands
+// ============================================================================
+
+/// Statistics about rejection rates for a rule
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuleRejectionStatsResponse {
+    pub rule_id: String,
+    pub total_feedback: i64,
+    pub rejected_count: i64,
+    pub rejection_rate: f64,
+}
+
+/// Get rejection statistics for all rules (for rule effectiveness dashboard)
+#[tauri::command]
+pub fn get_rule_rejection_stats(
+    state: State<'_, AppState>,
+) -> Result<Vec<RuleRejectionStatsResponse>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let stats = db
+        .rejection_repo()
+        .get_rule_stats()
+        .map_err(|e| e.to_string())?;
+
+    Ok(stats
+        .into_iter()
+        .map(|s| RuleRejectionStatsResponse {
+            rule_id: s.rule_id,
+            total_feedback: s.total_feedback,
+            rejected_count: s.rejected_count,
+            rejection_rate: s.rejection_rate,
+        })
+        .collect())
+}
+
+// ============================================================================
+// Learning System Commands
+// ============================================================================
+
+use crate::domain::{
+    LearnedPattern, LearnedPatternInput, LearningCompactionResult, LearningStatus,
+};
+
+/// Get all learned patterns
+#[tauri::command]
+pub fn get_learned_patterns(state: State<'_, AppState>) -> Result<Vec<LearnedPattern>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.learned_pattern_repo()
+        .list_all()
+        .map_err(|e| e.to_string())
+}
+
+/// Create a new learned pattern manually
+#[tauri::command]
+pub fn create_learned_pattern(
+    state: State<'_, AppState>,
+    input: LearnedPatternInput,
+) -> Result<LearnedPattern, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.learned_pattern_repo()
+        .create(&input, 0) // source_count = 0 for manual creation
+        .map_err(|e| e.to_string())
+}
+
+/// Update an existing learned pattern
+#[tauri::command]
+pub fn update_learned_pattern(
+    state: State<'_, AppState>,
+    id: String,
+    input: LearnedPatternInput,
+) -> Result<LearnedPattern, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.learned_pattern_repo()
+        .update(&id, &input)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Pattern not found".to_string())
+}
+
+/// Delete a learned pattern
+#[tauri::command]
+pub fn delete_learned_pattern(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let rows = db
+        .learned_pattern_repo()
+        .delete(&id)
+        .map_err(|e| e.to_string())?;
+    if rows == 0 {
+        return Err("Pattern not found".to_string());
+    }
+    Ok(())
+}
+
+/// Toggle a learned pattern's enabled status
+#[tauri::command]
+pub fn toggle_learned_pattern(
+    state: State<'_, AppState>,
+    id: String,
+    enabled: bool,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let rows = db
+        .learned_pattern_repo()
+        .toggle_enabled(&id, enabled)
+        .map_err(|e| e.to_string())?;
+    if rows == 0 {
+        return Err("Pattern not found".to_string());
+    }
+    Ok(())
+}
+
+/// Get the learning system status
+#[tauri::command]
+pub fn get_learning_status(state: State<'_, AppState>) -> Result<LearningStatus, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let pattern_repo = db.learned_pattern_repo();
+    let state_repo = db.learning_state_repo();
+    state_repo
+        .get_status(&pattern_repo)
+        .map_err(|e| e.to_string())
+}
+
+/// Trigger learning compaction manually
+#[tauri::command]
+pub async fn trigger_learning_compaction(
+    state: State<'_, AppState>,
+    agent_id: String,
+) -> Result<LearningCompactionResult, String> {
+    // Get the agent configuration
+    let (agent_command, agent_args) = {
+        let registry = AgentRegistry::default();
+        let agent_candidate = registry
+            .get_agent_candidate(&agent_id)
+            .ok_or_else(|| format!("Agent '{}' not found", agent_id))?;
+
+        let command = agent_candidate.command.clone().ok_or_else(|| {
+            format!(
+                "Agent '{}' is not available. Please configure it in settings.",
+                agent_id
+            )
+        })?;
+
+        (command, agent_candidate.args.clone())
+    };
+
+    // Get unprocessed rejections and existing patterns
+    let (rejections, existing_patterns, db_clone) = {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let rejection_repo = db.rejection_repo();
+        let pattern_repo = db.learned_pattern_repo();
+
+        let rejections = rejection_repo
+            .get_unprocessed_rejections(50)
+            .map_err(|e| e.to_string())?;
+
+        let existing_patterns = pattern_repo.list_enabled().map_err(|e| e.to_string())?;
+
+        // We need a clone of the Arc for the async operation
+        drop(db);
+        let db_clone = state.db.clone();
+
+        (rejections, existing_patterns, db_clone)
+    };
+
+    if rejections.is_empty() {
+        return Ok(LearningCompactionResult {
+            rejections_processed: 0,
+            patterns_created: 0,
+            patterns_updated: 0,
+            errors: vec!["No unprocessed rejections to analyze".to_string()],
+        });
+    }
+
+    let input = crate::infra::acp::LearningCompactionInput {
+        rejections,
+        existing_patterns,
+        agent_command,
+        agent_args,
+        db: db_clone,
+        timeout_secs: Some(300),
+        mcp_server_binary: None,
+        cancel_token: None,
+        debug: false,
+    };
+
+    crate::infra::acp::run_learning_compaction(input)
+        .await
+        .map_err(|e| e.to_string())
+}

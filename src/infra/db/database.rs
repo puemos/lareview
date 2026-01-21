@@ -158,6 +158,7 @@ impl Database {
                 title TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'todo',
                 impact TEXT NOT NULL DEFAULT 'nitpick',
+                confidence REAL NOT NULL DEFAULT 1.0,
                 anchor_file_path TEXT,
                 anchor_line INTEGER,
                 anchor_side TEXT,
@@ -320,6 +321,100 @@ impl Database {
             conn.execute("ALTER TABLE feedback ADD COLUMN finding_id TEXT", [])?;
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_feedback_finding_id ON feedback(finding_id)",
+                [],
+            )?;
+        }
+
+        // Migration: Add confidence to feedback if it doesn't exist
+        let has_confidence = conn
+            .prepare("SELECT 1 FROM pragma_table_info('feedback') WHERE name = 'confidence'")?
+            .exists([])?;
+
+        if !has_confidence {
+            conn.execute(
+                "ALTER TABLE feedback ADD COLUMN confidence REAL NOT NULL DEFAULT 1.0",
+                [],
+            )?;
+        }
+
+        // Migration: Add category to feedback if it doesn't exist
+        let has_feedback_category = conn
+            .prepare("SELECT 1 FROM pragma_table_info('feedback') WHERE name = 'category'")?
+            .exists([])?;
+
+        if !has_feedback_category {
+            conn.execute("ALTER TABLE feedback ADD COLUMN category TEXT", [])?;
+        }
+
+        // Create feedback_rejections table for tracking rejected/ignored feedback patterns
+        conn.execute(
+            r#"
+            CREATE TABLE IF NOT EXISTS feedback_rejections (
+                id TEXT PRIMARY KEY,
+                feedback_id TEXT NOT NULL,
+                review_id TEXT NOT NULL,
+                rule_id TEXT,
+                agent_id TEXT NOT NULL,
+                impact TEXT NOT NULL,
+                confidence REAL NOT NULL DEFAULT 1.0,
+                file_extension TEXT,
+                title TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(feedback_id) REFERENCES feedback(id) ON DELETE CASCADE,
+                FOREIGN KEY(review_id) REFERENCES reviews(id) ON DELETE CASCADE
+            )
+            "#,
+            [],
+        )?;
+
+        // Add indexes for efficient querying of rejection patterns
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_feedback_rejections_rule_id ON feedback_rejections(rule_id)",
+            [],
+        )?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_feedback_rejections_agent_id ON feedback_rejections(agent_id)",
+            [],
+        )?;
+
+        // Create learned_patterns table for storing AI-learned negative examples
+        conn.execute_batch(
+            r#"
+            CREATE TABLE IF NOT EXISTS learned_patterns (
+                id TEXT PRIMARY KEY,
+                pattern_text TEXT NOT NULL,
+                category TEXT,
+                file_extension TEXT,
+                source_count INTEGER NOT NULL DEFAULT 0,
+                is_edited INTEGER NOT NULL DEFAULT 0,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS learning_state (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_learned_patterns_enabled ON learned_patterns(enabled);
+            CREATE INDEX IF NOT EXISTS idx_learned_patterns_category ON learned_patterns(category);
+            "#,
+        )?;
+
+        // Migration: Add processed_for_learning column to feedback_rejections if it doesn't exist
+        let has_processed = conn
+            .prepare("SELECT 1 FROM pragma_table_info('feedback_rejections') WHERE name = 'processed_for_learning'")?
+            .exists([])?;
+
+        if !has_processed {
+            conn.execute(
+                "ALTER TABLE feedback_rejections ADD COLUMN processed_for_learning INTEGER DEFAULT 0",
+                [],
+            )?;
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_feedback_rejections_processed ON feedback_rejections(processed_for_learning)",
                 [],
             )?;
         }
@@ -534,6 +629,18 @@ impl Database {
 
     pub fn issue_check_repo(&self) -> crate::infra::db::repository::IssueCheckRepository {
         crate::infra::db::repository::IssueCheckRepository::new(self.connection())
+    }
+
+    pub fn rejection_repo(&self) -> crate::infra::db::repository::FeedbackRejectionRepository {
+        crate::infra::db::repository::FeedbackRejectionRepository::new(self.connection())
+    }
+
+    pub fn learned_pattern_repo(&self) -> crate::infra::db::repository::LearnedPatternRepository {
+        crate::infra::db::repository::LearnedPatternRepository::new(self.connection())
+    }
+
+    pub fn learning_state_repo(&self) -> crate::infra::db::repository::LearningStateRepository {
+        crate::infra::db::repository::LearningStateRepository::new(self.connection())
     }
 
     pub fn get_pending_reviews(&self) -> Result<Vec<PendingReviewState>, rusqlite::Error> {

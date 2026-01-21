@@ -58,7 +58,11 @@ index 0000000..1111111 100644\n\
     let output = result.expect("generation should succeed even with uncovered files");
     // Warning about uncovered files should appear in logs
     assert!(
-        output.logs.iter().any(|log| log.contains("Tasks do not cover all changed files") && log.contains("src/a.rs")),
+        output
+            .logs
+            .iter()
+            .any(|log| log.contains("Tasks do not cover all changed files")
+                && log.contains("src/a.rs")),
         "Expected warning about uncovered files in logs, got: {:?}",
         output.logs
     );

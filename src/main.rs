@@ -380,6 +380,8 @@ fn run_gui(initial_req: Option<DiffRequest>, initial_pending: Option<PendingDiff
             lareview::commands::get_available_editors,
             lareview::commands::get_editor_config,
             lareview::commands::update_editor_config,
+            lareview::commands::get_feedback_filter_config,
+            lareview::commands::update_feedback_filter_config,
             lareview::commands::get_review_rules,
             lareview::commands::create_review_rule,
             lareview::commands::update_review_rule,
@@ -406,6 +408,16 @@ fn run_gui(initial_req: Option<DiffRequest>, initial_pending: Option<PendingDiff
             lareview::commands::get_rule_library_by_category,
             lareview::commands::add_rule_from_library,
             lareview::commands::get_default_issue_categories,
+            // Rule analytics
+            lareview::commands::get_rule_rejection_stats,
+            // Learning system
+            lareview::commands::get_learned_patterns,
+            lareview::commands::create_learned_pattern,
+            lareview::commands::update_learned_pattern,
+            lareview::commands::delete_learned_pattern,
+            lareview::commands::toggle_learned_pattern,
+            lareview::commands::get_learning_status,
+            lareview::commands::trigger_learning_compaction,
         ])
         .run(tauri::generate_context!())
         .map_err(|e| anyhow::anyhow!("{}", e))
