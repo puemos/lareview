@@ -18,6 +18,10 @@ import type {
   LibraryRule,
   DefaultIssueCategory,
   LibraryCategory,
+  LearnedPattern,
+  LearnedPatternInput,
+  LearningStatus,
+  LearningCompactionResult,
 } from '../types';
 import { useCallback } from 'react';
 
@@ -352,9 +356,13 @@ export const useTauri = () => {
         id: string;
         review_id: string;
         task_id: string | null;
+        rule_id?: string | null;
+        finding_id?: string | null;
+        category?: string | null;
         title: string;
         status: string;
         impact: string;
+        confidence: number;
         anchor: {
           file_path: string | null;
           line_number: number | null;
@@ -610,6 +618,12 @@ export const useTauri = () => {
     updateEditorConfig: useCallback(async (editorId: string): Promise<void> => {
       return invoke('update_editor_config', { editorId });
     }, []),
+    getFeedbackFilterConfig: useCallback(async (): Promise<{ confidence_threshold: number | null }> => {
+      return invoke('get_feedback_filter_config');
+    }, []),
+    updateFeedbackFilterConfig: useCallback(async (threshold: number | null): Promise<void> => {
+      return invoke('update_feedback_filter_config', { threshold });
+    }, []),
     openInEditor: useCallback(
       async (filePath: string, lineNumber: number, repoRoot?: string): Promise<void> => {
         return invoke('open_in_editor', { filePath, lineNumber, repoRoot });
@@ -678,6 +692,44 @@ export const useTauri = () => {
     ),
     getDefaultIssueCategories: useCallback(async (): Promise<DefaultIssueCategory[]> => {
       return invoke('get_default_issue_categories');
+    }, []),
+
+    // Rule analytics
+    getRuleRejectionStats: useCallback(async (): Promise<
+      Array<{
+        rule_id: string;
+        total_feedback: number;
+        rejected_count: number;
+        rejection_rate: number;
+      }>
+    > => {
+      return invoke('get_rule_rejection_stats');
+    }, []),
+
+    // Learning system
+    getLearnedPatterns: useCallback(async (): Promise<LearnedPattern[]> => {
+      return invoke('get_learned_patterns');
+    }, []),
+    createLearnedPattern: useCallback(async (input: LearnedPatternInput): Promise<LearnedPattern> => {
+      return invoke('create_learned_pattern', { input });
+    }, []),
+    updateLearnedPattern: useCallback(
+      async (id: string, input: LearnedPatternInput): Promise<LearnedPattern> => {
+        return invoke('update_learned_pattern', { id, input });
+      },
+      []
+    ),
+    deleteLearnedPattern: useCallback(async (id: string): Promise<void> => {
+      return invoke('delete_learned_pattern', { id });
+    }, []),
+    toggleLearnedPattern: useCallback(async (id: string, enabled: boolean): Promise<void> => {
+      return invoke('toggle_learned_pattern', { id, enabled });
+    }, []),
+    getLearningStatus: useCallback(async (): Promise<LearningStatus> => {
+      return invoke('get_learning_status');
+    }, []),
+    triggerLearningCompaction: useCallback(async (agentId: string): Promise<LearningCompactionResult> => {
+      return invoke('trigger_learning_compaction', { agentId });
     }, []),
   };
 };

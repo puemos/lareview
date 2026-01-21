@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import type { Feedback, Comment, ReviewRule } from '../../types';
+import type { Feedback, Comment, ReviewRule, DefaultIssueCategory } from '../../types';
 import { ICONS } from '../../constants/icons';
-import ReactMarkdown from 'react-markdown';
+import { MarkdownRenderer } from '../ui/MarkdownRenderer';
 import { useQuery } from '@tanstack/react-query';
 import { useTauri } from '../../hooks/useTauri';
 
@@ -10,6 +10,7 @@ import { Select } from '../Common/Select';
 interface FeedbackDetailProps {
   feedback: Feedback | null;
   rulesById: Record<string, ReviewRule>;
+  categoriesById: Record<string, DefaultIssueCategory>;
   comments: Comment[];
   onUpdateStatus: (status: Feedback['status']) => void;
   onUpdateImpact: (impact: Feedback['impact']) => void;
@@ -22,32 +23,6 @@ interface FeedbackDetailProps {
   remoteProviderName?: string | null;
 }
 
-const statusOptions = [
-  {
-    value: 'todo',
-    label: 'Todo',
-    icon: ICONS.STATUS_TODO,
-    color: 'text-status-todo',
-  },
-  {
-    value: 'in_progress',
-    label: 'In Progress',
-    icon: ICONS.STATUS_IN_PROGRESS,
-    color: 'text-status-in_progress',
-  },
-  {
-    value: 'done',
-    label: 'Done',
-    icon: ICONS.STATUS_DONE,
-    color: 'text-status-done',
-  },
-  {
-    value: 'ignored',
-    label: 'Ignored',
-    icon: ICONS.STATUS_IGNORED,
-    color: 'text-status-ignored',
-  },
-];
 
 const impactOptions = [
   {
@@ -69,6 +44,7 @@ const impactOptions = [
     color: 'text-impact-nitpick',
   },
 ];
+
 
 function formatTimestamp(isoString: string): string {
   const date = new Date(isoString);
@@ -141,6 +117,7 @@ const DiffSnippetSkeleton: React.FC = () => (
 export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
   feedback,
   rulesById,
+  categoriesById,
   comments,
   onUpdateStatus,
   onUpdateImpact,
@@ -157,6 +134,7 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
   const [isTitleEditing, setIsTitleEditing] = useState(false);
   const [titleValue, setTitleValue] = useState('');
   const rule = feedback?.rule_id ? rulesById[feedback.rule_id] : null;
+  const category = feedback?.category ? categoriesById[feedback.category] : null;
   const remoteLabel = remoteProviderName ?? 'remote';
   const RemoteIcon = remoteProviderName === 'GitLab' ? ICONS.ICON_GITLAB : ICONS.ICON_GITHUB;
 
@@ -197,9 +175,7 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
   };
 
   const handleTitleSave = () => {
-    if (titleValue.trim() !== feedback.title) {
-      console.log('Title update would go here:', titleValue);
-    }
+    // TODO: Implement title update when backend supports it
     setIsTitleEditing(false);
   };
 
@@ -233,7 +209,7 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
             </h2>
           )}
           <div className="ml-2 flex items-center gap-1">
-            {remoteProviderName && onPushToRemote && (
+            {remoteProviderName && onPushToRemote && feedback.status !== 'ignored' && (
               <button
                 onClick={onPushToRemote}
                 className="hover:text-text-primary text-text-tertiary flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors hover:bg-white/5 active:scale-[0.98]"
@@ -243,13 +219,36 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
                 <span>Post Comment</span>
               </button>
             )}
-            <button
-              onClick={onDelete}
-              className="text-text-tertiary hover:text-status-ignored hover:bg-status-ignored/10 rounded p-1.5 transition-colors"
-              title="Delete feedback"
-            >
-              <ICONS.ACTION_DELETE size={14} />
-            </button>
+            {feedback.status === 'ignored' ? (
+              <>
+                <button
+                  onClick={() => onUpdateStatus('todo')}
+                  disabled={isUpdatingStatus}
+                  className="text-text-tertiary hover:text-status-done hover:bg-status-done/10 flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50"
+                  title="Restore this feedback"
+                >
+                  <ICONS.ACTION_RESTORE size={14} />
+                  <span>Restore</span>
+                </button>
+                <button
+                  onClick={onDelete}
+                  className="text-text-tertiary hover:text-status-ignored hover:bg-status-ignored/10 rounded p-1.5 transition-colors"
+                  title="Delete feedback permanently"
+                >
+                  <ICONS.ACTION_DELETE size={14} />
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => onUpdateStatus('ignored')}
+                disabled={isUpdatingStatus}
+                className="text-text-tertiary hover:text-status-ignored hover:bg-status-ignored/10 flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50"
+                title="Ignore this feedback (helps improve future reviews)"
+              >
+                <ICONS.STATUS_IGNORED size={14} />
+                <span>Ignore</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -267,15 +266,13 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
                 Rule: {rule?.text || feedback.rule_id}
               </span>
             )}
+            {!feedback.rule_id && feedback.category && (
+              <span className="text-text-tertiary text-[10px]">
+                Category: {category?.name || feedback.category}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            <Select
-              value={feedback.status}
-              onChange={val => onUpdateStatus(val as Feedback['status'])}
-              options={statusOptions}
-              disabled={isUpdatingStatus}
-            />
-
             <Select
               value={feedback.impact}
               onChange={val => onUpdateImpact(val as Feedback['impact'])}
@@ -330,9 +327,9 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
                       {formatTimestamp(comment.created_at)}
                     </span>
                   </div>
-                  <div className="prose prose-invert prose-sm text-text-secondary max-w-none">
-                    <ReactMarkdown>{comment.body}</ReactMarkdown>
-                  </div>
+                  <MarkdownRenderer className="prose prose-invert prose-sm text-text-secondary max-w-none">
+                    {comment.body}
+                  </MarkdownRenderer>
                 </div>
               </div>
             ))

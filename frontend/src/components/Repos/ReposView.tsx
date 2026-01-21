@@ -7,6 +7,7 @@ import {
   Trash,
   Asterisk,
 } from '@phosphor-icons/react';
+import { toast } from 'sonner';
 import type { ViewType } from '../../types';
 import { useRepos } from '../../hooks/useRepos';
 
@@ -20,7 +21,9 @@ export const ReposView: React.FC<ReposViewProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     if (addRepo.isError) {
-      alert(`Failed to link repository: ${addRepo.error}`);
+      toast.error('Failed to link repository', {
+        description: String(addRepo.error),
+      });
     }
   }, [addRepo.isError, addRepo.error]);
 

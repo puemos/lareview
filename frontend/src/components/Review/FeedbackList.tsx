@@ -1,14 +1,18 @@
 import React from 'react';
-import type { Feedback, ReviewRule } from '../../types';
+import type { Feedback, ReviewRule, DefaultIssueCategory } from '../../types';
 import { ICONS } from '../../constants/icons';
 import { RulePopover } from './RulePopover';
+import { CategoryBadge } from './CategoryBadge';
 
 interface FeedbackListProps {
   feedbacks: Feedback[];
   rulesById: Record<string, ReviewRule>;
+  categoriesById: Record<string, DefaultIssueCategory>;
   selectedFeedbackId: string | null;
   onSelectFeedback: (feedbackId: string) => void;
   isLoading?: boolean;
+  /** Minimum confidence threshold for displaying feedback (null = show all) */
+  confidenceThreshold?: number | null;
 }
 
 const FeedbackSkeleton: React.FC = () => (
@@ -37,12 +41,15 @@ const IMPACT_CONFIG = {
   nitpick: { icon: ICONS.IMPACT_NITPICK, color: 'text-impact-nitpick' },
 };
 
+
 export const FeedbackList: React.FC<FeedbackListProps> = ({
   feedbacks,
   rulesById,
+  categoriesById,
   selectedFeedbackId,
   onSelectFeedback,
   isLoading = false,
+  confidenceThreshold = null,
 }) => {
   if (isLoading) {
     return (
@@ -54,21 +61,30 @@ export const FeedbackList: React.FC<FeedbackListProps> = ({
     );
   }
 
-  if (feedbacks.length === 0) {
+  // Filter feedback based on confidence threshold
+  const filteredFeedbacks =
+    confidenceThreshold != null
+      ? feedbacks.filter(f => f.confidence >= confidenceThreshold)
+      : feedbacks;
+  const hiddenCount = feedbacks.length - filteredFeedbacks.length;
+
+  if (filteredFeedbacks.length === 0) {
     return (
       <div className="custom-scrollbar flex-1 overflow-y-auto">
         <div className="p-4 text-center">
           <ICONS.ICON_PLAN size={24} className="text-text-disabled mx-auto mb-2 opacity-50" />
           <p className="text-text-disabled text-xs opacity-50">No feedback yet</p>
           <p className="text-text-tertiary mt-1 text-[10px]">
-            Add inline feedback from the diff view
+            {hiddenCount > 0
+              ? `${hiddenCount} low-confidence item${hiddenCount > 1 ? 's' : ''} hidden`
+              : 'Add inline feedback from the diff view'}
           </p>
         </div>
       </div>
     );
   }
 
-  const sortedFeedbacks = [...feedbacks].sort((a, b) => {
+  const sortedFeedbacks = [...filteredFeedbacks].sort((a, b) => {
     const statusRank = { todo: 0, in_progress: 1, done: 2, ignored: 3 };
     const rankA = statusRank[a.status] ?? 0;
     const rankB = statusRank[b.status] ?? 0;
@@ -84,7 +100,12 @@ export const FeedbackList: React.FC<FeedbackListProps> = ({
           IMPACT_CONFIG[feedback.impact as keyof typeof IMPACT_CONFIG] || IMPACT_CONFIG.nitpick;
         const rule =
           feedback.rule_id && rulesById[feedback.rule_id] ? rulesById[feedback.rule_id] : null;
-        const ruleLabel = rule?.text || feedback.rule_id;
+        const category =
+          feedback.category && categoriesById[feedback.category]
+            ? categoriesById[feedback.category]
+            : null;
+        const hasRuleBadge = feedback.rule_id;
+        const hasCategoryBadge = !hasRuleBadge && feedback.category;
 
         return (
           <button
@@ -104,15 +125,23 @@ export const FeedbackList: React.FC<FeedbackListProps> = ({
                   isActive
                     ? 'text-text-primary'
                     : 'text-text-secondary group-hover:text-text-primary'
-                } ${feedback.status === 'done' ? 'text-text-disabled line-through opacity-50' : ''}`}
+                } ${feedback.status === 'done' || feedback.status === 'ignored' ? 'text-text-disabled line-through opacity-50' : ''}`}
               >
                 {feedback.title || 'Untitled Feedback'}
               </h3>
-              {ruleLabel && <RulePopover rule={rule} ruleId={feedback.rule_id || ''} />}
+              {hasRuleBadge && <RulePopover rule={rule} ruleId={feedback.rule_id || ''} />}
+              {hasCategoryBadge && (
+                <CategoryBadge category={category} categoryId={feedback.category || ''} />
+              )}
             </div>
           </button>
         );
       })}
+      {hiddenCount > 0 && (
+        <div className="text-text-tertiary px-4 py-2 text-center text-[10px]">
+          {hiddenCount} low-confidence item{hiddenCount > 1 ? 's' : ''} hidden
+        </div>
+      )}
     </div>
   );
 };

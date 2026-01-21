@@ -2,7 +2,7 @@ import React, { Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft } from '@phosphor-icons/react';
 import { SHARED_LAYOUT_TRANSITION } from '../../constants/animations';
-import type { ReviewTask, Feedback, ReviewRule } from '../../types';
+import type { ReviewTask, Feedback, ReviewRule, DefaultIssueCategory } from '../../types';
 import { TaskList, TaskListSkeleton } from './TaskList';
 import { FeedbackList } from './FeedbackList';
 import { ICONS } from '../../constants/icons';
@@ -14,11 +14,13 @@ interface ReviewSidebarProps {
   tasks: ReviewTask[];
   feedbacks: Feedback[];
   rulesById: Record<string, ReviewRule>;
+  categoriesById: Record<string, DefaultIssueCategory>;
   selectedTaskId: string | null;
   selectedFeedbackId: string | null;
   isTasksLoading: boolean;
   isTasksFetching: boolean;
   isFeedbacksLoading: boolean;
+  confidenceThreshold?: number | null;
   onSidebarTabChange: (tab: SidebarTab) => void;
   onSelectTask: (taskId: string | null) => void;
   onSelectFeedback: (feedbackId: string | null) => void;
@@ -32,11 +34,13 @@ export const ReviewSidebar: React.FC<ReviewSidebarProps> = ({
   tasks,
   feedbacks,
   rulesById,
+  categoriesById,
   selectedTaskId,
   selectedFeedbackId,
   isTasksLoading,
   isTasksFetching,
   isFeedbacksLoading,
+  confidenceThreshold,
   onSidebarTabChange,
   onSelectTask,
   onSelectFeedback,
@@ -131,9 +135,11 @@ export const ReviewSidebar: React.FC<ReviewSidebarProps> = ({
         <FeedbackList
           feedbacks={feedbacks}
           rulesById={rulesById}
+          categoriesById={categoriesById}
           selectedFeedbackId={selectedFeedbackId}
           onSelectFeedback={onSelectFeedback}
           isLoading={isFeedbacksLoading}
+          confidenceThreshold={confidenceThreshold}
         />
       )}
     </div>

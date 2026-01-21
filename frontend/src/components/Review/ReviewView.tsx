@@ -20,7 +20,8 @@ import { ConfirmationModal } from '../Common/ConfirmationModal';
 import { useReviews } from '../../hooks/useReviews';
 import { useTauri } from '../../hooks/useTauri';
 import { useDelayedLoading } from '../../hooks/useDelayedLoading';
-import type { ReviewTask, Feedback, ReviewRule } from '../../types';
+import { useFeedbackFilterConfig } from '../../hooks/useSettings';
+import type { ReviewTask, Feedback, ReviewRule, DefaultIssueCategory } from '../../types';
 import { ReviewViewSkeleton } from './ReviewViewSkeleton';
 import { AddFeedbackModal } from './AddFeedbackModal';
 import type { DiffFile } from '../../types';
@@ -67,8 +68,10 @@ export const ReviewView: React.FC = () => {
     pushRemoteFeedback,
     copyToClipboard,
     getRepoRootForReview,
+    getDefaultIssueCategories,
   } = useTauri();
   const { data: allReviews = [] } = useReviews();
+  const { config: filterConfig } = useFeedbackFilterConfig();
 
   // Fetch the local repository root for this review (matched via remote URL)
   const { data: repoRoot } = useQuery<string | null>({
@@ -145,6 +148,21 @@ export const ReviewView: React.FC = () => {
     return map;
   }, [rules]);
 
+  // Fetch default issue categories for category badge display
+  const { data: defaultCategories = [] } = useQuery<DefaultIssueCategory[]>({
+    queryKey: ['default-issue-categories'],
+    queryFn: getDefaultIssueCategories,
+    staleTime: Infinity, // Categories don't change during a session
+  });
+
+  const categoriesById = useMemo(() => {
+    const map: Record<string, DefaultIssueCategory> = {};
+    defaultCategories.forEach(cat => {
+      map[cat.id] = cat;
+    });
+    return map;
+  }, [defaultCategories]);
+
   const handleStatusChange = (status: string) => {
     if (selectedTask) {
       updateTaskStatus({
@@ -196,12 +214,6 @@ export const ReviewView: React.FC = () => {
           (currentReview?.source?.type as string) === 'git_hub_pr'
         ? 'GitHub'
         : null;
-  console.log('Review Debug:', {
-    reviewId,
-    found: !!currentReview,
-    sourceType: currentReview?.source?.type,
-    remoteProviderName,
-  });
 
   const handleExport = async (
     format: ExportFormat,
@@ -281,7 +293,7 @@ export const ReviewView: React.FC = () => {
   }
 
   if (shouldShowSkeleton) {
-    return <ReviewViewSkeleton />;
+    return <ReviewViewSkeleton mode={reviewViewMode} />;
   }
 
   if (reviewError) {
@@ -337,6 +349,7 @@ export const ReviewView: React.FC = () => {
         isTasksLoading={isTasksLoading}
         isTasksFetching={isTasksFetching}
         isFeedbacksLoading={isFeedbacksLoading}
+        confidenceThreshold={filterConfig.confidenceThreshold}
         onSidebarTabChange={setSidebarTab}
         onSelectTask={selectTask}
         onSelectFeedback={selectFeedback}
@@ -344,6 +357,7 @@ export const ReviewView: React.FC = () => {
         onAddGlobalFeedback={handleAddGlobalFeedback}
         onBackToSummary={handleBackToSummary}
         rulesById={rulesById}
+        categoriesById={categoriesById}
       />
 
       <div className="bg-bg-primary relative flex min-w-0 flex-1 flex-col">
@@ -357,6 +371,7 @@ export const ReviewView: React.FC = () => {
             <FeedbackDetail
               feedback={selectedFeedback}
               rulesById={rulesById}
+              categoriesById={categoriesById}
               comments={isCommentsLoading ? [] : comments}
               onUpdateStatus={handleFeedbackStatusChange}
               onUpdateImpact={handleFeedbackImpactChange}

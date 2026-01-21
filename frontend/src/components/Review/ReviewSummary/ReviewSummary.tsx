@@ -60,6 +60,7 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
   onSelectTask,
   onStartReview,
 }) => {
+  const [isExpanded, setIsExpanded] = React.useState(false);
   const { data: issueChecks = [], isLoading: isChecksLoading } = useIssueChecks(runId);
 
   const uncoveredFiles = useMemo(() => {
@@ -115,13 +116,35 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
 
         {/* Summary */}
         {review?.summary && (
-          <div className="bg-bg-tertiary/30 border-border/50 rounded-lg border p-4">
-            <h3 className="text-text-secondary mb-2 text-xs font-medium uppercase tracking-wide">
+          <div className="bg-bg-tertiary/30 border-border/50 relative rounded-lg border p-4">
+            <h3 className="text-text-secondary mb-2 text-xs font-medium tracking-wide uppercase">
               Summary
             </h3>
-            <div className="prose prose-sm prose-invert max-w-none">
+            <div
+              className={`prose prose-sm prose-invert max-w-none transition-all duration-300 ease-in-out ${
+                !isExpanded
+                  ? 'max-h-24 overflow-hidden [mask-image:linear-gradient(to_bottom,black_50%,transparent_100%)]'
+                  : 'max-h-[2000px]'
+              }`}
+            >
               <ReactMarkdown>{review.summary}</ReactMarkdown>
             </div>
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="text-brand hover:text-brand/80 mt-2 flex items-center gap-1 text-xs font-medium transition-colors"
+            >
+              {isExpanded ? (
+                <>
+                  <ICONS.CHEVRON_UP size={12} />
+                  Show less
+                </>
+              ) : (
+                <>
+                  <ICONS.CHEVRON_DOWN size={12} />
+                  Show more
+                </>
+              )}
+            </button>
           </div>
         )}
 
