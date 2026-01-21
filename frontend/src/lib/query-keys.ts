@@ -7,12 +7,17 @@ export const queryKeys = {
   tasks: (runId: string) => ['tasks', runId] as const,
   feedback: ['feedback'] as const,
   feedbackByReview: (reviewId: string) => ['feedback', 'byReview', reviewId] as const,
+  feedbackFilterConfig: ['feedbackFilterConfig'] as const,
   repos: ['repos'] as const,
   agents: ['agents'] as const,
   rules: ['rules'] as const,
   issueChecks: (runId: string) => ['issueChecks', runId] as const,
   ruleLibrary: ['ruleLibrary'] as const,
   defaultIssueCategories: ['defaultIssueCategories'] as const,
+  ruleRejectionStats: ['ruleRejectionStats'] as const,
+  // Learning system
+  learnedPatterns: ['learnedPatterns'] as const,
+  learningStatus: ['learningStatus'] as const,
 };
 
 export type QueryKeyType = typeof queryKeys;

@@ -46,10 +46,15 @@ const RulesView = lazy(() =>
     default: module.RulesView,
   }))
 );
+const LearningView = lazy(() =>
+  import('./components/Learning/LearningView').then(module => ({
+    default: module.LearningView,
+  }))
+);
 
 const queryClient = createQueryClient();
 
-type View = 'generate' | 'review' | 'repos' | 'rules' | 'settings';
+type View = 'generate' | 'review' | 'repos' | 'rules' | 'learning' | 'settings';
 
 function App() {
   const [currentView, setCurrentView] = useState<View>('generate');
@@ -110,6 +115,8 @@ function App() {
     };
   }, [loadDiff]);
 
+  const reviewViewMode = useAppStore(state => state.reviewViewMode);
+
   const renderView = () => {
     const viewContent = (() => {
       switch (currentView) {
@@ -125,6 +132,8 @@ function App() {
           return <ReposView onNavigate={setCurrentView} />;
         case 'rules':
           return <RulesView />;
+        case 'learning':
+          return <LearningView />;
         case 'settings':
           return <SettingsView onNavigate={setCurrentView} />;
         default:
@@ -137,7 +146,7 @@ function App() {
         case 'settings':
           return <SettingsPageSkeleton />;
         case 'review':
-          return <ReviewViewSkeleton />;
+          return <ReviewViewSkeleton mode={reviewViewMode} />;
         default:
           return <PageSkeleton />;
       }

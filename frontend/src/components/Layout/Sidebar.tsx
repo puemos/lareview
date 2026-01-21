@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store';
 import { ConfirmationModal } from '../Common/ConfirmationModal';
+import { Brain } from '@phosphor-icons/react';
 import { ICONS } from '../../constants/icons';
 import type { ViewType } from '../../types';
 import { useReviews } from '../../hooks/useReviews';
@@ -171,6 +172,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) =
         isActive={currentView === 'rules'}
         onClick={() => onViewChange('rules')}
         ariaLabel="Navigate to Rules"
+      />
+      <SidebarItem
+        icon={<Brain size={16} weight="fill" />}
+        label="Learning"
+        isActive={currentView === 'learning'}
+        onClick={() => onViewChange('learning')}
+        ariaLabel="Navigate to Learning"
       />
       <div className="flex-1" />
       <SidebarItem

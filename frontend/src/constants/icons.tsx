@@ -43,6 +43,7 @@ import {
   DotOutline,
   ArrowRight,
   CaretDown,
+  CaretUp,
   HandPalm,
   Lightbulb,
   Microscope,
@@ -97,6 +98,7 @@ export const ICONS = {
   ACTION_CLOSE: X,
   ACTION_CLEAR: Trash,
   ACTION_REFRESH: ArrowClockwise,
+  ACTION_RESTORE: ArrowClockwise,
   ACTION_OPEN_WINDOW: ArrowSquareOut,
   ACTION_EXPAND: ArrowsOutSimple,
   ACTION_COLLAPSE: ArrowsInSimple,
@@ -124,6 +126,7 @@ export const ICONS = {
   ICON_DOT: DotOutline,
   ICON_ARROW_RIGHT: ArrowRight,
   CHEVRON_DOWN: CaretDown,
+  CHEVRON_UP: CaretUp,
 
   // --- Impact ---
   IMPACT_BLOCKING: HandPalm,
