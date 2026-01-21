@@ -128,45 +128,59 @@ pub async fn get_cli_status() -> Result<CliStatus, String> {
 
 #[tauri::command]
 pub async fn install_cli() -> Result<(), String> {
-    #[cfg(target_os = "macos")]
+    #[cfg(unix)]
     {
         let current_exe = std::env::current_exe().map_err(|e| e.to_string())?;
-        let target = std::path::Path::new("/usr/local/bin/lareview");
 
-        // Ensure /usr/local/bin exists
-        if let Some(parent) = target.parent()
-            && !parent.exists()
-        {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create /usr/local/bin: {}", e))?;
-        }
+        // Try /usr/local/bin first, fall back to ~/.local/bin on permission denied
+        let primary_target = std::path::PathBuf::from("/usr/local/bin/lareview");
+        let fallback_target = dirs::home_dir()
+            .map(|h| h.join(".local/bin/lareview"))
+            .ok_or_else(|| "Could not determine home directory".to_string())?;
 
-        // Check if it already exists
-        if target.exists() {
-            // Check if it's already pointing to us
-            if let Ok(existing) = std::fs::read_link(target)
-                && existing == current_exe
-            {
+        let install_to_target = |target: &std::path::Path| -> Result<(), std::io::Error> {
+            // Ensure parent directory exists
+            if let Some(parent) = target.parent() {
+                if !parent.exists() {
+                    std::fs::create_dir_all(parent)?;
+                }
+            }
+
+            // Check if it already exists and points to the same executable
+            if target.exists() {
+                if let Ok(existing) = std::fs::read_link(target) {
+                    if existing == current_exe {
+                        return Ok(());
+                    }
+                }
+                // Remove existing if it's different or not a symlink
+                let _ = std::fs::remove_file(target);
+            }
+
+            std::os::unix::fs::symlink(&current_exe, target)
+        };
+
+        // Try primary location first
+        match install_to_target(&primary_target) {
+            Ok(()) => return Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
+                // Fall back to ~/.local/bin
+                install_to_target(&fallback_target).map_err(|e| {
+                    format!(
+                        "Failed to install CLI. Could not write to /usr/local/bin or ~/.local/bin: {}",
+                        e
+                    )
+                })?;
                 return Ok(());
             }
-            // Remove existing if it's different or not a symlink
-            let _ = std::fs::remove_file(target);
-        }
-
-        // Try to symlink
-        std::os::unix::fs::symlink(&current_exe, target).map_err(|e| {
-            if e.kind() == std::io::ErrorKind::PermissionDenied {
-                "Permission denied. Please ensure /usr/local/bin is writable or manually symlink lareview to /usr/local/bin.".to_string()
-            } else {
-                format!("Failed to create symlink: {}", e)
+            Err(e) => {
+                return Err(format!("Failed to create symlink: {}", e));
             }
-        })?;
-
-        Ok(())
+        }
     }
 
-    #[cfg(not(target_os = "macos"))]
-    Err("CLI installation is only supported on macOS".to_string())
+    #[cfg(not(unix))]
+    Err("CLI installation is only supported on macOS and Linux".to_string())
 }
 
 #[tauri::command]
@@ -2119,26 +2133,65 @@ pub fn get_pending_review_from_state(
 
 #[tauri::command]
 pub fn open_url(url: String) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open")
-            .arg(url)
-            .spawn()
-            .map_err(|e| e.to_string())?;
-    }
-    #[cfg(target_os = "linux")]
-    {
-        std::process::Command::new("xdg-open")
-            .arg(url)
-            .spawn()
-            .map_err(|e| e.to_string())?;
-    }
-    #[cfg(target_os = "windows")]
-    {
-        std::process::Command::new("cmd")
-            .args(["/C", "start", &url])
-            .spawn()
-            .map_err(|e| e.to_string())?;
+    use crate::infra::platform::{current_platform, Platform};
+
+    match current_platform() {
+        Platform::MacOS => {
+            std::process::Command::new("open")
+                .arg(&url)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
+        Platform::LinuxWsl => {
+            // Try multiple methods in order of reliability
+            // 1. wslview (from wslu package) - best option, handles URLs properly
+            // 2. explorer.exe - built into Windows, reliable for URLs
+            // 3. powershell.exe - fallback with proper URL handling
+
+            let wslview_result = std::process::Command::new("wslview")
+                .arg(&url)
+                .spawn();
+
+            if wslview_result.is_ok() {
+                // wslview started successfully
+            } else {
+                // Try explorer.exe which handles URLs well
+                let explorer_result = std::process::Command::new("explorer.exe")
+                    .arg(&url)
+                    .spawn();
+
+                if explorer_result.is_err() {
+                    // Final fallback: PowerShell with proper escaping
+                    let ps_command = format!("Start-Process '{}'", url.replace("'", "''"));
+                    std::process::Command::new("powershell.exe")
+                        .args(["-NoProfile", "-Command", &ps_command])
+                        .spawn()
+                        .map_err(|e| {
+                            format!(
+                                "Failed to open URL in WSL: {}. \
+                                 Install wslu package (sudo apt install wslu) for better support, \
+                                 or ensure Windows interop is enabled.",
+                                e
+                            )
+                        })?;
+                }
+            }
+        }
+        Platform::Linux => {
+            std::process::Command::new("xdg-open")
+                .arg(&url)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
+        Platform::Windows => {
+            std::process::Command::new("cmd")
+                .args(["/C", "start", &url])
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
+        Platform::Unknown => {
+            return Err("Unsupported platform for opening URLs".to_string());
+        }
     }
     Ok(())
 }

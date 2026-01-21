@@ -10,6 +10,7 @@ pub mod diagram;
 pub mod diff;
 pub mod editor;
 pub mod hash;
+pub mod platform;
 pub mod shell;
 pub mod vcs;
 

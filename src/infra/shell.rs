@@ -107,14 +107,19 @@ fn default_search_paths() -> Vec<PathBuf> {
     }
     #[cfg(target_os = "linux")]
     {
-        vec![
+        let mut paths = vec![
             PathBuf::from("/usr/local/bin"),
             PathBuf::from("/usr/bin"),
             PathBuf::from("/bin"),
             PathBuf::from("/usr/local/sbin"),
             PathBuf::from("/usr/sbin"),
             PathBuf::from("/sbin"),
-        ]
+        ];
+        // Add ~/.local/bin for user-installed binaries (common on Linux/WSL)
+        if let Some(home) = dirs::home_dir() {
+            paths.insert(0, home.join(".local/bin"));
+        }
+        paths
     }
     #[cfg(target_os = "windows")]
     {

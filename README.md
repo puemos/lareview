@@ -153,6 +153,21 @@ brew install puemos/tap/lareview
     mv ./lareview /usr/local/bin/lareview
     ```
 
+#### WSL (Windows Subsystem for Linux)
+
+LaReview runs natively inside WSL2 as a Linux app. Use the same installation steps as Linux above.
+
+**Optional:** For better Windows integration (opening URLs in your Windows browser), install the [wslu](https://github.com/wslutilities/wslu) package:
+
+```bash
+# Ubuntu/Debian
+sudo apt install wslu
+
+# Other distros: see https://wslutiliti.es/wslu/install.html
+```
+
+If `wslu` is not installed, LaReview will fall back to using `cmd.exe` for opening URLs.
+
 ### Option C: One-click CLI installation
 
 Launch LaReview and go to **Settings → CLI Installation** for a one-click setup to add `lareview` to your PATH.
