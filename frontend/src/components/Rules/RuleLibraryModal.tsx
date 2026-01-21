@@ -90,11 +90,11 @@ export const RuleLibraryModal: React.FC<RuleLibraryModalProps> = ({ isOpen, onCl
 
   return (
     <div className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm duration-200">
-      <div className="bg-bg-primary border-border/50 animate-in zoom-in-95 flex h-[80vh] w-full max-w-4xl flex-col rounded-xl border shadow-2xl duration-200">
+      <div className="bg-bg-primary border-border/50 animate-in zoom-in-95 flex h-[80vh] w-full max-w-4xl flex-col rounded-[2px] border shadow-2xl duration-200">
         {/* Header */}
-        <div className="border-border/50 bg-bg-secondary/30 flex items-center justify-between rounded-t-xl border-b px-5 py-4">
+        <div className="border-border/50 bg-bg-secondary/30 flex items-center justify-between rounded-t-[2px] border-b px-5 py-4">
           <div className="flex items-center gap-2.5">
-            <div className="bg-brand/10 text-brand rounded-md p-1.5">
+            <div className="bg-brand/10 text-brand rounded-[2px] p-1.5">
               <ICONS.ICON_PLAN size={18} />
             </div>
             <div>
@@ -106,7 +106,7 @@ export const RuleLibraryModal: React.FC<RuleLibraryModalProps> = ({ isOpen, onCl
           </div>
           <button
             onClick={onClose}
-            className="text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary rounded p-1 transition-all"
+            className="text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary rounded-[2px] p-1 transition-all"
           >
             <ICONS.ACTION_CLOSE size={18} />
           </button>
@@ -118,7 +118,7 @@ export const RuleLibraryModal: React.FC<RuleLibraryModalProps> = ({ isOpen, onCl
           <div className="border-border/50 w-48 flex-shrink-0 overflow-y-auto border-r p-3">
             <button
               onClick={() => setSelectedCategory('all')}
-              className={`mb-1 w-full rounded-md px-3 py-2 text-left text-xs transition-colors ${
+              className={`mb-1 w-full rounded-[2px] px-3 py-2 text-left text-xs transition-colors ${
                 selectedCategory === 'all'
                   ? 'bg-brand/10 text-brand'
                   : 'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary'
@@ -135,7 +135,7 @@ export const RuleLibraryModal: React.FC<RuleLibraryModalProps> = ({ isOpen, onCl
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`mb-1 w-full rounded-md px-3 py-2 text-left transition-colors ${
+                  className={`mb-1 w-full rounded-[2px] px-3 py-2 text-left transition-colors ${
                     selectedCategory === cat
                       ? 'bg-brand/10 text-brand'
                       : 'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary'
@@ -155,7 +155,7 @@ export const RuleLibraryModal: React.FC<RuleLibraryModalProps> = ({ isOpen, onCl
             {allRules.isLoading ? (
               <div className="animate-pulse space-y-3">
                 {[1, 2, 3, 4].map(i => (
-                  <div key={i} className="bg-bg-tertiary/50 h-24 rounded-lg" />
+                  <div key={i} className="bg-bg-tertiary/50 h-24 rounded-[2px]" />
                 ))}
               </div>
             ) : filteredRules.length === 0 ? (
@@ -190,7 +190,7 @@ export const RuleLibraryModal: React.FC<RuleLibraryModalProps> = ({ isOpen, onCl
               <select
                 value={addScope}
                 onChange={e => setAddScope(e.target.value as RuleScope)}
-                className="bg-bg-tertiary border-border text-text-primary focus:border-brand focus:ring-brand/20 rounded-md border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none"
+                className="bg-bg-tertiary border-border text-text-primary focus:border-brand focus:ring-brand/20 rounded-[2px] border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none"
               >
                 <option value="global">Global</option>
                 <option value="repo">Repository</option>
@@ -199,7 +199,7 @@ export const RuleLibraryModal: React.FC<RuleLibraryModalProps> = ({ isOpen, onCl
                 <select
                   value={addRepoId}
                   onChange={e => setAddRepoId(e.target.value)}
-                  className="bg-bg-tertiary border-border text-text-primary focus:border-brand focus:ring-brand/20 flex-1 rounded-md border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none"
+                  className="bg-bg-tertiary border-border text-text-primary focus:border-brand focus:ring-brand/20 flex-1 rounded-[2px] border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none"
                 >
                   <option value="">Select a repository</option>
                   {repos.map(repo => (
@@ -212,14 +212,14 @@ export const RuleLibraryModal: React.FC<RuleLibraryModalProps> = ({ isOpen, onCl
               <div className="ml-auto flex items-center gap-2">
                 <button
                   onClick={cancelAddRule}
-                  className="bg-bg-tertiary text-text-secondary hover:text-text-primary border-border rounded-md border px-3 py-2 text-xs font-medium transition-all"
+                  className="bg-bg-tertiary text-text-secondary hover:text-text-primary border-border rounded-[2px] border px-3 py-2 text-xs font-medium transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmAddRule}
                   disabled={addScope === 'repo' && !addRepoId}
-                  className="bg-brand text-bg-primary disabled:bg-bg-tertiary disabled:text-text-disabled rounded-md px-3 py-2 text-xs font-semibold transition-all hover:brightness-110 disabled:cursor-not-allowed"
+                  className="bg-brand text-bg-primary disabled:bg-bg-tertiary disabled:text-text-disabled rounded-[2px] px-3 py-2 text-xs font-semibold transition-all hover:brightness-110 disabled:cursor-not-allowed"
                 >
                   {addFromLibrary.isPending ? 'Adding...' : 'Add Rule'}
                 </button>
@@ -242,29 +242,29 @@ const RuleCard: React.FC<RuleCardProps> = ({ rule, onAdd, isAdding }) => {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="bg-bg-secondary/40 border-border/50 rounded-lg border p-4">
+    <div className="bg-bg-secondary/40 border-border/50 rounded-[2px] border p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h4 className="text-text-primary text-sm font-medium">{rule.name}</h4>
+            <h4 className="text-text-primary text-sm font-semibold">{rule.name}</h4>
             {rule.category && (
-              <span className="bg-bg-tertiary text-text-tertiary rounded px-1.5 py-0.5 text-[9px] font-bold">
-                {rule.category}
+              <span className="bg-bg-tertiary text-accent rounded-[2px] px-1.5 py-0.5 text-[9px] font-bold border border-accent/20">
+                {rule.category.toUpperCase()}
               </span>
             )}
           </div>
-          <p className="text-text-secondary mt-1 text-xs">{rule.description}</p>
+          <p className="text-text-secondary mt-1 text-xs leading-relaxed">{rule.description}</p>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             {rule.tags.slice(0, 3).map(tag => (
               <span
                 key={tag}
-                className="bg-bg-tertiary text-text-tertiary rounded px-1.5 py-0.5 text-[10px]"
+                className="bg-bg-tertiary text-text-tertiary rounded-[2px] px-1.5 py-0.5 text-[10px] border border-border/40"
               >
                 {tag}
               </span>
             ))}
             {rule.glob && (
-              <span className="bg-bg-tertiary text-text-tertiary rounded px-1.5 py-0.5 font-mono text-[10px]">
+              <span className="bg-bg-tertiary text-text-tertiary rounded-[2px] px-1.5 py-0.5 font-mono text-[10px] border border-border/40">
                 {rule.glob}
               </span>
             )}
@@ -273,17 +273,17 @@ const RuleCard: React.FC<RuleCardProps> = ({ rule, onAdd, isAdding }) => {
         <button
           onClick={onAdd}
           disabled={isAdding}
-          className="bg-brand/10 text-brand hover:bg-brand/20 flex-shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+          className="bg-brand/10 text-brand hover:bg-brand/20 flex-shrink-0 rounded-[2px] px-3 py-1.5 text-xs font-bold transition-colors disabled:opacity-50 border border-brand/20"
         >
           {isAdding ? 'Adding...' : 'Add'}
         </button>
       </div>
 
       {/* Expandable rule text */}
-      <div className="mt-3">
+      <div className="mt-4 border-t border-border/20 pt-3">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="text-text-tertiary hover:text-text-secondary flex items-center gap-1 text-[10px] transition-colors"
+          className="text-text-tertiary hover:text-text-secondary flex items-center gap-1 text-[10px] transition-colors font-medium"
         >
           <ICONS.CHEVRON_DOWN
             size={10}
@@ -292,7 +292,7 @@ const RuleCard: React.FC<RuleCardProps> = ({ rule, onAdd, isAdding }) => {
           {expanded ? 'Hide rule text' : 'Show rule text'}
         </button>
         {expanded && (
-          <div className="bg-bg-tertiary/50 text-text-secondary mt-2 rounded-md p-3 font-mono text-xs whitespace-pre-wrap">
+          <div className="bg-bg-tertiary/30 text-text-secondary mt-2 rounded-[2px] p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap border border-border/30 shadow-inner">
             {rule.text}
           </div>
         )}

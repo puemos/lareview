@@ -62,3 +62,20 @@ export function useRules() {
     removeRule,
   };
 }
+
+export interface RuleRejectionStats {
+  rule_id: string;
+  total_feedback: number;
+  rejected_count: number;
+  rejection_rate: number;
+}
+
+export function useRuleRejectionStats() {
+  const { getRuleRejectionStats } = useTauri();
+
+  return useQuery({
+    queryKey: queryKeys.ruleRejectionStats,
+    queryFn: getRuleRejectionStats,
+    staleTime: 60000, // 1 minute - stats don't change frequently
+  });
+}

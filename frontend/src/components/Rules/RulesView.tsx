@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { Asterisk, Check, PencilSimple, Trash } from '@phosphor-icons/react';
+import { Asterisk, Check, PencilSimple, Trash, Warning, ChartBar } from '@phosphor-icons/react';
 import { ICONS } from '../../constants/icons';
-import { useRules, type ReviewRuleInput } from '../../hooks/useRules';
+import { useRules, useRuleRejectionStats, type ReviewRuleInput, type RuleRejectionStats } from '../../hooks/useRules';
 import { useRepos } from '../../hooks/useRepos';
 import { RuleLibraryModal } from './RuleLibraryModal';
 import type { LinkedRepo, ReviewRule, RuleScope } from '../../types';
@@ -27,6 +27,7 @@ const emptyDraft: RuleDraft = {
 export const RulesView: React.FC = () => {
   const { data: rules = [], isLoading, createRule, updateRule, removeRule } = useRules();
   const { data: repos = [] } = useRepos();
+  const { data: rejectionStats = [] } = useRuleRejectionStats();
 
   const [draft, setDraft] = useState<RuleDraft>(emptyDraft);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -36,6 +37,15 @@ export const RulesView: React.FC = () => {
 
   const globalRules = useMemo(() => rules.filter(rule => rule.scope === 'global'), [rules]);
   const repoRules = useMemo(() => rules.filter(rule => rule.scope === 'repo'), [rules]);
+
+  // Create a map of rule_id to stats for quick lookup
+  const statsById = useMemo(() => {
+    const map: Record<string, RuleRejectionStats> = {};
+    rejectionStats.forEach(stat => {
+      map[stat.rule_id] = stat;
+    });
+    return map;
+  }, [rejectionStats]);
 
   const repoName = (repoId?: string | null) =>
     repos.find(repo => repo.id === repoId)?.name || 'Unknown repo';
@@ -145,6 +155,7 @@ export const RulesView: React.FC = () => {
             title="Global Rules"
             rules={globalRules}
             repos={repos}
+            statsById={statsById}
             editingId={editingId}
             editingDraft={editingDraft}
             onEdit={startEdit}
@@ -160,6 +171,7 @@ export const RulesView: React.FC = () => {
             title="Repository Rules"
             rules={repoRules}
             repos={repos}
+            statsById={statsById}
             editingId={editingId}
             editingDraft={editingDraft}
             onEdit={startEdit}
@@ -229,7 +241,7 @@ const AddRuleModal: React.FC<AddRuleModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary rounded p-1 transition-all"
+            className="text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary rounded-md p-1 transition-all"
           >
             <ICONS.ACTION_CLOSE size={18} />
           </button>
@@ -393,6 +405,7 @@ interface RuleSectionProps {
   title: string;
   rules: ReviewRule[];
   repos: LinkedRepo[];
+  statsById: Record<string, RuleRejectionStats>;
   editingId: string | null;
   editingDraft: RuleDraft;
   onEdit: (rule: ReviewRule) => void;
@@ -409,6 +422,7 @@ const RuleSection: React.FC<RuleSectionProps> = ({
   title,
   rules,
   repos,
+  statsById,
   editingId,
   editingDraft,
   onEdit,
@@ -428,86 +442,138 @@ const RuleSection: React.FC<RuleSectionProps> = ({
       </div>
 
       {rules.length === 0 ? (
-        <div className="text-text-tertiary bg-bg-secondary/40 border-border rounded-md border p-4 text-xs">
+        <div className="text-text-tertiary bg-bg-secondary/40 border-border rounded-lg border p-4 text-xs">
           No rules configured yet.
         </div>
       ) : (
         <div className="space-y-3">
           {rules.map(rule => (
-            <div key={rule.id} className="bg-bg-secondary/40 border-border rounded-lg border p-4">
+            <div
+              key={rule.id}
+              className="group bg-bg-secondary/40 hover:bg-bg-secondary hover:border-border relative rounded-lg border border-transparent transition-all"
+            >
               {editingId === rule.id ? (
-                <RuleForm
-                  draft={editingDraft}
-                  repos={repos}
-                  onChange={onEditChange}
-                  onSubmit={onUpdate}
-                  submitLabel="Save Changes"
-                  onCancel={onCancelEdit}
-                />
+                <div className="p-4">
+                  <RuleForm
+                    draft={editingDraft}
+                    repos={repos}
+                    onChange={onEditChange}
+                    onSubmit={onUpdate}
+                    submitLabel="Save Changes"
+                    onCancel={onCancelEdit}
+                  />
+                </div>
               ) : (
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="space-y-1">
-                      <div className="text-text-primary text-sm font-medium">{rule.text}</div>
-                      <div className="text-text-tertiary flex flex-wrap items-center gap-2 text-[10px]">
-                        <span className="bg-bg-tertiary rounded px-2 py-0.5 uppercase">
-                          {rule.scope}
-                        </span>
-                        {rule.scope === 'repo' && (
-                          <span className="bg-bg-tertiary rounded px-2 py-0.5">
-                            {repoName(rule.repo_id)}
-                          </span>
-                        )}
-                        {rule.category && (
-                          <span className="bg-bg-tertiary rounded px-2 py-0.5">
-                            {rule.category}
-                          </span>
-                        )}
-                        {rule.glob && (
-                          <span className="bg-bg-tertiary rounded px-2 py-0.5 font-mono">
-                            {rule.glob}
-                          </span>
-                        )}
+                <div className="flex flex-col">
+                  {/* Top: Description and Toggle */}
+                  <div className="p-4 space-y-4">
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="text-text-primary text-sm font-medium leading-relaxed flex-1">
+                        {rule.text}
                       </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
                       <button
                         onClick={() => onToggle(rule)}
-                        className={`rounded-md px-2.5 py-1 text-[10px] font-semibold transition-colors ${
+                        className={`shrink-0 rounded-md px-2.5 py-1 text-[10px] font-semibold transition-colors ${
                           rule.enabled
-                            ? 'bg-status-done/10 text-status-done'
-                            : 'bg-bg-tertiary text-text-tertiary'
+                            ? 'bg-status-done/10 text-status-done border border-status-done/20'
+                            : 'bg-bg-tertiary text-text-tertiary border border-border'
                         }`}
                       >
                         {rule.enabled ? 'Enabled' : 'Disabled'}
                       </button>
+                    </div>
+
+                    {/* Middle: Tags */}
+                    <div className="text-text-tertiary flex flex-wrap items-center gap-2 text-[10px]">
+                      <span className="bg-bg-tertiary rounded-md px-2 py-0.5 uppercase font-bold tracking-wider border border-border/50">
+                        {rule.scope}
+                      </span>
+                      {rule.scope === 'repo' && (
+                        <span className="bg-bg-tertiary rounded-md px-2 py-0.5 border border-border/50">
+                          {repoName(rule.repo_id)}
+                        </span>
+                      )}
+                      {rule.category && (
+                        <span className="bg-bg-tertiary text-accent font-medium rounded-md px-2 py-0.5 border border-accent/20">
+                          {rule.category.toUpperCase()}
+                        </span>
+                      )}
+                      {rule.glob && (
+                        <span className="bg-bg-tertiary rounded-md px-2 py-0.5 font-mono border border-border/50">
+                          {rule.glob}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Bottom: Footer with Meta and Actions */}
+                  <div className="border-t border-border/50 px-4 py-3 flex items-center justify-between">
+                    <div className="text-text-tertiary flex items-center gap-4 text-[10px]">
+                      <span className="flex items-center gap-1.5 opacity-80">
+                        <Check size={12} className="text-status-done" />
+                        Updated {new Date(rule.updated_at).toLocaleDateString()}
+                      </span>
+                      {statsById[rule.id] && (
+                        <RuleEffectivenessIndicator stats={statsById[rule.id]} />
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
                       <button
                         onClick={() => onEdit(rule)}
-                        className="text-text-tertiary hover:text-text-primary rounded-md border border-transparent p-1 transition-colors"
+                        className="text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary rounded-md p-1.5 transition-colors"
                         title="Edit rule"
                       >
                         <PencilSimple size={14} />
                       </button>
                       <button
                         onClick={() => onDelete(rule.id)}
-                        className="text-text-tertiary hover:text-status-ignored rounded-md border border-transparent p-1 transition-colors"
+                        className="text-text-tertiary hover:text-status-ignored hover:bg-status-ignored/10 rounded-md p-1.5 transition-colors"
                         title="Delete rule"
                       >
                         <Trash size={14} />
                       </button>
                     </div>
                   </div>
-
-                  <div className="text-text-tertiary flex items-center gap-2 text-[10px]">
-                    <Check size={12} className="text-status-done" />
-                    Updated {new Date(rule.updated_at).toLocaleDateString()}
-                  </div>
                 </div>
               )}
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+};
+
+interface RuleEffectivenessIndicatorProps {
+  stats: RuleRejectionStats;
+}
+
+const RuleEffectivenessIndicator: React.FC<RuleEffectivenessIndicatorProps> = ({ stats }) => {
+  const acceptanceRate = 1 - stats.rejection_rate;
+  const acceptancePercent = Math.round(acceptanceRate * 100);
+  const isNoisy = stats.rejection_rate > 0.3; // >30% rejection rate is considered noisy
+
+  return (
+    <div className="flex items-center gap-3">
+      <span className="flex items-center gap-1.5 opacity-80">
+        <ChartBar size={12} className="text-text-disabled" />
+        <span title={`${stats.total_feedback} feedback items generated`}>
+          {stats.total_feedback} triggered
+        </span>
+      </span>
+      <span className="text-text-disabled/40">·</span>
+      <span
+        className={`flex items-center gap-1.5 ${isNoisy ? 'text-status-ignored' : acceptancePercent >= 80 ? 'text-status-done' : 'text-status-in_progress'}`}
+        title={`${acceptancePercent}% of feedback from this rule was accepted (${stats.rejected_count} rejected)`}
+      >
+        {isNoisy && <Warning size={12} />}
+        {acceptancePercent}% accepted
+      </span>
+      {isNoisy && (
+        <span className="bg-status-ignored/10 text-status-ignored border border-status-ignored/20 rounded-[2px] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tighter">
+          Noisy
+        </span>
       )}
     </div>
   );
