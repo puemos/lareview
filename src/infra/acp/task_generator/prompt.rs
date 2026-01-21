@@ -1,4 +1,4 @@
-use crate::domain::{DefaultIssueCategory, ResolvedRule};
+use crate::domain::{DefaultIssueCategory, LearnedPattern, ResolvedRule};
 use crate::infra::acp::task_mcp_server::RunContext;
 use crate::prompts;
 use agent_client_protocol::{ClientCapabilities, FileSystemCapability, Meta};
@@ -19,10 +19,28 @@ struct RuleItem {
     rule_id: Option<String>,
 }
 
+/// Learned pattern item for the template
+#[derive(serde::Serialize)]
+struct LearnedPatternItem {
+    pattern_text: String,
+    category: Option<String>,
+    file_extension: Option<String>,
+    source_count: i32,
+}
+
 pub(super) fn build_prompt(
     run: &RunContext,
     repo_root: Option<&PathBuf>,
     rules: &[ResolvedRule],
+) -> anyhow::Result<String> {
+    build_prompt_with_patterns(run, repo_root, rules, &[])
+}
+
+pub fn build_prompt_with_patterns(
+    run: &RunContext,
+    repo_root: Option<&PathBuf>,
+    rules: &[ResolvedRule],
+    learned_patterns: &[LearnedPattern],
 ) -> anyhow::Result<String> {
     let has_repo_access = repo_root.is_some();
     let source_json = serde_json::to_string(&run.source).unwrap_or_default();
@@ -55,6 +73,17 @@ pub(super) fn build_prompt(
     // Get default issue categories (could be filtered by user settings in the future)
     let default_categories = DefaultIssueCategory::defaults();
 
+    // Convert learned patterns to template items
+    let learned_pattern_items: Vec<LearnedPatternItem> = learned_patterns
+        .iter()
+        .map(|p| LearnedPatternItem {
+            pattern_text: p.pattern_text.clone(),
+            category: p.category.clone(),
+            file_extension: p.file_extension.clone(),
+            source_count: p.source_count,
+        })
+        .collect();
+
     prompts::render(
         "generate_tasks",
         &json!({
@@ -72,6 +101,9 @@ pub(super) fn build_prompt(
             // Default categories (built-in)
             "has_default_categories": !default_categories.is_empty(),
             "default_categories": default_categories,
+            // Learned patterns from rejection analysis
+            "has_learned_patterns": !learned_pattern_items.is_empty(),
+            "learned_patterns": learned_pattern_items,
         }),
     )
     .context("failed to render generate_tasks prompt")

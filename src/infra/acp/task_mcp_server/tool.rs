@@ -247,15 +247,20 @@ pub(super) fn create_add_feedback_tool(config: Arc<ServerConfig>) -> impl ToolHa
            \"hunk_id\": \"src/auth.rs#H1\",\n\
            \"line_id\": \"L3\",\n\
            \"body\": \"Your comment here\",\n\
-           \"impact\": \"blocking\"\n\
+           \"impact\": \"blocking\",\n\
+           \"confidence\": 0.9\n\
          }\n\
          ```\n\n\
-         **Impact levels:**\n\
+         **Impact levels** (severity if the issue is real):\n\
          - `blocking`: Must fix before merge (security, correctness, data integrity)\n\
          - `nice_to_have`: Should fix, improves quality (missing tests, naming, tech debt)\n\
          - `nitpick`: Optional polish (style, minor typos)\n\n\
+         **Confidence (0.0-1.0):** How certain you are this is a real issue (not a false positive).\n\
+         - 0.9-1.0: High confidence - you're sure this is a real problem\n\
+         - 0.7-0.89: Medium confidence - likely real but could be intentional\n\
+         - 0.5-0.69: Low confidence - speculative, might be wrong\n\n\
          **General feedback:** For cross-cutting concerns, anchor to the most representative hunk and prefix body with \"**General feedback:**\"\n\n\
-         **Optional fields:** title, impact (default: nitpick), side (old|new, default: new), task_id",
+         **Optional fields:** title, impact (default: nitpick), confidence (default: 1.0), side (old|new, default: new), task_id",
     )
     .with_schema(add_feedback_schema())
 }
@@ -328,7 +333,8 @@ pub(super) fn create_report_issue_check_tool(config: Arc<ServerConfig>) -> impl 
          - `not_found`: Checked thoroughly, no issues\n\
          - `not_applicable`: Category doesn't apply to this PR\n\
          - `skipped`: Could not fully check\n\n\
-         **Confidence:** `high`, `medium`, or `low`",
+         **Confidence:** `high`, `medium`, or `low`\n\n\
+         **Note:** When reporting file locations in findings, both `file_path` AND `line_number` must be provided together.",
     )
     .with_schema(report_issue_check_schema())
 }
@@ -885,7 +891,13 @@ fn add_feedback_schema() -> Value {
             "impact": {
                 "type": "string",
                 "enum": ["nitpick", "blocking", "nice_to_have"],
-                "description": "Severity of the comment (default: nitpick)."
+                "description": "Severity of the issue if it's real (default: nitpick)."
+            },
+            "confidence": {
+                "type": "number",
+                "minimum": 0.0,
+                "maximum": 1.0,
+                "description": "How certain you are this is a real issue (0.0-1.0, default: 1.0). High (0.9-1.0): sure it's real. Medium (0.7-0.89): likely real. Low (0.5-0.69): speculative."
             },
             "task_id": {
                 "type": "string",
@@ -949,11 +961,11 @@ fn report_issue_check_schema() -> Value {
                         },
                         "file_path": {
                             "type": "string",
-                            "description": "Path to the file where the issue was found."
+                            "description": "Path to the file where the issue was found. Must be provided with line_number."
                         },
                         "line_number": {
                             "type": "integer",
-                            "description": "Line number where the issue occurs."
+                            "description": "Line number where the issue occurs. Must be provided with file_path."
                         },
                         "impact": {
                             "type": "string",
@@ -968,6 +980,151 @@ fn report_issue_check_schema() -> Value {
         },
         "required": ["category", "status", "confidence"]
     })
+}
+
+/// Create the submit_learned_patterns tool for the learning compaction agent
+pub(super) fn create_submit_learned_patterns_tool(config: Arc<ServerConfig>) -> impl ToolHandler {
+    SimpleTool::new("submit_learned_patterns", move |args: Value, _extra| {
+        let config = config.clone();
+        Box::pin(async move {
+            log_to_file(&config, "submit_learned_patterns called");
+            let persist_args = args.clone();
+
+            let persist_config = config.clone();
+            let persist_result = tokio::task::spawn_blocking(move || {
+                super::persistence::save_learned_patterns(&persist_config, persist_args)
+            })
+            .await;
+
+            match persist_result {
+                Ok(Ok(result)) => {
+                    log_to_file(
+                        &config,
+                        &format!(
+                            "SubmitLearnedPatternsTool: created={}, updated={}, errors={}",
+                            result.patterns_created,
+                            result.patterns_updated,
+                            result.errors.len()
+                        ),
+                    );
+                    Ok(json!({
+                        "status": "ok",
+                        "patterns_created": result.patterns_created,
+                        "patterns_updated": result.patterns_updated,
+                        "rejections_processed": result.rejections_processed,
+                        "errors": result.errors
+                    }))
+                }
+                Ok(Err(err)) => {
+                    log_to_file(
+                        &config,
+                        &format!("SubmitLearnedPatternsTool failed: {err:?}"),
+                    );
+                    Err(pmcp::Error::Validation(format!(
+                        "invalid submit_learned_patterns payload: {err}"
+                    )))
+                }
+                Err(join_err) => {
+                    log_to_file(
+                        &config,
+                        &format!("SubmitLearnedPatternsTool task join error: {join_err}"),
+                    );
+                    Err(pmcp::Error::Internal(format!(
+                        "submit_learned_patterns persistence join error: {join_err}"
+                    )))
+                }
+            }
+        })
+    })
+    .with_description(
+        "Submit learned patterns from rejection analysis. Used by the learning compaction agent \
+         to record patterns of feedback that reviewers found unhelpful.\n\n\
+         **Format:**\n\
+         ```json\n\
+         {\n\
+           \"patterns\": [\n\
+             {\n\
+               \"pattern_text\": \"Don't flag unwrap() in test files\",\n\
+               \"category\": \"testing\",\n\
+               \"file_extension\": \"rs\",\n\
+               \"source_count\": 5\n\
+             },\n\
+             {\n\
+               \"pattern_text\": \"Avoid suggesting error handling in examples\",\n\
+               \"category\": \"documentation\",\n\
+               \"source_count\": 3,\n\
+               \"merge_with_id\": \"pattern-abc123\"\n\
+             }\n\
+           ]\n\
+         }\n\
+         ```\n\n\
+         **Fields:**\n\
+         - `pattern_text`: The negative example (what to avoid flagging)\n\
+         - `category`: Classification (testing, performance, style, error-handling, security, documentation, naming)\n\
+         - `file_extension`: (optional) File extension if pattern applies to specific file types\n\
+         - `source_count`: Number of rejections this pattern explains\n\
+         - `merge_with_id`: (optional) ID of existing pattern to merge with instead of creating new",
+    )
+    .with_schema(submit_learned_patterns_schema())
+}
+
+fn submit_learned_patterns_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "patterns": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "pattern_text": {
+                            "type": "string",
+                            "description": "The negative example pattern (what to avoid flagging)."
+                        },
+                        "category": {
+                            "type": "string",
+                            "description": "Classification: testing, performance, style, error-handling, security, documentation, naming."
+                        },
+                        "file_extension": {
+                            "type": "string",
+                            "description": "File extension if pattern applies only to certain files (e.g., 'rs', 'ts')."
+                        },
+                        "source_count": {
+                            "type": "integer",
+                            "description": "Number of rejections this pattern explains."
+                        },
+                        "merge_with_id": {
+                            "type": "string",
+                            "description": "ID of existing pattern to merge with instead of creating a new one."
+                        }
+                    },
+                    "required": ["pattern_text", "source_count"]
+                },
+                "description": "Array of learned patterns to submit."
+            }
+        },
+        "required": ["patterns"]
+    })
+}
+
+/// Create the finalize_learning tool to signal learning analysis completion.
+pub(super) fn create_finalize_learning_tool(config: Arc<ServerConfig>) -> impl ToolHandler {
+    SimpleTool::new("finalize_learning", move |_args: Value, _extra| {
+        let config = config.clone();
+        Box::pin(async move {
+            log_to_file(&config, "finalize_learning called");
+            Ok(json!({"status": "ok", "message": "Learning analysis complete"}))
+        })
+    })
+    .with_description(
+        "Signal that learning analysis is complete. Call this after submitting all learned patterns \
+         via submit_learned_patterns to indicate the analysis is finished.",
+    )
+    .with_schema(json!({
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+    }))
 }
 
 #[cfg(test)]

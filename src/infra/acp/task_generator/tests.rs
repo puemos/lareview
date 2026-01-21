@@ -757,11 +757,13 @@ mod policy_tests {
         let warnings = crate::infra::acp::task_generator::validation::validate_tasks_payload(
             &missing,
             Some(&raw),
-            diff
+            diff,
         )
         .expect("should succeed with warnings");
         assert!(
-            warnings.iter().any(|w| w.contains("Tasks do not cover all changed files")),
+            warnings
+                .iter()
+                .any(|w| w.contains("Tasks do not cover all changed files")),
             "Expected warning about missing file coverage"
         );
     }

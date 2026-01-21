@@ -9,6 +9,7 @@ mod types;
 mod validation;
 mod worker;
 
+pub use prompt::build_prompt_with_patterns;
 pub use types::{GenerateTasksInput, GenerateTasksResult, ProgressEvent};
 pub use worker::generate_tasks_with_acp;
 

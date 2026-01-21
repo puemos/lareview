@@ -1,15 +1,18 @@
 //! Persistence functions for MCP server tools
 
 use super::config::ServerConfig;
-use super::task_ingest::{load_run_context, open_database};
+use super::task_ingest::open_database;
 use crate::domain::{
     CheckStatus, Comment, Confidence, Feedback, FeedbackAnchor, FeedbackImpact, FeedbackSide,
-    IssueCheck, IssueFinding, ReviewStatus,
+    IssueCheck, IssueFinding, LearnedPatternInput, LearningCompactionResult, ReviewStatus,
 };
 use anyhow::{Context, Result};
 use chrono::Utc;
 use serde_json::Value;
 use std::str::FromStr;
+
+#[allow(unused_imports)]
+use super::task_ingest::load_run_context;
 
 /// Save an issue check report from the agent
 pub fn save_issue_check(config: &ServerConfig, args: Value) -> Result<String> {
@@ -93,6 +96,7 @@ pub fn save_issue_check(config: &ServerConfig, args: Value) -> Result<String> {
                 &finding,
                 &ctx.review_id,
                 check.rule_id.as_deref(),
+                Some(&check.category),
                 &now,
             );
             feedback_repo
@@ -133,11 +137,12 @@ fn create_feedback_from_finding(
     finding: &IssueFinding,
     review_id: &str,
     rule_id: Option<&str>,
+    category: Option<&str>,
     now: &str,
 ) -> Feedback {
     let feedback_id = format!("feedback-{}", uuid::Uuid::new_v4());
 
-    let anchor = if finding.file_path.is_some() || finding.line_number.is_some() {
+    let anchor = if finding.file_path.is_some() && finding.line_number.is_some() {
         Some(FeedbackAnchor {
             file_path: finding.file_path.clone(),
             line_number: finding.line_number,
@@ -155,9 +160,11 @@ fn create_feedback_from_finding(
         task_id: None,
         rule_id: rule_id.map(|s| s.to_string()),
         finding_id: Some(finding.id.clone()),
+        category: category.map(|s| s.to_string()),
         title: finding.title.clone(),
         status: ReviewStatus::Todo,
         impact: finding.impact,
+        confidence: 1.0, // Feedback from issue checks inherits check's confidence
         anchor,
         author: "agent".to_string(),
         created_at: now.to_string(),
@@ -202,6 +209,14 @@ fn parse_finding(value: &Value, check_id: &str, idx: usize, now: &str) -> Result
         .and_then(|v| v.as_u64())
         .map(|n| n as u32);
 
+    // Validate that file_path and line_number are provided together or not at all
+    if file_path.is_some() != line_number.is_some() {
+        return Err(anyhow::anyhow!(
+            "finding {} must provide both file_path and line_number together, or neither",
+            idx
+        ));
+    }
+
     let finding_id = format!("finding-{}", uuid::Uuid::new_v4());
 
     Ok(IssueFinding {
@@ -241,6 +256,100 @@ fn format_category_name(category: &str) -> String {
         .join(" ")
 }
 
+/// Save learned patterns submitted by the learning agent
+pub fn save_learned_patterns(
+    config: &ServerConfig,
+    args: Value,
+) -> Result<LearningCompactionResult> {
+    let db = open_database(config)?;
+    let pattern_repo = db.learned_pattern_repo();
+
+    let mut result = LearningCompactionResult {
+        rejections_processed: 0,
+        patterns_created: 0,
+        patterns_updated: 0,
+        errors: Vec::new(),
+    };
+
+    let patterns = args
+        .get("patterns")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| anyhow::anyhow!("missing required field: patterns"))?;
+
+    for (idx, pattern_value) in patterns.iter().enumerate() {
+        let pattern_text = match pattern_value.get("pattern_text").and_then(|v| v.as_str()) {
+            Some(text) => text.to_string(),
+            None => {
+                result
+                    .errors
+                    .push(format!("pattern {} missing pattern_text", idx));
+                continue;
+            }
+        };
+
+        let category = pattern_value
+            .get("category")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        let file_extension = pattern_value
+            .get("file_extension")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        let source_count = pattern_value
+            .get("source_count")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(1) as i32;
+
+        let merge_with_id = pattern_value.get("merge_with_id").and_then(|v| v.as_str());
+
+        // Check if we should merge with an existing pattern
+        if let Some(existing_id) = merge_with_id {
+            match pattern_repo.merge_with(existing_id, source_count) {
+                Ok(rows) if rows > 0 => {
+                    result.patterns_updated += 1;
+                    result.rejections_processed += source_count as usize;
+                }
+                Ok(_) => {
+                    result.errors.push(format!(
+                        "pattern {} tried to merge with non-existent id: {}",
+                        idx, existing_id
+                    ));
+                }
+                Err(e) => {
+                    result.errors.push(format!(
+                        "pattern {} failed to merge with {}: {}",
+                        idx, existing_id, e
+                    ));
+                }
+            }
+        } else {
+            // Create a new pattern
+            let input = LearnedPatternInput {
+                pattern_text,
+                category,
+                file_extension,
+                enabled: Some(true),
+            };
+
+            match pattern_repo.create(&input, source_count) {
+                Ok(_) => {
+                    result.patterns_created += 1;
+                    result.rejections_processed += source_count as usize;
+                }
+                Err(e) => {
+                    result
+                        .errors
+                        .push(format!("pattern {} failed to create: {}", idx, e));
+                }
+            }
+        }
+    }
+
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -257,5 +366,108 @@ mod tests {
         assert_eq!(format_category_name("security"), "Security");
         assert_eq!(format_category_name("breaking-changes"), "Breaking Changes");
         assert_eq!(format_category_name("error-handling"), "Error Handling");
+    }
+
+    #[test]
+    fn test_parse_finding_with_both_location_fields() {
+        let value = serde_json::json!({
+            "title": "Test finding",
+            "description": "Test description",
+            "evidence": "Test evidence",
+            "impact": "nitpick",
+            "file_path": "src/main.rs",
+            "line_number": 42
+        });
+        let result = parse_finding(&value, "check-1", 0, "2024-01-01");
+        assert!(result.is_ok());
+        let finding = result.unwrap();
+        assert_eq!(finding.file_path, Some("src/main.rs".to_string()));
+        assert_eq!(finding.line_number, Some(42));
+    }
+
+    #[test]
+    fn test_parse_finding_with_only_file_path_fails() {
+        let value = serde_json::json!({
+            "title": "Test finding",
+            "description": "Test description",
+            "evidence": "Test evidence",
+            "impact": "nitpick",
+            "file_path": "src/main.rs"
+        });
+        let result = parse_finding(&value, "check-1", 0, "2024-01-01");
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("both file_path and line_number"));
+    }
+
+    #[test]
+    fn test_parse_finding_with_only_line_number_fails() {
+        let value = serde_json::json!({
+            "title": "Test finding",
+            "description": "Test description",
+            "evidence": "Test evidence",
+            "impact": "nitpick",
+            "line_number": 42
+        });
+        let result = parse_finding(&value, "check-1", 0, "2024-01-01");
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("both file_path and line_number"));
+    }
+
+    #[test]
+    fn test_parse_finding_with_neither_location_field() {
+        let value = serde_json::json!({
+            "title": "Test finding",
+            "description": "Test description",
+            "evidence": "Test evidence",
+            "impact": "nitpick"
+        });
+        let result = parse_finding(&value, "check-1", 0, "2024-01-01");
+        assert!(result.is_ok());
+        let finding = result.unwrap();
+        assert!(finding.file_path.is_none());
+        assert!(finding.line_number.is_none());
+    }
+
+    #[test]
+    fn test_create_feedback_anchor_requires_both_fields() {
+        let now = "2024-01-01";
+
+        // With both fields - anchor should be created
+        let finding_both = IssueFinding {
+            id: "f1".to_string(),
+            check_id: "c1".to_string(),
+            title: "Test".to_string(),
+            description: "Desc".to_string(),
+            evidence: "Evidence".to_string(),
+            file_path: Some("src/main.rs".to_string()),
+            line_number: Some(42),
+            impact: FeedbackImpact::Nitpick,
+            created_at: now.to_string(),
+        };
+        let feedback = create_feedback_from_finding(&finding_both, "review-1", None, Some("test-coverage"), now);
+        assert!(feedback.anchor.is_some());
+        assert_eq!(feedback.category, Some("test-coverage".to_string()));
+
+        // With neither field - anchor should be None
+        let finding_neither = IssueFinding {
+            id: "f2".to_string(),
+            check_id: "c1".to_string(),
+            title: "Test".to_string(),
+            description: "Desc".to_string(),
+            evidence: "Evidence".to_string(),
+            file_path: None,
+            line_number: None,
+            impact: FeedbackImpact::Nitpick,
+            created_at: now.to_string(),
+        };
+        let feedback = create_feedback_from_finding(&finding_neither, "review-1", None, None, now);
+        assert!(feedback.anchor.is_none());
+        assert_eq!(feedback.category, None);
     }
 }

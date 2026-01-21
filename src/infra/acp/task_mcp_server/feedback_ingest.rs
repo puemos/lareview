@@ -105,6 +105,13 @@ fn save_by_line_id(
         _ => FeedbackImpact::Nitpick,
     };
 
+    // Parse confidence score (0.0-1.0), defaulting to 1.0 (high confidence)
+    let confidence = args
+        .get("confidence")
+        .and_then(|v| v.as_f64())
+        .map(|c| c.clamp(0.0, 1.0))
+        .unwrap_or(1.0);
+
     let input_task_id = args
         .get("task_id")
         .and_then(|v| v.as_str())
@@ -194,9 +201,11 @@ fn save_by_line_id(
         task_id: final_task_id,
         rule_id,
         finding_id: None,
+        category: None,
         title,
         status: ReviewStatus::Todo,
         impact,
+        confidence,
         anchor: Some(FeedbackAnchor {
             file_path: Some(file.to_string()),
             line_number: Some(line_number),
@@ -276,6 +285,13 @@ fn save_by_content(
         _ => FeedbackImpact::Nitpick,
     };
 
+    // Parse confidence score (0.0-1.0), defaulting to 1.0 (high confidence)
+    let confidence = args
+        .get("confidence")
+        .and_then(|v| v.as_f64())
+        .map(|c| c.clamp(0.0, 1.0))
+        .unwrap_or(1.0);
+
     let input_task_id = args
         .get("task_id")
         .and_then(|v| v.as_str())
@@ -331,9 +347,11 @@ fn save_by_content(
         task_id: final_task_id,
         rule_id,
         finding_id: None,
+        category: None,
         title,
         status: ReviewStatus::Todo,
         impact,
+        confidence,
         anchor: Some(FeedbackAnchor {
             file_path: Some(file.to_string()),
             line_number: Some(line_number),
@@ -562,6 +580,13 @@ fn save_by_file_and_line(config: &ServerConfig, args: &Value) -> Result<String> 
         _ => FeedbackImpact::Nitpick,
     };
 
+    // Parse confidence score (0.0-1.0), defaulting to 1.0 (high confidence)
+    let confidence = args
+        .get("confidence")
+        .and_then(|v| v.as_f64())
+        .map(|c| c.clamp(0.0, 1.0))
+        .unwrap_or(1.0);
+
     let ctx = load_run_context(config);
     let db = open_database(config)?;
     let conn = db.connection();
@@ -656,9 +681,11 @@ fn save_by_file_and_line(config: &ServerConfig, args: &Value) -> Result<String> 
         task_id: final_task_id,
         rule_id,
         finding_id: None,
+        category: None,
         title,
         status: ReviewStatus::Todo,
         impact,
+        confidence,
         anchor: Some(FeedbackAnchor {
             file_path: Some(file.to_string()),
             line_number: Some(line),

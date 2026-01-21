@@ -50,6 +50,15 @@ pub async fn run_task_mcp_server() -> pmcp::Result<()> {
             "report_issue_check",
             tool::create_report_issue_check_tool(config.clone()),
         )
+        // Learning tools for pattern analysis
+        .tool(
+            "submit_learned_patterns",
+            tool::create_submit_learned_patterns_tool(config.clone()),
+        )
+        .tool(
+            "finalize_learning",
+            tool::create_finalize_learning_tool(config.clone()),
+        )
         .build()?;
 
     logging::log_to_file(&config, "running task MCP server on stdio (line-delimited)");
