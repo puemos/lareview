@@ -396,10 +396,12 @@ mod tests {
         });
         let result = parse_finding(&value, "check-1", 0, "2024-01-01");
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("both file_path and line_number"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("both file_path and line_number")
+        );
     }
 
     #[test]
@@ -413,10 +415,12 @@ mod tests {
         });
         let result = parse_finding(&value, "check-1", 0, "2024-01-01");
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("both file_path and line_number"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("both file_path and line_number")
+        );
     }
 
     #[test]
@@ -450,7 +454,13 @@ mod tests {
             impact: FeedbackImpact::Nitpick,
             created_at: now.to_string(),
         };
-        let feedback = create_feedback_from_finding(&finding_both, "review-1", None, Some("test-coverage"), now);
+        let feedback = create_feedback_from_finding(
+            &finding_both,
+            "review-1",
+            None,
+            Some("test-coverage"),
+            now,
+        );
         assert!(feedback.anchor.is_some());
         assert_eq!(feedback.category, Some("test-coverage".to_string()));
 

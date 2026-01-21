@@ -89,6 +89,7 @@ fn test_full_database_workflow() -> anyhow::Result<()> {
         task_id: Some(task.id.clone()),
         rule_id: None,
         finding_id: None,
+        category: None,
         title: "Feedback".into(),
         status: ReviewStatus::Todo,
         impact: FeedbackImpact::Nitpick,

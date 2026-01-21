@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.27] - 2026-01-21
+
+### Added
+
+- **Learning**: Learning patterns system for tracking and applying code review insights.
+- **Learning**: Learning view UI with pattern management and rejection tracking.
+- **Learning**: Confidence threshold configuration in settings.
+- **Platform**: WSL support for CLI installation and URL opening.
+- **Review**: Category badges and confidence display on feedback items.
+- **Review**: Show uncovered files in review summary.
+- **UI**: Card and MarkdownRenderer components for improved content display.
+
+### Changed
+
+- **Task Generator**: Updated prompts and MCP server for better agent output.
+- **Rules**: Improved rules UI and library modal.
+
+### Fixed
+
+- **Task Generator**: Warn instead of error for uncovered files.
+
 ## [0.0.26] - 2026-01-20
 
 ### Added

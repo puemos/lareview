@@ -140,18 +140,18 @@ pub async fn install_cli() -> Result<(), String> {
 
         let install_to_target = |target: &std::path::Path| -> Result<(), std::io::Error> {
             // Ensure parent directory exists
-            if let Some(parent) = target.parent() {
-                if !parent.exists() {
-                    std::fs::create_dir_all(parent)?;
-                }
+            if let Some(parent) = target.parent()
+                && !parent.exists()
+            {
+                std::fs::create_dir_all(parent)?;
             }
 
             // Check if it already exists and points to the same executable
             if target.exists() {
-                if let Ok(existing) = std::fs::read_link(target) {
-                    if existing == current_exe {
-                        return Ok(());
-                    }
+                if let Ok(existing) = std::fs::read_link(target)
+                    && existing == current_exe
+                {
+                    return Ok(());
                 }
                 // Remove existing if it's different or not a symlink
                 let _ = std::fs::remove_file(target);
@@ -162,7 +162,7 @@ pub async fn install_cli() -> Result<(), String> {
 
         // Try primary location first
         match install_to_target(&primary_target) {
-            Ok(()) => return Ok(()),
+            Ok(()) => Ok(()),
             Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
                 // Fall back to ~/.local/bin
                 install_to_target(&fallback_target).map_err(|e| {
@@ -170,12 +170,9 @@ pub async fn install_cli() -> Result<(), String> {
                         "Failed to install CLI. Could not write to /usr/local/bin or ~/.local/bin: {}",
                         e
                     )
-                })?;
-                return Ok(());
+                })
             }
-            Err(e) => {
-                return Err(format!("Failed to create symlink: {}", e));
-            }
+            Err(e) => Err(format!("Failed to create symlink: {}", e)),
         }
     }
 
@@ -2133,7 +2130,7 @@ pub fn get_pending_review_from_state(
 
 #[tauri::command]
 pub fn open_url(url: String) -> Result<(), String> {
-    use crate::infra::platform::{current_platform, Platform};
+    use crate::infra::platform::{Platform, current_platform};
 
     match current_platform() {
         Platform::MacOS => {
@@ -2148,17 +2145,13 @@ pub fn open_url(url: String) -> Result<(), String> {
             // 2. explorer.exe - built into Windows, reliable for URLs
             // 3. powershell.exe - fallback with proper URL handling
 
-            let wslview_result = std::process::Command::new("wslview")
-                .arg(&url)
-                .spawn();
+            let wslview_result = std::process::Command::new("wslview").arg(&url).spawn();
 
             if wslview_result.is_ok() {
                 // wslview started successfully
             } else {
                 // Try explorer.exe which handles URLs well
-                let explorer_result = std::process::Command::new("explorer.exe")
-                    .arg(&url)
-                    .spawn();
+                let explorer_result = std::process::Command::new("explorer.exe").arg(&url).spawn();
 
                 if explorer_result.is_err() {
                     // Final fallback: PowerShell with proper escaping
