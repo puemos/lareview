@@ -144,19 +144,33 @@ brew install puemos/tap/lareview
 
 #### Linux
 
-1.  Download the `lareview-linux.tar.gz` file and extract it.
+1.  Install required dependencies:
+    ```sh
+    # Debian/Ubuntu
+    sudo apt-get update
+    sudo apt-get install -y \
+      libwebkit2gtk-4.1-0 \
+      libappindicator3-1 \
+      librsvg2-2 \
+      libxdo3
+
+    # For other distros, install equivalent WebKit2GTK 4.1 packages
+    ```
+
+2.  Download the `lareview-linux.tar.gz` file and extract it.
     ```sh
     tar -xzvf lareview-linux.tar.gz
     ```
-2.  Make the binary executable and move it to your path.
+
+3.  Make the binary executable and move it to your path.
     ```sh
     chmod +x ./lareview
-    mv ./lareview /usr/local/bin/lareview
+    sudo mv ./lareview /usr/local/bin/lareview
     ```
 
 #### WSL (Windows Subsystem for Linux)
 
-LaReview runs natively inside WSL2 as a Linux app. Use the same installation steps as Linux above.
+LaReview runs natively inside WSL2 as a Linux app. Follow the Linux installation steps above (including dependency installation).
 
 **Optional:** For better Windows integration (opening URLs in your Windows browser), install the [wslu](https://github.com/wslutilities/wslu) package:
 
