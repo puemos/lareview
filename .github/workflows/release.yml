@@ -86,6 +86,32 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
+      - name: Create Linux tarball
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          # Find the binary in the Tauri build output
+          BINARY_PATH=$(find target/release -name "lareview" -type f -executable | head -n 1)
+
+          if [ -z "$BINARY_PATH" ]; then
+            echo "Error: Could not find lareview binary"
+            exit 1
+          fi
+
+          # Create tarball
+          mkdir -p dist
+          tar -czf dist/lareview-linux.tar.gz -C $(dirname "$BINARY_PATH") $(basename "$BINARY_PATH")
+
+          echo "Created tarball: dist/lareview-linux.tar.gz"
+          ls -lh dist/lareview-linux.tar.gz
+
+      - name: Upload Linux tarball to release
+        if: matrix.platform == 'ubuntu-22.04'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/lareview-linux.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   publish-homebrew:
     name: Bump Homebrew Tap
     needs: release

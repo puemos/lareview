@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.28] - 2026-01-23
+
+### Added
+
+- **Release**: Linux tarball artifact (`lareview-linux.tar.gz`) for simplified binary distribution.
+
 ## [0.0.27] - 2026-01-21
 
 ### Added

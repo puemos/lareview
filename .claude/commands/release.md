@@ -133,6 +133,20 @@ git push && git push --tags
 
 Note: GitHub CI will automatically handle builds, releases, and Homebrew tap updates once pushed.
 
+## Artifacts Generated
+
+The release workflow will generate the following artifacts:
+
+### macOS
+- `LaReview_aarch64.app.tar.gz` - Apple Silicon app bundle
+- `LaReview_x64.app.tar.gz` - Intel app bundle
+- `.dmg` installers for both architectures
+
+### Linux
+- `LaReview_${VERSION}_amd64.AppImage` - AppImage format (portable)
+- `lareview-linux.tar.gz` - Tarball with binary executable
+- `.deb` package (Debian/Ubuntu)
+
 ---
 
 ## Important Notes
