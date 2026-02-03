@@ -403,6 +403,8 @@ fn run_gui(initial_req: Option<DiffRequest>, initial_pending: Option<PendingDiff
             lareview::commands::set_repo_snapshot_access,
             // Issue checks
             lareview::commands::get_issue_checks_for_run,
+            // Merge confidence
+            lareview::commands::get_merge_confidence,
             // Rule library
             lareview::commands::get_rule_library,
             lareview::commands::get_rule_library_by_category,

@@ -1,5 +1,6 @@
 use crate::domain::{
-    Comment, Feedback, FeedbackImpact, FeedbackSide, Review, ReviewRun, ReviewTask, RiskLevel,
+    Comment, Feedback, FeedbackImpact, FeedbackSide, MergeConfidence, Review, ReviewRun,
+    ReviewTask, RiskLevel,
 };
 use crate::infra::diff::index::DiffIndex;
 use anyhow::Result;
@@ -11,6 +12,7 @@ pub struct ExportData {
     pub tasks: Vec<ReviewTask>,
     pub feedbacks: Vec<Feedback>,
     pub comments: Vec<Comment>,
+    pub merge_confidence: Option<MergeConfidence>,
 }
 
 #[derive(Debug, Clone)]
@@ -76,6 +78,27 @@ impl ReviewExporter {
 
         if options.include_stats {
             md.push_str("## Overview\n\n");
+
+            // Merge Confidence
+            if let Some(confidence) = &data.merge_confidence {
+                md.push_str(&format!(
+                    "### Merge Confidence: {:.1}/5 - {}\n\n",
+                    confidence.score,
+                    confidence.label()
+                ));
+                md.push_str(&format!("**\"{}\"**\n\n", confidence.recommendation()));
+
+                if !confidence.reasons.is_empty() {
+                    md.push_str("**Assessment:**\n");
+                    for reason in &confidence.reasons {
+                        md.push_str(&format!("- {}\n", reason));
+                    }
+                    md.push_str("\n");
+                }
+
+                md.push_str("---\n\n");
+            }
+
             let total_tasks = data.tasks.len();
             let high_risk = data
                 .tasks

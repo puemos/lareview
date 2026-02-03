@@ -349,3 +349,19 @@ export interface LearningCompactionResult {
   patterns_updated: number;
   errors: string[];
 }
+
+// Merge Confidence Types
+export interface MergeConfidence {
+  /** The confidence score (1.0-5.0) */
+  score: number;
+  /** The score rounded to nearest integer (1-5) */
+  scoreRounded: number;
+  /** Human-readable label (e.g., "Very Confident", "Moderate") */
+  label: string;
+  /** Recommendation message */
+  recommendation: string;
+  /** Bullet point reasons explaining the score */
+  reasons: string[];
+  /** When this assessment was computed (RFC3339) */
+  computedAt: string;
+}

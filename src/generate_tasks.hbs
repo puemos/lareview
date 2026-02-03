@@ -545,6 +545,50 @@ Treat <diff> as complete and authoritative.
 </example>
 </examples>
 
+<merge_confidence>
+## Merge Confidence Evaluation
+
+After completing your review, submit your merge confidence using `lareview-tasks_submit_merge_confidence`.
+
+### Scoring Guide
+
+| Score | When to Use |
+|-------|-------------|
+| **5.0** | Changes are low-risk, well-tested, and clearly improve the codebase. You'd approve without hesitation. |
+| **4.0** | Minor concerns exist but don't block merging. Safe to ship with noted caveats. |
+| **3.0** | Some risk factors warrant discussion. Reviewer should pay extra attention to flagged areas. |
+| **2.0** | Significant concerns should be addressed before merging. Not blocking, but warrants fixes. |
+| **1.0** | Blocking issues identified. Do not merge until resolved. |
+
+### What Raises Confidence
+- Well-scoped, focused changes (single concern)
+- Comprehensive test coverage with meaningful assertions
+- Clear code that's easy to understand
+- Proper error handling and input validation
+- Security considerations addressed
+- Backward compatibility maintained
+- Small diff size (<400 lines)
+
+### What Lowers Confidence
+- Security vulnerabilities (injection, auth bypass, etc.)
+- Missing tests for critical paths
+- Changes to sensitive areas (auth, payments, encryption) without extra scrutiny
+- Race conditions or concurrency issues
+- Large scope (many files, mixed concerns)
+- Breaking changes without migration path
+- Unclear intent or purpose
+- Complex logic without adequate tests
+- Error handling gaps
+
+### Writing Good Reasons
+Be specific and cite evidence:
+- ✓ "Comprehensive test coverage for payment flow (12 test cases in payment_test.rs)"
+- ✓ "Changes are well-scoped to a single feature (payment webhook handling)"
+- ⚠ "Missing null check in user_lookup() at users.rs:89 - could panic on missing user"
+- ⚠ "No tests for the new rate limiting logic in RateLimiter::check_limit()"
+- ✗ "SQL injection vulnerability in search_users() - uses string concatenation with user input"
+</merge_confidence>
+
 <output>
 Call MCP tools on server `lareview-tasks`:
 
@@ -579,6 +623,18 @@ Call MCP tools on server `lareview-tasks`:
 2. **Evidence**: Brief supporting detail (optional if obvious)
 3. **Recommendation**: Concrete next step
 
+**Merge confidence — `lareview-tasks_submit_merge_confidence`:**
+```json
+{
+  "score": 4.0,
+  "reasons": [
+    "✓ Well-scoped changes focused on authentication",
+    "✓ Comprehensive test coverage (8 test cases)",
+    "⚠ Missing error handling for token expiration edge case"
+  ]
+}
+```
+
 **Finally — `lareview-tasks_finalize_review`:**
 ```json
 {
@@ -587,7 +643,13 @@ Call MCP tools on server `lareview-tasks`:
 }
 ```
 
-- Call return_task for each task individually
+**Order of operations:**
+1. Call `return_task` for each task individually
+2. Call `add_feedback` for inline comments
+3. Call `report_issue_check` for each rule/category
+4. Call `submit_merge_confidence` with your overall assessment
+5. Call `finalize_review` at the end
+
 - Files and line stats computed automatically from hunk_ids
 - Copy content from manifest—never calculate line numbers yourself
 </output>

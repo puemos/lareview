@@ -22,6 +22,7 @@ import type {
   LearnedPatternInput,
   LearningStatus,
   LearningCompactionResult,
+  MergeConfidence,
 } from '../types';
 import { useCallback } from 'react';
 
@@ -730,6 +731,11 @@ export const useTauri = () => {
     }, []),
     triggerLearningCompaction: useCallback(async (agentId: string): Promise<LearningCompactionResult> => {
       return invoke('trigger_learning_compaction', { agentId });
+    }, []),
+
+    // Merge confidence
+    getMergeConfidence: useCallback(async (runId: string): Promise<MergeConfidence | null> => {
+      return invoke('get_merge_confidence', { runId });
     }, []),
   };
 };

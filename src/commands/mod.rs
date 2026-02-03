@@ -1935,12 +1935,20 @@ pub async fn export_review_markdown(
             comments.extend(f_comments);
         }
 
+        // Fetch merge confidence
+        let merge_confidence = db
+            .merge_confidence_repo()
+            .find_by_run_id(&active_run_id)
+            .ok()
+            .flatten();
+
         ExportData {
             review,
             run,
             tasks,
             feedbacks,
             comments,
+            merge_confidence,
         }
     };
 
@@ -2008,23 +2016,25 @@ pub async fn push_remote_review(
             comments.extend(f_comments);
         }
 
-        ExportData {
-            review,
-            run,
-            tasks,
-            feedbacks,
-            comments,
-        }
+        // Fetch merge confidence
+        let merge_confidence = db
+            .merge_confidence_repo()
+            .find_by_run_id(&active_run_id)
+            .ok()
+            .flatten();
+
+        (review, run, tasks, feedbacks, comments, merge_confidence)
     };
 
     let request = ReviewPushRequest {
-        review: data.review,
-        run: data.run,
-        tasks: data.tasks,
-        feedbacks: data.feedbacks,
-        comments: data.comments,
+        review: data.0,
+        run: data.1,
+        tasks: data.2,
+        feedbacks: data.3,
+        comments: data.4,
         selected_tasks,
         selected_feedbacks,
+        merge_confidence: data.5,
     };
 
     let provider_id = request
@@ -2365,6 +2375,58 @@ pub struct IssueCheckWithFindings {
 }
 
 use crate::domain::{IssueCheck, IssueFinding};
+
+// ============================================================================
+// Merge Confidence Commands
+// ============================================================================
+
+use crate::domain::MergeConfidence;
+
+/// Serializable version of MergeConfidence for frontend
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeConfidenceState {
+    /// The confidence score (1.0-5.0)
+    pub score: f32,
+    /// The score rounded to nearest integer (1-5)
+    pub score_rounded: u8,
+    /// Human-readable label (e.g., "Very Confident", "Moderate")
+    pub label: String,
+    /// Recommendation message
+    pub recommendation: String,
+    /// Bullet point reasons explaining the score
+    pub reasons: Vec<String>,
+    /// When this assessment was computed (RFC3339)
+    pub computed_at: String,
+}
+
+impl From<MergeConfidence> for MergeConfidenceState {
+    fn from(mc: MergeConfidence) -> Self {
+        Self {
+            score: mc.score,
+            score_rounded: mc.score_rounded(),
+            label: mc.label().to_string(),
+            recommendation: mc.recommendation().to_string(),
+            reasons: mc.reasons,
+            computed_at: mc.computed_at,
+        }
+    }
+}
+
+/// Get merge confidence for a review run (submitted by agent during review)
+#[tauri::command]
+pub fn get_merge_confidence(
+    state: State<'_, AppState>,
+    run_id: String,
+) -> Result<Option<MergeConfidenceState>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let confidence = db
+        .merge_confidence_repo()
+        .find_by_run_id(&run_id)
+        .map_err(|e| e.to_string())?;
+
+    Ok(confidence.map(Into::into))
+}
 
 // ============================================================================
 // Rule Library Commands

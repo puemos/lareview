@@ -350,6 +350,57 @@ pub fn save_learned_patterns(
     Ok(result)
 }
 
+/// Save merge confidence evaluation from the agent
+pub fn save_merge_confidence(config: &ServerConfig, args: Value) -> Result<String> {
+    let ctx = load_run_context(config);
+    let db = open_database(config)?;
+    let confidence_repo = db.merge_confidence_repo();
+
+    // Parse required fields
+    let score = args
+        .get("score")
+        .and_then(|v| v.as_f64())
+        .ok_or_else(|| anyhow::anyhow!("missing required field: score"))?;
+
+    // Validate score range
+    if !(1.0..=5.0).contains(&score) {
+        return Err(anyhow::anyhow!(
+            "score must be between 1.0 and 5.0, got: {}",
+            score
+        ));
+    }
+
+    let reasons = args
+        .get("reasons")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| anyhow::anyhow!("missing required field: reasons"))?
+        .iter()
+        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+        .collect::<Vec<String>>();
+
+    if reasons.is_empty() {
+        return Err(anyhow::anyhow!(
+            "reasons array must contain at least one explanation"
+        ));
+    }
+
+    if reasons.len() > 10 {
+        return Err(anyhow::anyhow!(
+            "reasons array must contain at most 10 items, got: {}",
+            reasons.len()
+        ));
+    }
+
+    // Create and save the merge confidence
+    let confidence = crate::domain::MergeConfidence::new(score as f32, reasons);
+
+    confidence_repo
+        .save(&ctx.run_id, &confidence)
+        .with_context(|| format!("save merge confidence for run {}", ctx.run_id))?;
+
+    Ok(ctx.run_id.clone())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

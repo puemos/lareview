@@ -56,6 +56,10 @@ import {
   File,
   ShieldCheck,
   SkipForward,
+  Gauge,
+  ArrowUp,
+  ArrowDown,
+  ArrowsClockwise,
 } from '@phosphor-icons/react';
 
 /**
@@ -145,4 +149,11 @@ export const ICONS = {
   MINUS: MinusCircle,
   FILE: File,
   SHIELD_CHECK: ShieldCheck,
+
+  // --- Merge Confidence ---
+  GAUGE: Gauge,
+  ARROW_UP: ArrowUp,
+  ARROW_DOWN: ArrowDown,
+  ARROWS_CLOCKWISE: ArrowsClockwise,
+  LIGHTBULB: Lightbulb,
 } as const;

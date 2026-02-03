@@ -70,6 +70,11 @@ pub async fn run_task_mcp_server() -> pmcp::Result<()> {
             "list_diff_files",
             tool::create_list_diff_files_tool(config.clone()),
         )
+        // Merge confidence evaluation
+        .tool(
+            "submit_merge_confidence",
+            tool::create_submit_merge_confidence_tool(config.clone()),
+        )
         .build()?;
 
     logging::log_to_file(&config, "running task MCP server on stdio (line-delimited)");

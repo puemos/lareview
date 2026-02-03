@@ -235,6 +235,17 @@ impl Database {
             CREATE INDEX IF NOT EXISTS idx_issue_checks_category ON issue_checks(category);
             CREATE INDEX IF NOT EXISTS idx_issue_findings_check_id ON issue_findings(check_id);
 
+            CREATE TABLE IF NOT EXISTS merge_confidence (
+                id TEXT PRIMARY KEY,
+                run_id TEXT NOT NULL UNIQUE,
+                score REAL NOT NULL CHECK (score >= 1.0 AND score <= 5.0),
+                reasons TEXT NOT NULL,
+                computed_at TEXT NOT NULL,
+                FOREIGN KEY(run_id) REFERENCES review_runs(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_merge_confidence_run_id ON merge_confidence(run_id);
+
             "#,
         )?;
 
@@ -415,6 +426,35 @@ impl Database {
             )?;
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_feedback_rejections_processed ON feedback_rejections(processed_for_learning)",
+                [],
+            )?;
+        }
+
+        // Migration: Update merge_confidence schema from signals to reasons
+        // Check if the old schema exists (has positive_signals column)
+        let has_old_schema = conn
+            .prepare("SELECT 1 FROM pragma_table_info('merge_confidence') WHERE name = 'positive_signals'")?
+            .exists([])?;
+
+        if has_old_schema {
+            // Migrate to new schema: drop old table and recreate
+            // Data loss is acceptable as confidence scores can be regenerated
+            conn.execute("DROP TABLE IF EXISTS merge_confidence", [])?;
+            conn.execute(
+                r#"
+                CREATE TABLE merge_confidence (
+                    id TEXT PRIMARY KEY,
+                    run_id TEXT NOT NULL UNIQUE,
+                    score REAL NOT NULL CHECK (score >= 1.0 AND score <= 5.0),
+                    reasons TEXT NOT NULL,
+                    computed_at TEXT NOT NULL,
+                    FOREIGN KEY(run_id) REFERENCES review_runs(id) ON DELETE CASCADE
+                )
+                "#,
+                [],
+            )?;
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_merge_confidence_run_id ON merge_confidence(run_id)",
                 [],
             )?;
         }
@@ -633,6 +673,10 @@ impl Database {
 
     pub fn rejection_repo(&self) -> crate::infra::db::repository::FeedbackRejectionRepository {
         crate::infra::db::repository::FeedbackRejectionRepository::new(self.connection())
+    }
+
+    pub fn merge_confidence_repo(&self) -> crate::infra::db::repository::MergeConfidenceRepository {
+        crate::infra::db::repository::MergeConfidenceRepository::new(self.connection())
     }
 
     pub fn learned_pattern_repo(&self) -> crate::infra::db::repository::LearnedPatternRepository {

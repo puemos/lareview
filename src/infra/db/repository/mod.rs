@@ -7,6 +7,7 @@ mod feedback;
 mod feedback_link;
 mod issue_check;
 mod learned_patterns;
+mod merge_confidence;
 mod rejections;
 mod repo;
 mod review;
@@ -19,6 +20,7 @@ pub use feedback::FeedbackRepository;
 pub use feedback_link::FeedbackLinkRepository;
 pub use issue_check::IssueCheckRepository;
 pub use learned_patterns::{LearnedPatternRepository, LearningStateRepository};
+pub use merge_confidence::MergeConfidenceRepository;
 pub use rejections::{
     AgentRejectionStats, FeedbackRejection, FeedbackRejectionRepository, RuleRejectionStats,
 };

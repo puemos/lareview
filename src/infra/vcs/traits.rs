@@ -1,4 +1,4 @@
-use crate::domain::{Comment, Feedback, Review, ReviewRun, ReviewSource, ReviewTask};
+use crate::domain::{Comment, Feedback, MergeConfidence, Review, ReviewRun, ReviewSource, ReviewTask};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -48,6 +48,7 @@ pub struct ReviewPushRequest {
     pub comments: Vec<Comment>,
     pub selected_tasks: Vec<String>,
     pub selected_feedbacks: Vec<String>,
+    pub merge_confidence: Option<MergeConfidence>,
 }
 
 #[derive(Debug, Clone)]

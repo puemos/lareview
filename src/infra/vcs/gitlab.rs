@@ -428,13 +428,37 @@ impl VcsProvider for GitLabProvider {
             }
         }
 
-        let summary_body = format!(
-            "# Review: {}\n\n{}",
-            request.review.title,
-            request.review.summary.as_deref().unwrap_or("")
-        )
-        .trim()
-        .to_string();
+        // Build summary body with optional merge confidence
+        let mut summary_body = String::new();
+
+        // Add merge confidence at the top if available
+        if let Some(confidence) = &request.merge_confidence {
+            summary_body.push_str(&format!(
+                "## Merge Confidence: {:.1}/5 - {}\n\n",
+                confidence.score,
+                confidence.label()
+            ));
+            summary_body.push_str(&format!("*\"{}\"*\n\n", confidence.recommendation()));
+
+            if !confidence.reasons.is_empty() {
+                summary_body.push_str("<details>\n<summary>Assessment</summary>\n\n");
+
+                for reason in &confidence.reasons {
+                    summary_body.push_str(&format!("- {}\n", reason));
+                }
+                summary_body.push('\n');
+
+                summary_body.push_str("</details>\n\n");
+            }
+            summary_body.push_str("---\n\n");
+        }
+
+        summary_body.push_str(&format!("# Review: {}\n\n", request.review.title));
+        if let Some(summary) = &request.review.summary {
+            summary_body.push_str(summary);
+        }
+
+        let summary_body = summary_body.trim().to_string();
 
         let mut result_url: Option<String> = None;
 

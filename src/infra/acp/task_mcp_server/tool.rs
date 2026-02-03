@@ -1473,6 +1473,102 @@ pub(super) fn create_list_diff_files_tool(config: Arc<ServerConfig>) -> impl Too
     }))
 }
 
+// ============================================================================
+// Merge Confidence Tool
+// ============================================================================
+
+/// Create the submit_merge_confidence tool for agent confidence evaluation.
+pub(super) fn create_submit_merge_confidence_tool(config: Arc<ServerConfig>) -> impl ToolHandler {
+    SimpleTool::new("submit_merge_confidence", move |args: Value, _extra| {
+        let config = config.clone();
+        Box::pin(async move {
+            log_to_file(&config, "submit_merge_confidence called");
+            let persist_args = args.clone();
+
+            let persist_config = config.clone();
+            let persist_result = tokio::task::spawn_blocking(move || {
+                super::persistence::save_merge_confidence(&persist_config, persist_args)
+            })
+            .await;
+
+            match persist_result {
+                Ok(Ok(run_id)) => {
+                    log_to_file(
+                        &config,
+                        &format!("SubmitMergeConfidenceTool saved for run: {}", run_id),
+                    );
+                    Ok(json!({
+                        "status": "ok",
+                        "message": "Merge confidence submitted successfully",
+                        "run_id": run_id
+                    }))
+                }
+                Ok(Err(err)) => {
+                    log_to_file(
+                        &config,
+                        &format!("SubmitMergeConfidenceTool failed: {err:?}"),
+                    );
+                    Err(pmcp::Error::Validation(format!(
+                        "invalid submit_merge_confidence payload: {err}"
+                    )))
+                }
+                Err(join_err) => {
+                    log_to_file(
+                        &config,
+                        &format!("SubmitMergeConfidenceTool task join error: {join_err}"),
+                    );
+                    Err(pmcp::Error::Internal(format!(
+                        "submit_merge_confidence persistence join error: {join_err}"
+                    )))
+                }
+            }
+        })
+    })
+    .with_description(
+        "Submit your final merge confidence evaluation for this PR. Call this once after completing your review.\n\n\
+         Your score should reflect how confident you would be approving this change as a senior engineer:\n\
+         - **5.0**: \"Ship it\" - Low risk, well-tested, clearly improves codebase\n\
+         - **4.0**: \"Looks good\" - Minor concerns that don't block merging\n\
+         - **3.0**: \"Needs attention\" - Some risk factors worth discussing\n\
+         - **2.0**: \"Proceed with caution\" - Significant concerns should be addressed\n\
+         - **1.0**: \"Don't merge yet\" - Blocking issues identified\n\n\
+         Your reasons should:\n\
+         - Cite specific evidence from the code (file names, function names, patterns observed)\n\
+         - Balance positive factors (what's done well) with concerns (what needs attention)\n\
+         - Explain the impact/severity of any concerns\n\
+         - Be actionable - if score is low, make clear what would raise confidence\n\n\
+         **Examples of good reasons:**\n\
+         - \"✓ Comprehensive test coverage for the new auth flow (auth_test.rs covers 8 edge cases)\"\n\
+         - \"✓ Changes are well-scoped to a single feature (payment webhook handling)\"\n\
+         - \"⚠ Missing error handling in payment_processor.rs:142 - could fail silently on API timeout\"\n\
+         - \"⚠ No tests for the new rate limiting logic in RateLimiter::check_limit()\"\n\
+         - \"✗ SQL query in user_search() is vulnerable to injection - uses string concatenation\"",
+    )
+    .with_schema(submit_merge_confidence_schema())
+}
+
+fn submit_merge_confidence_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "score": {
+                "type": "number",
+                "minimum": 1.0,
+                "maximum": 5.0,
+                "description": "Your merge confidence score (1.0-5.0). Consider: 5=ship it (low risk, well-tested), 4=looks good (minor concerns), 3=needs attention (some risk), 2=proceed with caution (significant concerns), 1=don't merge yet (blocking issues)."
+            },
+            "reasons": {
+                "type": "array",
+                "items": { "type": "string" },
+                "minItems": 1,
+                "maxItems": 10,
+                "description": "Bullet point explanations for your score. Include both positive factors raising confidence and negative factors lowering it. Be specific and cite evidence from the code."
+            }
+        },
+        "required": ["score", "reasons"]
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

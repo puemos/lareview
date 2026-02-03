@@ -6,6 +6,7 @@ import { IssueChecklist } from './IssueChecklist';
 import { KeyFeedback } from './KeyFeedback';
 import { FilesHeatmap } from './FilesHeatmap';
 import { UncoveredFiles } from './UncoveredFiles';
+import { MergeConfidenceBadge } from './MergeConfidenceBadge';
 import { useIssueChecks } from '../../../hooks/useIssueChecks';
 import type { ReviewTask, Feedback, ParsedDiff, Review, ReviewSource } from '../../../types';
 
@@ -86,18 +87,21 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
             {review?.title || parsedDiff?.title || 'Review Summary'}
           </h2>
         </div>
-        <button
-          onClick={onStartReview}
-          className="bg-brand text-brand-fg hover:bg-brand/90 flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors"
-        >
-          Start Review
-          <span className="opacity-70">→</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <MergeConfidenceBadge runId={runId} />
+          <button
+            onClick={onStartReview}
+            className="bg-brand text-brand-fg hover:bg-brand/90 flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors"
+          >
+            Start Review
+            <span className="opacity-70">→</span>
+          </button>
+        </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 space-y-6 overflow-auto p-6">
-        {/* Blocking Issues Alert */}
+        {/* Blocking Issues */}
         {blockingCount > 0 && (
           <div className="bg-status-error/5 border-status-error/20 flex items-center gap-3 rounded-lg border px-4 py-3">
             <div className="bg-status-error/10 flex h-8 w-8 items-center justify-center rounded-full">

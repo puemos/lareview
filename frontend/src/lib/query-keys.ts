@@ -18,6 +18,8 @@ export const queryKeys = {
   // Learning system
   learnedPatterns: ['learnedPatterns'] as const,
   learningStatus: ['learningStatus'] as const,
+  // Merge confidence
+  mergeConfidence: (runId: string) => ['mergeConfidence', runId] as const,
 };
 
 export type QueryKeyType = typeof queryKeys;

@@ -26,6 +26,8 @@ const TOOL_GET_HUNK: &str = "get_hunk";
 const TOOL_GET_FILE_HUNKS: &str = "get_file_hunks";
 const TOOL_SEARCH_DIFF: &str = "search_diff";
 const TOOL_LIST_DIFF_FILES: &str = "list_diff_files";
+// Merge confidence evaluation
+const TOOL_SUBMIT_MERGE_CONFIDENCE: &str = "submit_merge_confidence";
 
 /// All LaReview tool names that should be auto-approved.
 const LAREVIEW_TOOLS: &[&str] = &[
@@ -39,6 +41,8 @@ const LAREVIEW_TOOLS: &[&str] = &[
     TOOL_GET_FILE_HUNKS,
     TOOL_SEARCH_DIFF,
     TOOL_LIST_DIFF_FILES,
+    // Merge confidence evaluation
+    TOOL_SUBMIT_MERGE_CONFIDENCE,
 ];
 
 #[allow(dead_code)]
@@ -1111,6 +1115,10 @@ mod tests {
         assert!(client.looks_like_return_tool("list_diff_files"));
         assert!(client.looks_like_return_tool("mcp__lareview-tasks__list_diff_files"));
 
+        // Test merge confidence tool
+        assert!(client.looks_like_return_tool("submit_merge_confidence"));
+        assert!(client.looks_like_return_tool("mcp__lareview-tasks__submit_merge_confidence"));
+
         assert_eq!(
             LaReviewClient::tool_name_from_title("return_task"),
             Some("return_task")
@@ -1118,6 +1126,10 @@ mod tests {
         assert_eq!(
             LaReviewClient::tool_name_from_title("list_diff_files"),
             Some("list_diff_files")
+        );
+        assert_eq!(
+            LaReviewClient::tool_name_from_title("submit_merge_confidence"),
+            Some("submit_merge_confidence")
         );
         assert_eq!(LaReviewClient::tool_name_from_title("something_else"), None);
     }
