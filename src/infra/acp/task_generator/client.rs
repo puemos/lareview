@@ -21,6 +21,11 @@ const TOOL_RETURN_PLANS: &str = "return_plans";
 const TOOL_FINALIZE_REVIEW: &str = "finalize_review";
 const TOOL_ADD_FEEDBACK: &str = "add_feedback";
 const TOOL_REPORT_ISSUE_CHECK: &str = "report_issue_check";
+// Large diff handling tools
+const TOOL_GET_HUNK: &str = "get_hunk";
+const TOOL_GET_FILE_HUNKS: &str = "get_file_hunks";
+const TOOL_SEARCH_DIFF: &str = "search_diff";
+const TOOL_LIST_DIFF_FILES: &str = "list_diff_files";
 
 /// All LaReview tool names that should be auto-approved.
 const LAREVIEW_TOOLS: &[&str] = &[
@@ -29,6 +34,11 @@ const LAREVIEW_TOOLS: &[&str] = &[
     TOOL_FINALIZE_REVIEW,
     TOOL_ADD_FEEDBACK,
     TOOL_REPORT_ISSUE_CHECK,
+    // Large diff handling tools
+    TOOL_GET_HUNK,
+    TOOL_GET_FILE_HUNKS,
+    TOOL_SEARCH_DIFF,
+    TOOL_LIST_DIFF_FILES,
 ];
 
 #[allow(dead_code)]
@@ -1094,9 +1104,20 @@ mod tests {
         assert!(client.looks_like_return_tool("finalize_review"));
         assert!(!client.looks_like_return_tool("read_file"));
 
+        // Test large diff handling tools
+        assert!(client.looks_like_return_tool("get_hunk"));
+        assert!(client.looks_like_return_tool("get_file_hunks"));
+        assert!(client.looks_like_return_tool("search_diff"));
+        assert!(client.looks_like_return_tool("list_diff_files"));
+        assert!(client.looks_like_return_tool("mcp__lareview-tasks__list_diff_files"));
+
         assert_eq!(
             LaReviewClient::tool_name_from_title("return_task"),
             Some("return_task")
+        );
+        assert_eq!(
+            LaReviewClient::tool_name_from_title("list_diff_files"),
+            Some("list_diff_files")
         );
         assert_eq!(LaReviewClient::tool_name_from_title("something_else"), None);
     }

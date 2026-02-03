@@ -59,6 +59,17 @@ pub async fn run_task_mcp_server() -> pmcp::Result<()> {
             "finalize_learning",
             tool::create_finalize_learning_tool(config.clone()),
         )
+        // Large diff handling tools for on-demand content retrieval
+        .tool("get_hunk", tool::create_get_hunk_tool(config.clone()))
+        .tool(
+            "get_file_hunks",
+            tool::create_get_file_hunks_tool(config.clone()),
+        )
+        .tool("search_diff", tool::create_search_diff_tool(config.clone()))
+        .tool(
+            "list_diff_files",
+            tool::create_list_diff_files_tool(config.clone()),
+        )
         .build()?;
 
     logging::log_to_file(&config, "running task MCP server on stdio (line-delimited)");

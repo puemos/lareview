@@ -1,10 +1,20 @@
 use crate::domain::{DefaultIssueCategory, LearnedPattern, ResolvedRule};
 use crate::infra::acp::task_mcp_server::RunContext;
+use crate::infra::diff::index::DiffIndex;
 use crate::prompts;
 use agent_client_protocol::{ClientCapabilities, FileSystemCapability, Meta};
 use anyhow::Context;
 use serde_json::json;
 use std::path::PathBuf;
+
+/// Threshold for considering a diff "large" (~25k tokens).
+/// Diffs larger than this will use compact manifest mode.
+const LARGE_DIFF_THRESHOLD_CHARS: usize = 100_000;
+
+/// Check if a diff is considered "large" based on character count.
+pub fn is_large_diff(diff_text: &str) -> bool {
+    diff_text.len() > LARGE_DIFF_THRESHOLD_CHARS
+}
 
 /// Rule item structure for the template
 #[derive(serde::Serialize)]
@@ -45,10 +55,25 @@ pub fn build_prompt_with_patterns(
     let has_repo_access = repo_root.is_some();
     let source_json = serde_json::to_string(&run.source).unwrap_or_default();
 
-    // Generate unified manifest for agents (replaces all previous manifest formats)
-    let unified_manifest = match crate::infra::diff::index::DiffIndex::new(&run.diff_text) {
-        Ok(index) => index.generate_unified_manifest(),
-        Err(_) => String::new(),
+    // Check if this is a large diff
+    let large_diff = is_large_diff(&run.diff_text);
+    let diff_size_chars = run.diff_text.len();
+
+    // For large diffs, generate compact manifest instead of including full diff
+    let (diff_content, unified_manifest, compact_manifest) = if large_diff {
+        // Large diff mode: no full diff, use compact manifest
+        let compact = match DiffIndex::new(&run.diff_text) {
+            Ok(index) => index.generate_compact_manifest(),
+            Err(_) => String::new(),
+        };
+        (None, String::new(), Some(compact))
+    } else {
+        // Normal mode: include full diff and unified manifest
+        let unified = match DiffIndex::new(&run.diff_text) {
+            Ok(index) => index.generate_unified_manifest(),
+            Err(_) => String::new(),
+        };
+        (Some(run.diff_text.to_string()), unified, None)
     };
 
     // Convert all rules to rule items for the template
@@ -90,8 +115,11 @@ pub fn build_prompt_with_patterns(
             "review_id": run.review_id,
             "source_json": source_json,
             "initial_title": run.initial_title,
-            "diff": run.diff_text,
+            "diff": diff_content,
             "unified_manifest": unified_manifest,
+            "is_large_diff": large_diff,
+            "diff_size_chars": diff_size_chars,
+            "compact_manifest": compact_manifest,
             "has_repo_access": has_repo_access,
             "repo_root": repo_root.map(|p| p.display().to_string()),
             "repo_access_note": if has_repo_access { "read-only" } else { "none" },

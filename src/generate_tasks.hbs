@@ -19,6 +19,24 @@ Your reviews:
   {{#if initial_title}}* initial_title: {{initial_title}}{{/if}}
 </review>
 
+{{#if is_large_diff}}
+<large_diff_mode>
+**This is a large diff ({{diff_size_chars}} characters).** The full diff content is not included to stay within context limits.
+
+Use the diff retrieval tools to fetch content on-demand:
+- `lareview-tasks_get_hunk { hunk_id: "path/file.rs#H1" }` — Get a single hunk
+- `lareview-tasks_get_file_hunks { file_path: "path/file.rs" }` — Get all hunks for a file
+- `lareview-tasks_search_diff { pattern: "keyword" }` — Search across the diff
+- `lareview-tasks_list_diff_files` — List all changed files with stats
+
+**Workflow for large diffs:**
+1. Start with `list_diff_files` to see what changed and prioritize by change size
+2. Use `get_file_hunks` or `get_hunk` to retrieve content for files you need to review
+3. Use `search_diff` to find specific patterns across the diff
+
+{{compact_manifest}}
+</large_diff_mode>
+{{else}}
 <diff>
   {{diff}}
 </diff>
@@ -27,6 +45,7 @@ Your reviews:
 <hunk_manifest>
   {{unified_manifest}}
 </hunk_manifest>
+{{/if}}
 {{/if}}
 </input>
 
@@ -207,6 +226,14 @@ Allowed tools:
 - Use `lareview-tasks_add_feedback` for feedback
 - Use `lareview-tasks_report_issue_check` for rule verification{{#if has_rules}} (required){{/if}}
 - Use `lareview-tasks_finalize_review` at the end
+{{/if}}
+
+{{#if is_large_diff}}
+**Large diff tools** (use to fetch content on-demand):
+- `lareview-tasks_get_hunk` — Fetch a single hunk by ID
+- `lareview-tasks_get_file_hunks` — Fetch all hunks for a file
+- `lareview-tasks_search_diff` — Search pattern across diff content
+- `lareview-tasks_list_diff_files` — List all changed files with stats
 {{/if}}
 
 Verify hunk_ids exist in the manifest before using return_task or add_feedback.
@@ -431,6 +458,25 @@ One or two sentences of Staff Engineer commentary:
 </tasks>
 
 <process>
+{{#if is_large_diff}}
+**Large Diff Workflow:**
+
+1. **Survey**: Call `list_diff_files` to get an overview of all changed files and their sizes
+2. **Prioritize**: Focus on files with the most changes or highest-risk paths (auth, payments, data)
+3. **Fetch**: Use `get_file_hunks` or `get_hunk` to retrieve content for files you need to review
+4. **Search**: Use `search_diff` to find specific patterns (e.g., "unwrap", "password", "TODO")
+5. **Organize**: Group by logical flows, prioritize HIGH → MEDIUM → LOW
+6. **Review**: Create tasks, add high-signal feedback, include diagrams
+7. **Submit**:
+   - `lareview-tasks_return_task` for each task
+   - `lareview-tasks_add_feedback` for inline comments
+   - `lareview-tasks_finalize_review` at the end
+
+**Tips for large diffs:**
+- Don't try to fetch everything—be selective based on risk
+- Use search to quickly find security-sensitive patterns
+- Hunk IDs from `list_diff_files` can be used directly in tasks
+{{else}}
 Treat <diff> as complete and authoritative.
 
 1. **Understand**: Read entire diff, categorize change type, assess risk
@@ -443,6 +489,7 @@ Treat <diff> as complete and authoritative.
    - `lareview-tasks_return_task` for each task
    - `lareview-tasks_add_feedback` for inline comments
    - `lareview-tasks_finalize_review` at the end
+{{/if}}
 </process>
 
 <examples>

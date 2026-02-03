@@ -885,6 +885,104 @@ impl DiffIndex {
         self.files.keys().cloned().collect()
     }
 
+    /// Calculate total diff statistics (total files, hunks, additions, deletions).
+    pub fn total_stats(&self) -> (usize, usize, usize, usize) {
+        let mut total_files = 0;
+        let mut total_hunks = 0;
+        let mut total_additions = 0;
+        let mut total_deletions = 0;
+
+        for file_index in self.files.values() {
+            if !file_index.all_hunks.is_empty() {
+                total_files += 1;
+            }
+            for indexed_hunk in &file_index.all_hunks {
+                total_hunks += 1;
+                for line in indexed_hunk.hunk.lines() {
+                    match line.line_type.as_str() {
+                        unidiff::LINE_TYPE_ADDED => total_additions += 1,
+                        unidiff::LINE_TYPE_REMOVED => total_deletions += 1,
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        (total_files, total_hunks, total_additions, total_deletions)
+    }
+
+    /// Generate a compact manifest for large diffs.
+    /// This provides summary stats and per-file metadata without line content,
+    /// allowing agents to use MCP tools for on-demand content retrieval.
+    pub fn generate_compact_manifest(&self) -> String {
+        let (total_files, total_hunks, total_additions, total_deletions) = self.total_stats();
+
+        let mut result = String::new();
+        result.push_str("# Large Diff Manifest\n\n");
+        result.push_str("## Summary\n");
+        result.push_str(&format!(
+            "- **Files changed**: {}\n- **Total hunks**: {}\n- **Lines added**: +{}\n- **Lines removed**: -{}\n\n",
+            total_files, total_hunks, total_additions, total_deletions
+        ));
+
+        // Collect file stats and sort by total changes (largest first)
+        let mut file_stats: Vec<(String, usize, usize, usize, Vec<String>)> = Vec::new();
+
+        for (file_path, file_index) in &self.files {
+            if file_index.all_hunks.is_empty() {
+                continue;
+            }
+
+            let mut file_adds = 0;
+            let mut file_dels = 0;
+            let mut hunk_ids = Vec::new();
+
+            for (idx, indexed_hunk) in file_index.all_hunks.iter().enumerate() {
+                let hunk_id = format!("{}#H{}", file_path, idx + 1);
+                hunk_ids.push(hunk_id);
+
+                for line in indexed_hunk.hunk.lines() {
+                    match line.line_type.as_str() {
+                        unidiff::LINE_TYPE_ADDED => file_adds += 1,
+                        unidiff::LINE_TYPE_REMOVED => file_dels += 1,
+                        _ => {}
+                    }
+                }
+            }
+
+            file_stats.push((
+                file_path.clone(),
+                file_adds,
+                file_dels,
+                file_index.all_hunks.len(),
+                hunk_ids,
+            ));
+        }
+
+        // Sort by total changes (additions + deletions), largest first
+        file_stats.sort_by(|a, b| (b.1 + b.2).cmp(&(a.1 + a.2)));
+
+        result.push_str("## Files (sorted by change size)\n\n");
+        result.push_str("Use `get_hunk` or `get_file_hunks` tools to retrieve content.\n\n");
+
+        for (file_path, adds, dels, hunk_count, hunk_ids) in file_stats {
+            result.push_str(&format!("### {}\n", file_path));
+            result.push_str(&format!(
+                "- Changes: +{}, -{} ({} hunks)\n",
+                adds, dels, hunk_count
+            ));
+            result.push_str(&format!("- Hunk IDs: {}\n\n", hunk_ids.join(", ")));
+        }
+
+        result.push_str("## Available Tools\n\n");
+        result.push_str("- `get_hunk { hunk_id: \"path/file.rs#H1\" }` - Get content of a single hunk\n");
+        result.push_str("- `get_file_hunks { file_path: \"path/file.rs\" }` - Get all hunks for a file\n");
+        result.push_str("- `search_diff { pattern: \"keyword\" }` - Search across all diff content\n");
+        result.push_str("- `list_diff_files` - List all changed files\n");
+
+        result
+    }
+
     /// Get line content and metadata for all lines in a hunk.
     pub fn get_hunk_lines(&self, hunk_id: &str) -> Option<Vec<(usize, String, bool, bool)>> {
         let lines = self.get_hunk_lines_with_numbers(hunk_id)?;
@@ -1516,5 +1614,81 @@ another context
         assert!(index.find_line_by_id("src/main.rs#H1", "L999").is_none());
         assert!(index.find_line_by_id("src/main.rs#H1", "L0").is_none());
         assert!(index.find_line_by_id("nonexistent#H1", "L1").is_none());
+    }
+
+    #[test]
+    fn test_total_stats() {
+        let index = DiffIndex::new(TEST_DIFF).unwrap();
+        let (files, hunks, additions, deletions) = index.total_stats();
+
+        assert_eq!(files, 2); // src/main.rs and src/lib.rs
+        assert_eq!(hunks, 2); // one hunk in each file
+        assert_eq!(additions, 4); // 1 in main.rs, 3 in lib.rs
+        assert_eq!(deletions, 1); // 1 in main.rs
+    }
+
+    #[test]
+    fn test_generate_compact_manifest() {
+        let index = DiffIndex::new(TEST_DIFF).unwrap();
+        let manifest = index.generate_compact_manifest();
+
+        // Check summary section
+        assert!(manifest.contains("# Large Diff Manifest"));
+        assert!(manifest.contains("## Summary"));
+        assert!(manifest.contains("**Files changed**: 2"));
+        assert!(manifest.contains("**Total hunks**: 2"));
+        assert!(manifest.contains("**Lines added**: +4"));
+        assert!(manifest.contains("**Lines removed**: -1"));
+
+        // Check that files are listed
+        assert!(manifest.contains("### src/lib.rs") || manifest.contains("### src/main.rs"));
+
+        // Check that hunk IDs are present
+        assert!(manifest.contains("src/main.rs#H1"));
+        assert!(manifest.contains("src/lib.rs#H1"));
+
+        // Check available tools section
+        assert!(manifest.contains("## Available Tools"));
+        assert!(manifest.contains("get_hunk"));
+        assert!(manifest.contains("get_file_hunks"));
+        assert!(manifest.contains("search_diff"));
+        assert!(manifest.contains("list_diff_files"));
+    }
+
+    #[test]
+    fn test_compact_manifest_sorted_by_change_size() {
+        // Create a diff where one file has more changes than another
+        let diff = r#"diff --git a/small.rs b/small.rs
+--- a/small.rs
++++ b/small.rs
+@@ -1,2 +1,2 @@
+ line1
+-old
++new
+diff --git a/large.rs b/large.rs
+--- a/large.rs
++++ b/large.rs
+@@ -1,5 +1,8 @@
+ line1
+-old1
+-old2
+-old3
++new1
++new2
++new3
++new4
++new5
+ line6
+"#;
+        let index = DiffIndex::new(diff).unwrap();
+        let manifest = index.generate_compact_manifest();
+
+        // large.rs should appear before small.rs (sorted by change size)
+        let large_pos = manifest.find("### large.rs").unwrap();
+        let small_pos = manifest.find("### small.rs").unwrap();
+        assert!(
+            large_pos < small_pos,
+            "large.rs should appear before small.rs in the manifest"
+        );
     }
 }

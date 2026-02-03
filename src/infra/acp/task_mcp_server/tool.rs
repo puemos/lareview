@@ -1,7 +1,8 @@
 use super::config::ServerConfig;
 use super::feedback_ingest::save_agent_comment;
 use super::logging::log_to_file;
-use super::task_ingest::{save_task, update_review_metadata};
+use super::task_ingest::{load_run_context, save_task, update_review_metadata};
+use crate::infra::diff::index::DiffIndex;
 use grep::{
     regex::RegexMatcherBuilder,
     searcher::{BinaryDetection, SearcherBuilder, sinks::Lossy},
@@ -1119,6 +1120,352 @@ pub(super) fn create_finalize_learning_tool(config: Arc<ServerConfig>) -> impl T
     .with_description(
         "Signal that learning analysis is complete. Call this after submitting all learned patterns \
          via submit_learned_patterns to indicate the analysis is finished.",
+    )
+    .with_schema(json!({
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+    }))
+}
+
+// ============================================================================
+// Large Diff Handling Tools
+// ============================================================================
+// These tools allow agents to retrieve diff content on-demand when working
+// with large diffs that exceed context limits.
+
+#[derive(Debug, Deserialize)]
+struct GetHunkArgs {
+    hunk_id: String,
+}
+
+/// Create the get_hunk tool for fetching single hunk content.
+pub(super) fn create_get_hunk_tool(config: Arc<ServerConfig>) -> impl ToolHandler {
+    SimpleTool::new("get_hunk", move |args: Value, _extra| {
+        let config = config.clone();
+        Box::pin(async move {
+            log_to_file(&config, "get_hunk called");
+            let input: GetHunkArgs = serde_json::from_value(args)
+                .map_err(|err| pmcp::Error::Validation(err.to_string()))?;
+
+            let ctx = load_run_context(&config);
+            let diff_index = DiffIndex::new(&ctx.diff_text)
+                .map_err(|err| pmcp::Error::Internal(format!("Failed to parse diff: {}", err)))?;
+
+            // Parse hunk_id and get coordinates
+            let (file_path, hunk_idx) = diff_index
+                .parse_hunk_id(&input.hunk_id)
+                .ok_or_else(|| {
+                    pmcp::Error::Validation(format!(
+                        "Invalid hunk_id format: '{}'. Expected format: 'path/to/file#H1'",
+                        input.hunk_id
+                    ))
+                })?;
+
+            let file_index = diff_index.files.get(&file_path).ok_or_else(|| {
+                pmcp::Error::NotFound(format!("File not found in diff: {}", file_path))
+            })?;
+
+            let indexed_hunk = file_index.all_hunks.get(hunk_idx - 1).ok_or_else(|| {
+                pmcp::Error::NotFound(format!(
+                    "Hunk H{} not found in file {}. File has {} hunks.",
+                    hunk_idx,
+                    file_path,
+                    file_index.all_hunks.len()
+                ))
+            })?;
+
+            // Build the hunk content with line IDs
+            let hunk = &indexed_hunk.hunk;
+            let coords = indexed_hunk.coords;
+            let mut content = String::new();
+            content.push_str(&format!("## {}\n", input.hunk_id));
+            content.push_str(&format!(
+                "Old: {}-{} | New: {}-{}\n```\n",
+                coords.0,
+                coords.0 + hunk.source_length.saturating_sub(1) as u32,
+                coords.1,
+                coords.1 + hunk.target_length.saturating_sub(1) as u32
+            ));
+
+            for (line_idx, line) in hunk.lines().iter().enumerate() {
+                let prefix = match line.line_type.as_str() {
+                    unidiff::LINE_TYPE_ADDED => "+",
+                    unidiff::LINE_TYPE_REMOVED => "-",
+                    _ => " ",
+                };
+                content.push_str(&format!(
+                    "{} L{:<2} | {}\n",
+                    prefix,
+                    line_idx + 1,
+                    line.value.trim_end()
+                ));
+            }
+            content.push_str("```\n");
+
+            Ok(json!({
+                "hunk_id": input.hunk_id,
+                "file_path": file_path,
+                "content": content
+            }))
+        })
+    })
+    .with_description(
+        "Fetch the content of a single hunk from the diff by its hunk ID.\n\n\
+         Use this when reviewing large diffs to retrieve specific hunk content on-demand.\n\n\
+         **Parameters:**\n\
+         - `hunk_id`: The hunk ID from the compact manifest (e.g., 'src/auth.rs#H1')",
+    )
+    .with_schema(json!({
+        "type": "object",
+        "properties": {
+            "hunk_id": {
+                "type": "string",
+                "description": "The hunk ID to fetch (e.g., 'src/auth.rs#H1')"
+            }
+        },
+        "required": ["hunk_id"]
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+struct GetFileHunksArgs {
+    file_path: String,
+}
+
+/// Create the get_file_hunks tool for fetching all hunks in a file.
+pub(super) fn create_get_file_hunks_tool(config: Arc<ServerConfig>) -> impl ToolHandler {
+    SimpleTool::new("get_file_hunks", move |args: Value, _extra| {
+        let config = config.clone();
+        Box::pin(async move {
+            log_to_file(&config, "get_file_hunks called");
+            let input: GetFileHunksArgs = serde_json::from_value(args)
+                .map_err(|err| pmcp::Error::Validation(err.to_string()))?;
+
+            let ctx = load_run_context(&config);
+            let diff_index = DiffIndex::new(&ctx.diff_text)
+                .map_err(|err| pmcp::Error::Internal(format!("Failed to parse diff: {}", err)))?;
+
+            let file_index = diff_index.files.get(&input.file_path).ok_or_else(|| {
+                pmcp::Error::NotFound(format!("File not found in diff: {}", input.file_path))
+            })?;
+
+            let mut content = String::new();
+            content.push_str(&format!("# {}\n\n", input.file_path));
+
+            for (idx, indexed_hunk) in file_index.all_hunks.iter().enumerate() {
+                let hunk_id = format!("{}#H{}", input.file_path, idx + 1);
+                let hunk = &indexed_hunk.hunk;
+                let coords = indexed_hunk.coords;
+
+                content.push_str(&format!("## {}\n", hunk_id));
+                content.push_str(&format!(
+                    "Old: {}-{} | New: {}-{}\n```\n",
+                    coords.0,
+                    coords.0 + hunk.source_length.saturating_sub(1) as u32,
+                    coords.1,
+                    coords.1 + hunk.target_length.saturating_sub(1) as u32
+                ));
+
+                for (line_idx, line) in hunk.lines().iter().enumerate() {
+                    let prefix = match line.line_type.as_str() {
+                        unidiff::LINE_TYPE_ADDED => "+",
+                        unidiff::LINE_TYPE_REMOVED => "-",
+                        _ => " ",
+                    };
+                    content.push_str(&format!(
+                        "{} L{:<2} | {}\n",
+                        prefix,
+                        line_idx + 1,
+                        line.value.trim_end()
+                    ));
+                }
+                content.push_str("```\n\n");
+            }
+
+            let hunk_ids: Vec<String> = (1..=file_index.all_hunks.len())
+                .map(|i| format!("{}#H{}", input.file_path, i))
+                .collect();
+
+            Ok(json!({
+                "file_path": input.file_path,
+                "hunk_count": file_index.all_hunks.len(),
+                "hunk_ids": hunk_ids,
+                "content": content
+            }))
+        })
+    })
+    .with_description(
+        "Fetch all hunks for a specific file from the diff.\n\n\
+         Use this when you need to review all changes in a particular file.\n\n\
+         **Parameters:**\n\
+         - `file_path`: The path to the file (e.g., 'src/auth.rs')",
+    )
+    .with_schema(json!({
+        "type": "object",
+        "properties": {
+            "file_path": {
+                "type": "string",
+                "description": "The file path to fetch hunks for (e.g., 'src/auth.rs')"
+            }
+        },
+        "required": ["file_path"]
+    }))
+}
+
+const DEFAULT_DIFF_SEARCH_LIMIT: usize = 50;
+
+#[derive(Debug, Deserialize)]
+struct SearchDiffArgs {
+    pattern: String,
+    limit: Option<usize>,
+}
+
+/// Create the search_diff tool for searching across diff content.
+pub(super) fn create_search_diff_tool(config: Arc<ServerConfig>) -> impl ToolHandler {
+    SimpleTool::new("search_diff", move |args: Value, _extra| {
+        let config = config.clone();
+        Box::pin(async move {
+            log_to_file(&config, "search_diff called");
+            let input: SearchDiffArgs = serde_json::from_value(args)
+                .map_err(|err| pmcp::Error::Validation(err.to_string()))?;
+
+            if input.pattern.trim().is_empty() {
+                return Err(pmcp::Error::Validation(
+                    "search_diff requires a non-empty pattern".to_string(),
+                ));
+            }
+
+            let ctx = load_run_context(&config);
+            let diff_index = DiffIndex::new(&ctx.diff_text)
+                .map_err(|err| pmcp::Error::Internal(format!("Failed to parse diff: {}", err)))?;
+
+            let limit = input.limit.unwrap_or(DEFAULT_DIFF_SEARCH_LIMIT);
+            let matches = diff_index.find_all_by_content(&input.pattern);
+
+            let mut results: Vec<Value> = Vec::new();
+            let mut total_matches = 0;
+
+            for hunk_match in matches {
+                for line_match in &hunk_match.lines {
+                    if results.len() >= limit {
+                        break;
+                    }
+                    total_matches += 1;
+                    results.push(json!({
+                        "hunk_id": hunk_match.hunk_id,
+                        "file_path": hunk_match.file_path,
+                        "line_id": format!("L{}", line_match.position_in_hunk + 1),
+                        "line_number": line_match.line_number,
+                        "content": line_match.line_content,
+                        "is_addition": line_match.is_addition,
+                        "is_deletion": line_match.is_deletion
+                    }));
+                }
+                if results.len() >= limit {
+                    break;
+                }
+            }
+
+            Ok(json!({
+                "pattern": input.pattern,
+                "matches": results,
+                "total_matches": total_matches,
+                "truncated": total_matches > limit
+            }))
+        })
+    })
+    .with_description(
+        "Search for a pattern across all diff content.\n\n\
+         Use this to find specific code patterns, variable names, or keywords in the diff.\n\n\
+         **Parameters:**\n\
+         - `pattern`: The text pattern to search for\n\
+         - `limit`: Maximum number of matches to return (default: 50)",
+    )
+    .with_schema(json!({
+        "type": "object",
+        "properties": {
+            "pattern": {
+                "type": "string",
+                "description": "The text pattern to search for in the diff"
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Maximum number of matches to return (default: 50)"
+            }
+        },
+        "required": ["pattern"]
+    }))
+}
+
+/// Create the list_diff_files tool for listing all changed files.
+pub(super) fn create_list_diff_files_tool(config: Arc<ServerConfig>) -> impl ToolHandler {
+    SimpleTool::new("list_diff_files", move |_args: Value, _extra| {
+        let config = config.clone();
+        Box::pin(async move {
+            log_to_file(&config, "list_diff_files called");
+
+            let ctx = load_run_context(&config);
+            let diff_index = DiffIndex::new(&ctx.diff_text)
+                .map_err(|err| pmcp::Error::Internal(format!("Failed to parse diff: {}", err)))?;
+
+            let (total_files, total_hunks, total_additions, total_deletions) =
+                diff_index.total_stats();
+
+            // Collect file info with stats
+            let mut files: Vec<Value> = Vec::new();
+            for (file_path, file_index) in &diff_index.files {
+                if file_index.all_hunks.is_empty() {
+                    continue;
+                }
+
+                let mut adds = 0;
+                let mut dels = 0;
+                for indexed_hunk in &file_index.all_hunks {
+                    for line in indexed_hunk.hunk.lines() {
+                        match line.line_type.as_str() {
+                            unidiff::LINE_TYPE_ADDED => adds += 1,
+                            unidiff::LINE_TYPE_REMOVED => dels += 1,
+                            _ => {}
+                        }
+                    }
+                }
+
+                let hunk_ids: Vec<String> = (1..=file_index.all_hunks.len())
+                    .map(|i| format!("{}#H{}", file_path, i))
+                    .collect();
+
+                files.push(json!({
+                    "file_path": file_path,
+                    "hunk_count": file_index.all_hunks.len(),
+                    "additions": adds,
+                    "deletions": dels,
+                    "hunk_ids": hunk_ids
+                }));
+            }
+
+            // Sort by total changes (largest first)
+            files.sort_by(|a, b| {
+                let a_changes = a["additions"].as_u64().unwrap_or(0)
+                    + a["deletions"].as_u64().unwrap_or(0);
+                let b_changes = b["additions"].as_u64().unwrap_or(0)
+                    + b["deletions"].as_u64().unwrap_or(0);
+                b_changes.cmp(&a_changes)
+            });
+
+            Ok(json!({
+                "total_files": total_files,
+                "total_hunks": total_hunks,
+                "total_additions": total_additions,
+                "total_deletions": total_deletions,
+                "files": files
+            }))
+        })
+    })
+    .with_description(
+        "List all files changed in the diff with their statistics.\n\n\
+         Use this to get an overview of what files are affected and their change sizes.\n\n\
+         Returns files sorted by change size (largest first), with hunk IDs for each file.",
     )
     .with_schema(json!({
         "type": "object",
