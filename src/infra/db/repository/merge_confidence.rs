@@ -56,7 +56,13 @@ impl MergeConfidenceRepository {
                     (id, run_id, score, reasons, computed_at)
                 VALUES (?1, ?2, ?3, ?4, ?5)
                 "#,
-                params![id, run_id, confidence.score, reasons_json, confidence.computed_at,],
+                params![
+                    id,
+                    run_id,
+                    confidence.score,
+                    reasons_json,
+                    confidence.computed_at,
+                ],
             )
             .context("insert merge confidence")?;
         }
@@ -85,8 +91,7 @@ impl MergeConfidenceRepository {
 
         match result {
             Ok((score, reasons_json, computed_at)) => {
-                let reasons: Vec<String> =
-                    serde_json::from_str(&reasons_json).unwrap_or_default();
+                let reasons: Vec<String> = serde_json::from_str(&reasons_json).unwrap_or_default();
 
                 Ok(Some(MergeConfidence {
                     score: score as f32,

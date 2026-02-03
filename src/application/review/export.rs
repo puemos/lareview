@@ -93,7 +93,7 @@ impl ReviewExporter {
                     for reason in &confidence.reasons {
                         md.push_str(&format!("- {}\n", reason));
                     }
-                    md.push_str("\n");
+                    md.push('\n');
                 }
 
                 md.push_str("---\n\n");

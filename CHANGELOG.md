@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.30] - 2026-02-03
+
+### Added
+
+- **Review**: Merge confidence scoring system (1-5 scale) with agent-provided assessment and reasons.
+- **UI**: MergeConfidenceBadge component with tooltip showing score, label, and assessment details.
+- **Export**: Include merge confidence in markdown exports and VCS push requests.
+
 ## [0.0.28] - 2026-01-23
 
 ### Added
