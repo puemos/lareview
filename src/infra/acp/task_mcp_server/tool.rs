@@ -1153,9 +1153,8 @@ pub(super) fn create_get_hunk_tool(config: Arc<ServerConfig>) -> impl ToolHandle
                 .map_err(|err| pmcp::Error::Internal(format!("Failed to parse diff: {}", err)))?;
 
             // Parse hunk_id and get coordinates
-            let (file_path, hunk_idx) = diff_index
-                .parse_hunk_id(&input.hunk_id)
-                .ok_or_else(|| {
+            let (file_path, hunk_idx) =
+                diff_index.parse_hunk_id(&input.hunk_id).ok_or_else(|| {
                     pmcp::Error::Validation(format!(
                         "Invalid hunk_id format: '{}'. Expected format: 'path/to/file#H1'",
                         input.hunk_id
@@ -1446,10 +1445,10 @@ pub(super) fn create_list_diff_files_tool(config: Arc<ServerConfig>) -> impl Too
 
             // Sort by total changes (largest first)
             files.sort_by(|a, b| {
-                let a_changes = a["additions"].as_u64().unwrap_or(0)
-                    + a["deletions"].as_u64().unwrap_or(0);
-                let b_changes = b["additions"].as_u64().unwrap_or(0)
-                    + b["deletions"].as_u64().unwrap_or(0);
+                let a_changes =
+                    a["additions"].as_u64().unwrap_or(0) + a["deletions"].as_u64().unwrap_or(0);
+                let b_changes =
+                    b["additions"].as_u64().unwrap_or(0) + b["deletions"].as_u64().unwrap_or(0);
                 b_changes.cmp(&a_changes)
             });
 

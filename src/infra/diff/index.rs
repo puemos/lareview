@@ -975,9 +975,15 @@ impl DiffIndex {
         }
 
         result.push_str("## Available Tools\n\n");
-        result.push_str("- `get_hunk { hunk_id: \"path/file.rs#H1\" }` - Get content of a single hunk\n");
-        result.push_str("- `get_file_hunks { file_path: \"path/file.rs\" }` - Get all hunks for a file\n");
-        result.push_str("- `search_diff { pattern: \"keyword\" }` - Search across all diff content\n");
+        result.push_str(
+            "- `get_hunk { hunk_id: \"path/file.rs#H1\" }` - Get content of a single hunk\n",
+        );
+        result.push_str(
+            "- `get_file_hunks { file_path: \"path/file.rs\" }` - Get all hunks for a file\n",
+        );
+        result.push_str(
+            "- `search_diff { pattern: \"keyword\" }` - Search across all diff content\n",
+        );
         result.push_str("- `list_diff_files` - List all changed files\n");
 
         result
