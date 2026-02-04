@@ -212,17 +212,8 @@ fn extract_marked_env(output: &str) -> Option<&str> {
 #[cfg(unix)]
 fn apply_shell_environment(env: HashMap<String, String>) {
     for (key, value) in env {
-        if key == "PATH" {
-            unsafe {
-                std::env::set_var(&key, value);
-            }
-            continue;
-        }
-
-        if std::env::var_os(&key).is_none() {
-            unsafe {
-                std::env::set_var(&key, value);
-            }
+        unsafe {
+            std::env::set_var(&key, value);
         }
     }
 }
