@@ -612,29 +612,28 @@ impl VcsProvider for GitLabProvider {
                     String::from_utf8_lossy(&output.stderr)
                 );
 
-                if output.status.success() {
-                    let login = combined_output
-                        .lines()
-                        .find(|line| line.contains("Logged in to") && line.contains(" as "))
-                        .and_then(|line| line.split(" as ").nth(1))
-                        .map(|value| value.split_whitespace().next().unwrap_or("").to_string());
+                // Always try to extract login, even when glab reports partial failure
+                // (e.g. multiple instances configured but only one authenticated)
+                let login = combined_output
+                    .lines()
+                    .find(|line| line.contains("Logged in to") && line.contains(" as "))
+                    .and_then(|line| line.split(" as ").nth(1))
+                    .map(|value| value.split_whitespace().next().unwrap_or("").to_string());
 
-                    Ok(VcsStatus {
-                        id: self.id().to_string(),
-                        name: self.name().to_string(),
-                        cli_path: path_str,
-                        login,
-                        error: None,
-                    })
+                // Only report error if no login was found
+                let error = if login.is_none() && !output.status.success() {
+                    Some(combined_output)
                 } else {
-                    Ok(VcsStatus {
-                        id: self.id().to_string(),
-                        name: self.name().to_string(),
-                        cli_path: path_str,
-                        login: None,
-                        error: Some(combined_output),
-                    })
-                }
+                    None
+                };
+
+                Ok(VcsStatus {
+                    id: self.id().to_string(),
+                    name: self.name().to_string(),
+                    cli_path: path_str,
+                    login,
+                    error,
+                })
             }
             None => Ok(VcsStatus {
                 id: self.id().to_string(),
@@ -655,7 +654,7 @@ impl GitLabMrRef {
 
 #[cfg(test)]
 mod tests {
-    use super::build_gitlab_position;
+    use super::{build_gitlab_position, parse_mr_ref};
     use crate::domain::FeedbackSide;
     use crate::infra::diff::index::DiffIndex;
 
@@ -691,5 +690,114 @@ mod tests {
         let object = position.as_object().expect("position object");
         assert!(object.get("new_line").is_some());
         assert!(object.get("old_line").is_none());
+    }
+
+    #[test]
+    fn test_parse_mr_ref_gitlab_com_url() {
+        let result = parse_mr_ref("https://gitlab.com/owner/repo/-/merge_requests/123").unwrap();
+        assert_eq!(result.host, "gitlab.com");
+        assert_eq!(result.project_path, "owner/repo");
+        assert_eq!(result.number, 123);
+        assert_eq!(
+            result.url,
+            "https://gitlab.com/owner/repo/-/merge_requests/123"
+        );
+    }
+
+    #[test]
+    fn test_parse_mr_ref_gitlab_com_nested_group() {
+        let result =
+            parse_mr_ref("https://gitlab.com/group/subgroup/repo/-/merge_requests/42").unwrap();
+        assert_eq!(result.host, "gitlab.com");
+        assert_eq!(result.project_path, "group/subgroup/repo");
+        assert_eq!(result.number, 42);
+    }
+
+    #[test]
+    fn test_parse_mr_ref_custom_domain_url() {
+        let result =
+            parse_mr_ref("https://git.company.com/team/project/-/merge_requests/99").unwrap();
+        assert_eq!(result.host, "git.company.com");
+        assert_eq!(result.project_path, "team/project");
+        assert_eq!(result.number, 99);
+        assert_eq!(
+            result.url,
+            "https://git.company.com/team/project/-/merge_requests/99"
+        );
+    }
+
+    #[test]
+    fn test_parse_mr_ref_custom_domain_nested_group() {
+        let result =
+            parse_mr_ref("https://git.ridewithvia.dev/infra/backend/api/-/merge_requests/7")
+                .unwrap();
+        assert_eq!(result.host, "git.ridewithvia.dev");
+        assert_eq!(result.project_path, "infra/backend/api");
+        assert_eq!(result.number, 7);
+    }
+
+    #[test]
+    fn test_parse_mr_ref_url_without_scheme() {
+        let result = parse_mr_ref("git.company.com/owner/repo/-/merge_requests/55").unwrap();
+        assert_eq!(result.host, "git.company.com");
+        assert_eq!(result.project_path, "owner/repo");
+        assert_eq!(result.number, 55);
+    }
+
+    #[test]
+    fn test_parse_mr_ref_url_with_trailing_slash() {
+        let result = parse_mr_ref("https://gitlab.com/owner/repo/-/merge_requests/10/").unwrap();
+        assert_eq!(result.number, 10);
+    }
+
+    #[test]
+    fn test_parse_mr_ref_shorthand_exclamation() {
+        let result = parse_mr_ref("owner/repo!123").unwrap();
+        assert_eq!(result.host, "gitlab.com");
+        assert_eq!(result.project_path, "owner/repo");
+        assert_eq!(result.number, 123);
+    }
+
+    #[test]
+    fn test_parse_mr_ref_shorthand_hash() {
+        let result = parse_mr_ref("owner/repo#456").unwrap();
+        assert_eq!(result.host, "gitlab.com");
+        assert_eq!(result.project_path, "owner/repo");
+        assert_eq!(result.number, 456);
+    }
+
+    #[test]
+    fn test_parse_mr_ref_shorthand_nested_group() {
+        let result = parse_mr_ref("group/subgroup/repo!78").unwrap();
+        assert_eq!(result.host, "gitlab.com");
+        assert_eq!(result.project_path, "group/subgroup/repo");
+        assert_eq!(result.number, 78);
+    }
+
+    #[test]
+    fn test_parse_mr_ref_with_whitespace() {
+        let result = parse_mr_ref("  owner/repo!5  ").unwrap();
+        assert_eq!(result.project_path, "owner/repo");
+        assert_eq!(result.number, 5);
+    }
+
+    #[test]
+    fn test_parse_mr_ref_invalid_empty() {
+        assert!(parse_mr_ref("").is_none());
+    }
+
+    #[test]
+    fn test_parse_mr_ref_invalid_no_mr_number() {
+        assert!(parse_mr_ref("https://gitlab.com/owner/repo/-/merge_requests/").is_none());
+    }
+
+    #[test]
+    fn test_parse_mr_ref_invalid_random_text() {
+        assert!(parse_mr_ref("not a merge request").is_none());
+    }
+
+    #[test]
+    fn test_parse_mr_ref_invalid_no_separator() {
+        assert!(parse_mr_ref("ownerrepo123").is_none());
     }
 }
