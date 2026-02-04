@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.31] - 2026-02-04
+
+### Fixed
+
+- **Release**: Fixed version mismatch between Cargo.toml and tauri.conf.json that caused macOS artifacts to be uploaded to wrong release.
+
 ## [0.0.30] - 2026-02-03
 
 ### Added

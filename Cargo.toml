@@ -1,6 +1,6 @@
 [package]
 name = "lareview"
-version = "0.0.30"
+version = "0.0.31"
 edition = "2024"
 default-run = "lareview"
 
