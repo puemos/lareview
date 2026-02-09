@@ -61,7 +61,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
         <div className="custom-scrollbar max-h-[50vh] overflow-y-auto p-5">
           {/* What's New */}
           <div className="mb-5">
-            <h4 className="text-text-primary mb-2 text-xs font-semibold">What's New</h4>
+            <h4 className="text-text-primary mb-2 text-xs font-semibold">What&apos;s New</h4>
             {updateInfo.releaseNotes ? (
               <MarkdownRenderer className="prose prose-invert prose-sm max-w-none">
                 {updateInfo.releaseNotes}

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.33] - 2026-02-09
+
+### Added
+
+- **UI**: Update modal showing changelog and brew update command.
+
 ## [0.0.32] - 2026-02-09
 
 ### Fixed
