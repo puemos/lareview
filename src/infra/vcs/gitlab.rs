@@ -140,22 +140,22 @@ pub async fn fetch_mr_metadata(mr: &GitLabMrRef) -> Result<GitLabMrMetadata> {
 
 pub async fn fetch_mr_diff(mr: &GitLabMrRef) -> Result<String> {
     let glab_path = shell::find_bin("glab").context("resolve `glab` path")?;
-    let args = glab_args_with_host(
-        &mr.host,
-        vec![
-            "mr".to_string(),
-            "diff".to_string(),
-            mr.number.to_string(),
-            "--repo".to_string(),
-            mr.project_path.clone(),
-        ],
-    );
+    // Note: `glab mr diff` does not support --hostname (unlike `glab api`).
+    // For self-hosted instances we set GITLAB_HOST so glab resolves the right host.
+    let args = vec![
+        "mr".to_string(),
+        "diff".to_string(),
+        mr.number.to_string(),
+        "--repo".to_string(),
+        mr.project_path.clone(),
+    ];
 
-    let output = Command::new(&glab_path)
-        .args(args)
-        .output()
-        .await
-        .context("run `glab mr diff`")?;
+    let mut cmd = Command::new(&glab_path);
+    cmd.args(args);
+    if mr.host != "gitlab.com" {
+        cmd.env("GITLAB_HOST", &mr.host);
+    }
+    let output = cmd.output().await.context("run `glab mr diff`")?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

@@ -180,22 +180,22 @@ pub fn acquire_diff(source: DiffSource) -> Result<String> {
             number,
         } => {
             let glab_path = shell::find_bin("glab").context("Could not find 'glab' executable")?;
-            let mut args = vec![
+            // Note: `glab mr diff` does not support --hostname (unlike `glab api`).
+            // For self-hosted instances we set GITLAB_HOST so glab resolves the right host.
+            let args = vec![
                 "mr".to_string(),
                 "diff".to_string(),
                 number.to_string(),
                 "--repo".to_string(),
                 project_path,
             ];
-            if host != "gitlab.com" {
-                args.push("--hostname".to_string());
-                args.push(host);
-            }
 
-            let output = Command::new(glab_path)
-                .args(args)
-                .output()
-                .context("Failed to fetch MR via glab CLI")?;
+            let mut cmd = Command::new(glab_path);
+            cmd.args(args);
+            if host != "gitlab.com" {
+                cmd.env("GITLAB_HOST", &host);
+            }
+            let output = cmd.output().context("Failed to fetch MR via glab CLI")?;
 
             if !output.status.success() {
                 let stderr = String::from_utf8_lossy(&output.stderr);
