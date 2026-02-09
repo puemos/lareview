@@ -4,14 +4,16 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Sidebar } from '../Sidebar';
 import { useAppStore } from '../../../store';
 
-const { mockGetReviewRuns, mockDeleteReview, mockUseTauri } = vi.hoisted(() => {
+const { mockGetReviewRuns, mockDeleteReview, mockOpenUrl, mockUseTauri } = vi.hoisted(() => {
   const mockGetReviewRuns = vi.fn().mockResolvedValue([]);
   const mockDeleteReview = vi.fn().mockResolvedValue(undefined);
+  const mockOpenUrl = vi.fn().mockResolvedValue(undefined);
   const mockUseTauri = vi.fn(() => ({
     getReviewRuns: mockGetReviewRuns,
     deleteReview: mockDeleteReview,
+    openUrl: mockOpenUrl,
   }));
-  return { mockGetReviewRuns, mockDeleteReview, mockUseTauri };
+  return { mockGetReviewRuns, mockDeleteReview, mockOpenUrl, mockUseTauri };
 });
 
 vi.mock('../../../hooks/useTauri', async () => {
@@ -54,7 +56,12 @@ const renderSidebar = () => {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <Sidebar currentView="review" onViewChange={vi.fn()} />
+      <Sidebar
+        currentView="review"
+        onViewChange={vi.fn()}
+        currentVersion={null}
+        updateAvailable={null}
+      />
     </QueryClientProvider>
   );
 };
@@ -64,6 +71,7 @@ describe('Sidebar', () => {
     useAppStore.getState().reset();
     mockGetReviewRuns.mockClear();
     mockDeleteReview.mockClear();
+    mockOpenUrl.mockClear();
     mockUseTauri.mockClear();
   });
 

@@ -9,13 +9,23 @@ import type { ViewType } from '../../types';
 import { useReviews } from '../../hooks/useReviews';
 import { useTauri } from '../../hooks/useTauri';
 import { queryKeys } from '../../lib/query-keys';
+import type { UpdateInfo } from '../../hooks/useUpdateCheck';
 
 interface SidebarProps {
   currentView: ViewType;
   onViewChange: (view: ViewType) => void;
+  currentVersion: string | null;
+  updateAvailable: UpdateInfo | null;
+  onUpdateClick?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) => {
+export const Sidebar: React.FC<SidebarProps> = ({
+  currentView,
+  onViewChange,
+  currentVersion,
+  updateAvailable,
+  onUpdateClick,
+}) => {
   const queryClient = useQueryClient();
   const { setReviewId, reviewId } = useAppStore();
   const { data: reviews = [], isLoading, invalidate } = useReviews();
@@ -188,6 +198,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) =
         onClick={() => onViewChange('settings')}
         ariaLabel="Navigate to Settings"
       />
+
+      {currentVersion && (
+        <div className="border-border/50 mx-2 flex items-center justify-between border-t px-2 pt-2 pb-1">
+          <span className="text-text-disabled text-[10px]">v{currentVersion}</span>
+          {updateAvailable && (
+            <button
+              onClick={() => onUpdateClick?.()}
+              className="text-brand/70 hover:text-brand flex items-center gap-1 text-[10px] transition-colors"
+            >
+              <ICONS.ARROW_UP size={10} />
+              <span>Update</span>
+            </button>
+          )}
+        </div>
+      )}
 
       <ConfirmationModal
         isOpen={!!reviewToDelete}

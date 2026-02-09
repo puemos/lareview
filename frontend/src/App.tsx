@@ -1,5 +1,5 @@
 import { useEffect, useState, lazy, Suspense, useCallback } from 'react';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
 
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useTauri } from './hooks/useTauri';
@@ -11,6 +11,8 @@ import { ErrorBoundary } from './components/Common/ErrorBoundary';
 import { TooltipProvider } from './components/Common/Tooltip';
 import { ICONS } from './constants/icons';
 import { GenerationProvider } from './contexts/GenerationContext';
+import { useUpdateCheck } from './hooks/useUpdateCheck';
+import { UpdateModal } from './components/Common/UpdateModal';
 
 import { SettingsPageSkeleton } from './components/Settings/SettingsPageSkeleton';
 import { ReviewViewSkeleton } from './components/Review/ReviewViewSkeleton';
@@ -59,8 +61,10 @@ type View = 'generate' | 'review' | 'repos' | 'rules' | 'learning' | 'settings';
 function App() {
   const [currentView, setCurrentView] = useState<View>('generate');
   const [error, setError] = useState<string | null>(null);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
   const { parseDiff, getPendingReviewFromState, getDiffRequest, acquireDiffFromRequest } =
     useTauri();
+  const { currentVersion, updateAvailable } = useUpdateCheck();
   const diffText = useAppStore(state => state.diffText);
   const setDiffText = useAppStore(state => state.setDiffText);
   const setParsedDiff = useAppStore(state => state.setParsedDiff);
@@ -114,6 +118,19 @@ function App() {
       unlisten.then(fn => fn()).catch(console.error);
     };
   }, [loadDiff]);
+
+  useEffect(() => {
+    if (updateAvailable) {
+      toast('Update Available', {
+        description: `LaReview v${updateAvailable.latestVersion} is available. You're on v${currentVersion}.`,
+        duration: 10000,
+        action: {
+          label: 'Details',
+          onClick: () => setShowUpdateModal(true),
+        },
+      });
+    }
+  }, [updateAvailable, currentVersion]);
 
   const reviewViewMode = useAppStore(state => state.reviewViewMode);
 
@@ -193,10 +210,24 @@ function App() {
               </div>
             )}
             <div className="flex flex-1 overflow-hidden">
-              <Sidebar currentView={currentView} onViewChange={setCurrentView} />
+              <Sidebar
+                currentView={currentView}
+                onViewChange={setCurrentView}
+                currentVersion={currentVersion}
+                updateAvailable={updateAvailable}
+                onUpdateClick={() => setShowUpdateModal(true)}
+              />
               <main className="flex-1 overflow-hidden">{renderView()}</main>
             </div>
           </div>
+          {updateAvailable && currentVersion && (
+            <UpdateModal
+              isOpen={showUpdateModal}
+              onClose={() => setShowUpdateModal(false)}
+              currentVersion={currentVersion}
+              updateInfo={updateAvailable}
+            />
+          )}
         </TooltipProvider>
       </GenerationProvider>
     </QueryClientProvider>
