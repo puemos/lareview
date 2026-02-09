@@ -6,8 +6,8 @@ use crate::domain::{
     ReviewSource, ReviewStatus, ReviewTask, RuleScope,
 };
 use crate::infra::acp::{
-    AgentRegistry, GenerateTasksInput, ProgressEvent, RunContext, generate_tasks_with_acp,
-    invalidate_agent_cache,
+    GenerateTasksInput, ProgressEvent, RunContext, generate_tasks_with_acp,
+    invalidate_agent_cache, list_agent_candidates,
 };
 use crate::infra::diff::index::DiffIndex;
 use crate::infra::hash::hash_diff;
@@ -370,10 +370,11 @@ async fn generate_review_inner(
     };
 
     let (candidate_label, command, candidate_args) = {
-        let registry = AgentRegistry::default();
-        let agent_candidate = registry
-            .get_agent_candidate(&agent_id)
-            .or_else(|| registry.get_agent_candidate("default"))
+        let candidates = list_agent_candidates();
+        let agent_candidate = candidates
+            .iter()
+            .find(|c| c.id == agent_id)
+            .or_else(|| candidates.iter().find(|c| c.id == "default"))
             .ok_or_else(|| "No agent found".to_string())?;
 
         let candidate_label = agent_candidate.label.clone();
@@ -2626,9 +2627,10 @@ pub async fn trigger_learning_compaction(
 ) -> Result<LearningCompactionResult, String> {
     // Get the agent configuration
     let (agent_command, agent_args) = {
-        let registry = AgentRegistry::default();
-        let agent_candidate = registry
-            .get_agent_candidate(&agent_id)
+        let candidates = list_agent_candidates();
+        let agent_candidate = candidates
+            .iter()
+            .find(|c| c.id == agent_id)
             .ok_or_else(|| format!("Agent '{}' not found", agent_id))?;
 
         let command = agent_candidate.command.clone().ok_or_else(|| {

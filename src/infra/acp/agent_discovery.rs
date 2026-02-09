@@ -142,6 +142,60 @@ mod tests {
     }
 
     #[test]
+    fn test_path_override_applied_to_candidates() {
+        let candidates = list_agent_candidates();
+        let first = candidates.first().expect("should have at least one agent");
+        let agent_id = first.id.clone();
+        let original_command = first.command.clone();
+
+        // Set a path override in config
+        let mut config = load_config();
+        config
+            .agent_path_overrides
+            .insert(agent_id.clone(), "/custom/bin/agent".into());
+        config
+            .agent_args_overrides
+            .insert(agent_id.clone(), vec!["--custom-flag".into()]);
+        crate::infra::app_config::save_config(&config).unwrap();
+
+        // Invalidate cache so the new config is picked up
+        {
+            let mut cache_guard = AGENT_CACHE.lock().unwrap();
+            *cache_guard = None;
+        }
+
+        let updated = list_agent_candidates();
+        let agent = updated.iter().find(|c| c.id == agent_id).unwrap();
+        assert_eq!(
+            agent.command.as_deref(),
+            Some("/custom/bin/agent"),
+            "path override should replace factory command"
+        );
+        assert_eq!(
+            agent.args,
+            vec!["--custom-flag"],
+            "args override should replace factory args"
+        );
+
+        // Cleanup: restore original config
+        config.agent_path_overrides.remove(&agent_id);
+        config.agent_args_overrides.remove(&agent_id);
+        crate::infra::app_config::save_config(&config).unwrap();
+        {
+            let mut cache_guard = AGENT_CACHE.lock().unwrap();
+            *cache_guard = None;
+        }
+
+        // Verify the override is gone
+        let restored = list_agent_candidates();
+        let agent = restored.iter().find(|c| c.id == agent_id).unwrap();
+        assert_eq!(
+            agent.command, original_command,
+            "command should revert to factory default after removing override"
+        );
+    }
+
+    #[test]
     fn test_custom_agent_discovery() {
         let mut config = load_config();
         config.custom_agents.push(CustomAgentConfig {
