@@ -9,6 +9,8 @@ pub struct CustomAgentConfig {
     pub logo: Option<String>,
     pub command: String,
     pub args: Vec<String>,
+    #[serde(default)]
+    pub env_vars: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -120,6 +122,11 @@ mod tests {
                 logo: None,
                 command: "my-command".into(),
                 args: vec!["--flag".into()],
+                env_vars: {
+                    let mut m = HashMap::new();
+                    m.insert("MY_VAR".to_string(), "my_value".to_string());
+                    m
+                },
             }],
             agent_path_overrides: path_overrides,
             agent_args_overrides: args_overrides,

@@ -530,6 +530,23 @@ export const useTauri = () => {
     []
   );
 
+  const addCustomAgent = useCallback(
+    async (
+      id: string,
+      label: string,
+      command: string,
+      args?: string[],
+      logo?: string
+    ): Promise<void> => {
+      return invoke('add_custom_agent', { id, label, command, args, logo });
+    },
+    []
+  );
+
+  const deleteCustomAgent = useCallback(async (id: string): Promise<void> => {
+    return invoke('delete_custom_agent', { id });
+  }, []);
+
   const selectRepoFolder = useCallback(async (): Promise<string | null> => {
     const result = await open({
       directory: true,
@@ -597,6 +614,8 @@ export const useTauri = () => {
     onReviewComplete,
     getAgents,
     updateAgentConfig,
+    addCustomAgent,
+    deleteCustomAgent,
     getGitHubToken,
     setGitHubToken,
     getVcsStatus,

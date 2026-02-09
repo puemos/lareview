@@ -96,6 +96,10 @@ interface MockTauriReturn {
   loadTasks: Mock<(runId: string) => Promise<ReviewTask[]>>;
   updateTaskStatus: Mock<(taskId: string, status: string) => Promise<void>>;
   getAgents: Mock<() => Promise<Agent[]>>;
+  addCustomAgent: Mock<
+    (id: string, label: string, command: string, args?: string[], logo?: string) => Promise<void>
+  >;
+  deleteCustomAgent: Mock<(id: string) => Promise<void>>;
   linkRepo: Mock<(path: string) => Promise<LinkedRepo>>;
   cloneAndLinkRepo: Mock<
     (input: {
@@ -139,6 +143,8 @@ function createMockTauri(): MockTauriReturn {
     getAgents: vi
       .fn()
       .mockResolvedValue([{ id: 'agent-1', name: 'Test Agent', description: 'Test' }]),
+    addCustomAgent: vi.fn().mockResolvedValue(undefined),
+    deleteCustomAgent: vi.fn().mockResolvedValue(undefined),
     linkRepo: vi.fn().mockImplementation((path: string) =>
       Promise.resolve({
         id: 'repo-1',

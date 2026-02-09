@@ -226,6 +226,7 @@ export interface Agent {
   args?: string[];
   logo?: string;
   available?: boolean;
+  is_custom?: boolean;
 }
 
 export interface VcsStatus {

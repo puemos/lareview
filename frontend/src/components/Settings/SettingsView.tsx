@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Gear,
-  User,
   Terminal,
   Database,
   Asterisk,
@@ -19,6 +18,9 @@ import {
   Eye,
   ShieldCheck,
   Target,
+  Plus,
+  Trash,
+  Robot,
 } from '@phosphor-icons/react';
 import type {
   ViewType,
@@ -84,7 +86,7 @@ export const SettingsView: React.FC<SettingsViewProps> = () => {
               <div className="bg-border/50 mx-2 h-px" />
             </div>
             <TabButton
-              icon={<User size={14} />}
+              icon={<Robot size={14} />}
               label="Agents"
               isActive={activeTab === 'agents'}
               onClick={() => setActiveTab('agents')}
@@ -741,7 +743,7 @@ const FeedbackFilterSettings: React.FC = () => {
 };
 
 const AgentsSettings: React.FC = () => {
-  const { getAgents, updateAgentConfig } = useTauri();
+  const { getAgents, updateAgentConfig, addCustomAgent, deleteCustomAgent } = useTauri();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -751,6 +753,11 @@ const AgentsSettings: React.FC = () => {
   });
   const [savingId, setSavingId] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addForm, setAddForm] = useState({ id: '', label: '', command: '', args: '' });
+  const [isAdding, setIsAdding] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const fetchAgents = useCallback(async () => {
     setIsLoading(true);
@@ -813,23 +820,164 @@ const AgentsSettings: React.FC = () => {
     }
   };
 
+  const handleAddAgent = async () => {
+    setIsAdding(true);
+    try {
+      const argsArray = addForm.args
+        .split(' ')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+      await addCustomAgent(addForm.id, addForm.label, addForm.command, argsArray);
+      await fetchAgents();
+      setShowAddForm(false);
+      setAddForm({ id: '', label: '', command: '', args: '' });
+      toast('Agent Added', {
+        description: `Custom agent "${addForm.label}" has been added.`,
+      });
+    } catch (error) {
+      console.error('Failed to add custom agent:', error);
+      toast('Failed to add agent', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  const handleDeleteAgent = async (agentId: string) => {
+    setDeletingId(agentId);
+    try {
+      await deleteCustomAgent(agentId);
+      await fetchAgents();
+      setConfirmDeleteId(null);
+      toast('Agent Deleted', {
+        description: 'Custom agent has been removed.',
+      });
+    } catch (error) {
+      console.error('Failed to delete custom agent:', error);
+      toast('Failed to delete agent', {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const shouldShowSkeleton = useDelayedLoading(isLoading && agents.length === 0);
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <SectionHeader
-          title="Review Agents"
-          description="Manage and configure the AI agents available for code reviews. Built-in agents can be configured with custom executable paths."
-        />
-        <button
-          onClick={fetchAgents}
-          className="text-text-tertiary hover:text-text-primary bg-bg-secondary rounded-md p-2 transition-colors"
-          title="Refresh agents"
-        >
-          <ArrowsClockwise size={16} className={isLoading ? 'animate-spin' : ''} />
-        </button>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div className="max-w-md">
+          <SectionHeader
+            title="Review Agents"
+            description="Manage and configure the AI agents available for code reviews. Built-in agents can be configured with custom executable paths."
+          />
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={() => setShowAddForm(prev => !prev)}
+            className="bg-brand text-bg-primary flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-2 text-xs font-bold transition-all hover:brightness-110"
+          >
+            <Plus size={14} weight="bold" />
+            Add Custom Agent
+          </button>
+          <button
+            onClick={fetchAgents}
+            className="text-text-tertiary hover:text-text-primary bg-bg-secondary rounded-md p-2 transition-colors"
+            title="Refresh agents"
+          >
+            <ArrowsClockwise size={16} className={isLoading ? 'animate-spin' : ''} />
+          </button>
+        </div>
       </div>
+
+      {showAddForm && (
+        <div className="bg-bg-secondary/40 border-border mb-4 rounded-lg border p-5">
+          <h3 className="text-text-primary mb-4 text-sm font-semibold">New Custom Agent</h3>
+          <div className="grid gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-text-disabled mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
+                  ID
+                </label>
+                <input
+                  type="text"
+                  value={addForm.id}
+                  onChange={e => setAddForm(prev => ({ ...prev, id: e.target.value }))}
+                  placeholder="e.g. my-agent"
+                  className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand w-full rounded-md border px-3 py-2 font-mono text-xs transition-all focus:outline-none"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="text-text-disabled mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
+                  Label
+                </label>
+                <input
+                  type="text"
+                  value={addForm.label}
+                  onChange={e => setAddForm(prev => ({ ...prev, label: e.target.value }))}
+                  placeholder="e.g. My Agent"
+                  className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand w-full rounded-md border px-3 py-2 font-mono text-xs transition-all focus:outline-none"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-text-disabled mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
+                Command
+              </label>
+              <input
+                type="text"
+                value={addForm.command}
+                onChange={e => setAddForm(prev => ({ ...prev, command: e.target.value }))}
+                placeholder="e.g. /usr/local/bin/my-agent"
+                className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand w-full rounded-md border px-3 py-2 font-mono text-xs transition-all focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-text-disabled mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
+                Arguments
+              </label>
+              <input
+                type="text"
+                value={addForm.args}
+                onChange={e => setAddForm(prev => ({ ...prev, args: e.target.value }))}
+                placeholder="e.g. --model=gpt-4 --temperature=0.7"
+                className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand w-full rounded-md border px-3 py-2 font-mono text-xs transition-all focus:outline-none"
+              />
+              <p className="text-text-tertiary mt-1 text-[10px]">
+                Space-separated arguments passed to the agent command.
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <button
+              onClick={() => {
+                setShowAddForm(false);
+                setAddForm({ id: '', label: '', command: '', args: '' });
+              }}
+              disabled={isAdding}
+              className="text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleAddAgent}
+              disabled={isAdding || !addForm.id.trim() || !addForm.command.trim() || !addForm.label.trim()}
+              className="bg-brand text-bg-primary shadow-custom flex items-center gap-2 rounded-md px-4 py-2 text-xs font-bold transition-all hover:brightness-110 disabled:opacity-50"
+            >
+              {isAdding ? (
+                <ArrowsClockwise size={14} className="animate-spin" />
+              ) : (
+                <Plus size={14} weight="bold" />
+              )}
+              Add Agent
+            </button>
+          </div>
+        </div>
+      )}
 
       {shouldShowSkeleton ? (
         <AgentsSkeleton />
@@ -848,7 +996,7 @@ const AgentsSettings: React.FC = () => {
                     {agent.logo ? (
                       <img src={agent.logo} alt={agent.name} className="h-6 w-6 object-contain" />
                     ) : (
-                      <User size={20} weight="fill" className="text-brand" />
+                      <Robot size={20} weight="fill" className="text-brand" />
                     )}
                   </div>
                   <div>
@@ -886,6 +1034,38 @@ const AgentsSettings: React.FC = () => {
                     >
                       Edit
                     </button>
+                    {agent.is_custom && (
+                      confirmDeleteId === agent.id ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleDeleteAgent(agent.id)}
+                            disabled={deletingId === agent.id}
+                            className="text-status-error hover:bg-status-error/10 rounded px-2 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+                          >
+                            {deletingId === agent.id ? (
+                              <ArrowsClockwise size={14} className="animate-spin" />
+                            ) : (
+                              'Confirm'
+                            )}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            disabled={deletingId === agent.id}
+                            className="text-text-secondary hover:text-text-primary rounded px-2 py-1.5 text-xs transition-colors disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDeleteId(agent.id)}
+                          className="text-text-tertiary hover:text-status-error hover:bg-status-error/10 rounded p-1.5 transition-colors"
+                          title="Delete custom agent"
+                        >
+                          <Trash size={14} />
+                        </button>
+                      )
+                    )}
                   </div>
                 )}
               </div>
@@ -984,7 +1164,7 @@ const AgentsSettings: React.FC = () => {
 
           {agents.length === 0 && !isLoading && (
             <div className="border-border rounded-lg border border-dashed py-12 text-center">
-              <User size={32} weight="thin" className="text-text-disabled mx-auto mb-3" />
+              <Robot size={32} weight="thin" className="text-text-disabled mx-auto mb-3" />
               <p className="text-text-tertiary text-sm">No agents discovered</p>
             </div>
           )}

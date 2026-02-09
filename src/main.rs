@@ -369,6 +369,8 @@ fn run_gui(initial_req: Option<DiffRequest>, initial_pending: Option<PendingDiff
             lareview::commands::fetch_remote_pr,
             lareview::commands::get_agents,
             lareview::commands::update_agent_config,
+            lareview::commands::add_custom_agent,
+            lareview::commands::delete_custom_agent,
             lareview::commands::get_github_token,
             lareview::commands::set_github_token,
             lareview::commands::get_vcs_status,

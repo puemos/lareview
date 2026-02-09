@@ -1,6 +1,6 @@
 import React from 'react';
 import * as Select from '@radix-ui/react-select';
-import { Check, CaretDown, User } from '@phosphor-icons/react';
+import { Check, CaretDown, Robot } from '@phosphor-icons/react';
 import clsx from 'clsx';
 
 // Import Icons
@@ -48,7 +48,7 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
   return (
     <div className="space-y-1.5">
       <label className="text-text-disabled flex items-center gap-1.5 text-[10px] font-bold tracking-wider uppercase">
-        <User size={12} /> Agent
+        <Robot size={12} /> Agent
       </label>
       <Select.Root value={selectedAgentId} onValueChange={onSelect}>
         <Select.Trigger
@@ -58,11 +58,15 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
           <Select.Value asChild>
             <div className="flex items-center gap-2">
               {selectedAgent && (
-                <img
-                  src={AGENT_ICONS[selectedAgent.id] || AGENT_ICONS.codex /* fallback */}
-                  alt=""
-                  className="h-4 w-4 object-contain"
-                />
+                AGENT_ICONS[selectedAgent.id] ? (
+                  <img
+                    src={AGENT_ICONS[selectedAgent.id]}
+                    alt=""
+                    className="h-4 w-4 object-contain"
+                  />
+                ) : (
+                  <Robot size={16} weight="fill" className="text-brand" />
+                )
               )}
               <span className="truncate">{selectedAgent?.name || 'Select an agent...'}</span>
             </div>
@@ -90,11 +94,15 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
                     'data-[disabled]:pointer-events-none data-[disabled]:opacity-50'
                   )}
                 >
-                  <img
-                    src={AGENT_ICONS[agent.id] || AGENT_ICONS.codex}
-                    alt=""
-                    className="h-4 w-4 object-contain"
-                  />
+                  {AGENT_ICONS[agent.id] ? (
+                    <img
+                      src={AGENT_ICONS[agent.id]}
+                      alt=""
+                      className="h-4 w-4 object-contain"
+                    />
+                  ) : (
+                    <Robot size={16} weight="fill" className="text-brand" />
+                  )}
                   <div className="flex items-center gap-2">
                     <Select.ItemText>{agent.name}</Select.ItemText>
                     {agent.available === false && (
