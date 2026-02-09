@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.32] - 2026-02-09
+
+### Fixed
+
+- **Shell**: Always apply all environment variables from shell (removed conditional logic that skipped non-PATH vars).
+- **GitLab**: Extract login from glab CLI output even on partial failure (e.g., multiple instances configured).
+- **GitLab**: Added comprehensive tests for MR reference parsing.
+
 ## [0.0.31] - 2026-02-04
 
 ### Fixed
