@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.34] - 2026-02-10
+
+### Added
+
+- **Agents**: Custom agent management with add and delete support.
+
+### Fixed
+
+- **ACP**: Use `list_agent_candidates` to respect custom path overrides.
+- **GitLab**: Replace invalid `--hostname` flag with `GITLAB_HOST` env var for `glab mr diff`.
+
 ## [0.0.33] - 2026-02-09
 
 ### Added
