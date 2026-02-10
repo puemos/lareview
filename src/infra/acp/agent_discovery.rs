@@ -267,7 +267,10 @@ mod tests {
         let custom = candidates.iter().find(|c| c.id == "custom-bin-test");
         assert!(custom.is_some());
         let custom = custom.unwrap();
-        assert!(custom.available, "custom agent with 'ls' command should be available");
+        assert!(
+            custom.available,
+            "custom agent with 'ls' command should be available"
+        );
         // find_bin should resolve to full path or keep original if resolvable
         assert!(custom.command.is_some());
 
@@ -281,7 +284,10 @@ mod tests {
         let _guard = CONFIG_MUTEX.lock().unwrap();
         let mut config = load_config();
         let mut env_vars = std::collections::HashMap::new();
-        env_vars.insert("LAREVIEW_TEST_CUSTOM_ENV".to_string(), "test_value_123".to_string());
+        env_vars.insert(
+            "LAREVIEW_TEST_CUSTOM_ENV".to_string(),
+            "test_value_123".to_string(),
+        );
 
         config.custom_agents.push(CustomAgentConfig {
             id: "custom-env-test".into(),

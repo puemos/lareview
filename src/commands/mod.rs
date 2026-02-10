@@ -6,8 +6,8 @@ use crate::domain::{
     ReviewSource, ReviewStatus, ReviewTask, RuleScope,
 };
 use crate::infra::acp::{
-    GenerateTasksInput, ProgressEvent, RunContext, generate_tasks_with_acp,
-    invalidate_agent_cache, list_agent_candidates,
+    GenerateTasksInput, ProgressEvent, RunContext, generate_tasks_with_acp, invalidate_agent_cache,
+    list_agent_candidates,
 };
 use crate::infra::diff::index::DiffIndex;
 use crate::infra::hash::hash_diff;
@@ -1265,11 +1265,8 @@ pub async fn fetch_remote_pr(
 pub async fn get_agents(_state: State<'_, AppState>) -> Result<Vec<AgentInfo>, String> {
     let candidates = crate::infra::acp::list_agent_candidates();
     let config = crate::infra::app_config::load_config();
-    let custom_ids: std::collections::HashSet<&str> = config
-        .custom_agents
-        .iter()
-        .map(|c| c.id.as_str())
-        .collect();
+    let custom_ids: std::collections::HashSet<&str> =
+        config.custom_agents.iter().map(|c| c.id.as_str()).collect();
 
     let agents: Vec<AgentInfo> = candidates
         .into_iter()
