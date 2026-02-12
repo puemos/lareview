@@ -80,18 +80,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
-      className="border-border flex max-h-screen w-64 flex-col gap-0.5 overflow-hidden border-r bg-gray-950/50 py-2"
+      className="border-border flex max-h-screen w-64 flex-col gap-0.5 overflow-hidden border-r bg-gray-950/50 pb-2"
       role="navigation"
       aria-label="Main sidebar"
     >
+      <div data-tauri-drag-region className="h-10 w-full shrink-0" />
       {error && (
         <div className="bg-status-ignored/10 border-status-ignored/20 text-status-ignored mx-2 rounded-md border px-3 py-2 text-[10px]">
           {error}
         </div>
       )}
-      <div className="mb-2 shrink-0 px-3 text-[10px] font-bold tracking-wider text-gray-500 uppercase">
-        Workspace
-      </div>
       <SidebarItem
         icon={<ICONS.VIEW_GENERATE size={16} />}
         label="Generate Review"
@@ -199,9 +197,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ariaLabel="Navigate to Settings"
       />
 
-      {currentVersion && (
-        <div className="border-border/50 mx-2 flex items-center justify-between border-t px-2 pt-2 pb-1">
-          <span className="text-text-disabled text-[10px]">v{currentVersion}</span>
+      <div className="h-2" />
+
+      <div>
+        <div className="border-border/50 border-t" />
+        <div className="flex items-center justify-between px-4 pt-2 pb-1">
+          {currentVersion ? (
+            <span className="text-text-disabled text-[10px]">v{currentVersion}</span>
+          ) : (
+            <div className="bg-bg-tertiary h-3 w-12 animate-pulse rounded" />
+          )}
           {updateAvailable && (
             <button
               onClick={() => onUpdateClick?.()}
@@ -212,7 +217,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           )}
         </div>
-      )}
+      </div>
 
       <ConfirmationModal
         isOpen={!!reviewToDelete}

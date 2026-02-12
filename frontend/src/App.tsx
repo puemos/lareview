@@ -217,7 +217,10 @@ function App() {
                 updateAvailable={updateAvailable}
                 onUpdateClick={() => setShowUpdateModal(true)}
               />
-              <main className="flex-1 overflow-hidden">{renderView()}</main>
+              <main className="relative flex-1 overflow-hidden">
+                <div data-tauri-drag-region className="absolute top-0 right-0 left-0 z-10 h-3" />
+                {renderView()}
+              </main>
             </div>
           </div>
           {updateAvailable && currentVersion && (
