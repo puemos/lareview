@@ -182,10 +182,14 @@ pub fn acquire_diff(source: DiffSource) -> Result<String> {
             let glab_path = shell::find_bin("glab").context("Could not find 'glab' executable")?;
             // Note: `glab mr diff` does not support --hostname (unlike `glab api`).
             // For self-hosted instances we set GITLAB_HOST so glab resolves the right host.
+            // Use --raw to get a proper unified diff with `diff --git` headers.
+            // Without --raw, glab outputs diffs without file separator headers,
+            // causing the parser to only recognise the first file.
             let args = vec![
                 "mr".to_string(),
                 "diff".to_string(),
                 number.to_string(),
+                "--raw".to_string(),
                 "--repo".to_string(),
                 project_path,
             ];

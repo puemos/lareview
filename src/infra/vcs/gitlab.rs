@@ -142,10 +142,14 @@ pub async fn fetch_mr_diff(mr: &GitLabMrRef) -> Result<String> {
     let glab_path = shell::find_bin("glab").context("resolve `glab` path")?;
     // Note: `glab mr diff` does not support --hostname (unlike `glab api`).
     // For self-hosted instances we set GITLAB_HOST so glab resolves the right host.
+    // Use --raw to get a proper unified diff with `diff --git` headers.
+    // Without --raw, glab outputs diffs without file separator headers,
+    // causing the parser to only recognise the first file.
     let args = vec![
         "mr".to_string(),
         "diff".to_string(),
         mr.number.to_string(),
+        "--raw".to_string(),
         "--repo".to_string(),
         mr.project_path.clone(),
     ];
