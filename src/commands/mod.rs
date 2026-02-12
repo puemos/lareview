@@ -539,7 +539,7 @@ async fn generate_review_inner(
         agent_args: candidate_args,
         progress_tx: Some(mcp_tx),
         mcp_server_binary: None,
-        timeout_secs: Some(1000),
+        timeout_secs: Some(crate::infra::app_config::load_config().review_timeout_secs.unwrap_or(1000)),
         cancel_token: Some(cancel_token),
         debug: std::env::var("RUST_LOG")
             .map(|v| v.contains("acp"))
@@ -1712,6 +1712,28 @@ pub fn update_feedback_filter_config(threshold: Option<f64>) -> Result<(), Strin
     let mut config = load_config();
     // Clamp to valid range
     config.feedback_confidence_threshold = threshold.map(|t| t.clamp(0.0, 1.0));
+    save_config(&config).map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TimeoutConfig {
+    pub timeout_secs: Option<u64>,
+}
+
+#[tauri::command]
+pub fn get_timeout_config() -> TimeoutConfig {
+    use crate::infra::app_config::load_config;
+    let config = load_config();
+    TimeoutConfig {
+        timeout_secs: config.review_timeout_secs,
+    }
+}
+
+#[tauri::command]
+pub fn update_timeout_config(timeout_secs: Option<u64>) -> Result<(), String> {
+    use crate::infra::app_config::{load_config, save_config};
+    let mut config = load_config();
+    config.review_timeout_secs = timeout_secs.map(|t| t.clamp(60, 7200));
     save_config(&config).map_err(|e| e.to_string())
 }
 

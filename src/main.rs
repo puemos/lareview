@@ -384,6 +384,8 @@ fn run_gui(initial_req: Option<DiffRequest>, initial_pending: Option<PendingDiff
             lareview::commands::update_editor_config,
             lareview::commands::get_feedback_filter_config,
             lareview::commands::update_feedback_filter_config,
+            lareview::commands::get_timeout_config,
+            lareview::commands::update_timeout_config,
             lareview::commands::get_review_rules,
             lareview::commands::create_review_rule,
             lareview::commands::update_review_rule,

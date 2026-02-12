@@ -644,6 +644,12 @@ export const useTauri = () => {
     updateFeedbackFilterConfig: useCallback(async (threshold: number | null): Promise<void> => {
       return invoke('update_feedback_filter_config', { threshold });
     }, []),
+    getTimeoutConfig: useCallback(async (): Promise<{ timeout_secs: number | null }> => {
+      return invoke('get_timeout_config');
+    }, []),
+    updateTimeoutConfig: useCallback(async (timeoutSecs: number | null): Promise<void> => {
+      return invoke('update_timeout_config', { timeoutSecs });
+    }, []),
     openInEditor: useCallback(
       async (filePath: string, lineNumber: number, repoRoot?: string): Promise<void> => {
         return invoke('open_in_editor', { filePath, lineNumber, repoRoot });

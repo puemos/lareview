@@ -25,6 +25,10 @@ pub struct AppConfig {
     /// None means show all feedback (default behavior)
     #[serde(default)]
     pub feedback_confidence_threshold: Option<f64>,
+    /// Review generation timeout in seconds.
+    /// None means use the built-in default of 1000 seconds.
+    #[serde(default)]
+    pub review_timeout_secs: Option<u64>,
 }
 
 pub fn load_config() -> AppConfig {
@@ -133,6 +137,7 @@ mod tests {
             agent_envs,
             preferred_editor_id: Some("vscode".into()),
             feedback_confidence_threshold: None,
+            review_timeout_secs: None,
         };
 
         let tmp_file = NamedTempFile::new().unwrap();

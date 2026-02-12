@@ -21,6 +21,7 @@ import {
   Plus,
   Trash,
   Robot,
+  Timer,
 } from '@phosphor-icons/react';
 import type {
   ViewType,
@@ -33,7 +34,7 @@ import type {
 import { toast } from 'sonner';
 import { useTauri } from '../../hooks/useTauri';
 import { useDelayedLoading } from '../../hooks/useDelayedLoading';
-import { useFeedbackFilterConfig } from '../../hooks/useSettings';
+import { useFeedbackFilterConfig, useTimeoutConfig } from '../../hooks/useSettings';
 import { VcsSkeleton, CliSkeleton, EditorSkeleton, AgentsSkeleton } from './SettingsSkeleton';
 
 interface SettingsViewProps {
@@ -744,6 +745,7 @@ const FeedbackFilterSettings: React.FC = () => {
 
 const AgentsSettings: React.FC = () => {
   const { getAgents, updateAgentConfig, addCustomAgent, deleteCustomAgent } = useTauri();
+  const { config: timeoutConfig, updateTimeout, isUpdating: isUpdatingTimeout } = useTimeoutConfig();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -758,6 +760,39 @@ const AgentsSettings: React.FC = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const DEFAULT_TIMEOUT_SECS = 1000;
+  const [localTimeout, setLocalTimeout] = useState<string>('');
+
+  useEffect(() => {
+    setLocalTimeout(String(timeoutConfig.timeoutSecs ?? DEFAULT_TIMEOUT_SECS));
+  }, [timeoutConfig.timeoutSecs]);
+
+  const handleTimeoutSave = () => {
+    const secs = parseInt(localTimeout, 10);
+    if (isNaN(secs) || secs < 60 || secs > 7200) {
+      toast.error('Invalid timeout', { description: 'Must be between 60 and 7200 seconds.' });
+      return;
+    }
+    updateTimeout(secs, {
+      onSuccess: () => {
+        toast('Timeout Updated', {
+          description: `Review timeout set to ${secs}s (~${Math.round(secs / 60)} min).`,
+        });
+      },
+      onError: (error: Error) => {
+        toast.error('Failed to update timeout', { description: error.message });
+      },
+    });
+  };
+
+  const handleTimeoutReset = () => {
+    setLocalTimeout(String(DEFAULT_TIMEOUT_SECS));
+    updateTimeout(null, {
+      onSuccess: () => {
+        toast('Timeout Reset', { description: 'Reverted to default (1000s).' });
+      },
+    });
+  };
 
   const fetchAgents = useCallback(async () => {
     setIsLoading(true);
@@ -889,6 +924,41 @@ const AgentsSettings: React.FC = () => {
             title="Refresh agents"
           >
             <ArrowsClockwise size={16} className={isLoading ? 'animate-spin' : ''} />
+          </button>
+        </div>
+      </div>
+
+      {/* Review Timeout */}
+      <div className="mb-6 flex items-center gap-3">
+        <label className="text-text-tertiary flex items-center gap-1.5 text-xs whitespace-nowrap">
+          <Timer size={12} />
+          Timeout
+        </label>
+        <input
+          type="number"
+          min="60"
+          max="7200"
+          value={localTimeout}
+          onChange={e => setLocalTimeout(e.target.value)}
+          className="bg-bg-tertiary border-border text-text-primary focus:border-brand w-20 rounded-md border px-2 py-1.5 font-mono text-xs transition-all focus:outline-none"
+        />
+        <span className="text-text-disabled text-[10px]">
+          sec (~{Math.round((parseInt(localTimeout, 10) || 0) / 60)} min)
+        </span>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={handleTimeoutReset}
+            disabled={isUpdatingTimeout}
+            className="text-text-tertiary hover:text-text-primary text-xs transition-colors disabled:opacity-50"
+          >
+            Reset
+          </button>
+          <button
+            onClick={handleTimeoutSave}
+            disabled={isUpdatingTimeout}
+            className="bg-brand text-bg-primary hover:bg-brand/90 rounded-md px-3 py-1.5 text-xs font-medium transition-all disabled:opacity-50"
+          >
+            Save
           </button>
         </div>
       </div>
@@ -1170,6 +1240,7 @@ const AgentsSettings: React.FC = () => {
           )}
         </div>
       )}
+
     </div>
   );
 };
