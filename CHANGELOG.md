@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.35] - 2026-02-12
+
+### Added
+
+- **Settings**: Configurable review timeout setting.
+- **UI**: Native titlebar overlay with drag regions.
+
+### Fixed
+
+- **GitLab**: Use `--raw` flag for MR diff to return all changed files.
+
 ## [0.0.34] - 2026-02-10
 
 ### Added

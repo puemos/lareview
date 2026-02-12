@@ -539,7 +539,11 @@ async fn generate_review_inner(
         agent_args: candidate_args,
         progress_tx: Some(mcp_tx),
         mcp_server_binary: None,
-        timeout_secs: Some(crate::infra::app_config::load_config().review_timeout_secs.unwrap_or(1000)),
+        timeout_secs: Some(
+            crate::infra::app_config::load_config()
+                .review_timeout_secs
+                .unwrap_or(1000),
+        ),
         cancel_token: Some(cancel_token),
         debug: std::env::var("RUST_LOG")
             .map(|v| v.contains("acp"))
