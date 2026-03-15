@@ -79,6 +79,25 @@ pub fn parse_pr_ref(input: &str) -> Option<GitHubPrRef> {
     None
 }
 
+fn parse_gh_auth_login(output: &str) -> Option<String> {
+    output
+        .lines()
+        .find(|line| line.contains("Logged in to"))
+        .and_then(|line| {
+            if line.contains(" as ") {
+                line.split(" as ")
+                    .nth(1)
+                    .map(|s| s.split_whitespace().next().unwrap_or("").to_string())
+            } else if line.contains(" account ") {
+                line.split(" account ")
+                    .nth(1)
+                    .map(|s| s.split_whitespace().next().unwrap_or("").to_string())
+            } else {
+                None
+            }
+        })
+}
+
 #[derive(Debug, Deserialize)]
 struct GhPrViewJson {
     title: String,
@@ -606,22 +625,7 @@ impl VcsProvider for GitHubProvider {
                 );
 
                 if output.status.success() {
-                    let login = combined_output
-                        .lines()
-                        .find(|line| line.contains("Logged in to github.com"))
-                        .and_then(|line| {
-                            if line.contains(" as ") {
-                                line.split(" as ")
-                                    .nth(1)
-                                    .map(|s| s.split_whitespace().next().unwrap_or("").to_string())
-                            } else if line.contains(" account ") {
-                                line.split(" account ")
-                                    .nth(1)
-                                    .map(|s| s.split_whitespace().next().unwrap_or("").to_string())
-                            } else {
-                                None
-                            }
-                        });
+                    let login = parse_gh_auth_login(&combined_output);
 
                     Ok(VcsStatus {
                         id: self.id().to_string(),
@@ -689,5 +693,29 @@ mod tests {
     fn test_parse_pr_ref_invalid() {
         assert!(parse_pr_ref("invalid").is_none());
         assert!(parse_pr_ref("owner/repo").is_none());
+    }
+
+    #[test]
+    fn test_parse_gh_auth_login_github_com() {
+        let output = "github.com\n  ✓ Logged in to github.com as octocat (oauth_token)\n  ✓ Git operations for github.com configured to use https protocol.\n";
+        assert_eq!(parse_gh_auth_login(output), Some("octocat".to_string()));
+    }
+
+    #[test]
+    fn test_parse_gh_auth_login_enterprise() {
+        let output = "ghe.company.com\n  ✓ Logged in to ghe.company.com as john_doe (oauth_token)\n  ✓ Git operations for ghe.company.com configured to use https protocol.\n";
+        assert_eq!(parse_gh_auth_login(output), Some("john_doe".to_string()));
+    }
+
+    #[test]
+    fn test_parse_gh_auth_login_account_format() {
+        let output = "  ✓ Logged in to github.com account myuser (keyring)\n";
+        assert_eq!(parse_gh_auth_login(output), Some("myuser".to_string()));
+    }
+
+    #[test]
+    fn test_parse_gh_auth_login_no_match() {
+        let output = "You are not logged in to any GitHub hosts.\n";
+        assert_eq!(parse_gh_auth_login(output), None);
     }
 }
