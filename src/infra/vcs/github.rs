@@ -79,6 +79,58 @@ pub fn parse_pr_ref(input: &str) -> Option<GitHubPrRef> {
     None
 }
 
+/// A single account entry returned by `gh auth status --json hosts` (gh >= 2.81.0).
+#[derive(Debug, Deserialize)]
+struct GhAuthAccount {
+    login: Option<String>,
+    active: Option<bool>,
+    state: Option<String>,
+}
+
+/// Top-level JSON from `gh auth status --json hosts`.
+#[derive(Debug, Deserialize)]
+struct GhAuthStatusJson {
+    hosts: std::collections::HashMap<String, Vec<GhAuthAccount>>,
+}
+
+/// Extract login from the structured `--json hosts` output.
+fn parse_gh_auth_json(output: &str) -> Option<String> {
+    let parsed: GhAuthStatusJson = serde_json::from_str(output).ok()?;
+    parsed
+        .hosts
+        .values()
+        .flatten()
+        .find(|a| a.active.unwrap_or(false) && a.state.as_deref() == Some("success"))
+        .or_else(|| {
+            parsed
+                .hosts
+                .values()
+                .flatten()
+                .find(|a| a.state.as_deref() == Some("success"))
+        })
+        .and_then(|a| a.login.clone())
+}
+
+/// Fallback: extract login from the human-readable `gh auth status` output (gh < 2.81.0).
+fn parse_gh_auth_login(output: &str) -> Option<String> {
+    output
+        .lines()
+        .find(|line| line.contains("Logged in to"))
+        .and_then(|line| {
+            if line.contains(" as ") {
+                line.split(" as ")
+                    .nth(1)
+                    .map(|s| s.split_whitespace().next().unwrap_or("").to_string())
+            } else if line.contains(" account ") {
+                line.split(" account ")
+                    .nth(1)
+                    .map(|s| s.split_whitespace().next().unwrap_or("").to_string())
+            } else {
+                None
+            }
+        })
+}
+
 #[derive(Debug, Deserialize)]
 struct GhPrViewJson {
     title: String,
@@ -593,6 +645,26 @@ impl VcsProvider for GitHubProvider {
         match gh_path {
             Some(path) => {
                 let path_str = path.to_string_lossy().to_string();
+
+                // Try structured JSON output first (gh >= 2.81.0).
+                let json_output = Command::new(&path)
+                    .args(["auth", "status", "--json", "hosts"])
+                    .output()
+                    .await
+                    .context("run `gh auth status --json hosts`")?;
+
+                let stdout = String::from_utf8_lossy(&json_output.stdout);
+                if let Some(login) = parse_gh_auth_json(&stdout) {
+                    return Ok(VcsStatus {
+                        id: self.id().to_string(),
+                        name: self.name().to_string(),
+                        cli_path: path_str,
+                        login: Some(login),
+                        error: None,
+                    });
+                }
+
+                // Fallback: plain-text output for older gh versions.
                 let output = Command::new(&path)
                     .args(["auth", "status"])
                     .output()
@@ -606,22 +678,7 @@ impl VcsProvider for GitHubProvider {
                 );
 
                 if output.status.success() {
-                    let login = combined_output
-                        .lines()
-                        .find(|line| line.contains("Logged in to github.com"))
-                        .and_then(|line| {
-                            if line.contains(" as ") {
-                                line.split(" as ")
-                                    .nth(1)
-                                    .map(|s| s.split_whitespace().next().unwrap_or("").to_string())
-                            } else if line.contains(" account ") {
-                                line.split(" account ")
-                                    .nth(1)
-                                    .map(|s| s.split_whitespace().next().unwrap_or("").to_string())
-                            } else {
-                                None
-                            }
-                        });
+                    let login = parse_gh_auth_login(&combined_output);
 
                     Ok(VcsStatus {
                         id: self.id().to_string(),
@@ -689,5 +746,58 @@ mod tests {
     fn test_parse_pr_ref_invalid() {
         assert!(parse_pr_ref("invalid").is_none());
         assert!(parse_pr_ref("owner/repo").is_none());
+    }
+
+    #[test]
+    fn test_parse_gh_auth_json_github_com() {
+        let json = r#"{"hosts":{"github.com":[{"state":"success","active":true,"login":"octocat","tokenSource":"keyring","scopes":"repo","gitProtocol":"https","host":"github.com"}]}}"#;
+        assert_eq!(parse_gh_auth_json(json), Some("octocat".to_string()));
+    }
+
+    #[test]
+    fn test_parse_gh_auth_json_enterprise() {
+        let json = r#"{"hosts":{"ghe.company.com":[{"state":"success","active":true,"login":"john_doe","tokenSource":"oauth_token","scopes":"repo","gitProtocol":"https","host":"ghe.company.com"}]}}"#;
+        assert_eq!(parse_gh_auth_json(json), Some("john_doe".to_string()));
+    }
+
+    #[test]
+    fn test_parse_gh_auth_json_multiple_hosts_picks_active() {
+        let json = r#"{"hosts":{"github.com":[{"state":"success","active":false,"login":"personal"}],"ghe.corp.com":[{"state":"success","active":true,"login":"work"}]}}"#;
+        assert_eq!(parse_gh_auth_json(json), Some("work".to_string()));
+    }
+
+    #[test]
+    fn test_parse_gh_auth_json_no_success() {
+        let json = r#"{"hosts":{"github.com":[{"state":"failed","active":true,"login":"octocat"}]}}"#;
+        assert_eq!(parse_gh_auth_json(json), None);
+    }
+
+    #[test]
+    fn test_parse_gh_auth_json_invalid() {
+        assert_eq!(parse_gh_auth_json("not json"), None);
+    }
+
+    #[test]
+    fn test_parse_gh_auth_login_github_com() {
+        let output = "github.com\n  ✓ Logged in to github.com as octocat (oauth_token)\n  ✓ Git operations for github.com configured to use https protocol.\n";
+        assert_eq!(parse_gh_auth_login(output), Some("octocat".to_string()));
+    }
+
+    #[test]
+    fn test_parse_gh_auth_login_enterprise() {
+        let output = "ghe.company.com\n  ✓ Logged in to ghe.company.com as john_doe (oauth_token)\n  ✓ Git operations for ghe.company.com configured to use https protocol.\n";
+        assert_eq!(parse_gh_auth_login(output), Some("john_doe".to_string()));
+    }
+
+    #[test]
+    fn test_parse_gh_auth_login_account_format() {
+        let output = "  ✓ Logged in to github.com account myuser (keyring)\n";
+        assert_eq!(parse_gh_auth_login(output), Some("myuser".to_string()));
+    }
+
+    #[test]
+    fn test_parse_gh_auth_login_no_match() {
+        let output = "You are not logged in to any GitHub hosts.\n";
+        assert_eq!(parse_gh_auth_login(output), None);
     }
 }
