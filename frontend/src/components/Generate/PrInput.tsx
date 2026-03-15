@@ -44,8 +44,14 @@ export const PrInput: React.FC<PrInputProps> = ({
         : GitMerge;
   const iconKey = detectedProvider;
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!prRef.trim() || isLoading || disabled) return;
+    onFetch();
+  };
+
   return (
-    <>
+    <form onSubmit={handleSubmit} className="contents">
       <div className="text-text-disabled relative flex w-8 flex-shrink-0 items-center justify-center border-r border-white/5">
         <AnimatePresence mode="wait">
           <motion.span
@@ -75,12 +81,12 @@ export const PrInput: React.FC<PrInputProps> = ({
       </div>
       <div className="flex h-[14px] flex-shrink-0 items-center border-l border-white/5"></div>
       <button
-        onClick={onFetch}
+        type="submit"
         disabled={!prRef.trim() || isLoading || disabled}
         className="flex min-w-[48px] flex-shrink-0 items-center justify-center gap-1 px-3 py-1.5 text-[10px] font-medium opacity-80 transition-colors hover:opacity-100 disabled:opacity-50"
       >
         {isLoading ? <Spinner size={14} className="text-text-primary animate-spin" /> : 'Fetch'}
       </button>
-    </>
+    </form>
   );
 };
