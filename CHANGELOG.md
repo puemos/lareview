@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.36] - 2026-03-15
+
+### Fixed
+
+- **GitHub**: Support GitHub Enterprise in auth status check (#10).
+
+### Changed
+
+- **Build**: Organize and expand gitignore rules.
+
 ## [0.0.35] - 2026-02-12
 
 ### Added

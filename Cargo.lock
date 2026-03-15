@@ -3010,7 +3010,7 @@ dependencies = [
 
 [[package]]
 name = "lareview"
-version = "0.0.35"
+version = "0.0.36"
 dependencies = [
  "agent-client-protocol",
  "anyhow",

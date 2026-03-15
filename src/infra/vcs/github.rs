@@ -768,7 +768,8 @@ mod tests {
 
     #[test]
     fn test_parse_gh_auth_json_no_success() {
-        let json = r#"{"hosts":{"github.com":[{"state":"failed","active":true,"login":"octocat"}]}}"#;
+        let json =
+            r#"{"hosts":{"github.com":[{"state":"failed","active":true,"login":"octocat"}]}}"#;
         assert_eq!(parse_gh_auth_json(json), None);
     }
 
