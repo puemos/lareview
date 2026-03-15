@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.37] - 2026-03-15
+
+### Added
+
+- **Input**: Trigger fetch on Enter key press (#11).
+
 ## [0.0.36] - 2026-03-15
 
 ### Fixed
