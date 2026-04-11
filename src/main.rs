@@ -8,7 +8,7 @@ use clap::Parser;
 use log::{error, info};
 
 use lareview::infra;
-use lareview::infra::cli::args::{process_cli_args, CliArgs};
+use lareview::infra::cli::args::{CliArgs, process_cli_args};
 use lareview::infra::cli::diff::try_read_stdin_diff;
 use lareview::state::{AppState, DiffRequest, PendingDiff};
 use tauri::{Emitter, Manager};
