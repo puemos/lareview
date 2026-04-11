@@ -3,5 +3,6 @@
 //! Provides utilities for CLI-to-GUI workflow, including diff acquisition,
 //! repository detection, and pending review serialization.
 
+pub mod args;
 pub mod diff;
 pub mod repo;
