@@ -1,7 +1,11 @@
 //! Diff acquisition from various sources.
 
+use crate::block_on;
 use crate::infra::shell;
-use crate::infra::vcs::{github, gitlab};
+use crate::infra::vcs::{
+    github,
+    gitlab::{self, GitLabMrRef},
+};
 use anyhow::{Context, Result};
 use std::io::{IsTerminal, Read};
 use std::process::Command;
@@ -179,39 +183,21 @@ pub fn acquire_diff(source: DiffSource) -> Result<String> {
             project_path,
             number,
         } => {
-            let glab_path = shell::find_bin("glab").context("Could not find 'glab' executable")?;
-            // Note: `glab mr diff` does not support --hostname (unlike `glab api`).
-            // For self-hosted instances we set GITLAB_HOST so glab resolves the right host.
-            // Use --raw to get a proper unified diff with `diff --git` headers.
-            // Without --raw, glab outputs diffs without file separator headers,
-            // causing the parser to only recognise the first file.
-            let args = vec![
-                "mr".to_string(),
-                "diff".to_string(),
-                number.to_string(),
-                "--raw".to_string(),
-                "--repo".to_string(),
-                project_path,
-            ];
+            let mr = GitLabMrRef {
+                host: host.clone(),
+                project_path: project_path.clone(),
+                number,
+                url: format!("https://{host}/{project_path}/-/merge_requests/{number}"),
+            };
 
-            let mut cmd = Command::new(glab_path);
-            cmd.args(args);
-            if host != "gitlab.com" {
-                cmd.env("GITLAB_HOST", &host);
-            }
-            let output = cmd.output().context("Failed to fetch MR via glab CLI")?;
-
-            if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-
-                if stderr.contains("Authentication") || stderr.contains("not authenticated") {
-                    anyhow::bail!("GitLab authentication required. Run `glab auth login` first.");
+            let diff = block_on(gitlab::fetch_mr_diff(&mr)).map_err(|err| {
+                let msg = format!("{err:#}");
+                if msg.contains("Authentication") || msg.contains("not authenticated") {
+                    anyhow::anyhow!("GitLab authentication required. Run `glab auth login` first.")
+                } else {
+                    anyhow::anyhow!("Failed to fetch MR !{} diff: {}", number, msg)
                 }
-
-                anyhow::bail!("glab mr diff failed: {}", stderr);
-            }
-
-            let diff = String::from_utf8_lossy(&output.stdout).into_owned();
+            })?;
 
             if diff.is_empty() {
                 anyhow::bail!("MR !{} has no changes.", number);

@@ -97,6 +97,24 @@ struct GlabDiffRefs {
     start_sha: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct GlabMrChange {
+    old_path: String,
+    new_path: String,
+    #[serde(default)]
+    a_mode: Option<String>,
+    #[serde(default)]
+    b_mode: Option<String>,
+    #[serde(default)]
+    new_file: bool,
+    #[serde(default)]
+    renamed_file: bool,
+    #[serde(default)]
+    deleted_file: bool,
+    #[serde(default)]
+    diff: String,
+}
+
 pub async fn fetch_mr_metadata(mr: &GitLabMrRef) -> Result<GitLabMrMetadata> {
     let glab_path = shell::find_bin("glab").context("resolve `glab` path")?;
     let endpoint = format!(
@@ -138,35 +156,89 @@ pub async fn fetch_mr_metadata(mr: &GitLabMrRef) -> Result<GitLabMrMetadata> {
     })
 }
 
+// GitLab 17.8.x 500s /diffs when per_page > 30
+// (NoMethodError on PaginatedMergeRequestDiff). Do not raise.
+const MR_DIFFS_PER_PAGE: u32 = 20;
+
 pub async fn fetch_mr_diff(mr: &GitLabMrRef) -> Result<String> {
     let glab_path = shell::find_bin("glab").context("resolve `glab` path")?;
-    // Note: `glab mr diff` does not support --hostname (unlike `glab api`).
-    // For self-hosted instances we set GITLAB_HOST so glab resolves the right host.
-    // Use --raw to get a proper unified diff with `diff --git` headers.
-    // Without --raw, glab outputs diffs without file separator headers,
-    // causing the parser to only recognise the first file.
-    let args = vec![
-        "mr".to_string(),
-        "diff".to_string(),
-        mr.number.to_string(),
-        "--raw".to_string(),
-        "--repo".to_string(),
-        mr.project_path.clone(),
-    ];
+    let endpoint = format!(
+        "projects/{}/merge_requests/{}/diffs?per_page={}",
+        encode_project_path(&mr.project_path),
+        mr.number,
+        MR_DIFFS_PER_PAGE,
+    );
+    let args = glab_args_with_host(
+        &mr.host,
+        vec![
+            "api".to_string(),
+            "--paginate".to_string(),
+            "--output".to_string(),
+            "ndjson".to_string(),
+            endpoint,
+        ],
+    );
 
-    let mut cmd = Command::new(&glab_path);
-    cmd.args(args);
-    if mr.host != "gitlab.com" {
-        cmd.env("GITLAB_HOST", &mr.host);
-    }
-    let output = cmd.output().await.context("run `glab mr diff`")?;
+    let output = Command::new(&glab_path)
+        .args(args)
+        .output()
+        .await
+        .context("run `glab api` for MR diffs")?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow::anyhow!(format!("`glab mr diff` failed: {stderr}")));
+        return Err(anyhow::anyhow!(format!(
+            "`glab api` diffs failed: {stderr}"
+        )));
     }
 
-    String::from_utf8(output.stdout).context("decode `glab mr diff` stdout")
+    let json = String::from_utf8(output.stdout).context("decode `glab api` diffs stdout")?;
+    let changes = parse_ndjson_changes(&json).context("parse `glab api` diffs ndjson")?;
+
+    Ok(synthesize_unified_diff(&changes))
+}
+
+fn parse_ndjson_changes(ndjson: &str) -> Result<Vec<GlabMrChange>> {
+    serde_json::Deserializer::from_str(ndjson)
+        .into_iter::<GlabMrChange>()
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(Into::into)
+}
+
+fn synthesize_unified_diff(changes: &[GlabMrChange]) -> String {
+    use std::fmt::Write as _;
+
+    let mut buf = String::new();
+    for c in changes {
+        let _ = writeln!(buf, "diff --git a/{} b/{}", c.old_path, c.new_path);
+
+        if c.new_file {
+            let mode = c.b_mode.as_deref().unwrap_or("100644");
+            let _ = writeln!(buf, "new file mode {mode}");
+            buf.push_str("--- /dev/null\n");
+            let _ = writeln!(buf, "+++ b/{}", c.new_path);
+        } else if c.deleted_file {
+            let mode = c.a_mode.as_deref().unwrap_or("100644");
+            let _ = writeln!(buf, "deleted file mode {mode}");
+            let _ = writeln!(buf, "--- a/{}", c.old_path);
+            buf.push_str("+++ /dev/null\n");
+        } else {
+            if c.renamed_file {
+                let _ = writeln!(buf, "rename from {}", c.old_path);
+                let _ = writeln!(buf, "rename to {}", c.new_path);
+            }
+            let _ = writeln!(buf, "--- a/{}", c.old_path);
+            let _ = writeln!(buf, "+++ b/{}", c.new_path);
+        }
+
+        if !c.diff.is_empty() {
+            buf.push_str(&c.diff);
+            if !c.diff.ends_with('\n') {
+                buf.push('\n');
+            }
+        }
+    }
+    buf
 }
 
 async fn post_glab_api(
