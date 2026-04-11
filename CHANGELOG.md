@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.0.38] - 2026-04-11
+
+### Fixed
+
+- **CLI**: Auto-detect piped stdin without requiring `--stdin` flag (#13, #15).
+- **GitLab**: Avoid `/raw_diffs` endpoint on older GitLab versions (#12, #14).
+
 ## [0.0.37] - 2026-03-15
 
 ### Added
