@@ -3,82 +3,15 @@
     windows_subsystem = "windows"
 )]
 
-use anyhow::{Context, Result};
-use clap::{Parser, Subcommand};
+use anyhow::Result;
+use clap::Parser;
 use log::{error, info};
 
 use lareview::infra;
-use lareview::infra::cli::diff::{self, read_stdin_diff};
-use lareview::infra::cli::repo::detect_git_repo;
+use lareview::infra::cli::args::{CliArgs, process_cli_args};
+use lareview::infra::cli::diff::try_read_stdin_diff;
 use lareview::state::{AppState, DiffRequest, PendingDiff};
 use tauri::{Emitter, Manager};
-
-#[derive(Parser, Debug)]
-#[command(name = "lareview")]
-#[command(author = "LaReview Team")]
-#[command(version = env!("CARGO_PKG_VERSION"))]
-#[command(about = "LaReview - Better Code Reviews", long_about = None)]
-struct Args {
-    /// Agent to use for review (claude, codex, qwen, etc.)
-    #[arg(short, long)]
-    agent: Option<String>,
-
-    /// Branch, tag, or commit to diff from
-    #[arg()]
-    from: Option<String>,
-
-    /// Branch, tag, or commit to diff to (requires --from)
-    #[arg()]
-    to: Option<String>,
-
-    /// PR reference (owner/repo#number or URL)
-    #[arg(short, long)]
-    pr: Option<String>,
-
-    /// Review uncommitted changes
-    #[arg(long)]
-    status: bool,
-
-    /// Open with pre-loaded diff from stdin
-    #[arg(long)]
-    stdin: bool,
-
-    #[command(subcommand)]
-    command: Option<Commands>,
-}
-
-#[derive(Subcommand, Debug)]
-enum Commands {
-    /// Open the GUI (default behavior)
-    Gui,
-
-    /// Review changes between branches/tags/commits
-    Diff {
-        /// Source ref
-        #[arg(index = 1)]
-        from: String,
-        /// Target ref
-        #[arg(index = 2)]
-        to: String,
-    },
-
-    /// Review a GitHub PR
-    Pr {
-        /// PR reference (owner/repo#number or URL)
-        #[arg(index = 1)]
-        pr_ref: String,
-    },
-
-    /// Review uncommitted changes
-    Status,
-
-    /// Review git stash entries
-    Stash {
-        /// Stash index (default: 0, latest)
-        #[arg(default_value = "0")]
-        index: usize,
-    },
-}
 
 use std::io::Write;
 
@@ -116,15 +49,20 @@ fn main() -> Result<()> {
     }
 
     // Try parsing args for this instance (primary launch or CLI tool)
-    match Args::try_parse() {
+    match CliArgs::try_parse() {
         Ok(parsed_args) => {
             debug_log(&format!(
                 "Parsed initial args command: {:?}",
                 parsed_args.command
             ));
 
+            // Read piped stdin once, up front. `try_read_stdin_diff` returns
+            // `None` when stdin is a terminal, so this is a no-op during a
+            // normal GUI launch.
+            let piped_stdin = try_read_stdin_diff().unwrap_or(None);
+
             // Process CLI args into data structures, WITHOUT touching DB/AppState yet.
-            let (initial_req, initial_pending) = process_cli_args(&parsed_args)?;
+            let (initial_req, initial_pending) = process_cli_args(&parsed_args, piped_stdin)?;
 
             // Run GUI. We pass the initial data.
             // AppState will be created INSIDE run_gui setup, ensuring Second Instance never touches DB.
@@ -138,143 +76,6 @@ fn main() -> Result<()> {
     }
 }
 
-fn process_cli_args(args: &Args) -> Result<(Option<DiffRequest>, Option<PendingDiff>)> {
-    debug_log("process_cli_args called");
-    let mut diff_req = None;
-    let mut pending = None;
-
-    if let Some(cmd) = &args.command {
-        debug_log(&format!("Processing command: {:?}", cmd));
-        match cmd {
-            Commands::Gui => {}
-            Commands::Diff { from, to } => {
-                debug_log(&format!("Diff command: {} .. {}", from, to));
-                diff_req = Some(DiffRequest {
-                    from: from.clone(),
-                    to: to.clone(),
-                    agent: args.agent.clone(),
-                    source: format!("git diff {}..{}", from, to),
-                });
-            }
-            Commands::Pr { pr_ref } => {
-                debug_log(&format!("PR command: {}", pr_ref));
-                let remote_ref = diff::parse_remote_ref(pr_ref)?;
-                match remote_ref {
-                    diff::RemoteRef::GitHub {
-                        owner,
-                        repo,
-                        number,
-                    } => {
-                        debug_log(&format!("Parsed PR: {}/{}#{}", owner, repo, number));
-                        diff_req = Some(DiffRequest {
-                            from: format!("{}/{}/pull/{}", owner, repo, number),
-                            to: String::new(),
-                            agent: args.agent.clone(),
-                            source: format!("PR {}", pr_ref),
-                        });
-                    }
-                    diff::RemoteRef::GitLab {
-                        host,
-                        project_path,
-                        number,
-                    } => {
-                        debug_log(&format!("Parsed MR: {}/{}!{}", host, project_path, number));
-                        diff_req = Some(DiffRequest {
-                            from: format!(
-                                "https://{host}/{project_path}/-/merge_requests/{number}"
-                            ),
-                            to: String::new(),
-                            agent: args.agent.clone(),
-                            source: format!("MR {}", pr_ref),
-                        });
-                    }
-                }
-            }
-            Commands::Status => {
-                diff_req = Some(DiffRequest {
-                    from: String::new(),
-                    to: String::new(),
-                    agent: args.agent.clone(),
-                    source: "uncommitted changes".to_string(),
-                });
-            }
-            Commands::Stash { index } => {
-                let diff = diff::get_stash_diff(*index)?;
-                pending = Some(PendingDiff {
-                    diff,
-                    repo_root: detect_git_repo(),
-                    agent: args.agent.clone(),
-                    source: format!("stash@{{{}}}", index),
-                    created_at: chrono::Utc::now(),
-                });
-            }
-        }
-    } else if let Some(pr_ref) = &args.pr {
-        let remote_ref = diff::parse_remote_ref(pr_ref)?;
-        match remote_ref {
-            diff::RemoteRef::GitHub {
-                owner,
-                repo,
-                number,
-            } => {
-                diff_req = Some(DiffRequest {
-                    from: format!("{}/{}/pull/{}", owner, repo, number),
-                    to: String::new(),
-                    agent: args.agent.clone(),
-                    source: format!("PR {}", pr_ref),
-                });
-            }
-            diff::RemoteRef::GitLab {
-                host,
-                project_path,
-                number,
-            } => {
-                diff_req = Some(DiffRequest {
-                    from: format!("https://{host}/{project_path}/-/merge_requests/{number}"),
-                    to: String::new(),
-                    agent: args.agent.clone(),
-                    source: format!("MR {}", pr_ref),
-                });
-            }
-        }
-    } else if args.status {
-        diff_req = Some(DiffRequest {
-            from: String::new(),
-            to: String::new(),
-            agent: args.agent.clone(),
-            source: "uncommitted changes".to_string(),
-        });
-    } else if let (Some(from), Some(to)) = (&args.from, &args.to) {
-        diff_req = Some(DiffRequest {
-            from: from.clone(),
-            to: to.clone(),
-            agent: args.agent.clone(),
-            source: format!("git diff {}..{}", from, to),
-        });
-    } else if let Some(from) = &args.from {
-        diff_req = Some(DiffRequest {
-            from: from.clone(),
-            to: "HEAD".to_string(),
-            agent: args.agent.clone(),
-            source: format!("git diff {}..HEAD", from),
-        });
-    } else if args.stdin {
-        let diff = read_stdin_diff().context("Failed to read diff from stdin")?;
-        if diff.trim().is_empty() {
-            anyhow::bail!("Error: No diff provided via stdin");
-        }
-        pending = Some(PendingDiff {
-            diff,
-            repo_root: detect_git_repo(),
-            agent: args.agent.clone(),
-            source: "stdin".to_string(),
-            created_at: chrono::Utc::now(),
-        });
-    }
-
-    Ok((diff_req, pending))
-}
-
 fn run_gui(initial_req: Option<DiffRequest>, initial_pending: Option<PendingDiff>) -> Result<()> {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -284,14 +85,17 @@ fn run_gui(initial_req: Option<DiffRequest>, initial_pending: Option<PendingDiff
                 argv
             ));
 
-            match Args::try_parse_from(&argv) {
+            match CliArgs::try_parse_from(&argv) {
                 Ok(args) => {
                     debug_log(&format!(
                         "Successfully parsed second instance args: {:?}",
                         args.command
                     ));
-                    // We process args again, here inside the Primary instance.
-                    match process_cli_args(&args) {
+                    // Second-instance callback runs in the already-launched
+                    // GUI process; its stdin is not connected to the new
+                    // CLI invocation, so we cannot read the piped diff here.
+                    // Pass `None` and rely on explicit CLI args.
+                    match process_cli_args(&args, None) {
                         Ok((req, pending)) => {
                             let state = app.state::<AppState>();
 
