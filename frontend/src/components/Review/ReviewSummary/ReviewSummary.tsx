@@ -8,6 +8,8 @@ import { FilesHeatmap } from './FilesHeatmap';
 import { UncoveredFiles } from './UncoveredFiles';
 import { MergeConfidenceBadge } from './MergeConfidenceBadge';
 import { useIssueChecks } from '../../../hooks/useIssueChecks';
+import { useTauri } from '../../../hooks/useTauri';
+import { sourceUrl } from './sourceUrl';
 import type { ReviewTask, Feedback, ParsedDiff, Review, ReviewSource } from '../../../types';
 
 interface ReviewSummaryProps {
@@ -27,27 +29,48 @@ interface SourceBadgeProps {
 }
 
 const SourceBadge: React.FC<SourceBadgeProps> = ({ source }) => {
-  if (source.type === 'github_pr') {
-    return (
-      <span className="flex items-center gap-1.5 text-xs">
+  const { openUrl } = useTauri();
+
+  if (source.type === 'diff_paste') {
+    return <span className="text-text-disabled text-xs">Diff paste</span>;
+  }
+
+  const isGitHub = source.type === 'github_pr';
+  const label = isGitHub
+    ? `${source.owner}/${source.repo}#${source.number}`
+    : `${source.project_path}!${source.number}`;
+  const url = sourceUrl(source);
+
+  const content = (
+    <>
+      {isGitHub ? (
         <ICONS.ICON_GITHUB size={14} className="text-text-secondary" />
-        <span className="text-text-secondary">
-          {source.owner}/{source.repo}#{source.number}
-        </span>
-      </span>
-    );
-  }
-  if (source.type === 'gitlab_mr') {
-    return (
-      <span className="flex items-center gap-1.5 text-xs">
+      ) : (
         <ICONS.ICON_GITLAB size={14} className="text-text-secondary" />
-        <span className="text-text-secondary">
-          {source.project_path}!{source.number}
-        </span>
-      </span>
-    );
+      )}
+      <span className="text-text-secondary">{label}</span>
+    </>
+  );
+
+  if (!url) {
+    return <span className="flex items-center gap-1.5 text-xs">{content}</span>;
   }
-  return <span className="text-text-disabled text-xs">Diff paste</span>;
+
+  return (
+    <button
+      type="button"
+      onClick={() => openUrl(url)}
+      title={`Open ${label} in browser`}
+      aria-label={`Open ${label} in browser`}
+      className="text-text-secondary hover:text-text-primary hover:bg-bg-tertiary group -mx-1.5 flex items-center gap-1.5 rounded px-1.5 py-0.5 text-xs transition-colors"
+    >
+      {content}
+      <ICONS.ACTION_OPEN_WINDOW
+        size={12}
+        className="text-text-disabled group-hover:text-text-secondary"
+      />
+    </button>
+  );
 };
 
 export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
@@ -72,10 +95,7 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
 
   const blockingCount =
     feedbacks.filter(f => f.impact === 'blocking').length +
-    issueChecks.reduce(
-      (sum, c) => sum + c.findings.filter(f => f.impact === 'blocking').length,
-      0
-    );
+    issueChecks.reduce((sum, c) => sum + c.findings.filter(f => f.impact === 'blocking').length, 0);
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -111,9 +131,7 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
               <p className="text-status-error text-sm font-medium">
                 {blockingCount} Blocking {blockingCount === 1 ? 'Issue' : 'Issues'}
               </p>
-              <p className="text-status-error/70 text-xs">
-                Review these items before approving
-              </p>
+              <p className="text-status-error/70 text-xs">Review these items before approving</p>
             </div>
           </div>
         )}
