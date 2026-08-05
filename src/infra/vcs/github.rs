@@ -1,5 +1,5 @@
 use crate::application::review::export::ReviewExporter;
-use crate::domain::{FeedbackSide, ReviewSource};
+use crate::domain::{CandidateReason, FeedbackSide, ReviewCandidate, ReviewSource};
 use crate::infra::diff::index::DiffIndex;
 use crate::infra::shell;
 use crate::infra::vcs::traits::{
@@ -8,6 +8,7 @@ use crate::infra::vcs::traits::{
 };
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::Deserialize;
@@ -53,6 +54,9 @@ pub struct DraftReviewComment {
     pub side: Option<String>,
     pub body: String,
 }
+
+/// Identifier for this provider, matching `VcsProvider::id`.
+const PROVIDER_ID: &str = "github";
 
 lazy_static! {
     static ref GH_PR_RE: Regex = Regex::new(
@@ -191,6 +195,117 @@ pub async fn fetch_pr_diff(pr: &GitHubPrRef) -> Result<String> {
     }
 
     String::from_utf8(output.stdout).context("decode `gh pr diff` stdout")
+}
+
+/// One entry from `gh search prs --json ...`.
+#[derive(Debug, Deserialize)]
+struct GhSearchPrJson {
+    number: u32,
+    title: String,
+    url: String,
+    #[serde(rename = "updatedAt")]
+    updated_at: Option<String>,
+    author: Option<GhSearchAuthor>,
+    repository: Option<GhSearchRepository>,
+    #[serde(rename = "isDraft", default)]
+    is_draft: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct GhSearchAuthor {
+    login: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GhSearchRepository {
+    #[serde(rename = "nameWithOwner")]
+    name_with_owner: Option<String>,
+}
+
+/// Fields requested from `gh search prs`.
+///
+/// `isDraft` is requested separately and tolerated as absent, because older `gh`
+/// versions reject it for the search endpoint.
+const SEARCH_PR_FIELDS: &str = "number,title,url,updatedAt,author,repository";
+const SEARCH_PR_FIELDS_WITH_DRAFT: &str = "number,title,url,updatedAt,author,repository,isDraft";
+
+/// Pull requests where the authenticated user is a requested reviewer.
+pub async fn list_review_requested_prs() -> Result<Vec<ReviewCandidate>> {
+    let gh_path = shell::find_bin("gh").context("resolve `gh` path")?;
+
+    // Prefer the richer field set; fall back if this `gh` rejects `isDraft`.
+    let mut json = run_pr_search(&gh_path, SEARCH_PR_FIELDS_WITH_DRAFT).await;
+    if json.is_err() {
+        json = run_pr_search(&gh_path, SEARCH_PR_FIELDS).await;
+    }
+    let json = json?;
+
+    let entries: Vec<GhSearchPrJson> =
+        serde_json::from_str(&json).context("parse `gh search prs` json")?;
+
+    Ok(entries
+        .into_iter()
+        .filter_map(candidate_from_search_entry)
+        .collect())
+}
+
+async fn run_pr_search(gh_path: &std::path::Path, fields: &str) -> Result<String> {
+    let output = Command::new(gh_path)
+        .args([
+            "search",
+            "prs",
+            "--review-requested=@me",
+            "--state=open",
+            "--limit",
+            "100",
+            "--json",
+            fields,
+        ])
+        .output()
+        .await
+        .context("run `gh search prs`")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!(format!("`gh search prs` failed: {stderr}")));
+    }
+
+    String::from_utf8(output.stdout).context("decode `gh search prs` stdout")
+}
+
+/// Builds a candidate, skipping entries without a parseable `owner/name`.
+fn candidate_from_search_entry(entry: GhSearchPrJson) -> Option<ReviewCandidate> {
+    let name_with_owner = entry.repository.and_then(|r| r.name_with_owner)?;
+    let (owner, repo) = name_with_owner.split_once('/')?;
+
+    Some(ReviewCandidate {
+        provider_id: PROVIDER_ID.to_string(),
+        source: ReviewSource::GitHubPr {
+            owner: owner.to_string(),
+            repo: repo.to_string(),
+            number: entry.number,
+            url: Some(entry.url.clone()),
+            // Search results carry no SHAs; resolved lazily when a review is generated.
+            head_sha: None,
+            base_sha: None,
+        },
+        title: entry.title,
+        url: entry.url,
+        author: entry
+            .author
+            .and_then(|a| a.login)
+            .unwrap_or_else(|| "unknown".to_string()),
+        repo: name_with_owner,
+        number: entry.number,
+        updated_at: entry
+            .updated_at
+            .as_deref()
+            .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+            .map(|dt| dt.with_timezone(&Utc))
+            .unwrap_or_else(Utc::now),
+        reason: CandidateReason::ReviewRequested,
+        is_draft: entry.is_draft,
+    })
 }
 
 fn normalize_repo_path(path: &str) -> String {
@@ -388,7 +503,7 @@ impl VcsRef for GitHubPrRef {
 #[async_trait]
 impl VcsProvider for GitHubProvider {
     fn id(&self) -> &str {
-        "github"
+        PROVIDER_ID
     }
 
     fn name(&self) -> &str {
@@ -401,6 +516,14 @@ impl VcsProvider for GitHubProvider {
 
     fn parse_ref(&self, reference: &str) -> Option<Box<dyn VcsRef>> {
         parse_pr_ref(reference).map(|pr| Box::new(pr) as Box<dyn VcsRef>)
+    }
+
+    fn supports_review_candidates(&self) -> bool {
+        true
+    }
+
+    async fn list_review_candidates(&self) -> Result<Vec<ReviewCandidate>> {
+        list_review_requested_prs().await
     }
 
     async fn fetch_pr(&self, reference: &dyn VcsRef) -> Result<VcsPrData> {

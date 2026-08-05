@@ -1,7 +1,10 @@
+use crate::application::review::candidates::annotate_candidates;
+use crate::domain::AnnotatedCandidate;
 use crate::domain::ReviewStatus;
 use crate::infra::vcs::registry::VcsRegistry;
 use crate::infra::vcs::traits::{FeedbackPushRequest, ReviewPushRequest, VcsStatus};
 use crate::state::AppState;
+use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use super::diff::{ParsedDiff, parse_diff};
@@ -63,6 +66,83 @@ pub async fn get_vcs_status() -> Result<Vec<VcsStatus>, String> {
         statuses.push(status);
     }
     Ok(statuses)
+}
+
+/// Result of listing review candidates.
+///
+/// Providers are polled concurrently and reported independently: one failing
+/// provider must not blank the whole inbox, so its error is returned alongside
+/// whatever the others produced rather than replacing it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewCandidatesResult {
+    pub candidates: Vec<AnnotatedCandidate>,
+    pub errors: Vec<ProviderError>,
+    /// Providers that cannot report candidates, so the UI can say so rather than
+    /// implying their users have nothing to review.
+    pub unsupported_providers: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderError {
+    pub provider_id: String,
+    pub provider_name: String,
+    pub message: String,
+}
+
+#[tauri::command]
+pub async fn list_review_candidates(
+    state: State<'_, AppState>,
+) -> Result<ReviewCandidatesResult, String> {
+    let registry = VcsRegistry::default();
+
+    let (supported, unsupported): (Vec<_>, Vec<_>) = registry
+        .providers()
+        .into_iter()
+        .partition(|provider| provider.supports_review_candidates());
+
+    let unsupported_providers: Vec<String> = unsupported
+        .into_iter()
+        .map(|provider| provider.name().to_string())
+        .collect();
+
+    let results = futures::future::join_all(supported.into_iter().map(|provider| async {
+        (
+            provider.id().to_string(),
+            provider.name().to_string(),
+            provider.list_review_candidates().await,
+        )
+    }))
+    .await;
+
+    let mut candidates = Vec::new();
+    let mut errors = Vec::new();
+    for (provider_id, provider_name, result) in results {
+        match result {
+            Ok(found) => candidates.extend(found),
+            Err(err) => errors.push(ProviderError {
+                provider_id,
+                provider_name,
+                message: err.to_string(),
+            }),
+        }
+    }
+
+    let reviews = {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        db.review_repo().list_all().map_err(|e| e.to_string())?
+    };
+
+    let mut annotated = annotate_candidates(candidates, &reviews);
+    // Most recently updated first — the inbox is a work queue.
+    annotated.sort_by(|a, b| b.candidate.updated_at.cmp(&a.candidate.updated_at));
+
+    Ok(ReviewCandidatesResult {
+        candidates: annotated,
+        errors,
+        unsupported_providers,
+    })
 }
 
 #[tauri::command]

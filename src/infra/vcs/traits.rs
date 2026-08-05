@@ -1,5 +1,6 @@
 use crate::domain::{
-    Comment, Feedback, MergeConfidence, Review, ReviewRun, ReviewSource, ReviewTask,
+    Comment, Feedback, MergeConfidence, Review, ReviewCandidate, ReviewRun, ReviewSource,
+    ReviewTask,
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -68,6 +69,22 @@ pub trait VcsProvider: Send + Sync {
     fn matches_ref(&self, reference: &str) -> bool;
     fn parse_ref(&self, reference: &str) -> Option<Box<dyn VcsRef>>;
     async fn fetch_pr(&self, reference: &dyn VcsRef) -> Result<VcsPrData>;
+    /// Whether this provider can report review candidates.
+    ///
+    /// Lets callers tell "nothing is awaiting review" apart from "this provider
+    /// cannot answer the question", so the distinction can be surfaced instead of
+    /// showing an empty list either way.
+    fn supports_review_candidates(&self) -> bool {
+        false
+    }
+
+    /// Pull/merge requests awaiting review by the authenticated user.
+    ///
+    /// Defaults to an empty list so providers with no concept of review
+    /// assignment need not implement it.
+    async fn list_review_candidates(&self) -> Result<Vec<ReviewCandidate>> {
+        Ok(Vec::new())
+    }
     async fn push_review(&self, request: ReviewPushRequest) -> Result<String>;
     async fn push_feedback(&self, request: FeedbackPushRequest) -> Result<String>;
     async fn clone_repo(&self, request: VcsCloneRequest) -> Result<VcsCloneResult>;
