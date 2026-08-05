@@ -302,7 +302,51 @@ export type ReviewSource =
       start_sha?: string;
     };
 
-export type ViewType = 'generate' | 'review' | 'repos' | 'rules' | 'settings' | 'learning';
+export type ViewType =
+  | 'generate'
+  | 'review'
+  | 'inbox'
+  | 'repos'
+  | 'rules'
+  | 'settings'
+  | 'learning';
+
+export type CandidateReason = 'review_requested' | 'assigned';
+
+export type CandidateStatus =
+  | 'new'
+  | { reviewed: { review_id: string } }
+  | { stale: { review_id: string; reviewed_head_sha: string } };
+
+export interface ReviewCandidate {
+  providerId: string;
+  source: ReviewSource;
+  title: string;
+  url: string;
+  author: string;
+  repo: string;
+  number: number;
+  updatedAt: string;
+  reason: CandidateReason;
+  isDraft: boolean;
+}
+
+/** A candidate plus how it relates to reviews already stored locally. */
+export interface AnnotatedCandidate extends ReviewCandidate {
+  status: CandidateStatus;
+}
+
+export interface CandidateProviderError {
+  providerId: string;
+  providerName: string;
+  message: string;
+}
+
+export interface ReviewCandidatesResult {
+  candidates: AnnotatedCandidate[];
+  errors: CandidateProviderError[];
+  unsupportedProviders: string[];
+}
 
 export interface Plan {
   entries: PlanEntry[];

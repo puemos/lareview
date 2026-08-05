@@ -10,6 +10,7 @@ export const queryKeys = {
   feedbackFilterConfig: ['feedbackFilterConfig'] as const,
   timeoutConfig: ['timeoutConfig'] as const,
   repos: ['repos'] as const,
+  reviewCandidates: ['reviewCandidates'] as const,
   agents: ['agents'] as const,
   rules: ['rules'] as const,
   issueChecks: (runId: string) => ['issueChecks', runId] as const,

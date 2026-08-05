@@ -91,6 +91,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       )}
       <SidebarItem
+        icon={<ICONS.VIEW_INBOX size={16} />}
+        label="Inbox"
+        isActive={currentView === 'inbox'}
+        onClick={() => onViewChange('inbox')}
+        ariaLabel="Navigate to Inbox"
+      />
+      <SidebarItem
         icon={<ICONS.VIEW_GENERATE size={16} />}
         label="Generate Review"
         isActive={currentView === 'generate'}

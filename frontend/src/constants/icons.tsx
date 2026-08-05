@@ -32,6 +32,7 @@ import {
   Copy,
   MagnifyingGlass,
   ListChecks,
+  Tray,
   GithubLogo,
   GitlabLogo,
   BoundingBox,
@@ -83,6 +84,7 @@ export const ICONS = {
   // --- Navigation & Views ---
   VIEW_GENERATE: Asterisk,
   VIEW_REVIEW: Eyes,
+  VIEW_INBOX: Tray,
   VIEW_REPOS: Folder,
   VIEW_RULES: Gavel,
   VIEW_SETTINGS: Gear,
