@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.1.2] - 2026-08-06
+
+### Changed
+
+- **Database**: Upgrade `rusqlite` to 0.40.1, bundling SQLite 3.53.2 and upstream savepoint-name hardening (#27).
+- **CI**: Upgrade checkout, Node.js setup, pnpm setup, cache, and GitHub release actions to their Node.js 24-compatible releases (#22, #23, #24, #25, #26).
+
 ## [0.1.1] - 2026-08-06
 
 ### Added
