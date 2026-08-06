@@ -57,7 +57,9 @@ LaReview is designed for a local-first, secure, and focused review experience.
 2. **Fetch (for PRs)**
    - LaReview fetches the change locally and prepares the review workspace. No intermediate servers.
 3. **Generate a review plan**
-   - AI generates a review plan grouped by flows and ordered by risk. You can customize the agent (Claude, OpenAI, etc).
+   - Starting creates the review immediately and opens its live Activity page while the selected AI agent works in the background.
+   - You can return to Generate and start another review; two generations can run concurrently and additional reviews wait in a visible queue.
+   - When generation finishes, the same review page automatically becomes the full review workbench.
 4. **Review**
    - Review task by task with your AI coding agent.
    - Ship focused feedback that authors can act on, without comment spam.

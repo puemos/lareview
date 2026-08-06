@@ -6,6 +6,7 @@ import { useTauri } from './hooks/useTauri';
 import { listen } from '@tauri-apps/api/event';
 import { useAppStore } from './store';
 import { Sidebar } from './components/Layout/Sidebar';
+import { WindowDragRegion } from './components/Layout/WindowDragRegion';
 import { createQueryClient } from './lib/query-client';
 import { ErrorBoundary } from './components/Common/ErrorBoundary';
 import { TooltipProvider } from './components/Common/Tooltip';
@@ -225,7 +226,7 @@ function App() {
                 onUpdateClick={() => setShowUpdateModal(true)}
               />
               <main className="relative flex-1 overflow-hidden">
-                <div data-tauri-drag-region className="absolute top-0 right-0 left-0 z-10 h-3" />
+                <WindowDragRegion className="absolute top-0 right-0 left-0 z-10 h-3" />
                 {renderView()}
               </main>
             </div>

@@ -310,7 +310,6 @@ pub(super) fn update_review_metadata(config: &ServerConfig, args: Value) -> Resu
     let db = open_database(config)?;
     let conn = db.connection();
     let review_repo = ReviewRepository::new(conn.clone());
-    let review_run_repo = crate::infra::db::ReviewRunRepository::new(conn.clone());
 
     // Ensure the review record exists before updating its metadata.
     let review_placeholder = crate::domain::Review {
@@ -348,35 +347,6 @@ pub(super) fn update_review_metadata(config: &ServerConfig, args: Value) -> Resu
     review_repo
         .update_title_and_summary(&ctx.review_id, &review_title, summary.as_deref())
         .context("update review title and summary")?;
-
-    let review_run = crate::domain::ReviewRun {
-        id: ctx.run_id.clone(),
-        review_id: ctx.review_id.clone(),
-        agent_id: ctx.agent_id.clone(),
-        input_ref: ctx.input_ref.clone(),
-        diff_text: ctx.diff_text.clone(),
-        diff_hash: ctx.diff_hash.clone(),
-        status: crate::domain::ReviewRunStatus::Completed,
-        created_at: ctx
-            .created_at
-            .clone()
-            .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
-    };
-    review_run_repo
-        .save(&review_run)
-        .with_context(|| format!("save review run {}", ctx.run_id))?;
-
-    if let Err(err) =
-        review_run_repo.update_status(&ctx.run_id, crate::domain::ReviewRunStatus::Completed)
-    {
-        log_to_file(
-            config,
-            &format!(
-                "Failed to update run status to completed for {}: {}",
-                ctx.run_id, err
-            ),
-        );
-    }
 
     Ok(())
 }

@@ -1,4 +1,5 @@
 import React from 'react';
+import { WindowDragRegion } from './WindowDragRegion';
 
 interface HeaderProps {
   version: string;
@@ -6,10 +7,8 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ version }) => {
   return (
-    <header
-      data-tauri-drag-region
-      className="border-border flex h-10 shrink-0 items-center justify-between border-b bg-gray-950 pr-4 pl-20 select-none"
-    >
+    <header className="border-border relative flex h-10 shrink-0 items-center justify-between border-b bg-gray-950 pr-4 pl-20 select-none">
+      <WindowDragRegion className="absolute inset-0" />
       <div className="flex items-center gap-2 opacity-60 transition-opacity hover:opacity-100">
         <span className="font-display text-xs font-medium tracking-wide text-gray-400">
           lareview

@@ -1,4 +1,4 @@
-import { invoke, Channel } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import type { EventCallback } from '@tauri-apps/api/event';
@@ -26,6 +26,8 @@ import type {
   ReviewCandidatesResult,
   AgentConfigSelection,
   AgentSessionConfigOption,
+  ReviewRunEvent,
+  ReviewRunStatus,
 } from '../types';
 import { useCallback } from 'react';
 
@@ -160,6 +162,7 @@ export function isCurrentModeUpdate(update: SessionUpdate): update is SessionUpd
 
 export interface ProgressEventPayload {
   event:
+    | 'Status'
     | 'Log'
     | 'MessageDelta'
     | 'ThoughtDelta'
@@ -171,6 +174,7 @@ export interface ProgressEventPayload {
     | 'Error'
     | 'Plan';
   data:
+    | { status: ReviewRunStatus }
     | string
     | { id: string; delta: string }
     | { tool_call_id: string; title: string; kind: string }
@@ -227,7 +231,7 @@ export const useTauri = () => {
       created_at: string;
       source: ReviewSource;
       status: string;
-      active_run_status?: string | null;
+      active_run_status?: ReviewRunStatus | null;
     }>
   > => {
     return invoke('get_all_reviews');
@@ -245,13 +249,17 @@ export const useTauri = () => {
         diff_text: string;
         created_at: string;
         task_count: number;
-        status: string;
+        status: ReviewRunStatus;
       }>
     > => {
       return invoke('get_review_runs', { reviewId });
     },
     []
   );
+
+  const getReviewRunEvents = useCallback(async (runId: string): Promise<ReviewRunEvent[]> => {
+    return invoke('get_review_run_events', { runId });
+  }, []);
 
   const getLinkedRepos = useCallback(async (): Promise<
     Array<{
@@ -282,22 +290,18 @@ export const useTauri = () => {
     async (
       diffText: string,
       agentId: string,
-      runId?: string,
       repoId?: string,
       source?: ReviewSource,
       useSnapshot?: boolean,
-      onProgress?: Channel<ProgressEventPayload>,
       agentConfig?: AgentConfigSelection[]
-    ): Promise<{ task_count: number; review_id: string; run_id?: string }> => {
+    ): Promise<{ review_id: string; run_id: string; status: ReviewRunStatus }> => {
       return invoke('generate_review', {
         diffText,
         agentId,
-        runId,
         repoId,
         source,
         useSnapshot: useSnapshot || false,
         agentConfig,
-        onProgress,
       });
     },
     []
@@ -607,6 +611,7 @@ export const useTauri = () => {
     getPendingReviewFromState,
     getAllReviews,
     getReviewRuns,
+    getReviewRunEvents,
     getLinkedRepos,
     parseDiff,
     getFileContent,

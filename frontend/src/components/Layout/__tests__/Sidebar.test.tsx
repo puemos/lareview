@@ -87,4 +87,17 @@ describe('Sidebar', () => {
 
     expect(mockUseTauri).toHaveBeenCalledTimes(1);
   });
+
+  it('prioritizes review creation and history before the inbox', () => {
+    renderSidebar();
+
+    const generate = screen.getByLabelText('Navigate to Generate Review');
+    const reviews = screen.getByLabelText('Navigate to Reviews');
+    const inbox = screen.getByLabelText('Navigate to Inbox');
+
+    expect(
+      generate.compareDocumentPosition(reviews) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(reviews.compareDocumentPosition(inbox) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });

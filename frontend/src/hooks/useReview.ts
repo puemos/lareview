@@ -1,22 +1,12 @@
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useTauri } from '../hooks/useTauri';
 import { useMemo } from 'react';
-
-interface ReviewRunData {
-  id: string;
-  review_id: string;
-  agent_id: string;
-  input_ref: string;
-  diff_text: string;
-  created_at: string;
-  task_count: number;
-  status?: string;
-}
+import type { ReviewRun } from '../types';
 
 export interface UseReviewResult {
   runId: string | null;
-  runs: ReviewRunData[];
-  firstRun: ReviewRunData | null;
+  runs: ReviewRun[];
+  firstRun: ReviewRun | null;
   isLoading: boolean;
   error: Error | null;
 }
@@ -30,10 +20,9 @@ export function useReview(reviewId: string | null): UseReviewResult {
     error,
   } = useQuery({
     queryKey: ['reviewRuns', reviewId],
-    queryFn: () => (reviewId ? getReviewRuns(reviewId) : Promise.resolve<ReviewRunData[]>([])),
+    queryFn: () => (reviewId ? getReviewRuns(reviewId) : Promise.resolve<ReviewRun[]>([])),
     enabled: !!reviewId,
     staleTime: 30000,
-    placeholderData: keepPreviousData,
   });
 
   const result = useMemo((): UseReviewResult => {

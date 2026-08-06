@@ -155,6 +155,7 @@ fn run_gui(initial_req: Option<DiffRequest>, initial_pending: Option<PendingDiff
             lareview::commands::get_pending_reviews,
             lareview::commands::get_all_reviews,
             lareview::commands::get_review_runs,
+            lareview::commands::get_review_run_events,
             lareview::commands::get_linked_repos,
             lareview::commands::parse_diff,
             lareview::commands::get_file_content,

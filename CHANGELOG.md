@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.1.4] - 2026-08-06
+
+### Added
+
+- **Reviews**: Start reviews as persisted background jobs, open their live activity immediately, and keep Generate available for additional work with bounded concurrency.
+- **Inbox**: Filter review requests by status and repository, or search across title, repository, author, and pull request number.
+
+### Changed
+
+- **Generate**: Move review configuration into a compact, consistently aligned top strip and center the remote-input composer until a diff is loaded.
+- **Activity**: Follow new activity while the reader remains near the bottom, pause when they scroll up, and provide a direct jump back to the latest event.
+
+### Fixed
+
+- **Window**: Restore native window dragging from the application header and sidebar drag regions.
+
 ## [0.1.3] - 2026-08-06
 
 ### Changed

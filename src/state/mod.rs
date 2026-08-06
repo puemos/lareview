@@ -4,6 +4,7 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Clone)]
@@ -29,13 +30,14 @@ pub struct AppState {
     pub diff_request: Arc<Mutex<Option<DiffRequest>>>,
     pub pending_diff: Arc<Mutex<Option<PendingDiff>>>,
     pub active_runs: Arc<Mutex<HashMap<String, CancellationToken>>>,
+    pub generation_slots: Arc<Semaphore>,
 }
 
 impl AppState {
     pub fn new() -> Self {
         let db = Database::open().expect("Failed to open database");
-        if let Err(err) = db.mark_stale_runs_failed() {
-            log::warn!("Failed to mark stale runs as failed: {}", err);
+        if let Err(err) = db.mark_stale_runs_interrupted() {
+            log::warn!("Failed to mark stale runs as interrupted: {}", err);
         }
         Self {
             db: Arc::new(Mutex::new(db)),
@@ -43,6 +45,7 @@ impl AppState {
             diff_request: Arc::new(Mutex::new(None)),
             pending_diff: Arc::new(Mutex::new(None)),
             active_runs: Arc::new(Mutex::new(HashMap::new())),
+            generation_slots: Arc::new(Semaphore::new(2)),
         }
     }
 }

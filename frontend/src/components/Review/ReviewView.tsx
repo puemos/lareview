@@ -27,6 +27,7 @@ import { AddFeedbackModal } from './AddFeedbackModal';
 import type { DiffFile } from '../../types';
 import { ReviewSummary } from './ReviewSummary';
 import type { SidebarTab } from './ReviewSidebar';
+import { ReviewGenerationActivity } from './ReviewGenerationActivity';
 
 export const ReviewView: React.FC = () => {
   const selectedFile = useAppStore(state => state.selectedFile);
@@ -86,6 +87,13 @@ export const ReviewView: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPushModalOpen, setIsPushModalOpen] = useState(false);
   const [isDeleteFeedbackModalOpen, setIsDeleteFeedbackModalOpen] = useState(false);
+  const currentReview = allReviews.find(review => review.id === reviewId) ?? null;
+
+  useEffect(() => {
+    selectTask(null);
+    selectFeedback(null);
+    selectFile(null);
+  }, [reviewId, selectFeedback, selectFile, selectTask]);
 
   // Feedback Modal State
   const [isAddFeedbackModalOpen, setIsAddFeedbackModalOpen] = useState(false);
@@ -206,7 +214,6 @@ export const ReviewView: React.FC = () => {
     window.location.reload();
   };
 
-  const currentReview = allReviews.find(r => r.id === reviewId);
   const remoteProviderName =
     currentReview?.source?.type === 'gitlab_mr'
       ? 'GitLab'
@@ -300,6 +307,10 @@ export const ReviewView: React.FC = () => {
     return <ErrorState error={reviewError} onRetry={handleRetry} />;
   }
 
+  if (firstRun && firstRun.status !== 'completed') {
+    return <ReviewGenerationActivity review={currentReview} run={firstRun} />;
+  }
+
   // Summary mode - full width, no sidebar
   if (reviewViewMode === 'summary') {
     return (
@@ -316,7 +327,7 @@ export const ReviewView: React.FC = () => {
               tasks={tasks}
               feedbacks={feedbacks}
               parsedDiff={parsedDiff ?? null}
-              review={currentReview ?? null}
+              review={currentReview}
               onSelectFeedback={handleSelectFeedbackFromSummary}
               onSelectFile={handleSelectFileFromSummary}
               onSelectTask={handleSelectTaskFromSummary}

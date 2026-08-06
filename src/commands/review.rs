@@ -1,5 +1,5 @@
 use crate::application::review::export::{ExportData, ExportOptions, ReviewExporter};
-use crate::domain::{Feedback, FeedbackImpact, Review, ReviewStatus, ReviewTask};
+use crate::domain::{Feedback, FeedbackImpact, Review, ReviewRunEvent, ReviewStatus, ReviewTask};
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -37,6 +37,15 @@ pub fn get_review_runs(
 }
 
 #[tauri::command]
+pub fn get_review_run_events(
+    state: State<'_, AppState>,
+    run_id: String,
+) -> Result<Vec<ReviewRunEvent>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.get_review_run_events(&run_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn update_task_status(
     state: State<'_, AppState>,
     task_id: String,
@@ -52,6 +61,15 @@ pub fn update_task_status(
 #[tauri::command]
 pub fn delete_review(state: State<'_, AppState>, review_id: String) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
+    if let Some(review) = db.get_review(&review_id).map_err(|e| e.to_string())?
+        && let Some(run_id) = review.active_run_id
+        && let Some(run) = db
+            .get_review_run_by_id(&run_id)
+            .map_err(|e| e.to_string())?
+        && run.status.is_active()
+    {
+        return Err("Cancel the running review before deleting it.".to_string());
+    }
     db.review_repo()
         .delete(&review_id)
         .map_err(|e| e.to_string())?;

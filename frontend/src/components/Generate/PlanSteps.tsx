@@ -10,14 +10,24 @@ export interface PlanStep {
 interface PlanStepsProps {
   steps: PlanStep[];
   className?: string;
+  emptyMessage?: string;
 }
 
-export const PlanSteps: React.FC<PlanStepsProps> = ({ steps, className }) => {
+export const PlanSteps: React.FC<PlanStepsProps> = ({
+  steps,
+  className,
+  emptyMessage = 'No plan generated yet',
+}) => {
   if (steps.length === 0) {
     return (
-      <div className="text-text-disabled flex flex-col items-center justify-center space-y-2 py-8 opacity-50">
+      <div
+        className={clsx(
+          'text-text-disabled flex min-h-[160px] flex-col items-center justify-center gap-2 text-center opacity-60',
+          className
+        )}
+      >
         <CircleIcon size={24} />
-        <p className="text-xs">No plan generated yet</p>
+        <p className="max-w-56 text-xs leading-relaxed">{emptyMessage}</p>
       </div>
     );
   }

@@ -1,22 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GenerationProvider } from './GenerationContext';
 import { useGeneration } from './useGeneration';
 import { mockTauri } from '../test/mocks';
 import { useAppStore } from '../store';
-import type { ProgressEventPayload } from '../hooks/useTauri';
 
-vi.mock('@tauri-apps/api/core', () => {
-  return {
-    Channel: class {
-      onmessage: ((payload: ProgressEventPayload) => void) | null = null;
-      send = vi.fn();
-    },
-    invoke: vi.fn(),
-  };
-});
+const eventMock = vi.hoisted(() => ({ listener: null as ((event: unknown) => void) | null }));
+
+vi.mock('@tauri-apps/api/event', () => ({
+  listen: vi.fn(async (_eventName: string, listener: (event: unknown) => void) => {
+    eventMock.listener = listener;
+    return vi.fn();
+  }),
+}));
 
 vi.mock('../hooks/useTauri', () => ({
   useTauri: () => mockTauri,
@@ -25,9 +23,7 @@ vi.mock('../hooks/useTauri', () => ({
 const createWrapper = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
-      queries: {
-        retry: false,
-      },
+      queries: { retry: false },
     },
   });
   return ({ children }: { children: React.ReactNode }) => (
@@ -37,99 +33,52 @@ const createWrapper = () => {
   );
 };
 
-interface MockChannel {
-  onmessage: ((payload: ProgressEventPayload) => void) | null;
-  send: (payload: ProgressEventPayload) => void;
-}
-
 describe('GenerationContext', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useAppStore.getState().reset();
+    mockTauri.generateReview.mockResolvedValue({
+      review_id: 'review-new',
+      run_id: 'run-new',
+      status: 'queued',
+    });
   });
 
-  it('starts generation and sets isGenerating to true', async () => {
-    const { result } = renderHook(() => useGeneration(), {
-      wrapper: createWrapper(),
-    });
+  it('returns the new review handle as soon as generation is queued', async () => {
+    const { result } = renderHook(() => useGeneration(), { wrapper: createWrapper() });
 
-    // Mock generateReview to be slow
-
-    vi.mocked(mockTauri.generateReview).mockImplementation(() => new Promise(() => {}));
-
-    act(() => {
-      result.current.startGeneration({
-        diffText: 'test diff',
+    let createdReview: Awaited<ReturnType<typeof result.current.startGeneration>> = null;
+    await act(async () => {
+      createdReview = await result.current.startGeneration({
+        diffText: 'diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts',
         agentId: 'test-agent',
         repoId: 'test-repo',
         source: { type: 'diff_paste', diff_hash: 'hash' },
       });
     });
 
-    await waitFor(() => expect(useAppStore.getState().isGenerating).toBe(true));
+    expect(createdReview).toEqual({
+      review_id: 'review-new',
+      run_id: 'run-new',
+      status: 'queued',
+    });
+    expect(mockTauri.generateReview).toHaveBeenCalledWith(
+      'diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts',
+      'test-agent',
+      'test-repo',
+      { type: 'diff_paste', diff_hash: 'hash' },
+      false,
+      undefined
+    );
   });
 
-  it('stops generating when Completed event is received', async () => {
-    const { result } = renderHook(() => useGeneration(), {
-      wrapper: createWrapper(),
-    });
-
-    let channelInstance: MockChannel | null = null;
-
-    vi.mocked(mockTauri.generateReview).mockImplementation(async (...args: unknown[]) => {
-      channelInstance = (args[6] as MockChannel | undefined) || null;
-      // Keep the promise pending until we send the Completed event
-      return new Promise(() => {});
-    });
-
-    act(() => {
-      result.current.startGeneration({
-        diffText: 'test diff',
-        agentId: 'test-agent',
-        repoId: 'test-repo',
-        source: { type: 'diff_paste', diff_hash: 'hash' },
-      });
-    });
-
-    await waitFor(() => expect(channelInstance).not.toBeNull());
-
-    expect(useAppStore.getState().isGenerating).toBe(true);
+  it('stops the requested run without relying on a global active run', async () => {
+    const { result } = renderHook(() => useGeneration(), { wrapper: createWrapper() });
 
     await act(async () => {
-      channelInstance?.onmessage?.({ event: 'Completed', data: { task_count: 5 } });
+      await result.current.stopGeneration('run-two');
     });
 
-    // This is expected to FAIL before the fix
-    expect(useAppStore.getState().isGenerating).toBe(false);
-  });
-
-  it('stops generating when Error event is received', async () => {
-    const { result } = renderHook(() => useGeneration(), {
-      wrapper: createWrapper(),
-    });
-
-    let channelInstance: MockChannel | null = null;
-
-    vi.mocked(mockTauri.generateReview).mockImplementation(async (...args: unknown[]) => {
-      channelInstance = (args[6] as MockChannel | undefined) || null;
-      return new Promise(() => {});
-    });
-
-    act(() => {
-      result.current.startGeneration({
-        diffText: 'test diff',
-        agentId: 'test-agent',
-        repoId: 'test-repo',
-        source: { type: 'diff_paste', diff_hash: 'hash' },
-      });
-    });
-
-    await waitFor(() => expect(channelInstance).not.toBeNull());
-
-    act(() => {
-      channelInstance?.onmessage?.({ event: 'Error', data: { message: 'Failed' } });
-    });
-
-    expect(useAppStore.getState().isGenerating).toBe(false);
+    expect(mockTauri.stop_generation).toHaveBeenCalledWith('run-two');
   });
 });

@@ -10,6 +10,7 @@ interface VcsInputCardProps {
   isLoading: boolean;
   disabled: boolean;
   onClear: () => void;
+  prominent?: boolean;
 }
 
 export const VcsInputCard: React.FC<VcsInputCardProps> = ({
@@ -20,6 +21,7 @@ export const VcsInputCard: React.FC<VcsInputCardProps> = ({
   isLoading,
   disabled,
   onClear,
+  prominent = false,
 }) => {
   const vcsSource =
     pendingSource && (pendingSource.type === 'github_pr' || pendingSource.type === 'gitlab_mr')
@@ -41,7 +43,9 @@ export const VcsInputCard: React.FC<VcsInputCardProps> = ({
 
   return (
     <div
-      className={`ring-border pointer-events-auto flex h-8 w-fit max-w-full min-w-52 items-center overflow-hidden rounded-md border text-xs font-medium backdrop-blur-md transition-colors duration-200 ${
+      className={`ring-border pointer-events-auto flex max-w-full items-center overflow-hidden border text-xs font-medium backdrop-blur-md transition-[background-color,border-color,box-shadow] duration-200 ${
+        prominent ? 'h-10 w-full min-w-0 rounded-lg' : 'h-8 w-fit min-w-52 rounded-md'
+      } ${
         hasRemoteSource
           ? 'border-green-500/20 bg-green-500/10 text-green-400 shadow-sm'
           : 'border-border bg-bg-secondary/90 text-text-primary shadow-lg shadow-black/20'
@@ -71,6 +75,7 @@ export const VcsInputCard: React.FC<VcsInputCardProps> = ({
           onFetch={onFetch}
           isLoading={isLoading}
           disabled={disabled}
+          expanded={prominent}
         />
       )}
     </div>

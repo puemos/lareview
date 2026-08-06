@@ -8,6 +8,7 @@ interface PrInputProps {
   onFetch: () => void;
   isLoading: boolean;
   disabled: boolean;
+  expanded?: boolean;
 }
 
 export const PrInput: React.FC<PrInputProps> = ({
@@ -16,6 +17,7 @@ export const PrInput: React.FC<PrInputProps> = ({
   onFetch,
   isLoading,
   disabled,
+  expanded = false,
 }) => {
   const detectedProvider = useMemo(() => {
     const value = prRef.trim();
@@ -66,7 +68,7 @@ export const PrInput: React.FC<PrInputProps> = ({
           </motion.span>
         </AnimatePresence>
       </div>
-      <div className="grid max-w-[400px] min-w-0 flex-shrink">
+      <div className={expanded ? 'grid min-w-0 flex-1' : 'grid max-w-[400px] min-w-0 flex-shrink'}>
         <input
           type="text"
           value={prRef}

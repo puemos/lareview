@@ -85,7 +85,23 @@ export interface ReviewRun {
   diff_text: string;
   created_at: string;
   task_count: number;
-  status: string;
+  status: ReviewRunStatus;
+}
+
+export type ReviewRunStatus =
+  | 'queued'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'interrupted';
+
+export interface ReviewRunEvent {
+  id: number;
+  review_id: string;
+  run_id: string;
+  payload: import('../hooks/useTauri').ProgressEventPayload;
+  created_at: string;
 }
 
 export interface Feedback {
@@ -286,19 +302,6 @@ export interface EditorConfig {
   preferred_editor_id: string | null;
 }
 
-export interface AppState {
-  diffText: string;
-  parsedDiff: ParsedDiff | null;
-  selectedFile: DiffFile | null;
-  commentThreads: Map<number, CommentThread[]>;
-  tasks: ReviewTask[];
-  selectedTaskId: string | null;
-  isGenerating: boolean;
-  currentView: string;
-  reviewId?: string;
-  runId?: string;
-}
-
 export interface Review {
   id: string;
   title: string;
@@ -310,7 +313,7 @@ export interface Review {
   task_count: number;
   agent_id?: string;
   status: string;
-  active_run_status?: string | null;
+  active_run_status?: ReviewRunStatus | null;
 }
 
 export type ReviewSource =

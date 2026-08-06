@@ -119,6 +119,7 @@ pub enum ReviewRunStatus {
     Completed,
     Failed,
     Cancelled,
+    Interrupted,
 }
 
 impl fmt::Display for ReviewRunStatus {
@@ -129,6 +130,7 @@ impl fmt::Display for ReviewRunStatus {
             Self::Completed => write!(f, "completed"),
             Self::Failed => write!(f, "failed"),
             Self::Cancelled => write!(f, "cancelled"),
+            Self::Interrupted => write!(f, "interrupted"),
         }
     }
 }
@@ -143,9 +145,30 @@ impl FromStr for ReviewRunStatus {
             "COMPLETED" | "DONE" => Ok(Self::Completed),
             "FAILED" | "ERROR" => Ok(Self::Failed),
             "CANCELLED" | "CANCELED" => Ok(Self::Cancelled),
+            "INTERRUPTED" => Ok(Self::Interrupted),
             _ => Ok(Self::Completed),
         }
     }
+}
+
+impl ReviewRunStatus {
+    pub fn is_active(self) -> bool {
+        matches!(self, Self::Queued | Self::Running)
+    }
+
+    pub fn is_terminal(self) -> bool {
+        !self.is_active()
+    }
+}
+
+/// A persisted activity update for a review generation run.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewRunEvent {
+    pub id: i64,
+    pub review_id: ReviewId,
+    pub run_id: ReviewRunId,
+    pub payload: serde_json::Value,
+    pub created_at: String,
 }
 
 /// A single generation run for a review (diff + agent output).

@@ -1,5 +1,4 @@
 import { vi, type Mock } from 'vitest';
-import type { Channel } from '@tauri-apps/api/core';
 import type {
   ReviewTask,
   Review,
@@ -12,8 +11,8 @@ import type {
   ReviewSource,
   AgentConfigSelection,
   AgentSessionConfigOption,
+  ReviewRunEvent,
 } from '../types';
-import type { ProgressEventPayload } from '../hooks/useTauri';
 
 const createMockReview = (overrides = {}): Review => ({
   id: 'review-1',
@@ -93,6 +92,7 @@ interface MockTauriReturn {
   getAllReviews: Mock<() => Promise<Review[]>>;
   getPendingReviews: Mock<() => Promise<Review[]>>;
   getReviewRuns: Mock<(reviewId: string) => Promise<ReviewRun[]>>;
+  getReviewRunEvents: Mock<(runId: string) => Promise<ReviewRunEvent[]>>;
   getLinkedRepos: Mock<() => Promise<LinkedRepo[]>>;
   parseDiff: Mock<(diffText: string) => Promise<ParsedDiff>>;
   loadTasks: Mock<(runId: string) => Promise<ReviewTask[]>>;
@@ -126,13 +126,11 @@ interface MockTauriReturn {
     (
       diffText: string,
       agentId: string,
-      runId?: string,
       repoId?: string,
       source?: ReviewSource,
       useSnapshot?: boolean,
-      onProgress?: Channel<ProgressEventPayload>,
       agentConfig?: AgentConfigSelection[]
-    ) => Promise<{ task_count: number; review_id: string; run_id?: string }>
+    ) => Promise<{ review_id: string; run_id: string; status: 'queued' }>
   >;
   stop_generation: Mock<(runId: string) => Promise<void>>;
 }
@@ -142,6 +140,7 @@ function createMockTauri(): MockTauriReturn {
     getAllReviews: vi.fn().mockResolvedValue([createMockReview()]),
     getPendingReviews: vi.fn().mockResolvedValue([]),
     getReviewRuns: vi.fn().mockResolvedValue([createMockRun()]),
+    getReviewRunEvents: vi.fn().mockResolvedValue([]),
     getLinkedRepos: vi.fn().mockResolvedValue([]),
     parseDiff: vi.fn().mockResolvedValue(createMockParsedDiff()),
     loadTasks: vi.fn().mockResolvedValue([createMockTask()]),
@@ -178,9 +177,9 @@ function createMockTauri(): MockTauriReturn {
     addComment: vi.fn().mockResolvedValue('comment-1'),
     getFeedbackByReview: vi.fn().mockResolvedValue([createMockFeedback()]),
     generateReview: vi.fn().mockResolvedValue({
-      task_count: 5,
       review_id: 'review-1',
       run_id: 'run-1',
+      status: 'queued',
     }),
     stop_generation: vi.fn().mockResolvedValue(undefined),
   };

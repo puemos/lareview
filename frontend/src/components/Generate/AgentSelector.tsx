@@ -13,6 +13,12 @@ import qwenIcon from '../../assets/icons/qwen.svg';
 import grokIcon from '../../assets/icons/grok.svg';
 import opencodeIcon from '../../assets/icons/opencode.svg';
 import codexIcon from '../../assets/icons/codex.svg';
+import {
+  configFieldLabelClass,
+  configFieldTriggerClass,
+  configSelectContentClass,
+  configSelectItemClass,
+} from './configFieldStyles';
 
 const AGENT_ICONS: Record<string, string> = {
   gemini: geminiIcon,
@@ -47,18 +53,16 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
 
   return (
     <div className="space-y-1.5">
-      <label className="text-text-disabled flex items-center gap-1.5 text-[10px] font-bold tracking-wider uppercase">
-        <Robot size={12} /> Agent
-      </label>
+      <label className={configFieldLabelClass}>Agent</label>
       <Select.Root value={selectedAgentId} onValueChange={onSelect}>
         <Select.Trigger
-          className="bg-bg-tertiary border-border text-text-primary focus:border-brand focus:ring-brand/20 hover:border-text-disabled data-[placeholder]:text-text-disabled inline-flex w-full items-center justify-between rounded-md border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none"
+          className={`${configFieldTriggerClass} data-[placeholder]:text-text-disabled w-full justify-between`}
           aria-label="Agent"
         >
           <Select.Value asChild>
             <div className="flex items-center gap-2">
-              {selectedAgent && (
-                AGENT_ICONS[selectedAgent.id] ? (
+              {selectedAgent &&
+                (AGENT_ICONS[selectedAgent.id] ? (
                   <img
                     src={AGENT_ICONS[selectedAgent.id]}
                     alt=""
@@ -66,8 +70,7 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
                   />
                 ) : (
                   <Robot size={16} weight="fill" className="text-brand" />
-                )
-              )}
+                ))}
               <span className="truncate">{selectedAgent?.name || 'Select an agent...'}</span>
             </div>
           </Select.Value>
@@ -78,9 +81,10 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
 
         <Select.Portal>
           <Select.Content
-            className="bg-bg-secondary border-border z-50 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-md border shadow-lg"
+            className={`${configSelectContentClass} min-w-[var(--radix-select-trigger-width)]`}
             position="popper"
-            sideOffset={5}
+            sideOffset={8}
+            collisionPadding={12}
           >
             <Select.Viewport className="p-1">
               {agents.map(agent => (
@@ -88,18 +92,10 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
                   key={agent.id}
                   value={agent.id}
                   disabled={agent.available === false}
-                  className={clsx(
-                    'text-text-primary relative flex cursor-pointer items-center gap-2 rounded-sm py-2 pr-8 pl-2 text-xs outline-none select-none',
-                    'data-[highlighted]:text-text-primary data-[highlighted]:bg-white/10',
-                    'data-[disabled]:pointer-events-none data-[disabled]:opacity-50'
-                  )}
+                  className={clsx(configSelectItemClass, 'gap-2')}
                 >
                   {AGENT_ICONS[agent.id] ? (
-                    <img
-                      src={AGENT_ICONS[agent.id]}
-                      alt=""
-                      className="h-4 w-4 object-contain"
-                    />
+                    <img src={AGENT_ICONS[agent.id]} alt="" className="h-4 w-4 object-contain" />
                   ) : (
                     <Robot size={16} weight="fill" className="text-brand" />
                   )}

@@ -1,9 +1,10 @@
 use crate::commands::{LinkedRepoState, PendingReviewState, ReviewRunState, ReviewState};
-use crate::domain::{Comment, Feedback, Review, ReviewRun, ReviewTask};
+use crate::domain::{Comment, Feedback, Review, ReviewRun, ReviewRunEvent, ReviewTask};
 use anyhow::Result;
 use rusqlite::{Connection, params};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 pub struct Database {
     conn: Arc<Mutex<Connection>>,
@@ -17,6 +18,7 @@ impl Database {
 
     pub fn open_in_memory() -> Result<Self> {
         let conn = Connection::open_in_memory()?;
+        Self::configure_connection(&conn, false)?;
         let db = Self {
             conn: Arc::new(Mutex::new(conn)),
         };
@@ -30,6 +32,7 @@ impl Database {
         }
 
         let conn = Connection::open(&path)?;
+        Self::configure_connection(&conn, true)?;
         let db = Self {
             conn: Arc::new(Mutex::new(conn)),
         };
@@ -86,6 +89,15 @@ impl Database {
             .join("db.sqlite")
     }
 
+    fn configure_connection(conn: &Connection, file_backed: bool) -> Result<()> {
+        conn.busy_timeout(Duration::from_secs(5))?;
+        conn.execute_batch("PRAGMA foreign_keys = ON; PRAGMA synchronous = NORMAL;")?;
+        if file_backed {
+            conn.pragma_update(None, "journal_mode", "WAL")?;
+        }
+        Ok(())
+    }
+
     fn init(&self) -> Result<()> {
         let conn = self.conn.lock().expect("Failed to acquire database lock");
         conn.execute_batch("PRAGMA foreign_keys = ON;")?;
@@ -132,6 +144,16 @@ impl Database {
                 status TEXT NOT NULL DEFAULT 'completed',
                 created_at TEXT NOT NULL,
                 FOREIGN KEY(review_id) REFERENCES reviews(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS review_run_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                review_id TEXT NOT NULL,
+                run_id TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(review_id) REFERENCES reviews(id) ON DELETE CASCADE,
+                FOREIGN KEY(run_id) REFERENCES review_runs(id) ON DELETE CASCADE
             );
 
             CREATE TABLE IF NOT EXISTS tasks (
@@ -234,6 +256,7 @@ impl Database {
             CREATE INDEX IF NOT EXISTS idx_issue_checks_run_id ON issue_checks(run_id);
             CREATE INDEX IF NOT EXISTS idx_issue_checks_category ON issue_checks(category);
             CREATE INDEX IF NOT EXISTS idx_issue_findings_check_id ON issue_findings(check_id);
+            CREATE INDEX IF NOT EXISTS idx_review_run_events_run_id ON review_run_events(run_id, id);
 
             CREATE TABLE IF NOT EXISTS merge_confidence (
                 id TEXT PRIMARY KEY,
@@ -805,12 +828,73 @@ impl Database {
         Ok(runs)
     }
 
+    pub fn save_review_run_event(
+        &self,
+        review_id: &str,
+        run_id: &str,
+        payload: &serde_json::Value,
+    ) -> Result<ReviewRunEvent, rusqlite::Error> {
+        let created_at = chrono::Utc::now().to_rfc3339();
+        let payload_json = serde_json::to_string(payload)
+            .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
+        let conn = self.conn.lock().expect("Failed to acquire database lock");
+        conn.execute(
+            "INSERT INTO review_run_events (review_id, run_id, payload_json, created_at) VALUES (?1, ?2, ?3, ?4)",
+            (review_id, run_id, &payload_json, &created_at),
+        )?;
+        Ok(ReviewRunEvent {
+            id: conn.last_insert_rowid(),
+            review_id: review_id.to_string(),
+            run_id: run_id.to_string(),
+            payload: payload.clone(),
+            created_at,
+        })
+    }
+
+    pub fn get_review_run_events(
+        &self,
+        run_id: &str,
+    ) -> Result<Vec<ReviewRunEvent>, rusqlite::Error> {
+        let conn = self.conn.lock().expect("Failed to acquire database lock");
+        let mut stmt = conn.prepare(
+            "SELECT id, review_id, run_id, payload_json, created_at FROM review_run_events WHERE run_id = ?1 ORDER BY id ASC",
+        )?;
+        let rows = stmt.query_map([run_id], |row| {
+            let payload_json: String = row.get(3)?;
+            let payload = serde_json::from_str(&payload_json).unwrap_or_else(|_| {
+                serde_json::json!({"event": "Log", "data": "Activity payload could not be read"})
+            });
+            Ok(ReviewRunEvent {
+                id: row.get(0)?,
+                review_id: row.get(1)?,
+                run_id: row.get(2)?,
+                payload,
+                created_at: row.get(4)?,
+            })
+        })?;
+        rows.collect()
+    }
+
     pub fn get_review_run_by_id(&self, run_id: &str) -> Result<Option<ReviewRun>, rusqlite::Error> {
         let repo = self.run_repo();
         let run_id_str = run_id.to_string();
         repo.find_by_id(&run_id_str).map_err(|e: anyhow::Error| {
             rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(1), Some(e.to_string()))
         })
+    }
+
+    pub fn transition_run_status(
+        &self,
+        run_id: &str,
+        expected: crate::domain::ReviewRunStatus,
+        next: crate::domain::ReviewRunStatus,
+    ) -> Result<bool, rusqlite::Error> {
+        let conn = self.conn.lock().expect("Failed to acquire database lock");
+        let updated = conn.execute(
+            "UPDATE review_runs SET status = ?1 WHERE id = ?2 AND status = ?3",
+            (&next.to_string(), run_id, &expected.to_string()),
+        )?;
+        Ok(updated == 1)
     }
 
     pub fn get_linked_repos(&self) -> Result<Vec<LinkedRepoState>, rusqlite::Error> {
@@ -875,6 +959,46 @@ impl Database {
             ],
         )?;
         Ok(())
+    }
+
+    pub fn save_review_with_run(
+        &self,
+        review: &Review,
+        run: &ReviewRun,
+    ) -> Result<(), rusqlite::Error> {
+        let source_json = serde_json::to_string(&review.source)
+            .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?;
+        let mut conn = self.conn.lock().expect("Failed to acquire database lock");
+        let transaction = conn.transaction()?;
+        transaction.execute(
+            "INSERT INTO reviews (id, title, summary, source_json, active_run_id, status, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                &review.id,
+                &review.title,
+                &review.summary,
+                &source_json,
+                &review.active_run_id,
+                &review.status.to_string(),
+                &review.created_at,
+                &review.updated_at,
+            ],
+        )?;
+        transaction.execute(
+            "INSERT INTO review_runs (id, review_id, agent_id, input_ref, diff_text, diff_hash, status, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                &run.id,
+                &run.review_id,
+                &run.agent_id,
+                &run.input_ref,
+                &run.diff_text,
+                &run.diff_hash,
+                &run.status.to_string(),
+                &run.created_at,
+            ],
+        )?;
+        transaction.commit()
     }
 
     pub fn get_review(&self, review_id: &str) -> Result<Option<Review>, rusqlite::Error> {
@@ -1023,10 +1147,10 @@ impl Database {
         Ok(())
     }
 
-    pub fn mark_stale_runs_failed(&self) -> Result<usize, rusqlite::Error> {
+    pub fn mark_stale_runs_interrupted(&self) -> Result<usize, rusqlite::Error> {
         let conn = self.conn.lock().expect("Failed to acquire database lock");
         conn.execute(
-            "UPDATE review_runs SET status = 'failed' WHERE status IN ('running', 'queued')",
+            "UPDATE review_runs SET status = 'interrupted' WHERE status IN ('running', 'queued')",
             [],
         )
     }
@@ -1070,6 +1194,84 @@ mod tests {
         let reviews = db.get_all_reviews()?;
         assert_eq!(reviews.len(), 1);
         assert_eq!(reviews[0].active_run_status.as_deref(), Some("running"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_save_review_with_run_is_atomic() -> anyhow::Result<()> {
+        let db = Database::open_in_memory()?;
+        let review = Review {
+            id: "rev-atomic".to_string(),
+            title: "Atomic Review".to_string(),
+            summary: None,
+            source: ReviewSource::DiffPaste {
+                diff_hash: "atomic-hash".into(),
+            },
+            active_run_id: Some("run-atomic".into()),
+            status: ReviewStatus::Todo,
+            created_at: "now".to_string(),
+            updated_at: "now".to_string(),
+        };
+        let invalid_run = ReviewRun {
+            id: "run-atomic".into(),
+            review_id: "missing-review".into(),
+            agent_id: "agent".into(),
+            input_ref: "input".into(),
+            diff_text: "diff".into(),
+            diff_hash: "atomic-hash".into(),
+            status: ReviewRunStatus::Queued,
+            created_at: "now".into(),
+        };
+
+        assert!(db.save_review_with_run(&review, &invalid_run).is_err());
+        assert!(db.get_review(&review.id)?.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_run_status_transitions_reject_stale_writers() -> anyhow::Result<()> {
+        let db = Database::open_in_memory()?;
+        let review = Review {
+            id: "rev-transition".to_string(),
+            title: "Transition Review".to_string(),
+            summary: None,
+            source: ReviewSource::DiffPaste {
+                diff_hash: "transition-hash".into(),
+            },
+            active_run_id: Some("run-transition".into()),
+            status: ReviewStatus::Todo,
+            created_at: "now".to_string(),
+            updated_at: "now".to_string(),
+        };
+        let run = ReviewRun {
+            id: "run-transition".into(),
+            review_id: review.id.clone(),
+            agent_id: "agent".into(),
+            input_ref: "input".into(),
+            diff_text: "diff".into(),
+            diff_hash: "transition-hash".into(),
+            status: ReviewRunStatus::Queued,
+            created_at: "now".into(),
+        };
+        db.save_review_with_run(&review, &run)?;
+
+        assert!(db.transition_run_status(
+            &run.id,
+            ReviewRunStatus::Queued,
+            ReviewRunStatus::Running
+        )?);
+        assert!(!db.transition_run_status(
+            &run.id,
+            ReviewRunStatus::Queued,
+            ReviewRunStatus::Completed
+        )?);
+        assert!(db.transition_run_status(
+            &run.id,
+            ReviewRunStatus::Running,
+            ReviewRunStatus::Completed
+        )?);
 
         Ok(())
     }
@@ -1136,7 +1338,52 @@ mod tests {
     }
 
     #[test]
-    fn test_mark_stale_runs_failed() -> anyhow::Result<()> {
+    fn test_review_run_events_round_trip_and_follow_review_lifecycle() -> anyhow::Result<()> {
+        let db = Database::open_in_memory()?;
+        let review = Review {
+            id: "rev-events".to_string(),
+            title: "Event Review".to_string(),
+            summary: None,
+            source: ReviewSource::DiffPaste {
+                diff_hash: "events-hash".into(),
+            },
+            active_run_id: Some("run-events".into()),
+            status: ReviewStatus::Todo,
+            created_at: "now".to_string(),
+            updated_at: "now".to_string(),
+        };
+        db.save_review(&review)?;
+        db.save_run(&ReviewRun {
+            id: "run-events".into(),
+            review_id: review.id.clone(),
+            agent_id: "agent".into(),
+            input_ref: "input".into(),
+            diff_text: "diff".into(),
+            diff_hash: "events-hash".into(),
+            status: ReviewRunStatus::Running,
+            created_at: "now".into(),
+        })?;
+
+        let queued = serde_json::json!({"event": "Status", "data": {"status": "queued"}});
+        let running = serde_json::json!({"event": "Status", "data": {"status": "running"}});
+        let first = db.save_review_run_event(&review.id, "run-events", &queued)?;
+        let second = db.save_review_run_event(&review.id, "run-events", &running)?;
+
+        let events = db.get_review_run_events("run-events")?;
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].id, first.id);
+        assert_eq!(events[0].payload, queued);
+        assert_eq!(events[1].id, second.id);
+        assert_eq!(events[1].payload, running);
+
+        db.review_repo().delete(&review.id)?;
+        assert!(db.get_review_run_events("run-events")?.is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_mark_stale_runs_interrupted() -> anyhow::Result<()> {
         let db = Database::open_in_memory()?;
 
         let review = Review {
@@ -1164,14 +1411,14 @@ mod tests {
             created_at: "now".into(),
         })?;
 
-        let updated = db.mark_stale_runs_failed()?;
+        let updated = db.mark_stale_runs_interrupted()?;
         assert_eq!(updated, 1);
 
         let run = db
             .run_repo()
             .find_by_id(&"run-stale".into())?
             .expect("run exists");
-        assert_eq!(run.status, ReviewRunStatus::Failed);
+        assert_eq!(run.status, ReviewRunStatus::Interrupted);
 
         Ok(())
     }

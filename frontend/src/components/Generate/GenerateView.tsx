@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Trash, Spinner } from '@phosphor-icons/react';
+import { LayoutGroup, motion, useReducedMotion } from 'framer-motion';
 import { useTauri } from '../../hooks/useTauri';
 import { useAppStore } from '../../store';
 import { useAgents } from '../../hooks/useAgents';
@@ -8,8 +9,6 @@ import type { ReviewSource, ViewType } from '../../types';
 import { useGeneration } from '../../contexts/useGeneration';
 import { DiffEditorPanel } from './DiffEditorPanel';
 import { AgentConfigPanel } from './AgentConfigPanel';
-import { PlanOverview } from './PlanOverview';
-import { LiveActivityFeed } from './LiveActivityFeed';
 import { VcsInputCard } from './VcsInputCard';
 import { ViewModeToggle } from './ViewModeToggle';
 import { DiffStats } from './DiffStats';
@@ -35,14 +34,14 @@ const isVcsSource = (
 export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavigate }) => {
   const [diffText, setDiffText] = useState('');
   const lastAutoSwitchedTextRef = React.useRef('');
-  const hasAutoExpandedRef = React.useRef(false);
-
   const [isLoadingPr, setIsLoadingPr] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
 
   const [validationError, setValidationError] = useState<string | null>(null);
+  const shouldReduceMotion = useReducedMotion();
 
   const { fetchRemotePr } = useTauri();
-  const { startGeneration, stopGeneration } = useGeneration();
+  const { startGeneration } = useGeneration();
   const { data: agents = [] } = useAgents();
   const { data: repos = [], addRepo, cloneRepo, selectRepoFolder } = useRepos();
 
@@ -51,10 +50,12 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   const setAgentIdStore = useAppStore(state => state.setAgentId);
   const agentConfigPreferences = useAppStore(state => state.agentConfigPreferences);
   const setParsedDiff = useAppStore(state => state.setParsedDiff);
-  const isGenerating = useAppStore(state => state.isGenerating);
-  const plan = useAppStore(state => state.plan);
-
-  const progressMessages = useAppStore(state => state.progressMessages);
+  const setReviewId = useAppStore(state => state.setReviewId);
+  const setTasks = useAppStore(state => state.setTasks);
+  const selectTask = useAppStore(state => state.selectTask);
+  const selectFeedback = useAppStore(state => state.selectFeedback);
+  const selectFile = useAppStore(state => state.selectFile);
+  const setReviewViewMode = useAppStore(state => state.setReviewViewMode);
   const pendingSource = useAppStore(state => state.pendingSource);
   const setPendingSource = useAppStore(state => state.setPendingSource);
   const selectedRepoId = useAppStore(state => state.selectedRepoId);
@@ -63,8 +64,6 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   const setPrRef = useAppStore(state => state.setPrRef);
   const viewMode = useAppStore(state => state.viewMode);
   const setViewMode = useAppStore(state => state.setViewMode);
-  const isPlanExpanded = useAppStore(state => state.isPlanExpanded);
-  const setIsPlanExpanded = useAppStore(state => state.setIsPlanExpanded);
 
   const [repoLinkCallout, setRepoLinkCallout] = useState<RepoLinkCallout | null>(null);
 
@@ -104,6 +103,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   }, [diffText, validateDiff]);
 
   const isDiffValid = diffText.trim().length > 0 && !diffValidationError;
+  const isComposerEmpty = !diffText.trim() && !pendingSource;
 
   // Auto-switch to diff mode on valid pasting
   useEffect(() => {
@@ -214,14 +214,28 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
 
     setDiffTextStore(diffText);
     setAgentIdStore(agentId);
-    const ok = await startGeneration({
+    setIsStarting(true);
+    const result = await startGeneration({
       diffText,
       agentId,
       repoId: selectedRepoId || undefined,
       source: pendingSource,
       agentConfig: toAgentConfigSelections(agentConfigPreferences[agentId] || []),
     });
-    if (ok) {
+    setIsStarting(false);
+    if (result) {
+      setReviewId(result.review_id);
+      setTasks([]);
+      selectTask(null);
+      selectFeedback(null);
+      selectFile(null);
+      setReviewViewMode('summary');
+      setDiffText('');
+      setDiffTextStore('');
+      setParsedDiff(null);
+      setPendingSource(null);
+      setPrRef('');
+      setViewMode('raw');
       _onNavigate('review');
     }
   }, [
@@ -235,6 +249,16 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     pendingSource,
     selectedRepoId,
     agentConfigPreferences,
+    setReviewId,
+    setTasks,
+    selectTask,
+    selectFeedback,
+    selectFile,
+    setParsedDiff,
+    setPendingSource,
+    setPrRef,
+    setViewMode,
+    setReviewViewMode,
   ]);
 
   const handleFetchPr = useCallback(async () => {
@@ -292,136 +316,158 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     setPrRef('');
     setValidationError(null);
     setViewMode('raw');
-    setIsPlanExpanded(false);
-    hasAutoExpandedRef.current = false;
     setRepoLinkCallout(null);
-  }, [setDiffTextStore, setParsedDiff, setPendingSource, setPrRef, setViewMode, setIsPlanExpanded]);
-
-  const planItemsToRender = useMemo(() => {
-    return (
-      plan?.entries.map(e => ({
-        content: e.content,
-        status: e.status || 'pending',
-      })) || []
-    );
-  }, [plan]);
-
-  useEffect(() => {
-    if (planItemsToRender.length > 0 && !hasAutoExpandedRef.current) {
-      setIsPlanExpanded(true);
-      hasAutoExpandedRef.current = true;
-    }
-  }, [planItemsToRender.length, setIsPlanExpanded]);
+  }, [setDiffTextStore, setParsedDiff, setPendingSource, setPrRef, setViewMode]);
 
   return (
     <div className="bg-bg-primary flex h-full flex-col">
+      <AgentConfigPanel
+        agents={agents}
+        repos={repos}
+        selectedAgentId={agentId}
+        selectedRepoId={selectedRepoId}
+        onAgentSelect={setAgentIdStore}
+        onRepoSelect={setSelectedRepoId}
+        isStarting={isStarting}
+        onGenerate={handleGenerate}
+        isDiffValid={isDiffValid}
+      />
+
       <div className="flex flex-1 overflow-hidden">
-        <div className="border-border bg-bg-primary relative flex min-w-0 flex-1 flex-col border-r">
-          <div className="flex flex-col gap-2 p-4 pb-0">
-            <div className="flex items-center gap-3">
-              <VcsInputCard
-                pendingSource={pendingSource}
-                prRef={prRef}
-                onPrRefChange={setPrRef}
-                onFetch={handleFetchPr}
-                isLoading={isLoadingPr}
-                disabled={isGenerating}
-                onClear={handleClear}
-              />
-
-              <div className="flex-1" />
-
-              <div className="pointer-events-auto flex gap-2">
-                {(diffText.trim() || prRef.trim()) && (
-                  <button
-                    onClick={handleClear}
-                    className="bg-bg-secondary/90 hover:bg-bg-tertiary text-text-secondary hover:text-text-primary ring-border flex h-8 items-center gap-1.5 rounded-md px-3 text-[10px] font-medium shadow-sm ring-1 backdrop-blur-sm transition-all"
+        <LayoutGroup id="generate-source-input">
+          <div className="bg-bg-primary relative flex min-w-0 flex-1 flex-col">
+            <div className="flex flex-col gap-2 p-4 pb-0">
+              <div className="flex items-center gap-3">
+                {!isComposerEmpty && (
+                  <motion.div
+                    layoutId="review-source-input"
+                    transition={{
+                      layout: {
+                        duration: shouldReduceMotion ? 0 : 0.22,
+                        ease: [0.23, 1, 0.32, 1],
+                      },
+                    }}
+                    className="min-w-0"
                   >
-                    <Trash size={13} />
-                    <span>Clear</span>
-                  </button>
+                    <VcsInputCard
+                      pendingSource={pendingSource}
+                      prRef={prRef}
+                      onPrRefChange={setPrRef}
+                      onFetch={handleFetchPr}
+                      isLoading={isLoadingPr}
+                      disabled={isStarting}
+                      onClear={handleClear}
+                    />
+                  </motion.div>
                 )}
 
-                <ViewModeToggle
-                  mode={viewMode}
-                  onChange={setViewMode}
-                  disabled={!diffText.trim()}
-                />
-              </div>
-            </div>
+                <div className="flex-1" />
 
-            {repoLinkCallout && (
-              <div className="pointer-events-auto flex items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200 shadow-sm">
-                <div className="min-w-0">
-                  <div className="font-medium text-amber-100">No linked repo found</div>
-                  <div className="truncate text-amber-200/80">
-                    Link or clone {repoLinkCallout.label} to enable snapshots.
+                <div className="pointer-events-auto flex gap-2">
+                  {(diffText.trim() || prRef.trim()) && (
+                    <button
+                      onClick={handleClear}
+                      className="bg-bg-secondary/90 hover:bg-bg-tertiary text-text-secondary hover:text-text-primary ring-border flex h-8 items-center gap-1.5 rounded-md px-3 text-[10px] font-medium shadow-sm ring-1 backdrop-blur-sm transition-[background-color,color,transform] active:scale-[0.97]"
+                    >
+                      <Trash size={13} />
+                      <span>Clear</span>
+                    </button>
+                  )}
+
+                  <ViewModeToggle
+                    mode={viewMode}
+                    onChange={setViewMode}
+                    disabled={!diffText.trim()}
+                  />
+                </div>
+              </div>
+
+              {repoLinkCallout && (
+                <div className="pointer-events-auto flex items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200 shadow-sm">
+                  <div className="min-w-0">
+                    <div className="font-medium text-amber-100">No linked repo found</div>
+                    <div className="truncate text-amber-200/80">
+                      Link or clone {repoLinkCallout.label} to enable snapshots.
+                    </div>
+                  </div>
+                  <div className="flex flex-shrink-0 items-center gap-2">
+                    <button
+                      onClick={handleCloneAndLink}
+                      disabled={isStarting || isRepoLinking}
+                      className="flex items-center gap-1 rounded bg-amber-500/20 px-2 py-1 text-[10px] font-semibold text-amber-100 transition-colors hover:bg-amber-500/30 disabled:opacity-60"
+                    >
+                      {isRepoLinking ? <Spinner size={12} className="animate-spin" /> : null}
+                      <span>Clone &amp; Link</span>
+                    </button>
+                    <button
+                      onClick={handleLinkExisting}
+                      disabled={isStarting || isRepoLinking}
+                      className="bg-bg-secondary/80 hover:bg-bg-tertiary text-text-primary rounded px-2 py-1 text-[10px] font-semibold transition-colors disabled:opacity-60"
+                    >
+                      Link Existing
+                    </button>
+                    <button
+                      onClick={() => setRepoLinkCallout(null)}
+                      disabled={isRepoLinking}
+                      className="text-text-tertiary hover:text-text-primary px-1 text-[10px] font-semibold transition-colors disabled:opacity-60"
+                    >
+                      Dismiss
+                    </button>
                   </div>
                 </div>
-                <div className="flex flex-shrink-0 items-center gap-2">
-                  <button
-                    onClick={handleCloneAndLink}
-                    disabled={isGenerating || isRepoLinking}
-                    className="flex items-center gap-1 rounded bg-amber-500/20 px-2 py-1 text-[10px] font-semibold text-amber-100 transition-colors hover:bg-amber-500/30 disabled:opacity-60"
+              )}
+            </div>
+
+            {isComposerEmpty && (
+              <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-8 pb-20">
+                <div className="pointer-events-auto w-full max-w-xl">
+                  <div className="mb-4 text-center">
+                    <h1 className="text-text-primary text-base font-semibold">Start a review</h1>
+                    <p className="text-text-tertiary mt-1 text-xs">
+                      Paste a pull request or merge request link
+                    </p>
+                  </div>
+                  <motion.div
+                    layoutId="review-source-input"
+                    transition={{
+                      layout: {
+                        duration: shouldReduceMotion ? 0 : 0.22,
+                        ease: [0.23, 1, 0.32, 1],
+                      },
+                    }}
                   >
-                    {isRepoLinking ? <Spinner size={12} className="animate-spin" /> : null}
-                    <span>Clone &amp; Link</span>
-                  </button>
-                  <button
-                    onClick={handleLinkExisting}
-                    disabled={isGenerating || isRepoLinking}
-                    className="bg-bg-secondary/80 hover:bg-bg-tertiary text-text-primary rounded px-2 py-1 text-[10px] font-semibold transition-colors disabled:opacity-60"
-                  >
-                    Link Existing
-                  </button>
-                  <button
-                    onClick={() => setRepoLinkCallout(null)}
-                    disabled={isRepoLinking}
-                    className="text-text-tertiary hover:text-text-primary px-1 text-[10px] font-semibold transition-colors disabled:opacity-60"
-                  >
-                    Dismiss
-                  </button>
+                    <VcsInputCard
+                      pendingSource={pendingSource}
+                      prRef={prRef}
+                      onPrRefChange={setPrRef}
+                      onFetch={handleFetchPr}
+                      isLoading={isLoadingPr}
+                      disabled={isStarting}
+                      onClear={handleClear}
+                      prominent
+                    />
+                  </motion.div>
+                  <p className="text-text-disabled mt-3 text-center text-[11px]">
+                    Or paste a unified diff directly into the editor
+                  </p>
                 </div>
               </div>
             )}
+
+            <DiffEditorPanel
+              diffText={diffText}
+              viewMode={viewMode}
+              onDiffTextChange={setDiffText}
+              validationError={diffValidationError || validationError}
+            />
+
+            <DiffStats
+              charCount={diffText.length}
+              additions={countAdditions(diffText)}
+              deletions={countDeletions(diffText)}
+            />
           </div>
-
-          <DiffEditorPanel
-            diffText={diffText}
-            viewMode={viewMode}
-            onDiffTextChange={setDiffText}
-            validationError={diffValidationError || validationError}
-          />
-
-          <DiffStats
-            charCount={diffText.length}
-            additions={countAdditions(diffText)}
-            deletions={countDeletions(diffText)}
-          />
-        </div>
-
-        <div className="bg-bg-secondary border-border flex w-[380px] flex-col">
-          <AgentConfigPanel
-            agents={agents}
-            repos={repos}
-            selectedAgentId={agentId}
-            selectedRepoId={selectedRepoId}
-            onAgentSelect={setAgentIdStore}
-            onRepoSelect={setSelectedRepoId}
-            isGenerating={isGenerating}
-            onGenerate={handleGenerate}
-            onStop={stopGeneration}
-            isDiffValid={isDiffValid}
-          />
-
-          <PlanOverview
-            items={planItemsToRender}
-            isExpanded={isPlanExpanded}
-            onToggle={() => setIsPlanExpanded(!isPlanExpanded)}
-          />
-
-          <LiveActivityFeed messages={progressMessages} isRunning={isGenerating} />
-        </div>
+        </LayoutGroup>
       </div>
     </div>
   );

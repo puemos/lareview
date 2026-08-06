@@ -50,23 +50,25 @@ LaReview follows a layered architecture to keep core concepts stable and keep IO
 ### Backend State (`AppState`)
 
 - **Location**: `src/state/mod.rs`.
-- **Scope**: Domain state (linked repos, configurations) and database connection.
+- **Scope**: Domain state (linked repos, configurations), database connection, run-keyed cancellation tokens, and the two-permit generation semaphore.
 - **Update Pattern**: Initialized once at app startup, accessed via Tauri State in commands.
 
 ### Frontend State (Zustand)
 
 - **Location**: `frontend/src/store/index.ts`.
-- **Scope**: UI state, selected review/run/task, feedback list, progress messages.
+- **Scope**: Draft and UI selection state. Persisted review activity is server state keyed by run ID and loaded through TanStack Query.
 - **Update Pattern**: Mutated via Zustand actions, persisted to backend via Tauri commands.
 
 ## Tauri IPC Flow
 
-1. Frontend calls Tauri command (e.g., `invoke('generate_review', {...})`).
-2. Command in `src/commands/mod.rs` executes business logic.
-3. Command accesses `AppState` for database operations.
-4. Command may spawn async tasks for ACP agent communication.
-5. Progress events streamed back via Tauri Channel.
-6. Frontend receives events and updates Zustand store.
+1. Frontend calls a Tauri command (for example, `invoke('generate_review', {...})`).
+2. The start command validates the request, atomically stores a Review and queued ReviewRun, spawns an owned job, and returns the IDs immediately.
+3. The job waits for one of two generation permits, then runs ACP independently of the current page.
+4. Activity is written to `review_run_events` before being emitted on the static `review-run-event` app event.
+5. The frontend merges persisted history with live events by run ID and invalidates only affected TanStack Query keys.
+6. Queued/running reviews render their Activity page. A completed status automatically switches that same page to the existing review UI.
+
+SQLite file connections use WAL journaling, a busy timeout, foreign keys, and `synchronous=NORMAL` so the app and concurrent MCP subprocesses can write safely. Run transitions are conditional; the generation job is the only owner of terminal status. Queued/running rows left by an app exit are marked `interrupted` on the next launch.
 
 ## Dependency rules (intent)
 

@@ -1,9 +1,10 @@
-import type { ReviewTask, Review, Agent } from '../types';
+import type { ReviewTask, Review, Agent, ReviewRunStatus } from '../types';
 
 export const queryKeys = {
   reviews: ['reviews'] as const,
   review: (id: string) => ['reviews', id] as const,
   reviewRuns: (reviewId: string) => ['reviewRuns', reviewId] as const,
+  reviewRunEvents: (runId: string) => ['reviewRunEvents', runId] as const,
   tasks: (runId: string) => ['tasks', runId] as const,
   feedback: ['feedback'] as const,
   feedbackByReview: (reviewId: string) => ['feedback', 'byReview', reviewId] as const,
@@ -35,7 +36,7 @@ export type ReviewRunsQuery = Array<{
   diff_text: string;
   created_at: string;
   task_count: number;
-  status: string;
+  status: ReviewRunStatus;
 }>;
 export type TasksQuery = ReviewTask[];
 export type ReposQuery = Array<{
