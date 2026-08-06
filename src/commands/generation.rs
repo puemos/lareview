@@ -72,26 +72,37 @@ pub struct FrontendPlanEntry {
 }
 
 struct SnapshotCleanupGuard {
+    manager: Option<crate::infra::vcs::snapshot::SnapshotManager>,
     path: Option<std::path::PathBuf>,
 }
 
 impl SnapshotCleanupGuard {
-    fn new(path: Option<std::path::PathBuf>) -> Self {
-        Self { path }
+    fn new(
+        manager: Option<crate::infra::vcs::snapshot::SnapshotManager>,
+        path: Option<std::path::PathBuf>,
+    ) -> Self {
+        Self { manager, path }
     }
 }
 
 impl Drop for SnapshotCleanupGuard {
     fn drop(&mut self) {
-        if let Some(path) = &self.path
+        if let (Some(manager), Some(path)) = (&self.manager, &self.path)
             && path.exists()
+            && let Err(error) = manager.remove_blocking(path)
         {
-            let _ = std::fs::remove_dir_all(path);
+            log::warn!(
+                "Failed to clean up snapshot {} from scope guard: {error}",
+                path.display()
+            );
         }
     }
 }
 
-async fn cleanup_snapshot(path: &std::path::Path) {
+async fn cleanup_snapshot(
+    manager: &crate::infra::vcs::snapshot::SnapshotManager,
+    path: &std::path::Path,
+) {
     let mut retries = 5;
     let mut delay = std::time::Duration::from_millis(200);
 
@@ -100,7 +111,7 @@ async fn cleanup_snapshot(path: &std::path::Path) {
             break;
         }
 
-        if let Err(e) = std::fs::remove_dir_all(path) {
+        if let Err(e) = manager.remove(path).await {
             log::warn!("Failed to cleanup snapshot {}: {}", path.display(), e);
         }
 
@@ -166,6 +177,7 @@ async fn generate_review_inner(
     });
 
     // Create snapshot if requested and applicable
+    let mut snapshot_manager = None;
     let snapshot_path = if use_snapshot {
         let repo_id_ref = &repo_id;
         let head_sha = match &source {
@@ -201,6 +213,7 @@ async fn generate_review_inner(
                     .create(&run_id, head_sha)
                     .await
                     .map_err(|e| e.to_string())?;
+                snapshot_manager = Some(manager);
 
                 let _ = on_progress.send(ProgressEventPayload::Log(format!(
                     "Snapshot ready at {}",
@@ -218,7 +231,8 @@ async fn generate_review_inner(
         None
     };
 
-    let _snapshot_guard = SnapshotCleanupGuard::new(snapshot_path.clone());
+    let _snapshot_guard =
+        SnapshotCleanupGuard::new(snapshot_manager.clone(), snapshot_path.clone());
 
     let now = chrono::Utc::now().to_rfc3339();
 
@@ -445,8 +459,10 @@ async fn generate_review_inner(
         active.remove(&run_id);
     }
 
-    if let Some(snapshot_path) = snapshot_path.as_ref() {
-        cleanup_snapshot(snapshot_path).await;
+    if let (Some(manager), Some(snapshot_path)) =
+        (snapshot_manager.as_ref(), snapshot_path.as_ref())
+    {
+        cleanup_snapshot(manager, snapshot_path).await;
     }
 
     match result {

@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.1.3] - 2026-08-06
+
+### Changed
+
+- **Snapshots**: Materialize PR commits as detached Git worktrees so partial clones batch missing blobs and existing commits avoid unnecessary network fetches.
+
+### Fixed
+
+- **Snapshots**: Repair commit-graph/promisor inconsistencies with one targeted refetch, respect configured promisor remotes, and remove incomplete worktree metadata.
+
 ## [0.1.2] - 2026-08-06
 
 ### Changed
