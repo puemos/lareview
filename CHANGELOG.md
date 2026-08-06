@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.1.1] - 2026-08-06
+
+### Added
+
+- **Agents**: Discover an installed Grok Build CLI and launch its native ACP stdio mode while preserving LaReview's mandatory MCP review contract.
+
 ## [0.1.0] - 2026-08-06
 
 ### Added

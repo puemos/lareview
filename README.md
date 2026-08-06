@@ -94,6 +94,7 @@ LaReview launches compatible harnesses through commands already available on you
 | Claude | `npx -y @agentclientprotocol/claude-agent-acp@0.65.0` |
 | Codex | `npx -y @agentclientprotocol/codex-acp@1.1.9` |
 | Gemini | `gemini --acp` |
+| Grok | `grok --no-auto-update agent stdio` |
 | Kimi | `kimi acp` |
 | Mistral | `vibe-acp` |
 | OpenCode | `opencode acp` |
