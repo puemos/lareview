@@ -142,25 +142,26 @@ jobs:
 
           # Get SHA256 for Linux AppImage
           APPIMAGE_URL="https://github.com/puemos/lareview/releases/download/v${VERSION}/LaReview_${VERSION}_amd64.AppImage"
-          APPIMAGE_SHA=$(curl -sL "$APPIMAGE_URL" | sha256sum | cut -d' ' -f1)
+          APPIMAGE_SHA=$(curl -fsSL "$APPIMAGE_URL" | sha256sum | cut -d' ' -f1)
 
           # Get SHA256 for macOS ARM
           ARM_URL="https://github.com/puemos/lareview/releases/download/v${VERSION}/LaReview_aarch64.app.tar.gz"
-          ARM_SHA=$(curl -sL "$ARM_URL" | sha256sum | cut -d' ' -f1)
+          ARM_SHA=$(curl -fsSL "$ARM_URL" | sha256sum | cut -d' ' -f1)
 
           # Get SHA256 for macOS Intel
           INTEL_URL="https://github.com/puemos/lareview/releases/download/v${VERSION}/LaReview_x64.app.tar.gz"
-          INTEL_SHA=$(curl -sL "$INTEL_URL" | sha256sum | cut -d' ' -f1)
+          INTEL_SHA=$(curl -fsSL "$INTEL_URL" | sha256sum | cut -d' ' -f1)
 
           # Update Formula
-          sed -i "s|url \"https://github.com/puemos/lareview/releases/download/v[^\"]*\"|url \"https://github.com/puemos/lareview/releases/download/v${VERSION}/LaReview_${VERSION}_amd64.AppImage\"|" Formula/lareview.rb
-          sed -i "s/version \"[^\"]*\"/version \"${VERSION}\"/" Formula/lareview.rb
-          sed -i "s/sha256 \"[^\"]*\"/sha256 \"${APPIMAGE_SHA}\"/" Formula/lareview.rb
+          sed -i "s|^  url \"[^\"]*\"|  url \"https://github.com/puemos/lareview/releases/download/v${VERSION}/LaReview_${VERSION}_amd64.AppImage\"|" Formula/lareview.rb
+          sed -i "s/^  version \"[^\"]*\"/  version \"${VERSION}\"/" Formula/lareview.rb
+          sed -i "s/^  sha256 \"[^\"]*\"/  sha256 \"${APPIMAGE_SHA}\"/" Formula/lareview.rb
 
           # Update Cask
-          sed -i "s/version \"[^\"]*\"/version \"${VERSION}\"/" Casks/lareview.rb
-          sed -i "s/sha256 arm:   \"[^\"]*\"/sha256 arm:   \"${ARM_SHA}\"/" Casks/lareview.rb
-          sed -i "s/intel: \"[^\"]*\"/intel: \"${INTEL_SHA}\"/" Casks/lareview.rb
+          sed -i 's/^  arch arm: "[^"]*", intel: "[^"]*"/  arch arm: "aarch64", intel: "x64"/' Casks/lareview.rb
+          sed -i "s/^  version \"[^\"]*\"/  version \"${VERSION}\"/" Casks/lareview.rb
+          sed -i "s/^  sha256 arm:   \"[^\"]*\"/  sha256 arm:   \"${ARM_SHA}\"/" Casks/lareview.rb
+          sed -i "s/^         intel: \"[^\"]*\"/         intel: \"${INTEL_SHA}\"/" Casks/lareview.rb
 
           # Commit and push
           git config user.name "github-actions[bot]"
