@@ -87,8 +87,19 @@ The CLI launches the GUI in the background and passes your diff/repo info seamle
 
 ## Supported Agents
 
-| <img src="assets/icons/claude.svg" width="40"><br>Claude | <img src="assets/icons/codex.svg" width="40"><br>Codex | <img src="assets/icons/gemini.svg" width="40"><br>Gemini | <img src="assets/icons/grok.svg" width="40"><br>Grok | <img src="assets/icons/kimi.svg" width="40"><br>Kimi | <img src="assets/icons/mistral.svg" width="40"><br>Mistral | <img src="assets/icons/opencode.svg" width="40"><br>OpenCode | <img src="assets/icons/qwen.svg" width="40"><br>Qwen |
-| :------------------------------------------------------: | :----------------------------------------------------: | :------------------------------------------------------: | :--------------------------------------------------: | :--------------------------------------------------: | :--------------------------------------------------------: | :----------------------------------------------------------: | :--------------------------------------------------: |
+LaReview launches compatible harnesses through commands already available on your `PATH`, or an executable override configured in Settings. It does not provide an in-app harness installer.
+
+| Agent | Launch command |
+| --- | --- |
+| Claude | `npx -y @agentclientprotocol/claude-agent-acp@0.65.0` |
+| Codex | `npx -y @agentclientprotocol/codex-acp@1.1.9` |
+| Gemini | `gemini --acp` |
+| Kimi | `kimi acp` |
+| Mistral | `vibe-acp` |
+| OpenCode | `opencode acp` |
+| Qwen | `qwen --acp --experimental-skills` |
+
+General ACP support is not sufficient: the harness must forward LaReview's client-provided MCP server and call its tools. `pi-acp` is intentionally unsupported because it does not provide that required MCP behavior.
 
 ## Requirements
 
@@ -135,8 +146,8 @@ brew install puemos/tap/lareview
 
 #### macOS
 
-1. Download the `lareview-macos-*.zip` asset and unzip it. You should see `LaReview.app`.
-2. Drag `LaReview.app` into `/Applications`.
+1. Download `LaReview_<version>_aarch64.dmg` for Apple silicon or `LaReview_<version>_x64.dmg` for Intel.
+2. Open the disk image and drag `LaReview.app` into `/Applications`.
 3. If macOS blocks it on first run, open **System Settings → Privacy & Security** and allow it.
 4. To use from terminal, add to PATH (or use the **CLI Installation** button in Settings):
    ```bash

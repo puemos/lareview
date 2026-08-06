@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.1.0] - 2026-08-06
+
+### Added
+
+- **Inbox**: List GitHub pull requests awaiting review, grouped by whether their current head has already been reviewed (#20).
+- **Review**: Open the source GitHub pull request or GitLab merge request directly from the review header (#21).
+- **Agents**: Choose models and reasoning effort from the live session options advertised by each ACP harness.
+
+### Changed
+
+- **ACP/MCP**: Upgrade the ACP client to 2.0.0 while continuing to negotiate wire protocol v1, and upgrade the MCP runtime to 2.17.0.
+- **Agents**: Refresh the pinned Claude and Codex adapters, remove the hard-coded Codex model override, and keep harness discovery based on locally available commands and configured overrides.
+- **MCP**: Keep LaReview MCP tools as the only structured review output path. ACP harnesses that cannot forward client-provided MCP servers, including `pi-acp`, remain unsupported.
+- **Tooling**: Move to Tauri 2.11, Rust 1.97.1 with MSRV 1.91, Node.js 24.18.0, pnpm 11.20.0, Vite 8, TypeScript 7, and Tailwind CSS 4.
+- **Architecture**: Split the Tauri command bridge into modules grouped by concern (#20).
+
+### Fixed
+
+- **Diff**: Highlight Elixir, EEx, and HEEx files with the appropriate Monaco languages (#18).
+- **ACP**: Apply model selections before dependent effort selections and handle updated session configuration options returned by harnesses.
+
 ## [0.0.38] - 2026-04-11
 
 ### Fixed

@@ -4,12 +4,13 @@ Thanks for your interest in improving LaReview! This document outlines the basic
 
 ## Quick start
 
-- Install Rust nightly (edition 2024) with `rustup` and ensure `rustfmt` and `clippy` components are available.
+- Install Rust 1.97.1 with `rustup` and ensure `rustfmt` and `clippy` components are available. The crate's MSRV is 1.91.
+- Install Node.js 24.18.0 and pnpm 11.20.0 for frontend and landing-page work.
 - System deps: `libxkbcommon-dev` and `libxkbcommon-x11-dev` (for Tauri on Linux).
 - Clone the repo, then run:
   - `cargo fmt -- --check`
   - `cargo clippy --all-targets --all-features -- -D warnings`
-  - `cargo test`
+  - `cargo test --all-targets`
 - Optional but encouraged: `cargo deny check` (also runs in scheduled CI) to spot advisory/license issues early.
 - UI/dev loop: `cargo tauri dev` launches the desktop app with hot reload.
 - Local data lives in `~/.local/share/lareview/db.sqlite` (Linux) or `~/Library/Application Support/LaReview/db.sqlite` (macOS).
