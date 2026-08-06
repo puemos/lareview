@@ -4,6 +4,7 @@
 
 pub mod acp;
 pub mod app_config;
+pub mod browser;
 pub mod cli;
 pub mod db;
 pub mod diagram;
