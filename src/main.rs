@@ -172,6 +172,7 @@ fn run_gui(initial_req: Option<DiffRequest>, initial_pending: Option<PendingDiff
             lareview::commands::export_review,
             lareview::commands::fetch_remote_pr,
             lareview::commands::get_agents,
+            lareview::commands::get_agent_session_config,
             lareview::commands::update_agent_config,
             lareview::commands::add_custom_agent,
             lareview::commands::delete_custom_agent,

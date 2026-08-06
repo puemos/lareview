@@ -14,7 +14,7 @@
   <a href="https://github.com/puemos/lareview/actions/workflows/ci.yml"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/puemos/lareview/ci.yml?style=flat-square" /></a>
   <a href="https://github.com/puemos/lareview/releases"><img alt="Release" src="https://img.shields.io/github/v/release/puemos/lareview?style=flat-square" /></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" /></a>
-  <a href="https://www.rust-lang.org"><img alt="Rust" src="https://img.shields.io/badge/rust-nightly-orange?style=flat-square" /></a>
+  <a href="https://www.rust-lang.org"><img alt="Rust" src="https://img.shields.io/badge/rust-1.97.1-orange?style=flat-square" /></a>
 </p>
 
 [![LaReview hero screenshot](assets/screenshots/review.webp)](assets/screenshots/review.webp)
@@ -92,7 +92,8 @@ The CLI launches the GUI in the background and passes your diff/repo info seamle
 
 ## Requirements
 
-- **Rust nightly** (see `rust-toolchain.toml`)
+- **Rust 1.97.1** (installed automatically by rustup from `rust-toolchain.toml`; MSRV 1.91)
+- **Node.js 24.18.0** and **pnpm 11.20.0** for frontend development
 - **GitHub CLI** (optional):
   - Install: `brew install gh` (or your OS package manager)
   - Auth: `gh auth login`
@@ -275,7 +276,7 @@ Wipe local state:
 
 ## Development
 
-- Toolchain: nightly Rust with `rustfmt` and `clippy` components (edition 2024; see `rust-toolchain.toml`)
+- Toolchain: Rust 1.97.1 with `rustfmt` and `clippy` components (edition 2024; MSRV 1.91)
 - Run the app: `cargo run`
 - Reset/seed sample data:
 

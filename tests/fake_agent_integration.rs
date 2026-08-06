@@ -1,5 +1,6 @@
 use lareview::domain::ReviewSource;
 use lareview::infra::acp::RunContext;
+use lareview::infra::acp::{AgentConfigSelection, AgentConfigValue};
 use lareview::infra::acp::{GenerateTasksInput, generate_tasks_with_acp};
 use std::sync::Arc;
 
@@ -47,8 +48,9 @@ index 0000000..1111111 100644\n\
         cleanup_path: None,
         agent_command: agent_path.to_string(),
         agent_args: Vec::new(),
+        agent_config: Vec::new(),
         progress_tx: None,
-        mcp_server_binary: None,
+        mcp_server_binary: Some(std::path::PathBuf::from(env!("CARGO_BIN_EXE_lareview"))),
         timeout_secs: Some(10),
         cancel_token: None,
         debug: true,
@@ -66,4 +68,73 @@ index 0000000..1111111 100644\n\
         "Expected warning about uncovered files in logs, got: {:?}",
         output.logs
     );
+}
+
+#[tokio::test]
+async fn test_generate_tasks_applies_model_before_dependent_effort() {
+    let mut agent_path = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("examples/fake_acp_agent");
+    if !agent_path.exists() {
+        agent_path = std::env::current_exe()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("examples/fake_acp_agent");
+    }
+    let diff_text = "diff --git a/src/a.rs b/src/a.rs\n\
+index 0000000..1111111 100644\n\
+--- a/src/a.rs\n\
++++ b/src/a.rs\n\
+@@ -0,0 +1 @@\n\
++line\n";
+    let run_context = RunContext {
+        review_id: "config-review".to_string(),
+        run_id: "config-run".to_string(),
+        agent_id: "fake".to_string(),
+        input_ref: "diff".to_string(),
+        diff_text: Arc::from(diff_text),
+        diff_hash: "hash".to_string(),
+        source: ReviewSource::DiffPaste {
+            diff_hash: "hash".to_string(),
+        },
+        initial_title: None,
+        created_at: None,
+    };
+
+    let input = GenerateTasksInput {
+        run_context,
+        rules: Vec::new(),
+        repo_root: None,
+        cleanup_path: None,
+        agent_command: agent_path.to_string_lossy().to_string(),
+        agent_args: vec![
+            "--expect-config".to_string(),
+            "fake-fast".to_string(),
+            "high".to_string(),
+        ],
+        agent_config: vec![
+            AgentConfigSelection {
+                config_id: "model".to_string(),
+                value: AgentConfigValue::Select("fake-fast".to_string()),
+            },
+            AgentConfigSelection {
+                config_id: "reasoning_effort".to_string(),
+                value: AgentConfigValue::Select("high".to_string()),
+            },
+        ],
+        progress_tx: None,
+        mcp_server_binary: Some(std::path::PathBuf::from(env!("CARGO_BIN_EXE_lareview"))),
+        timeout_secs: Some(10),
+        cancel_token: None,
+        debug: true,
+    };
+
+    generate_tasks_with_acp(input)
+        .await
+        .expect("generation should apply the advertised model and effort before prompting");
 }

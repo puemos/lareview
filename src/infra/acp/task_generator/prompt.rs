@@ -2,7 +2,7 @@ use crate::domain::{DefaultIssueCategory, LearnedPattern, ResolvedRule};
 use crate::infra::acp::task_mcp_server::RunContext;
 use crate::infra::diff::index::DiffIndex;
 use crate::prompts;
-use agent_client_protocol::{ClientCapabilities, FileSystemCapability, Meta};
+use agent_client_protocol::schema::v1::{ClientCapabilities, FileSystemCapabilities, Meta};
 use anyhow::Context;
 use serde_json::json;
 use std::path::PathBuf;
@@ -152,13 +152,13 @@ fn format_category_name(category: &str) -> String {
         .join(" ")
 }
 
-pub(super) fn build_client_capabilities(has_repo_access: bool) -> ClientCapabilities {
+pub(crate) fn build_client_capabilities(has_repo_access: bool) -> ClientCapabilities {
     let fs_cap = if has_repo_access {
-        FileSystemCapability::new()
+        FileSystemCapabilities::new()
             .read_text_file(true)
             .write_text_file(false)
     } else {
-        FileSystemCapability::new()
+        FileSystemCapabilities::new()
             .read_text_file(false)
             .write_text_file(false)
     };

@@ -1,11 +1,11 @@
 use super::ProgressEvent;
-use agent_client_protocol::{
-    ContentBlock, Error, ExtNotification, ExtRequest, ExtResponse, Meta, PermissionOptionKind,
+use agent_client_protocol::Error;
+use agent_client_protocol::schema::v1::{
+    ContentBlock, ExtNotification, ExtRequest, ExtResponse, Meta, PermissionOptionKind,
     ReadTextFileRequest, ReadTextFileResponse, RequestPermissionOutcome, RequestPermissionRequest,
     RequestPermissionResponse, SelectedPermissionOutcome, SessionNotification, SessionUpdate,
-    ToolKind,
+    ToolCallId, ToolCallLocation, ToolCallStatus, ToolKind,
 };
-use async_trait::async_trait;
 use log::debug;
 use serde_json::json;
 use serde_json::value::RawValue;
@@ -57,6 +57,7 @@ type PendingToolCallValue = (String, String, Option<serde_json::Value>);
 type PendingToolCallMap = HashMap<String, PendingToolCallValue>;
 
 /// Client implementation for receiving agent callbacks.
+#[derive(Clone)]
 pub(super) struct LaReviewClient {
     pub(super) messages: Arc<Mutex<Vec<String>>>,
     pub(super) thoughts: Arc<Mutex<Vec<String>>>,
@@ -214,20 +215,13 @@ impl LaReviewClient {
         false
     }
 
-    fn record_tool_call_name(
-        &self,
-        tool_call_id: &agent_client_protocol::ToolCallId,
-        tool_name: &str,
-    ) {
+    fn record_tool_call_name(&self, tool_call_id: &ToolCallId, tool_name: &str) {
         if let Ok(mut guard) = self.tool_call_names.lock() {
             guard.insert(tool_call_id.to_string(), tool_name.to_string());
         }
     }
 
-    fn lookup_tool_call_name(
-        &self,
-        tool_call_id: &agent_client_protocol::ToolCallId,
-    ) -> Option<String> {
+    fn lookup_tool_call_name(&self, tool_call_id: &ToolCallId) -> Option<String> {
         let key = tool_call_id.to_string();
         self.tool_call_names
             .lock()
@@ -235,7 +229,7 @@ impl LaReviewClient {
             .and_then(|guard| guard.get(key.as_str()).cloned())
     }
 
-    fn clear_tool_call_name(&self, tool_call_id: &agent_client_protocol::ToolCallId) {
+    fn clear_tool_call_name(&self, tool_call_id: &ToolCallId) {
         if let Ok(mut guard) = self.tool_call_names.lock() {
             let key = tool_call_id.to_string();
             guard.remove(key.as_str());
@@ -302,7 +296,7 @@ impl LaReviewClient {
     }
 
     fn extract_path_from_locations(
-        locations: &[agent_client_protocol::ToolCallLocation],
+        locations: &[ToolCallLocation],
     ) -> Option<(PathBuf, Option<u32>)> {
         locations.first().map(|loc| (loc.path.clone(), loc.line))
     }
@@ -372,7 +366,7 @@ impl LaReviewClient {
         &self,
         raw_input: &Option<serde_json::Value>,
         _tool_title: &str,
-        locations: Option<&[agent_client_protocol::ToolCallLocation]>,
+        locations: Option<&[ToolCallLocation]>,
     ) -> ReadCheck {
         let Some(root) = self.repo_root.as_ref() else {
             return ReadCheck {
@@ -494,6 +488,7 @@ impl LaReviewClient {
     }
 
     /// Handle task submission via extension payloads.
+    #[allow(dead_code)]
     fn handle_extension_payload(&self, method: &str, params: &RawValue) -> bool {
         if matches!(method, "lareview/return_task" | "return_task")
             && let Ok(value) = serde_json::from_str::<serde_json::Value>(params.get())
@@ -563,9 +558,8 @@ impl LaReviewClient {
     }
 }
 
-#[async_trait(?Send)]
-impl agent_client_protocol::Client for LaReviewClient {
-    async fn request_permission(
+impl LaReviewClient {
+    pub(super) async fn request_permission(
         &self,
         args: RequestPermissionRequest,
     ) -> agent_client_protocol::Result<RequestPermissionResponse> {
@@ -708,7 +702,7 @@ impl agent_client_protocol::Client for LaReviewClient {
         Ok(RequestPermissionResponse::new(outcome))
     }
 
-    async fn read_text_file(
+    pub(super) async fn read_text_file(
         &self,
         args: ReadTextFileRequest,
     ) -> agent_client_protocol::Result<ReadTextFileResponse> {
@@ -733,7 +727,7 @@ impl agent_client_protocol::Client for LaReviewClient {
         Ok(ReadTextFileResponse::new(sliced))
     }
 
-    async fn session_notification(
+    pub(super) async fn session_notification(
         &self,
         notification: SessionNotification,
     ) -> agent_client_protocol::Result<()> {
@@ -926,14 +920,8 @@ impl agent_client_protocol::Client for LaReviewClient {
                             .and_then(Self::tool_name_from_payload)
                     })
                     .or_else(|| self.lookup_tool_call_name(&update.tool_call_id));
-                let is_completed = matches!(
-                    update.fields.status,
-                    Some(agent_client_protocol::ToolCallStatus::Completed)
-                );
-                let is_failed = matches!(
-                    update.fields.status,
-                    Some(agent_client_protocol::ToolCallStatus::Failed)
-                );
+                let is_completed = matches!(update.fields.status, Some(ToolCallStatus::Completed));
+                let is_failed = matches!(update.fields.status, Some(ToolCallStatus::Failed));
                 let is_finalize = matches!(tool_name.as_deref(), Some("finalize_review"))
                     || tool_id.contains("finalize_review");
                 let is_return_task = matches!(tool_name.as_deref(), Some("return_task"))
@@ -1036,7 +1024,11 @@ impl agent_client_protocol::Client for LaReviewClient {
         Ok(())
     }
 
-    async fn ext_method(&self, args: ExtRequest) -> agent_client_protocol::Result<ExtResponse> {
+    #[allow(dead_code)]
+    pub(super) async fn ext_method(
+        &self,
+        args: ExtRequest,
+    ) -> agent_client_protocol::Result<ExtResponse> {
         let stored = self.handle_extension_payload(&args.method, &args.params);
         let response_value = if stored {
             serde_json::json!({ "status": "ok" })
@@ -1049,7 +1041,11 @@ impl agent_client_protocol::Client for LaReviewClient {
         Ok(ExtResponse::new(raw))
     }
 
-    async fn ext_notification(&self, args: ExtNotification) -> agent_client_protocol::Result<()> {
+    #[allow(dead_code)]
+    pub(super) async fn ext_notification(
+        &self,
+        args: ExtNotification,
+    ) -> agent_client_protocol::Result<()> {
         self.handle_extension_payload(&args.method, &args.params);
         Ok(())
     }
@@ -1188,7 +1184,7 @@ mod tests {
 
     #[test]
     fn test_tool_call_tracking() {
-        use agent_client_protocol::ToolCallId;
+        use agent_client_protocol::schema::v1::ToolCallId;
         let client = LaReviewClient::new(None, "run1", None);
         let id = ToolCallId::new("tc1");
 
@@ -1201,7 +1197,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_request_permission() {
-        use agent_client_protocol::{Client, RequestPermissionRequest};
+        use agent_client_protocol::schema::v1::RequestPermissionRequest;
         let client = LaReviewClient::new(None, "run1", None);
 
         let req_json = json!({
@@ -1227,7 +1223,7 @@ mod tests {
         let resp = client.request_permission(req).await.unwrap();
         assert!(matches!(
             resp.outcome,
-            agent_client_protocol::RequestPermissionOutcome::Selected(_)
+            agent_client_protocol::schema::v1::RequestPermissionOutcome::Selected(_)
         ));
     }
 

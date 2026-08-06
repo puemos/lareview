@@ -6,5 +6,5 @@ crate::define_standard_acp_agent!(
     "Kimi",
     "assets/icons/kimi.svg",
     "kimi",
-    ["--experimental-acp"]
+    ["acp"]
 );

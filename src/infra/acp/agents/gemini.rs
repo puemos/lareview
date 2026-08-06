@@ -6,5 +6,5 @@ crate::define_standard_acp_agent!(
     "Gemini",
     "assets/icons/gemini.svg",
     "gemini",
-    ["--experimental-acp"]
+    ["--acp"]
 );

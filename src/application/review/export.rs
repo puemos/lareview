@@ -346,7 +346,7 @@ impl ReviewExporter {
         } else {
             for comment in comments {
                 let author = if let Some(stripped) = comment.author.strip_prefix("agent:") {
-                    format!("Agent {}{}", &stripped[0..1].to_uppercase(), &stripped[1..])
+                    format!("Agent {}{}", stripped[0..1].to_uppercase(), &stripped[1..])
                 } else {
                     comment.author.clone()
                 };

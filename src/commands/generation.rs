@@ -1,7 +1,8 @@
 use crate::application::review::rules::resolve_rules;
 use crate::domain::{ResolvedRule, Review, ReviewRun, ReviewRunStatus, ReviewSource, ReviewStatus};
 use crate::infra::acp::{
-    GenerateTasksInput, ProgressEvent, RunContext, generate_tasks_with_acp, list_agent_candidates,
+    AgentConfigSelection, GenerateTasksInput, ProgressEvent, RunContext, generate_tasks_with_acp,
+    list_agent_candidates,
 };
 use crate::infra::diff::index::DiffIndex;
 use crate::infra::hash::hash_diff;
@@ -127,6 +128,7 @@ pub async fn generate_review(
     repo_id: Option<String>,
     source: Option<ReviewSource>,
     use_snapshot: bool,
+    agent_config: Option<Vec<AgentConfigSelection>>,
     on_progress: Channel<ProgressEventPayload>,
 ) -> Result<ReviewGenerationResult, String> {
     generate_review_inner(
@@ -137,6 +139,7 @@ pub async fn generate_review(
         repo_id,
         source,
         use_snapshot,
+        agent_config,
         on_progress,
     )
     .await
@@ -151,6 +154,7 @@ async fn generate_review_inner(
     repo_id: Option<String>,
     source: Option<ReviewSource>,
     use_snapshot: bool,
+    agent_config: Option<Vec<AgentConfigSelection>>,
     on_progress: Channel<ProgressEventPayload>,
 ) -> Result<ReviewGenerationResult, String> {
     let diff_hash = hash_diff(&diff_text);
@@ -420,6 +424,7 @@ async fn generate_review_inner(
         cleanup_path: snapshot_path.clone(),
         agent_command: command,
         agent_args: candidate_args,
+        agent_config: agent_config.unwrap_or_default(),
         progress_tx: Some(mcp_tx),
         mcp_server_binary: None,
         timeout_secs: Some(

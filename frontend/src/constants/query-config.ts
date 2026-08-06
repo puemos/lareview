@@ -13,4 +13,5 @@ export const PERSIST_CONFIG = {
 
 export const STORAGE_KEYS = {
   agentId: 'agentId',
+  agentConfigPreferences: 'agentConfigPreferences',
 } as const;

@@ -14,6 +14,7 @@ import { VcsInputCard } from './VcsInputCard';
 import { ViewModeToggle } from './ViewModeToggle';
 import { DiffStats } from './DiffStats';
 import { countAdditions, countDeletions } from './DiffEditorPanel';
+import { toAgentConfigSelections } from '../../lib/agent-config';
 
 interface GenerateViewProps {
   onNavigate: (view: ViewType) => void;
@@ -48,6 +49,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   const setDiffTextStore = useAppStore(state => state.setDiffText);
   const agentId = useAppStore(state => state.agentId);
   const setAgentIdStore = useAppStore(state => state.setAgentId);
+  const agentConfigPreferences = useAppStore(state => state.agentConfigPreferences);
   const setParsedDiff = useAppStore(state => state.setParsedDiff);
   const isGenerating = useAppStore(state => state.isGenerating);
   const plan = useAppStore(state => state.plan);
@@ -217,6 +219,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
       agentId,
       repoId: selectedRepoId || undefined,
       source: pendingSource,
+      agentConfig: toAgentConfigSelections(agentConfigPreferences[agentId] || []),
     });
     if (ok) {
       _onNavigate('review');
@@ -231,6 +234,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     _onNavigate,
     pendingSource,
     selectedRepoId,
+    agentConfigPreferences,
   ]);
 
   const handleFetchPr = useCallback(async () => {

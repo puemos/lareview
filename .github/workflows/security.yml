@@ -13,7 +13,7 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly
+          toolchain: 1.97.1
       - uses: actions/cache@v4
         with:
           path: ~/.cargo/bin/cargo-deny

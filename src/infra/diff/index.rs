@@ -960,7 +960,7 @@ impl DiffIndex {
         }
 
         // Sort by total changes (additions + deletions), largest first
-        file_stats.sort_by(|a, b| (b.1 + b.2).cmp(&(a.1 + a.2)));
+        file_stats.sort_by_key(|entry| std::cmp::Reverse(entry.1 + entry.2));
 
         result.push_str("## Files (sorted by change size)\n\n");
         result.push_str("Use `get_hunk` or `get_file_hunks` tools to retrieve content.\n\n");
@@ -1148,7 +1148,7 @@ mod tests {
 index 0123456..789abcd 100644
 --- a/src/main.rs
 +++ b/src/main.rs
-@@ -1,5 +1,5 @@
+@@ -1,4 +1,4 @@
  fn main() {
 -    println!("Hello, world!");
 +    println!("Hello, Gemini!");
@@ -1256,7 +1256,7 @@ index 0000000..abcdefg
         let (diff_text, files) = index.render_unified_diff(&diff_refs).unwrap();
         assert_eq!(files, vec!["src/main.rs"]);
         assert!(diff_text.contains("diff --git a/src/main.rs b/src/main.rs"));
-        assert!(diff_text.contains("@@ -1,5 +1,5 @@"));
+        assert!(diff_text.contains("@@ -1,4 +1,4 @@"));
         assert!(diff_text.contains("-    println!(\"Hello, world!\");"));
         assert!(diff_text.contains("+    println!(\"Hello, Gemini!\");"));
         assert!(!diff_text.contains("diff --git a/src/lib.rs b/src/lib.rs"));
@@ -1371,12 +1371,12 @@ index 0000000..abcdefg
         let diff = r#"diff --git a/file.txt b/file.txt
 --- a/file.txt
 +++ b/file.txt
-@@ -1,5 +1,5 @@
+@@ -1,3 +1,3 @@
  context line
 -context line 2
 +context line 2 changed
  context line 3
-@@ -10,5 +10,5 @@
+@@ -10,3 +10,3 @@
  context line
 -context line 2
 +context line 2 changed
@@ -1411,7 +1411,7 @@ index 0000000..abcdefg
         let diff = r##"diff --git a/complex.rs b/complex.rs
 --- a/complex.rs
 +++ b/complex.rs
-@@ -10,8 +10,8 @@
+@@ -10,5 +10,5 @@
  context line 1
 -context line 2
 +added line 2
@@ -1419,7 +1419,7 @@ index 0000000..abcdefg
 -context line 4
 +added line 4
  context line 5
-@@ -20,5 +20,5 @@
+@@ -20,3 +20,3 @@
  context line
 -removed line
 +added line
@@ -1435,7 +1435,7 @@ index 0000000..abcdefg
 
         let index = DiffIndex::new(diff).unwrap();
 
-        // Test first hunk: @@ -10,8 +10,8 @@
+        // Test first hunk: @@ -10,5 +10,5 @@
         // In unified diff format, removals come before additions:
         // Pos:  0        1 (rem)    2 (add)    3        4 (rem)    5 (add)    6
         //
@@ -1476,7 +1476,7 @@ index 0000000..abcdefg
         assert_eq!(result.0, 14);
         assert_eq!(result.1, 6);
 
-        // Test second hunk: @@ -20,5 +20,5 @@
+        // Test second hunk: @@ -20,3 +20,3 @@
         // Pos:  0        1 (rem)    2 (add)    3
         //
         // New file line numbers:

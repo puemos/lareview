@@ -136,7 +136,7 @@ pub async fn list_review_candidates(
 
     let mut annotated = annotate_candidates(candidates, &reviews);
     // Most recently updated first — the inbox is a work queue.
-    annotated.sort_by(|a, b| b.candidate.updated_at.cmp(&a.candidate.updated_at));
+    annotated.sort_by_key(|candidate| std::cmp::Reverse(candidate.candidate.updated_at));
 
     Ok(ReviewCandidatesResult {
         candidates: annotated,

@@ -5,6 +5,6 @@ crate::define_standard_acp_agent!(
     "mistral",
     "Mistral",
     "assets/icons/mistral.svg",
-    "mistral",
-    ["--experimental-acp"]
+    "vibe-acp",
+    []
 );

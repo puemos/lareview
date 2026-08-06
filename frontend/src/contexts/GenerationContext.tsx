@@ -44,7 +44,13 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const currentTaskTitleRef = useRef<string | null>(null);
 
   const startGeneration = useCallback(
-    async ({ diffText, agentId, repoId, source }: StartGenerationArgs): Promise<boolean> => {
+    async ({
+      diffText,
+      agentId,
+      repoId,
+      source,
+      agentConfig,
+    }: StartGenerationArgs): Promise<boolean> => {
       if (isGeneratingRef.current) return false;
 
       isGeneratingRef.current = true;
@@ -208,7 +214,8 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           repoId,
           source || undefined,
           useSnapshot,
-          onProgress
+          onProgress,
+          agentConfig
         );
 
         setReviewId(result.review_id);

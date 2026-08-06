@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Database } from '@phosphor-icons/react';
 import { AgentSelector } from './AgentSelector';
 import { Tooltip } from '../Common/Tooltip';
+import { HarnessConfigControls } from './HarnessConfigControls';
 import type { Agent, LinkedRepo } from '../../types';
 
 interface AgentConfigPanelProps {
@@ -34,6 +35,12 @@ export const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
     <div className="border-border space-y-6 border-b p-5">
       <div className="space-y-4">
         <AgentSelector agents={agents} selectedAgentId={selectedAgentId} onSelect={onAgentSelect} />
+
+        <HarnessConfigControls
+          agentId={selectedAgentId}
+          enabled={agents.some(agent => agent.id === selectedAgentId && agent.available !== false)}
+          disabled={isGenerating}
+        />
 
         <div className="space-y-1.5">
           <label className="text-text-disabled flex items-center gap-1.5 text-[10px] font-bold tracking-wider uppercase">

@@ -10,6 +10,8 @@ import type {
   Feedback,
   Comment,
   ReviewSource,
+  AgentConfigSelection,
+  AgentSessionConfigOption,
 } from '../types';
 import type { ProgressEventPayload } from '../hooks/useTauri';
 
@@ -96,6 +98,9 @@ interface MockTauriReturn {
   loadTasks: Mock<(runId: string) => Promise<ReviewTask[]>>;
   updateTaskStatus: Mock<(taskId: string, status: string) => Promise<void>>;
   getAgents: Mock<() => Promise<Agent[]>>;
+  getAgentSessionConfig: Mock<
+    (agentId: string, selections?: AgentConfigSelection[]) => Promise<AgentSessionConfigOption[]>
+  >;
   addCustomAgent: Mock<
     (id: string, label: string, command: string, args?: string[], logo?: string) => Promise<void>
   >;
@@ -125,7 +130,8 @@ interface MockTauriReturn {
       repoId?: string,
       source?: ReviewSource,
       useSnapshot?: boolean,
-      onProgress?: Channel<ProgressEventPayload>
+      onProgress?: Channel<ProgressEventPayload>,
+      agentConfig?: AgentConfigSelection[]
     ) => Promise<{ task_count: number; review_id: string; run_id?: string }>
   >;
   stop_generation: Mock<(runId: string) => Promise<void>>;
@@ -143,6 +149,7 @@ function createMockTauri(): MockTauriReturn {
     getAgents: vi
       .fn()
       .mockResolvedValue([{ id: 'agent-1', name: 'Test Agent', description: 'Test' }]),
+    getAgentSessionConfig: vi.fn().mockResolvedValue([]),
     addCustomAgent: vi.fn().mockResolvedValue(undefined),
     deleteCustomAgent: vi.fn().mockResolvedValue(undefined),
     linkRepo: vi.fn().mockImplementation((path: string) =>

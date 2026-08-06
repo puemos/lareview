@@ -1,0 +1,3 @@
+allowBuilds:
+  '@parcel/watcher': true
+  '@tailwindcss/oxide': true

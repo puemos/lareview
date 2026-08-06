@@ -24,6 +24,8 @@ import type {
   LearningCompactionResult,
   MergeConfidence,
   ReviewCandidatesResult,
+  AgentConfigSelection,
+  AgentSessionConfigOption,
 } from '../types';
 import { useCallback } from 'react';
 
@@ -284,7 +286,8 @@ export const useTauri = () => {
       repoId?: string,
       source?: ReviewSource,
       useSnapshot?: boolean,
-      onProgress?: Channel<ProgressEventPayload>
+      onProgress?: Channel<ProgressEventPayload>,
+      agentConfig?: AgentConfigSelection[]
     ): Promise<{ task_count: number; review_id: string; run_id?: string }> => {
       return invoke('generate_review', {
         diffText,
@@ -293,6 +296,7 @@ export const useTauri = () => {
         repoId,
         source,
         useSnapshot: useSnapshot || false,
+        agentConfig,
         onProgress,
       });
     },
@@ -462,6 +466,16 @@ export const useTauri = () => {
     return invoke('get_agents');
   }, []);
 
+  const getAgentSessionConfig = useCallback(
+    async (
+      agentId: string,
+      selections?: AgentConfigSelection[]
+    ): Promise<AgentSessionConfigOption[]> => {
+      return invoke('get_agent_session_config', { agentId, selections });
+    },
+    []
+  );
+
   const getGitHubToken = useCallback(async (): Promise<string | null> => {
     return invoke('get_github_token');
   }, []);
@@ -618,6 +632,7 @@ export const useTauri = () => {
     onProgress,
     onReviewComplete,
     getAgents,
+    getAgentSessionConfig,
     updateAgentConfig,
     addCustomAgent,
     deleteCustomAgent,

@@ -1,12 +1,14 @@
 use super::client::LaReviewClient;
 use super::prompt::{build_client_capabilities, build_prompt};
 use super::validation::validate_tasks_payload;
-use agent_client_protocol::{
-    Agent, ClientSideConnection, ContentBlock, Implementation, InitializeRequest, McpServer,
-    McpServerStdio, NewSessionRequest, PromptRequest, ProtocolVersion, TextContent,
+use crate::infra::acp::session_config::apply_session_config_options;
+use agent_client_protocol::schema::ProtocolVersion;
+use agent_client_protocol::schema::v1::{
+    ContentBlock, InitializeRequest, McpServer, McpServerStdio, NewSessionRequest, PromptRequest,
+    ReadTextFileRequest, RequestPermissionRequest, SessionNotification, TextContent,
 };
+use agent_client_protocol::{ByteStreams, Client as AcpClient, Error as AcpError};
 use anyhow::{Context as _, Result};
-use futures::future::LocalBoxFuture;
 use log::debug;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -188,6 +190,7 @@ async fn generate_tasks_with_acp_inner_impl(
         cleanup_path: _,
         agent_command,
         agent_args,
+        agent_config,
         progress_tx,
         mcp_server_binary,
         timeout_secs: _,
@@ -290,28 +293,46 @@ async fn generate_tasks_with_acp_inner_impl(
     let stdin_compat = stdin.compat_write();
     let stdout_compat = stdout.compat();
 
-    let spawn_fn = |fut: LocalBoxFuture<'static, ()>| {
-        tokio::task::spawn_local(fut);
-    };
+    let permission_client = client.clone();
+    let read_client = client.clone();
+    let notification_client = client.clone();
+    let transport = ByteStreams::new(stdin_compat, stdout_compat);
 
-    let (connection, io_future) =
-        ClientSideConnection::new(client, stdin_compat, stdout_compat, spawn_fn);
-
-    // Spawn the asynchronous I/O loop to facilitate bidirectional
-    // communication with the agent process.
-    let io_handle = tokio::task::spawn_local(async move {
-        let _ = io_future.await;
-    });
-
-    let result = async {
+    let result = AcpClient
+        .builder()
+        .name("lareview")
+        .on_receive_request(
+            async move |request: RequestPermissionRequest, responder, _connection| {
+                responder.respond(permission_client.request_permission(request).await?)
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: ReadTextFileRequest, responder, _connection| {
+                responder.respond(read_client.read_text_file(request).await?)
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_notification(
+            async move |notification: SessionNotification, _connection| {
+                notification_client.session_notification(notification).await
+            },
+            agent_client_protocol::on_receive_notification!(),
+        )
+        .connect_with(transport, async |connection| {
+            let operation: Result<GenerateTasksResult> = async {
         // Initialize connection
         push_log(&logs, "initialize", debug);
         connection
-            .initialize(
+            .send_request(
                 InitializeRequest::new(ProtocolVersion::V1)
-                    .client_info(Implementation::new("lareview", env!("CARGO_PKG_VERSION")))
+                    .client_info(agent_client_protocol::schema::v1::Implementation::new(
+                        "lareview",
+                        env!("CARGO_PKG_VERSION"),
+                    ))
                     .client_capabilities(build_client_capabilities(has_repo_access)),
             )
+            .block_task()
             .await
             .with_context(|| "ACP initialize failed")?;
         push_log(&logs, "initialize ok", debug);
@@ -355,19 +376,44 @@ async fn generate_tasks_with_acp_inner_impl(
             task_mcp_server_path.display(),
         ));
         let session = connection
-            .new_session(NewSessionRequest::new(cwd).mcp_servers(mcp_servers))
+            .send_request(NewSessionRequest::new(cwd).mcp_servers(mcp_servers))
+            .block_task()
             .await
             .with_context(|| "ACP new_session failed")?;
         push_log(&logs, "new_session ok", debug);
+
+        let session_id = session.session_id;
+        if !agent_config.is_empty() {
+            let _effective_options = apply_session_config_options(
+                &connection,
+                &session_id,
+                session.config_options.unwrap_or_default(),
+                &agent_config,
+                |selection| {
+                    push_log(
+                        &logs,
+                        format!(
+                            "session config '{}' is no longer advertised; using the agent default",
+                            selection.config_id
+                        ),
+                        debug,
+                    );
+                },
+            )
+            .await
+            .with_context(|| "ACP session configuration failed")?;
+            push_log(&logs, "session config ok", debug);
+        }
 
         // Send prompt
         let prompt_text = build_prompt(&run_context, repo_root.as_ref(), &rules)?;
         push_log(&logs, "prompt", debug);
         let prompt_result = connection
-            .prompt(PromptRequest::new(
-                session.session_id,
+            .send_request(PromptRequest::new(
+                session_id,
                 vec![ContentBlock::Text(TextContent::new(prompt_text))],
             ))
+            .block_task()
             .await;
 
         if let Err(err) = &prompt_result {
@@ -456,9 +502,8 @@ async fn generate_tasks_with_acp_inner_impl(
                 }
             }
         };
-        // Ensure all pending notifications from the agent are processed before return.
+        // Ensure the agent process is not left running after completion.
         kill_process_group(child_pid, &logs, debug);
-        let _ = io_handle.await;
         process_guard.disarm();
 
         push_log(&logs, format!("Agent exit status: {}", status), debug);
@@ -520,8 +565,12 @@ async fn generate_tasks_with_acp_inner_impl(
             thoughts: final_thoughts,
             logs: final_logs,
         })
-    }
-    .await;
+            }
+            .await;
+            operation.map_err(|error| AcpError::internal_error().data(format!("{error:#}")))
+        })
+        .await
+        .map_err(|error| anyhow::anyhow!("ACP connection failed: {error:?}"));
 
     if result.is_err() {
         let _ = child.start_kill();
@@ -582,6 +631,7 @@ mod tests {
             agent_command: "sleep".into(),
 
             agent_args: vec!["10".into()],
+            agent_config: Vec::new(),
             progress_tx: None,
             mcp_server_binary: None,
             timeout_secs: Some(1),
@@ -621,6 +671,7 @@ mod tests {
             cleanup_path: None,
             agent_command: "sleep".into(),
             agent_args: vec!["10".into()],
+            agent_config: Vec::new(),
             progress_tx: None,
             mcp_server_binary: None,
             timeout_secs: Some(10),

@@ -1,9 +1,10 @@
-use agent_client_protocol::{
-    ContentBlock, Error, ExtNotification, ExtRequest, ExtResponse, PermissionOptionKind,
+use agent_client_protocol::Error;
+use agent_client_protocol::schema::v1::{
+    ContentBlock, ExtNotification, ExtRequest, ExtResponse, PermissionOptionKind,
     ReadTextFileRequest, ReadTextFileResponse, RequestPermissionOutcome, RequestPermissionRequest,
     RequestPermissionResponse, SelectedPermissionOutcome, SessionNotification, SessionUpdate,
+    ToolCallStatus,
 };
-use async_trait::async_trait;
 use log::debug;
 use serde_json::value::RawValue;
 use serde_json::{Value, json};
@@ -15,6 +16,7 @@ const TOOL_SUBMIT_LEARNED_PATTERNS: &str = "submit_learned_patterns";
 const TOOL_FINALIZE_LEARNING: &str = "finalize_learning";
 const LEARNING_TOOLS: &[&str] = &[TOOL_SUBMIT_LEARNED_PATTERNS, TOOL_FINALIZE_LEARNING];
 
+#[derive(Clone)]
 pub struct LearningClient {
     pub patterns: Arc<Mutex<Vec<LearnedPatternInput>>>,
     pub finalization_received: Arc<Mutex<bool>>,
@@ -123,6 +125,7 @@ impl LearningClient {
         }
     }
 
+    #[allow(dead_code)]
     fn handle_extension_payload(&self, method: &str, params: &RawValue) -> bool {
         if matches!(
             method,
@@ -142,9 +145,8 @@ impl LearningClient {
     }
 }
 
-#[async_trait(?Send)]
-impl agent_client_protocol::Client for LearningClient {
-    async fn request_permission(
+impl LearningClient {
+    pub async fn request_permission(
         &self,
         args: RequestPermissionRequest,
     ) -> agent_client_protocol::Result<RequestPermissionResponse> {
@@ -192,7 +194,7 @@ impl agent_client_protocol::Client for LearningClient {
         Ok(RequestPermissionResponse::new(outcome))
     }
 
-    async fn read_text_file(
+    pub async fn read_text_file(
         &self,
         _args: ReadTextFileRequest,
     ) -> agent_client_protocol::Result<ReadTextFileResponse> {
@@ -201,7 +203,7 @@ impl agent_client_protocol::Client for LearningClient {
         })))
     }
 
-    async fn session_notification(
+    pub async fn session_notification(
         &self,
         notification: SessionNotification,
     ) -> agent_client_protocol::Result<()> {
@@ -276,10 +278,7 @@ impl agent_client_protocol::Client for LearningClient {
                             .and_then(Self::tool_name_from_payload)
                     });
 
-                let is_completed = matches!(
-                    update.fields.status,
-                    Some(agent_client_protocol::ToolCallStatus::Completed)
-                );
+                let is_completed = matches!(update.fields.status, Some(ToolCallStatus::Completed));
                 let is_finalize = matches!(tool_name.as_deref(), Some(TOOL_FINALIZE_LEARNING));
                 let is_submit_patterns =
                     matches!(tool_name.as_deref(), Some(TOOL_SUBMIT_LEARNED_PATTERNS));
@@ -299,7 +298,8 @@ impl agent_client_protocol::Client for LearningClient {
         Ok(())
     }
 
-    async fn ext_method(&self, args: ExtRequest) -> agent_client_protocol::Result<ExtResponse> {
+    #[allow(dead_code)]
+    pub async fn ext_method(&self, args: ExtRequest) -> agent_client_protocol::Result<ExtResponse> {
         let stored = self.handle_extension_payload(&args.method, &args.params);
         let response_value = if stored {
             json!({ "status": "ok" })
@@ -312,7 +312,11 @@ impl agent_client_protocol::Client for LearningClient {
         Ok(ExtResponse::new(raw))
     }
 
-    async fn ext_notification(&self, args: ExtNotification) -> agent_client_protocol::Result<()> {
+    #[allow(dead_code)]
+    pub async fn ext_notification(
+        &self,
+        args: ExtNotification,
+    ) -> agent_client_protocol::Result<()> {
         self.handle_extension_payload(&args.method, &args.params);
         Ok(())
     }

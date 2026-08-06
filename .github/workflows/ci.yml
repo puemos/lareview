@@ -1,4 +1,4 @@
-name: Rust CI
+name: CI
 
 on:
   push:
@@ -19,6 +19,22 @@ permissions:
   contents: read
 
 jobs:
+  supply-chain:
+    name: Supply chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.97.1
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@cargo-deny
+      - name: Run cargo-deny
+        run: cargo deny check
+
   check:
     name: Check & Lint
     runs-on: ubuntu-latest
@@ -42,7 +58,7 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-12-06
+          toolchain: 1.97.1
           components: rustfmt, clippy
 
       - name: Cache Rust build artifacts
@@ -58,8 +74,8 @@ jobs:
           mkdir -p frontend/dist
           touch frontend/dist/index.html
 
-      - name: Lint (default features)
-        run: cargo clippy -- -D warnings
+      - name: Lint
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
   test:
     name: Tests
@@ -85,7 +101,7 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-12-06
+          toolchain: 1.97.1
 
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
@@ -101,7 +117,12 @@ jobs:
         run: cargo build --example fake_acp_agent
 
       - name: Run tests
-        run: cargo test --verbose
+        env:
+          LAREVIEW_CONFIG_PATH: ${{ runner.temp }}/lareview-test-config.toml
+          LAREVIEW_DATA_HOME: ${{ runner.temp }}/lareview-test-data
+          LAREVIEW_DB_PATH: ${{ runner.temp }}/lareview-test.sqlite
+          RUST_TEST_THREADS: "1"
+        run: cargo test --all-targets --verbose
 
   build:
     name: Build Check
@@ -127,17 +148,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "lts/*"
+          node-version: "24.18.0"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 11.20.0
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-12-06
+          toolchain: 1.97.1
 
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
@@ -145,7 +166,15 @@ jobs:
           workspaces: ". -> target"
 
       - name: Install frontend dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
+        working-directory: frontend
+
+      - name: Lint frontend
+        run: pnpm lint --max-warnings 0
+        working-directory: frontend
+
+      - name: Test frontend
+        run: pnpm test --run
         working-directory: frontend
 
       - name: Build frontend
@@ -154,3 +183,63 @@ jobs:
 
       - name: Build release binary
         run: cargo build --release
+
+  msrv:
+    name: Minimum Supported Rust
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libxdo-dev \
+            libssl-dev
+
+      - name: Set up Rust MSRV
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.91"
+
+      - name: Create dummy frontend assets
+        run: |
+          mkdir -p frontend/dist
+          touch frontend/dist/index.html
+
+      - name: Check MSRV
+        run: cargo check --all-targets
+
+  landing:
+    name: Landing Page
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.18.0"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.20.0
+
+      - name: Install landing dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: landing
+
+      - name: Build landing page
+        run: pnpm build
+        working-directory: landing

@@ -9,6 +9,7 @@ import {
   ReviewTask,
   DiffComment,
   ParsedDiff,
+  AgentConfigPreference,
 } from '../types';
 import { PERSIST_CONFIG, STORAGE_KEYS } from '../constants/query-config';
 import type { AvailableCommand, SessionUpdate } from '../hooks/useTauri';
@@ -24,7 +25,6 @@ import {
 interface ProgressMessage {
   type: string;
   message: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data?: any;
   timestamp: number;
   id?: string;
@@ -41,6 +41,7 @@ interface AppStore {
   selectedFeedbackId: string | null;
   isGenerating: boolean;
   agentId: string;
+  agentConfigPreferences: Record<string, AgentConfigPreference[]>;
   reviewId: string | null;
   runId: string | null;
   progressMessages: ProgressMessage[];
@@ -65,9 +66,14 @@ interface AppStore {
   selectFeedback: (feedbackId: string | null) => void;
   setIsGenerating: (isGenerating: boolean) => void;
   setAgentId: (agentId: string) => void;
+  setAgentConfigPreference: (
+    agentId: string,
+    preference: AgentConfigPreference,
+    clearCategories?: string[]
+  ) => void;
+  setAgentConfigPreferences: (agentId: string, preferences: AgentConfigPreference[]) => void;
   setReviewId: (id: string | null) => void;
   setRunId: (id: string | null) => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   addProgressMessage: (type: string, message: string, data?: any) => void;
   updateLastProgressMessage: (updates: Partial<ProgressMessage>) => void;
   handleServerUpdate: (update: SessionUpdate | Plan) => void;
@@ -95,6 +101,7 @@ export const useAppStore = create<AppStore>()(
         selectedFeedbackId: null,
         isGenerating: false,
         agentId: 'default',
+        agentConfigPreferences: {},
         reviewId: null,
         runId: null,
         progressMessages: [],
@@ -150,6 +157,29 @@ export const useAppStore = create<AppStore>()(
         selectFeedback: feedbackId => set({ selectedFeedbackId: feedbackId, selectedTaskId: null }),
         setIsGenerating: isGenerating => set({ isGenerating }),
         setAgentId: agentId => set({ agentId }),
+        setAgentConfigPreference: (agentId, preference, clearCategories = []) =>
+          set(state => {
+            const current = state.agentConfigPreferences[agentId] || [];
+            const next = current.filter(
+              item =>
+                item.configId !== preference.configId &&
+                (!item.category || !clearCategories.includes(item.category))
+            );
+            next.push(preference);
+            return {
+              agentConfigPreferences: {
+                ...state.agentConfigPreferences,
+                [agentId]: next,
+              },
+            };
+          }),
+        setAgentConfigPreferences: (agentId, preferences) =>
+          set(state => ({
+            agentConfigPreferences: {
+              ...state.agentConfigPreferences,
+              [agentId]: preferences,
+            },
+          })),
 
         setReviewId: id => set({ reviewId: id }),
         setRunId: id => set({ runId: id }),
@@ -367,6 +397,7 @@ export const useAppStore = create<AppStore>()(
         name: PERSIST_CONFIG.name,
         partialize: state => ({
           [STORAGE_KEYS.agentId]: state.agentId,
+          [STORAGE_KEYS.agentConfigPreferences]: state.agentConfigPreferences,
         }),
       }
     )

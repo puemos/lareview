@@ -10,7 +10,24 @@ feature-depth = 1
 
 [advisories]
 ignore = [
-    { id = "RUSTSEC-2024-0436", reason = "paste is only pulled via rav1e->image; no fixed version available yet" },
+    { id = "RUSTSEC-2024-0436", reason = "paste remains transitive through image's EXR/AVIF codecs; no maintained compatible replacement is available upstream" },
+    { id = "RUSTSEC-2024-0370", reason = "proc-macro-error is build-time-only through Tauri's required GTK3 bindings; no maintained compatible release exists" },
+    { id = "RUSTSEC-2024-0411", reason = "Tauri 2.11 still requires the archived GTK3/WebKit stack on Linux; migrate when Tauri supports a maintained Linux webview stack" },
+    { id = "RUSTSEC-2024-0412", reason = "Tauri 2.11 still requires the archived GTK3/WebKit stack on Linux; migrate when Tauri supports a maintained Linux webview stack" },
+    { id = "RUSTSEC-2024-0413", reason = "Tauri 2.11 still requires the archived GTK3/WebKit stack on Linux; migrate when Tauri supports a maintained Linux webview stack" },
+    { id = "RUSTSEC-2024-0414", reason = "Tauri 2.11 still requires the archived GTK3/WebKit stack on Linux; migrate when Tauri supports a maintained Linux webview stack" },
+    { id = "RUSTSEC-2024-0415", reason = "Tauri 2.11 still requires the archived GTK3/WebKit stack on Linux; migrate when Tauri supports a maintained Linux webview stack" },
+    { id = "RUSTSEC-2024-0416", reason = "Tauri 2.11 still requires the archived GTK3/WebKit stack on Linux; migrate when Tauri supports a maintained Linux webview stack" },
+    { id = "RUSTSEC-2024-0417", reason = "Tauri 2.11 still requires the archived GTK3/WebKit stack on Linux; migrate when Tauri supports a maintained Linux webview stack" },
+    { id = "RUSTSEC-2024-0418", reason = "Tauri 2.11 still requires the archived GTK3/WebKit stack on Linux; migrate when Tauri supports a maintained Linux webview stack" },
+    { id = "RUSTSEC-2024-0419", reason = "Tauri 2.11 still requires the archived GTK3/WebKit stack on Linux; migrate when Tauri supports a maintained Linux webview stack" },
+    { id = "RUSTSEC-2024-0420", reason = "Tauri 2.11 still requires the archived GTK3/WebKit stack on Linux; migrate when Tauri supports a maintained Linux webview stack" },
+    { id = "RUSTSEC-2024-0429", reason = "glib 0.18 is pinned by Tauri's required GTK3/WebKit Linux stack; LaReview does not use VariantStrIter directly" },
+    { id = "RUSTSEC-2025-0075", reason = "urlpattern is transitive through Tauri 2.11 and has no compatible release without the archived rust-unic crates" },
+    { id = "RUSTSEC-2025-0080", reason = "urlpattern is transitive through Tauri 2.11 and has no compatible release without the archived rust-unic crates" },
+    { id = "RUSTSEC-2025-0081", reason = "urlpattern is transitive through Tauri 2.11 and has no compatible release without the archived rust-unic crates" },
+    { id = "RUSTSEC-2025-0098", reason = "urlpattern is transitive through Tauri 2.11 and has no compatible release without the archived rust-unic crates" },
+    { id = "RUSTSEC-2025-0100", reason = "urlpattern is transitive through Tauri 2.11 and has no compatible release without the archived rust-unic crates" },
 ]
 
 [licenses]
@@ -30,6 +47,7 @@ allow = [
     "Ubuntu-font-1.0",
     "NCSA",
     "CDLA-Permissive-2.0",
+    "CC0-1.0",
 ]
 confidence-threshold = 0.8
 exceptions = []
@@ -49,4 +67,4 @@ allow = []
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
-allow-git = []
+allow-git = ["https://github.com/tauri-apps/fix-path-env-rs"]

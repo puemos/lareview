@@ -1,4 +1,5 @@
 use crate::domain::ResolvedRule;
+use crate::infra::acp::AgentConfigSelection;
 use crate::infra::acp::task_mcp_server::RunContext;
 use std::path::PathBuf;
 
@@ -19,6 +20,8 @@ pub struct GenerateTasksInput {
     pub agent_command: String,
     /// Arguments to pass to the ACP agent command.
     pub agent_args: Vec<String>,
+    /// Harness-advertised session configuration values to apply before prompting.
+    pub agent_config: Vec<AgentConfigSelection>,
     /// Optional channel to send progress updates during generation.
     pub progress_tx: Option<tokio::sync::mpsc::UnboundedSender<ProgressEvent>>,
     /// Override for MCP server binary path.
@@ -61,7 +64,7 @@ pub enum ProgressEvent {
         raw_output: Option<serde_json::Value>,
     },
     /// Plan update (sent as complete object).
-    Plan(agent_client_protocol::Plan),
+    Plan(agent_client_protocol::schema::v1::Plan),
     /// Local log output from the ACP worker/process.
     LocalLog(String),
     /// Signal that the agent has finished its work (received finalize_review).

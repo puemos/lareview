@@ -43,17 +43,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "lts/*"
+          node-version: "24.18.0"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 11.20.0
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-12-06
+          toolchain: 1.97.1
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Cache Rust dependencies
@@ -62,7 +62,7 @@ jobs:
           workspaces: ". -> target"
 
       - name: Install frontend dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
         working-directory: frontend
 
       - name: Build with Tauri action
@@ -83,7 +83,7 @@ jobs:
           releaseName: "LaReview v__VERSION__"
           releaseBody: "See the assets to download and install this version."
           releaseDraft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
           args: ${{ matrix.args }}
 
       - name: Create Linux tarball
@@ -99,14 +99,16 @@ jobs:
 
           # Create tarball
           mkdir -p dist
-          tar -czf dist/lareview-linux.tar.gz -C $(dirname "$BINARY_PATH") $(basename "$BINARY_PATH")
+          BINARY_DIR="$(dirname "$BINARY_PATH")"
+          BINARY_NAME="$(basename "$BINARY_PATH")"
+          tar -czf dist/lareview-linux.tar.gz -C "$BINARY_DIR" "$BINARY_NAME"
 
           echo "Created tarball: dist/lareview-linux.tar.gz"
           ls -lh dist/lareview-linux.tar.gz
 
       - name: Upload Linux tarball to release
         if: matrix.platform == 'ubuntu-22.04'
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: dist/lareview-linux.tar.gz
         env:
@@ -115,6 +117,7 @@ jobs:
   publish-homebrew:
     name: Bump Homebrew Tap
     needs: release
+    if: ${{ !contains(github.ref_name, '-') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout homebrew-tap
@@ -128,7 +131,7 @@ jobs:
         id: release
         run: |
           VERSION="${GITHUB_REF#refs/tags/v}"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Update Formula and Cask
         env:

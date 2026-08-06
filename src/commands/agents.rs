@@ -1,4 +1,4 @@
-use crate::infra::acp::invalidate_agent_cache;
+use crate::infra::acp::{AgentConfigSelection, invalidate_agent_cache, probe_agent_session_config};
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -28,6 +28,20 @@ pub async fn get_agents(_state: State<'_, AppState>) -> Result<Vec<AgentInfo>, S
         .collect();
 
     Ok(agents)
+}
+
+/// Ask the installed ACP harness for its current session configuration options.
+///
+/// The probe is intentionally short-lived. Any supplied selections are applied in order so the
+/// response reflects dependent choices, such as the effort levels supported by a selected model.
+#[tauri::command]
+pub async fn get_agent_session_config(
+    agent_id: String,
+    selections: Option<Vec<AgentConfigSelection>>,
+) -> Result<Vec<agent_client_protocol::schema::v1::SessionConfigOption>, String> {
+    probe_agent_session_config(&agent_id, selections.unwrap_or_default())
+        .await
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]

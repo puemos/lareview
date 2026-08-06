@@ -1,0 +1,6 @@
+allowBuilds:
+  esbuild: true
+
+peerDependencyRules:
+  allowedVersions:
+    eslint: "10"

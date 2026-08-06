@@ -15,15 +15,12 @@ pub fn codex_candidate() -> AgentCandidate {
         None => crate::infra::shell::find_bin("npx"),
     };
     let available = command.is_some();
+    let package = std::env::var("CODEX_ACP_PACKAGE")
+        .unwrap_or_else(|_| "@agentclientprotocol/codex-acp@1.1.9".to_string());
     let args = if bin_override.is_some() {
         Vec::new()
     } else {
-        vec![
-            "-y".to_string(),
-            "@zed-industries/codex-acp@latest".to_string(),
-            "-c".to_string(),
-            "model=\"gpt-5.2\"".to_string(),
-        ]
+        vec!["-y".to_string(), package]
     };
 
     AgentCandidate {
@@ -53,9 +50,6 @@ impl super::super::agent_trait::AcpAgent for CodexAgent {
     }
 
     fn is_available(&self) -> bool {
-        let _package = std::env::var("CODEX_ACP_PACKAGE")
-            .unwrap_or_else(|_| "@zed-industries/codex-acp@latest".to_string());
-
         if let Ok(bin_path) = std::env::var("CODEX_ACP_BIN") {
             is_command_available(&bin_path)
         } else {

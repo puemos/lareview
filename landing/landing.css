@@ -1,6 +1,14 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@source "./index.html";
+
+@theme {
+  --color-velura-light: #ebe6de;
+  --color-velura-bg: #ebe6de;
+  --color-velura-dark: #1a1a1a;
+  --color-velura-gray: #5a5a5a;
+  --font-sans: "Inter", sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+}
 
 @layer base {
   ::-webkit-scrollbar {

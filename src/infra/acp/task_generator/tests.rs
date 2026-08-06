@@ -149,37 +149,32 @@ mod policy_tests {
     async fn permission_cancelled_without_repo_access() {
         let client =
             crate::infra::acp::task_generator::client::LaReviewClient::new(None, "run-1", None);
-        let fields = agent_client_protocol::ToolCallUpdateFields::new()
-            .kind(agent_client_protocol::ToolKind::Read)
+        let fields = agent_client_protocol::schema::v1::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::schema::v1::ToolKind::Read)
             .title("fs/read_text_file")
             .raw_input(serde_json::json!({ "path": "src/a.rs" }));
-        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
+        let tool_call = agent_client_protocol::schema::v1::ToolCallUpdate::new("tc1", fields);
         let options = vec![
-            agent_client_protocol::PermissionOption::new(
+            agent_client_protocol::schema::v1::PermissionOption::new(
                 "allow",
                 "Allow",
-                agent_client_protocol::PermissionOptionKind::AllowOnce,
+                agent_client_protocol::schema::v1::PermissionOptionKind::AllowOnce,
             ),
-            agent_client_protocol::PermissionOption::new(
+            agent_client_protocol::schema::v1::PermissionOption::new(
                 "reject",
                 "Reject",
-                agent_client_protocol::PermissionOptionKind::RejectOnce,
+                agent_client_protocol::schema::v1::PermissionOptionKind::RejectOnce,
             ),
         ];
-        let req = agent_client_protocol::RequestPermissionRequest::new(
-            agent_client_protocol::SessionId::new("s1"),
+        let req = agent_client_protocol::schema::v1::RequestPermissionRequest::new(
+            agent_client_protocol::schema::v1::SessionId::new("s1"),
             tool_call,
             options,
         );
-        let resp =
-            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
-                &client, req,
-            )
-            .await
-            .unwrap();
+        let resp = client.request_permission(req).await.unwrap();
         assert!(matches!(
             resp.outcome,
-            agent_client_protocol::RequestPermissionOutcome::Cancelled
+            agent_client_protocol::schema::v1::RequestPermissionOutcome::Cancelled
         ));
     }
 
@@ -187,8 +182,8 @@ mod policy_tests {
     async fn permission_allows_return_task_even_without_repo_access() {
         let client =
             crate::infra::acp::task_generator::client::LaReviewClient::new(None, "run-1", None);
-        let fields = agent_client_protocol::ToolCallUpdateFields::new()
-            .kind(agent_client_protocol::ToolKind::Other)
+        let fields = agent_client_protocol::schema::v1::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::schema::v1::ToolKind::Other)
             .title("return_task")
             .raw_input(serde_json::json!({
                 "id": "test-task",
@@ -197,26 +192,21 @@ mod policy_tests {
                 "stats": { "risk": "LOW", "tags": ["test"] },
                 "hunk_ids": []
             }));
-        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
-        let options = vec![agent_client_protocol::PermissionOption::new(
+        let tool_call = agent_client_protocol::schema::v1::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::schema::v1::PermissionOption::new(
             "allow",
             "Allow",
-            agent_client_protocol::PermissionOptionKind::AllowOnce,
+            agent_client_protocol::schema::v1::PermissionOptionKind::AllowOnce,
         )];
-        let req = agent_client_protocol::RequestPermissionRequest::new(
-            agent_client_protocol::SessionId::new("s1"),
+        let req = agent_client_protocol::schema::v1::RequestPermissionRequest::new(
+            agent_client_protocol::schema::v1::SessionId::new("s1"),
             tool_call,
             options,
         );
-        let resp =
-            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
-                &client, req,
-            )
-            .await
-            .unwrap();
+        let resp = client.request_permission(req).await.unwrap();
         assert!(matches!(
             resp.outcome,
-            agent_client_protocol::RequestPermissionOutcome::Selected(_)
+            agent_client_protocol::schema::v1::RequestPermissionOutcome::Selected(_)
         ));
     }
 
@@ -224,8 +214,8 @@ mod policy_tests {
     async fn permission_allows_wrapped_return_task_payload() {
         let client =
             crate::infra::acp::task_generator::client::LaReviewClient::new(None, "run-1", None);
-        let fields = agent_client_protocol::ToolCallUpdateFields::new()
-            .kind(agent_client_protocol::ToolKind::Other)
+        let fields = agent_client_protocol::schema::v1::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::schema::v1::ToolKind::Other)
             .title("mcp")
             .raw_input(serde_json::json!({
                 "tool": "return_task",
@@ -238,26 +228,21 @@ mod policy_tests {
                     "hunk_ids": []
                 }
             }));
-        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
-        let options = vec![agent_client_protocol::PermissionOption::new(
+        let tool_call = agent_client_protocol::schema::v1::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::schema::v1::PermissionOption::new(
             "allow",
             "Allow",
-            agent_client_protocol::PermissionOptionKind::AllowOnce,
+            agent_client_protocol::schema::v1::PermissionOptionKind::AllowOnce,
         )];
-        let req = agent_client_protocol::RequestPermissionRequest::new(
-            agent_client_protocol::SessionId::new("s1"),
+        let req = agent_client_protocol::schema::v1::RequestPermissionRequest::new(
+            agent_client_protocol::schema::v1::SessionId::new("s1"),
             tool_call,
             options,
         );
-        let resp =
-            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
-                &client, req,
-            )
-            .await
-            .unwrap();
+        let resp = client.request_permission(req).await.unwrap();
         assert!(matches!(
             resp.outcome,
-            agent_client_protocol::RequestPermissionOutcome::Selected(_)
+            agent_client_protocol::schema::v1::RequestPermissionOutcome::Selected(_)
         ));
     }
 
@@ -266,29 +251,24 @@ mod policy_tests {
         let client =
             crate::infra::acp::task_generator::client::LaReviewClient::new(None, "run-1", None);
         let task_json = r###"{"id":"T1","title":"Example","description":"Test","stats":{"risk":"low","tags":[]},"diff_refs":[{"file":"test.rs","hunks":[{"old_start":1,"old_lines":1,"new_start":1,"new_lines":1}]}]}"###;
-        let fields = agent_client_protocol::ToolCallUpdateFields::new()
-            .kind(agent_client_protocol::ToolKind::Other)
+        let fields = agent_client_protocol::schema::v1::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::schema::v1::ToolKind::Other)
             .title(task_json);
-        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
-        let options = vec![agent_client_protocol::PermissionOption::new(
+        let tool_call = agent_client_protocol::schema::v1::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::schema::v1::PermissionOption::new(
             "allow",
             "Allow",
-            agent_client_protocol::PermissionOptionKind::AllowOnce,
+            agent_client_protocol::schema::v1::PermissionOptionKind::AllowOnce,
         )];
-        let req = agent_client_protocol::RequestPermissionRequest::new(
-            agent_client_protocol::SessionId::new("s1"),
+        let req = agent_client_protocol::schema::v1::RequestPermissionRequest::new(
+            agent_client_protocol::schema::v1::SessionId::new("s1"),
             tool_call,
             options,
         );
-        let resp =
-            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
-                &client, req,
-            )
-            .await
-            .unwrap();
+        let resp = client.request_permission(req).await.unwrap();
         assert!(matches!(
             resp.outcome,
-            agent_client_protocol::RequestPermissionOutcome::Selected(_)
+            agent_client_protocol::schema::v1::RequestPermissionOutcome::Selected(_)
         ));
     }
 
@@ -297,29 +277,24 @@ mod policy_tests {
         let client =
             crate::infra::acp::task_generator::client::LaReviewClient::new(None, "run-1", None);
         let finalize_json = r###"{"title":"Review Title","summary":"Review summary"}"###;
-        let fields = agent_client_protocol::ToolCallUpdateFields::new()
-            .kind(agent_client_protocol::ToolKind::Other)
+        let fields = agent_client_protocol::schema::v1::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::schema::v1::ToolKind::Other)
             .title(finalize_json);
-        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
-        let options = vec![agent_client_protocol::PermissionOption::new(
+        let tool_call = agent_client_protocol::schema::v1::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::schema::v1::PermissionOption::new(
             "allow",
             "Allow",
-            agent_client_protocol::PermissionOptionKind::AllowOnce,
+            agent_client_protocol::schema::v1::PermissionOptionKind::AllowOnce,
         )];
-        let req = agent_client_protocol::RequestPermissionRequest::new(
-            agent_client_protocol::SessionId::new("s1"),
+        let req = agent_client_protocol::schema::v1::RequestPermissionRequest::new(
+            agent_client_protocol::schema::v1::SessionId::new("s1"),
             tool_call,
             options,
         );
-        let resp =
-            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
-                &client, req,
-            )
-            .await
-            .unwrap();
+        let resp = client.request_permission(req).await.unwrap();
         assert!(matches!(
             resp.outcome,
-            agent_client_protocol::RequestPermissionOutcome::Selected(_)
+            agent_client_protocol::schema::v1::RequestPermissionOutcome::Selected(_)
         ));
     }
 
@@ -335,30 +310,25 @@ mod policy_tests {
             "run-1",
             Some(root.path().to_path_buf()),
         );
-        let fields = agent_client_protocol::ToolCallUpdateFields::new()
-            .kind(agent_client_protocol::ToolKind::Read)
+        let fields = agent_client_protocol::schema::v1::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::schema::v1::ToolKind::Read)
             .title("fs/read_text_file")
             .raw_input(serde_json::json!({ "path": "src/a.rs" }));
-        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
-        let options = vec![agent_client_protocol::PermissionOption::new(
+        let tool_call = agent_client_protocol::schema::v1::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::schema::v1::PermissionOption::new(
             "allow",
             "Allow",
-            agent_client_protocol::PermissionOptionKind::AllowOnce,
+            agent_client_protocol::schema::v1::PermissionOptionKind::AllowOnce,
         )];
-        let req = agent_client_protocol::RequestPermissionRequest::new(
-            agent_client_protocol::SessionId::new("s1"),
+        let req = agent_client_protocol::schema::v1::RequestPermissionRequest::new(
+            agent_client_protocol::schema::v1::SessionId::new("s1"),
             tool_call,
             options,
         );
-        let resp =
-            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
-                &client, req,
-            )
-            .await
-            .unwrap();
+        let resp = client.request_permission(req).await.unwrap();
         assert!(matches!(
             resp.outcome,
-            agent_client_protocol::RequestPermissionOutcome::Selected(_)
+            agent_client_protocol::schema::v1::RequestPermissionOutcome::Selected(_)
         ));
     }
 
@@ -372,30 +342,25 @@ mod policy_tests {
             "run-1",
             Some(root.path().to_path_buf()),
         );
-        let fields = agent_client_protocol::ToolCallUpdateFields::new()
-            .kind(agent_client_protocol::ToolKind::Read)
+        let fields = agent_client_protocol::schema::v1::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::schema::v1::ToolKind::Read)
             .title("fs/read_text_file")
             .raw_input(serde_json::json!({ "filePath": "test.ex" }));
-        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
-        let options = vec![agent_client_protocol::PermissionOption::new(
+        let tool_call = agent_client_protocol::schema::v1::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::schema::v1::PermissionOption::new(
             "allow",
             "Allow",
-            agent_client_protocol::PermissionOptionKind::AllowOnce,
+            agent_client_protocol::schema::v1::PermissionOptionKind::AllowOnce,
         )];
-        let req = agent_client_protocol::RequestPermissionRequest::new(
-            agent_client_protocol::SessionId::new("s1"),
+        let req = agent_client_protocol::schema::v1::RequestPermissionRequest::new(
+            agent_client_protocol::schema::v1::SessionId::new("s1"),
             tool_call,
             options,
         );
-        let resp =
-            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
-                &client, req,
-            )
-            .await
-            .unwrap();
+        let resp = client.request_permission(req).await.unwrap();
         assert!(matches!(
             resp.outcome,
-            agent_client_protocol::RequestPermissionOutcome::Selected(_)
+            agent_client_protocol::schema::v1::RequestPermissionOutcome::Selected(_)
         ));
     }
 
@@ -407,30 +372,25 @@ mod policy_tests {
             "run-1",
             Some(root.path().to_path_buf()),
         );
-        let fields = agent_client_protocol::ToolCallUpdateFields::new()
-            .kind(agent_client_protocol::ToolKind::Read)
+        let fields = agent_client_protocol::schema::v1::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::schema::v1::ToolKind::Read)
             .title("fs/read_text_file")
             .raw_input(serde_json::json!({ "path": "src/missing.rs" }));
-        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
-        let options = vec![agent_client_protocol::PermissionOption::new(
+        let tool_call = agent_client_protocol::schema::v1::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::schema::v1::PermissionOption::new(
             "allow",
             "Allow",
-            agent_client_protocol::PermissionOptionKind::AllowOnce,
+            agent_client_protocol::schema::v1::PermissionOptionKind::AllowOnce,
         )];
-        let req = agent_client_protocol::RequestPermissionRequest::new(
-            agent_client_protocol::SessionId::new("s1"),
+        let req = agent_client_protocol::schema::v1::RequestPermissionRequest::new(
+            agent_client_protocol::schema::v1::SessionId::new("s1"),
             tool_call,
             options,
         );
-        let resp =
-            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
-                &client, req,
-            )
-            .await
-            .unwrap();
+        let resp = client.request_permission(req).await.unwrap();
         assert!(matches!(
             resp.outcome,
-            agent_client_protocol::RequestPermissionOutcome::Selected(_)
+            agent_client_protocol::schema::v1::RequestPermissionOutcome::Selected(_)
         ));
     }
 
@@ -444,30 +404,25 @@ mod policy_tests {
             "run-1",
             Some(root.path().to_path_buf()),
         );
-        let fields = agent_client_protocol::ToolCallUpdateFields::new()
-            .kind(agent_client_protocol::ToolKind::Read)
+        let fields = agent_client_protocol::schema::v1::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::schema::v1::ToolKind::Read)
             .title("fs/read_text_file")
             .raw_input(serde_json::json!({ "path": "../outside.rs" }));
-        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
-        let options = vec![agent_client_protocol::PermissionOption::new(
+        let tool_call = agent_client_protocol::schema::v1::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::schema::v1::PermissionOption::new(
             "allow",
             "Allow",
-            agent_client_protocol::PermissionOptionKind::AllowOnce,
+            agent_client_protocol::schema::v1::PermissionOptionKind::AllowOnce,
         )];
-        let req = agent_client_protocol::RequestPermissionRequest::new(
-            agent_client_protocol::SessionId::new("s1"),
+        let req = agent_client_protocol::schema::v1::RequestPermissionRequest::new(
+            agent_client_protocol::schema::v1::SessionId::new("s1"),
             tool_call,
             options,
         );
-        let resp =
-            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
-                &client, req,
-            )
-            .await
-            .unwrap();
+        let resp = client.request_permission(req).await.unwrap();
         assert!(matches!(
             resp.outcome,
-            agent_client_protocol::RequestPermissionOutcome::Cancelled
+            agent_client_protocol::schema::v1::RequestPermissionOutcome::Cancelled
         ));
     }
 
@@ -479,30 +434,25 @@ mod policy_tests {
             "run-1",
             Some(root.path().to_path_buf()),
         );
-        let fields = agent_client_protocol::ToolCallUpdateFields::new()
-            .kind(agent_client_protocol::ToolKind::Execute)
+        let fields = agent_client_protocol::schema::v1::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::schema::v1::ToolKind::Execute)
             .title("terminal/exec")
             .raw_input(serde_json::json!({ "command": "echo hi" }));
-        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
-        let options = vec![agent_client_protocol::PermissionOption::new(
+        let tool_call = agent_client_protocol::schema::v1::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::schema::v1::PermissionOption::new(
             "allow",
             "Allow",
-            agent_client_protocol::PermissionOptionKind::AllowOnce,
+            agent_client_protocol::schema::v1::PermissionOptionKind::AllowOnce,
         )];
-        let req = agent_client_protocol::RequestPermissionRequest::new(
-            agent_client_protocol::SessionId::new("s1"),
+        let req = agent_client_protocol::schema::v1::RequestPermissionRequest::new(
+            agent_client_protocol::schema::v1::SessionId::new("s1"),
             tool_call,
             options,
         );
-        let resp =
-            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
-                &client, req,
-            )
-            .await
-            .unwrap();
+        let resp = client.request_permission(req).await.unwrap();
         assert!(matches!(
             resp.outcome,
-            agent_client_protocol::RequestPermissionOutcome::Cancelled
+            agent_client_protocol::schema::v1::RequestPermissionOutcome::Cancelled
         ));
     }
 
@@ -516,32 +466,27 @@ mod policy_tests {
             "run-1",
             Some(root.path().to_path_buf()),
         );
-        let fields = agent_client_protocol::ToolCallUpdateFields::new()
-            .kind(agent_client_protocol::ToolKind::Read)
+        let fields = agent_client_protocol::schema::v1::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::schema::v1::ToolKind::Read)
             .title("fs/read_text_file")
-            .locations(vec![agent_client_protocol::ToolCallLocation::new(
-                "test.txt",
-            )]);
-        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
-        let options = vec![agent_client_protocol::PermissionOption::new(
+            .locations(vec![
+                agent_client_protocol::schema::v1::ToolCallLocation::new("test.txt"),
+            ]);
+        let tool_call = agent_client_protocol::schema::v1::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::schema::v1::PermissionOption::new(
             "allow",
             "Allow",
-            agent_client_protocol::PermissionOptionKind::AllowOnce,
+            agent_client_protocol::schema::v1::PermissionOptionKind::AllowOnce,
         )];
-        let req = agent_client_protocol::RequestPermissionRequest::new(
-            agent_client_protocol::SessionId::new("s1"),
+        let req = agent_client_protocol::schema::v1::RequestPermissionRequest::new(
+            agent_client_protocol::schema::v1::SessionId::new("s1"),
             tool_call,
             options,
         );
-        let resp =
-            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
-                &client, req,
-            )
-            .await
-            .unwrap();
+        let resp = client.request_permission(req).await.unwrap();
         assert!(matches!(
             resp.outcome,
-            agent_client_protocol::RequestPermissionOutcome::Selected(_)
+            agent_client_protocol::schema::v1::RequestPermissionOutcome::Selected(_)
         ));
     }
 
@@ -555,29 +500,24 @@ mod policy_tests {
             "run-1",
             Some(root.path().to_path_buf()),
         );
-        let fields = agent_client_protocol::ToolCallUpdateFields::new()
-            .kind(agent_client_protocol::ToolKind::Read)
+        let fields = agent_client_protocol::schema::v1::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::schema::v1::ToolKind::Read)
             .title("Read test.txt");
-        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
-        let options = vec![agent_client_protocol::PermissionOption::new(
+        let tool_call = agent_client_protocol::schema::v1::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::schema::v1::PermissionOption::new(
             "allow",
             "Allow",
-            agent_client_protocol::PermissionOptionKind::AllowOnce,
+            agent_client_protocol::schema::v1::PermissionOptionKind::AllowOnce,
         )];
-        let req = agent_client_protocol::RequestPermissionRequest::new(
-            agent_client_protocol::SessionId::new("s1"),
+        let req = agent_client_protocol::schema::v1::RequestPermissionRequest::new(
+            agent_client_protocol::schema::v1::SessionId::new("s1"),
             tool_call,
             options,
         );
-        let resp =
-            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
-                &client, req,
-            )
-            .await
-            .unwrap();
+        let resp = client.request_permission(req).await.unwrap();
         assert!(matches!(
             resp.outcome,
-            agent_client_protocol::RequestPermissionOutcome::Selected(_)
+            agent_client_protocol::schema::v1::RequestPermissionOutcome::Selected(_)
         ));
     }
 
@@ -591,32 +531,27 @@ mod policy_tests {
             "run-1",
             Some(root.path().to_path_buf()),
         );
-        let fields = agent_client_protocol::ToolCallUpdateFields::new()
-            .kind(agent_client_protocol::ToolKind::Read)
+        let fields = agent_client_protocol::schema::v1::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::schema::v1::ToolKind::Read)
             .title("fs/read_text_file")
-            .locations(vec![agent_client_protocol::ToolCallLocation::new(
-                "/etc/passwd",
-            )]);
-        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
-        let options = vec![agent_client_protocol::PermissionOption::new(
+            .locations(vec![
+                agent_client_protocol::schema::v1::ToolCallLocation::new("/etc/passwd"),
+            ]);
+        let tool_call = agent_client_protocol::schema::v1::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::schema::v1::PermissionOption::new(
             "allow",
             "Allow",
-            agent_client_protocol::PermissionOptionKind::AllowOnce,
+            agent_client_protocol::schema::v1::PermissionOptionKind::AllowOnce,
         )];
-        let req = agent_client_protocol::RequestPermissionRequest::new(
-            agent_client_protocol::SessionId::new("s1"),
+        let req = agent_client_protocol::schema::v1::RequestPermissionRequest::new(
+            agent_client_protocol::schema::v1::SessionId::new("s1"),
             tool_call,
             options,
         );
-        let resp =
-            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
-                &client, req,
-            )
-            .await
-            .unwrap();
+        let resp = client.request_permission(req).await.unwrap();
         assert!(matches!(
             resp.outcome,
-            agent_client_protocol::RequestPermissionOutcome::Cancelled
+            agent_client_protocol::schema::v1::RequestPermissionOutcome::Cancelled
         ));
     }
 
@@ -633,31 +568,26 @@ mod policy_tests {
             "run-1",
             Some(root.path().to_path_buf()),
         );
-        let fields = agent_client_protocol::ToolCallUpdateFields::new()
-            .kind(agent_client_protocol::ToolKind::Read)
+        let fields = agent_client_protocol::schema::v1::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::schema::v1::ToolKind::Read)
             .title("Read /etc/passwd");
-        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
-        let options = vec![agent_client_protocol::PermissionOption::new(
+        let tool_call = agent_client_protocol::schema::v1::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::schema::v1::PermissionOption::new(
             "allow",
             "Allow",
-            agent_client_protocol::PermissionOptionKind::AllowOnce,
+            agent_client_protocol::schema::v1::PermissionOptionKind::AllowOnce,
         )];
-        let req = agent_client_protocol::RequestPermissionRequest::new(
-            agent_client_protocol::SessionId::new("s1"),
+        let req = agent_client_protocol::schema::v1::RequestPermissionRequest::new(
+            agent_client_protocol::schema::v1::SessionId::new("s1"),
             tool_call,
             options,
         );
-        let resp =
-            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
-                &client, req,
-            )
-            .await
-            .unwrap();
+        let resp = client.request_permission(req).await.unwrap();
         // Permission is allowed because path can't be extracted (no extension)
         // Security is enforced at layer 2: read_text_file will block /etc/passwd
         assert!(matches!(
             resp.outcome,
-            agent_client_protocol::RequestPermissionOutcome::Selected(_)
+            agent_client_protocol::schema::v1::RequestPermissionOutcome::Selected(_)
         ));
     }
 
@@ -674,31 +604,26 @@ mod policy_tests {
             "run-1",
             Some(root.path().to_path_buf()),
         );
-        let fields = agent_client_protocol::ToolCallUpdateFields::new()
-            .kind(agent_client_protocol::ToolKind::Read)
+        let fields = agent_client_protocol::schema::v1::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::schema::v1::ToolKind::Read)
             .title("Read ../../etc/passwd");
-        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
-        let options = vec![agent_client_protocol::PermissionOption::new(
+        let tool_call = agent_client_protocol::schema::v1::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::schema::v1::PermissionOption::new(
             "allow",
             "Allow",
-            agent_client_protocol::PermissionOptionKind::AllowOnce,
+            agent_client_protocol::schema::v1::PermissionOptionKind::AllowOnce,
         )];
-        let req = agent_client_protocol::RequestPermissionRequest::new(
-            agent_client_protocol::SessionId::new("s1"),
+        let req = agent_client_protocol::schema::v1::RequestPermissionRequest::new(
+            agent_client_protocol::schema::v1::SessionId::new("s1"),
             tool_call,
             options,
         );
-        let resp =
-            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
-                &client, req,
-            )
-            .await
-            .unwrap();
+        let resp = client.request_permission(req).await.unwrap();
         // Permission is allowed because path can't be extracted (no extension)
         // Security is enforced at layer 2: read_text_file will block traversal paths
         assert!(matches!(
             resp.outcome,
-            agent_client_protocol::RequestPermissionOutcome::Selected(_)
+            agent_client_protocol::schema::v1::RequestPermissionOutcome::Selected(_)
         ));
     }
 
@@ -712,13 +637,9 @@ mod policy_tests {
             "run-1",
             Some(root.path().to_path_buf()),
         );
-        let session_id = agent_client_protocol::SessionId::new("s1");
-        let read_req = agent_client_protocol::ReadTextFileRequest::new(session_id, "");
-        let result =
-            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::read_text_file(
-                &client, read_req,
-            )
-            .await;
+        let session_id = agent_client_protocol::schema::v1::SessionId::new("s1");
+        let read_req = agent_client_protocol::schema::v1::ReadTextFileRequest::new(session_id, "");
+        let result = client.read_text_file(read_req).await;
         assert!(result.is_err());
         let err = result.unwrap_err();
         let data = &err.data;
@@ -836,31 +757,26 @@ mod policy_tests {
             Some(root.path().to_path_buf()),
         );
         // Empty raw_input simulates ACP sending permission request before parameters
-        let fields = agent_client_protocol::ToolCallUpdateFields::new()
-            .kind(agent_client_protocol::ToolKind::Read)
+        let fields = agent_client_protocol::schema::v1::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::schema::v1::ToolKind::Read)
             .title("read")
             .raw_input(serde_json::json!({}));
-        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
-        let options = vec![agent_client_protocol::PermissionOption::new(
+        let tool_call = agent_client_protocol::schema::v1::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::schema::v1::PermissionOption::new(
             "allow",
             "Allow",
-            agent_client_protocol::PermissionOptionKind::AllowOnce,
+            agent_client_protocol::schema::v1::PermissionOptionKind::AllowOnce,
         )];
-        let req = agent_client_protocol::RequestPermissionRequest::new(
-            agent_client_protocol::SessionId::new("s1"),
+        let req = agent_client_protocol::schema::v1::RequestPermissionRequest::new(
+            agent_client_protocol::schema::v1::SessionId::new("s1"),
             tool_call,
             options,
         );
-        let resp =
-            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
-                &client, req,
-            )
-            .await
-            .unwrap();
+        let resp = client.request_permission(req).await.unwrap();
         // Should be allowed because repo access is enabled (deferred validation)
         assert!(matches!(
             resp.outcome,
-            agent_client_protocol::RequestPermissionOutcome::Selected(_)
+            agent_client_protocol::schema::v1::RequestPermissionOutcome::Selected(_)
         ));
     }
 
@@ -869,31 +785,26 @@ mod policy_tests {
         let client =
             crate::infra::acp::task_generator::client::LaReviewClient::new(None, "run-1", None);
         // Empty raw_input with no repo access should be denied
-        let fields = agent_client_protocol::ToolCallUpdateFields::new()
-            .kind(agent_client_protocol::ToolKind::Read)
+        let fields = agent_client_protocol::schema::v1::ToolCallUpdateFields::new()
+            .kind(agent_client_protocol::schema::v1::ToolKind::Read)
             .title("read")
             .raw_input(serde_json::json!({}));
-        let tool_call = agent_client_protocol::ToolCallUpdate::new("tc1", fields);
-        let options = vec![agent_client_protocol::PermissionOption::new(
+        let tool_call = agent_client_protocol::schema::v1::ToolCallUpdate::new("tc1", fields);
+        let options = vec![agent_client_protocol::schema::v1::PermissionOption::new(
             "allow",
             "Allow",
-            agent_client_protocol::PermissionOptionKind::AllowOnce,
+            agent_client_protocol::schema::v1::PermissionOptionKind::AllowOnce,
         )];
-        let req = agent_client_protocol::RequestPermissionRequest::new(
-            agent_client_protocol::SessionId::new("s1"),
+        let req = agent_client_protocol::schema::v1::RequestPermissionRequest::new(
+            agent_client_protocol::schema::v1::SessionId::new("s1"),
             tool_call,
             options,
         );
-        let resp =
-            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::request_permission(
-                &client, req,
-            )
-            .await
-            .unwrap();
+        let resp = client.request_permission(req).await.unwrap();
         // Should be denied because no repo access
         assert!(matches!(
             resp.outcome,
-            agent_client_protocol::RequestPermissionOutcome::Cancelled
+            agent_client_protocol::schema::v1::RequestPermissionOutcome::Cancelled
         ));
     }
 
@@ -907,13 +818,10 @@ mod policy_tests {
             "run-1",
             Some(root.path().to_path_buf()),
         );
-        let session_id = agent_client_protocol::SessionId::new("s1");
-        let read_req = agent_client_protocol::ReadTextFileRequest::new(session_id, "/etc/passwd");
-        let result =
-            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::read_text_file(
-                &client, read_req,
-            )
-            .await;
+        let session_id = agent_client_protocol::schema::v1::SessionId::new("s1");
+        let read_req =
+            agent_client_protocol::schema::v1::ReadTextFileRequest::new(session_id, "/etc/passwd");
+        let result = client.read_text_file(read_req).await;
         // Should be denied by read_text_file's resolve_repo_path
         assert!(result.is_err());
     }
@@ -928,14 +836,12 @@ mod policy_tests {
             "run-1",
             Some(root.path().to_path_buf()),
         );
-        let session_id = agent_client_protocol::SessionId::new("s1");
-        let read_req =
-            agent_client_protocol::ReadTextFileRequest::new(session_id, "../../../etc/passwd");
-        let result =
-            <crate::infra::acp::task_generator::client::LaReviewClient as agent_client_protocol::Client>::read_text_file(
-                &client, read_req,
-            )
-            .await;
+        let session_id = agent_client_protocol::schema::v1::SessionId::new("s1");
+        let read_req = agent_client_protocol::schema::v1::ReadTextFileRequest::new(
+            session_id,
+            "../../../etc/passwd",
+        );
+        let result = client.read_text_file(read_req).await;
         // Should be denied by read_text_file's resolve_repo_path
         assert!(result.is_err());
     }

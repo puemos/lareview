@@ -7,12 +7,13 @@ use super::client::{LearningClient, LearningProgressEvent};
 use crate::domain::{LearnedPattern, LearningCompactionResult};
 use crate::infra::db::repository::FeedbackRejection;
 use crate::prompts;
-use agent_client_protocol::{
-    Agent, ClientSideConnection, ContentBlock, Implementation, InitializeRequest, McpServer,
-    McpServerStdio, NewSessionRequest, PromptRequest, ProtocolVersion, TextContent,
+use agent_client_protocol::schema::ProtocolVersion;
+use agent_client_protocol::schema::v1::{
+    ContentBlock, Implementation, InitializeRequest, McpServer, McpServerStdio, NewSessionRequest,
+    PromptRequest, ReadTextFileRequest, RequestPermissionRequest, SessionNotification, TextContent,
 };
+use agent_client_protocol::{ByteStreams, Client as AcpClient, Error as AcpError};
 use anyhow::{Context, Result};
-use futures::future::LocalBoxFuture;
 use log::debug;
 use serde_json::json;
 use std::path::PathBuf;
@@ -277,171 +278,194 @@ async fn run_learning_compaction_inner(
     let stdin_compat = stdin.compat_write();
     let stdout_compat = stdout.compat();
 
-    let spawn_fn = |fut: LocalBoxFuture<'static, ()>| {
-        tokio::task::spawn_local(fut);
-    };
+    let permission_client = client.clone();
+    let read_client = client.clone();
+    let notification_client = client.clone();
+    let transport = ByteStreams::new(stdin_compat, stdout_compat);
 
-    let (connection, io_future) =
-        ClientSideConnection::new(client, stdin_compat, stdout_compat, spawn_fn);
+    let result = AcpClient
+        .builder()
+        .name("lareview-learning")
+        .on_receive_request(
+            async move |request: RequestPermissionRequest, responder, _connection| {
+                responder.respond(permission_client.request_permission(request).await?)
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: ReadTextFileRequest, responder, _connection| {
+                responder.respond(read_client.read_text_file(request).await?)
+            },
+            agent_client_protocol::on_receive_request!(),
+        )
+        .on_receive_notification(
+            async move |notification: SessionNotification, _connection| {
+                notification_client.session_notification(notification).await
+            },
+            agent_client_protocol::on_receive_notification!(),
+        )
+        .connect_with(transport, async |connection| {
+            let operation: Result<()> = async {
+                // Initialize connection
+                push_log(&logs, "initialize", debug);
+                connection
+                    .send_request(InitializeRequest::new(ProtocolVersion::V1).client_info(
+                        Implementation::new("lareview-learning", env!("CARGO_PKG_VERSION")),
+                    ))
+                    .block_task()
+                    .await
+                    .with_context(|| "ACP initialize failed")?;
+                push_log(&logs, "initialize ok", debug);
 
-    // Spawn the asynchronous I/O loop
-    let io_handle = tokio::task::spawn_local(async move {
-        let _ = io_future.await;
-    });
+                // Create session with MCP task server
+                let temp_cwd = tempfile::tempdir().context("create temp working directory")?;
+                let cwd: PathBuf = temp_cwd.path().to_path_buf();
 
-    let result = async {
-        // Initialize connection
-        push_log(&logs, "initialize", debug);
-        connection
-            .initialize(InitializeRequest::new(ProtocolVersion::V1).client_info(
-                Implementation::new("lareview-learning", env!("CARGO_PKG_VERSION")),
-            ))
-            .await
-            .with_context(|| "ACP initialize failed")?;
-        push_log(&logs, "initialize ok", debug);
+                let current_exe =
+                    std::env::current_exe().unwrap_or_else(|_| PathBuf::from("lareview"));
+                let task_mcp_server_path =
+                    resolve_task_mcp_server_path(mcp_server_binary.as_ref(), &current_exe);
 
-        // Create session with MCP task server
-        let temp_cwd = tempfile::tempdir().context("create temp working directory")?;
-        let cwd: PathBuf = temp_cwd.path().to_path_buf();
+                // Build MCP server args - learning mode doesn't need PR context or repo root
+                let mut mcp_args = vec!["--task-mcp-server".to_string()];
+                if let Ok(db_path) = std::env::var("LAREVIEW_DB_PATH") {
+                    mcp_args.push("--db-path".to_string());
+                    mcp_args.push(db_path);
+                }
 
-        let current_exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("lareview"));
-        let task_mcp_server_path =
-            resolve_task_mcp_server_path(mcp_server_binary.as_ref(), &current_exe);
+                let mcp_servers = vec![McpServer::Stdio(
+                    McpServerStdio::new("lareview-tasks", task_mcp_server_path.clone())
+                        .args(mcp_args),
+                )];
 
-        // Build MCP server args - learning mode doesn't need PR context or repo root
-        let mut mcp_args = vec!["--task-mcp-server".to_string()];
-        if let Ok(db_path) = std::env::var("LAREVIEW_DB_PATH") {
-            mcp_args.push("--db-path".to_string());
-            mcp_args.push(db_path);
-        }
-
-        let mcp_servers = vec![McpServer::Stdio(
-            McpServerStdio::new("lareview-tasks", task_mcp_server_path.clone()).args(mcp_args),
-        )];
-
-        push_log(
-            &logs,
-            format!(
-                "new_session (mcp server: {} --task-mcp-server)",
-                task_mcp_server_path.display(),
-            ),
-            debug,
-        );
-        let session = connection
-            .new_session(NewSessionRequest::new(cwd).mcp_servers(mcp_servers))
-            .await
-            .with_context(|| "ACP new_session failed")?;
-        push_log(&logs, "new_session ok", debug);
-
-        // Send prompt
-        push_log(&logs, "prompt", debug);
-        let prompt_result = connection
-            .prompt(PromptRequest::new(
-                session.session_id,
-                vec![ContentBlock::Text(TextContent::new(prompt))],
-            ))
-            .await;
-
-        if let Err(err) = &prompt_result {
-            push_log(&logs, format!("prompt error: {err:?}"), true);
-            if let Ok(Some(status)) = child.try_wait() {
                 push_log(
                     &logs,
-                    format!("agent exited before prompt completed: {status}"),
-                    true,
-                );
-            }
-
-            if !*finalization_received_capture.lock().unwrap() {
-                return Err(anyhow::anyhow!(
-                    "ACP prompt failed: {:?}",
-                    prompt_result.unwrap_err()
-                ));
-            }
-
-            push_log(
-                &logs,
-                "prompt error ignored because finalization was received",
-                debug,
-            );
-        } else {
-            push_log(&logs, "prompt ok", debug);
-        }
-
-        // Monitor agent execution until completion or cancellation
-        let status = loop {
-            let finalization_received = *finalization_received_capture.lock().unwrap();
-
-            if finalization_received {
-                push_log(
-                    &logs,
-                    "finalization received; terminating agent immediately",
+                    format!(
+                        "new_session (mcp server: {} --task-mcp-server)",
+                        task_mcp_server_path.display(),
+                    ),
                     debug,
                 );
+                let session = connection
+                    .send_request(NewSessionRequest::new(cwd).mcp_servers(mcp_servers))
+                    .block_task()
+                    .await
+                    .with_context(|| "ACP new_session failed")?;
+                push_log(&logs, "new_session ok", debug);
 
-                let _ = child.start_kill();
-                kill_process_group(child_pid, &logs, debug);
-                match child.wait().await {
-                    Ok(res) => break res,
-                    Err(e) => {
+                // Send prompt
+                push_log(&logs, "prompt", debug);
+                let prompt_result = connection
+                    .send_request(PromptRequest::new(
+                        session.session_id,
+                        vec![ContentBlock::Text(TextContent::new(prompt))],
+                    ))
+                    .block_task()
+                    .await;
+
+                if let Err(err) = &prompt_result {
+                    push_log(&logs, format!("prompt error: {err:?}"), true);
+                    if let Ok(Some(status)) = child.try_wait() {
                         push_log(
                             &logs,
-                            format!("failed to wait on child after kill: {}", e),
+                            format!("agent exited before prompt completed: {status}"),
+                            true,
+                        );
+                    }
+
+                    if !*finalization_received_capture.lock().unwrap() {
+                        return Err(anyhow::anyhow!(
+                            "ACP prompt failed: {:?}",
+                            prompt_result.unwrap_err()
+                        ));
+                    }
+
+                    push_log(
+                        &logs,
+                        "prompt error ignored because finalization was received",
+                        debug,
+                    );
+                } else {
+                    push_log(&logs, "prompt ok", debug);
+                }
+
+                // Monitor agent execution until completion or cancellation
+                let status = loop {
+                    let finalization_received = *finalization_received_capture.lock().unwrap();
+
+                    if finalization_received {
+                        push_log(
+                            &logs,
+                            "finalization received; terminating agent immediately",
                             debug,
                         );
-                        break child.wait().await?;
-                    }
-                }
-            }
 
-            if let Some(token) = &cancel_token
-                && token.is_cancelled()
-            {
-                push_log(&logs, "cancellation received; killing agent", debug);
-                let _ = child.start_kill();
+                        let _ = child.start_kill();
+                        kill_process_group(child_pid, &logs, debug);
+                        match child.wait().await {
+                            Ok(res) => break res,
+                            Err(e) => {
+                                push_log(
+                                    &logs,
+                                    format!("failed to wait on child after kill: {}", e),
+                                    debug,
+                                );
+                                break child.wait().await?;
+                            }
+                        }
+                    }
+
+                    if let Some(token) = &cancel_token
+                        && token.is_cancelled()
+                    {
+                        push_log(&logs, "cancellation received; killing agent", debug);
+                        let _ = child.start_kill();
+                        kill_process_group(child_pid, &logs, debug);
+                        let _ = child.wait().await;
+                        process_guard.disarm();
+                        return Err(anyhow::anyhow!("Learning compaction cancelled by user"));
+                    }
+
+                    tokio::select! {
+                        res = child.wait() => {
+                            break res?;
+                        }
+                        _ = tokio::time::sleep(Duration::from_millis(200)) => {
+                            if child.try_wait().unwrap_or(None).is_some() {
+                                break child.wait().await?;
+                            }
+                        }
+                    }
+                };
+
+                // Ensure the agent process is not left running after completion.
                 kill_process_group(child_pid, &logs, debug);
-                let _ = child.wait().await;
                 process_guard.disarm();
-                return Err(anyhow::anyhow!("Learning compaction cancelled by user"));
-            }
 
-            tokio::select! {
-                res = child.wait() => {
-                    break res?;
+                push_log(&logs, format!("Agent exit status: {}", status), debug);
+
+                let finalization_received = *finalization_received_capture.lock().unwrap();
+                if !finalization_received {
+                    let final_logs = logs.lock().unwrap().clone();
+                    let ctx_logs = if final_logs.is_empty() {
+                        "ACP invocation produced no stderr or phase logs".to_string()
+                    } else {
+                        format!("ACP invocation logs:\n{}", final_logs.join("\n"))
+                    };
+
+                    return Err(anyhow::anyhow!(
+                        "Agent completed but did not call finalize_learning"
+                    )
+                    .context(ctx_logs));
                 }
-                _ = tokio::time::sleep(Duration::from_millis(200)) => {
-                    if child.try_wait().unwrap_or(None).is_some() {
-                        break child.wait().await?;
-                    }
-                }
+
+                Ok(())
             }
-        };
-
-        // Ensure all pending notifications are processed
-        kill_process_group(child_pid, &logs, debug);
-        let _ = io_handle.await;
-        process_guard.disarm();
-
-        push_log(&logs, format!("Agent exit status: {}", status), debug);
-
-        let finalization_received = *finalization_received_capture.lock().unwrap();
-        if !finalization_received {
-            let final_logs = logs.lock().unwrap().clone();
-            let ctx_logs = if final_logs.is_empty() {
-                "ACP invocation produced no stderr or phase logs".to_string()
-            } else {
-                format!("ACP invocation logs:\n{}", final_logs.join("\n"))
-            };
-
-            return Err(
-                anyhow::anyhow!("Agent completed but did not call finalize_learning")
-                    .context(ctx_logs),
-            );
-        }
-
-        Ok(())
-    }
-    .await;
+            .await;
+            operation.map_err(|error| AcpError::internal_error().data(format!("{error:#}")))
+        })
+        .await
+        .map_err(|error| anyhow::anyhow!("ACP connection failed: {error:?}"));
 
     if let Err(e) = result {
         let _ = child.start_kill();

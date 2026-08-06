@@ -232,8 +232,8 @@ pub struct Plan {
     pub meta: Option<serde_json::Value>,
 }
 
-impl From<agent_client_protocol::Plan> for Plan {
-    fn from(p: agent_client_protocol::Plan) -> Self {
+impl From<agent_client_protocol::schema::v1::Plan> for Plan {
+    fn from(p: agent_client_protocol::schema::v1::Plan) -> Self {
         Self {
             entries: p.entries.into_iter().map(PlanEntry::from).collect(),
             meta: p.meta.map(serde_json::Value::Object),
@@ -241,20 +241,26 @@ impl From<agent_client_protocol::Plan> for Plan {
     }
 }
 
-impl From<agent_client_protocol::PlanEntry> for PlanEntry {
-    fn from(e: agent_client_protocol::PlanEntry) -> Self {
+impl From<agent_client_protocol::schema::v1::PlanEntry> for PlanEntry {
+    fn from(e: agent_client_protocol::schema::v1::PlanEntry) -> Self {
         Self {
             content: e.content,
             priority: match e.priority {
-                agent_client_protocol::PlanEntryPriority::Low => PlanPriority::Low,
-                agent_client_protocol::PlanEntryPriority::Medium => PlanPriority::Medium,
-                agent_client_protocol::PlanEntryPriority::High => PlanPriority::High,
+                agent_client_protocol::schema::v1::PlanEntryPriority::Low => PlanPriority::Low,
+                agent_client_protocol::schema::v1::PlanEntryPriority::Medium => {
+                    PlanPriority::Medium
+                }
+                agent_client_protocol::schema::v1::PlanEntryPriority::High => PlanPriority::High,
                 _ => PlanPriority::Medium,
             },
             status: match e.status {
-                agent_client_protocol::PlanEntryStatus::Pending => PlanStatus::Pending,
-                agent_client_protocol::PlanEntryStatus::InProgress => PlanStatus::InProgress,
-                agent_client_protocol::PlanEntryStatus::Completed => PlanStatus::Completed,
+                agent_client_protocol::schema::v1::PlanEntryStatus::Pending => PlanStatus::Pending,
+                agent_client_protocol::schema::v1::PlanEntryStatus::InProgress => {
+                    PlanStatus::InProgress
+                }
+                agent_client_protocol::schema::v1::PlanEntryStatus::Completed => {
+                    PlanStatus::Completed
+                }
                 _ => PlanStatus::Pending,
             },
             meta: e.meta.map(serde_json::Value::Object),

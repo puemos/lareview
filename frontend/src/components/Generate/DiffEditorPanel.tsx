@@ -203,12 +203,10 @@ export const DiffEditorPanel: React.FC<DiffEditorPanelProps> = ({
   );
 };
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const countAdditions = (diff: string): number => {
   return diff.split('\n').filter(line => line.startsWith('+') && !line.startsWith('+++')).length;
 };
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const countDeletions = (diff: string): number => {
   return diff.split('\n').filter(line => line.startsWith('-') && !line.startsWith('---')).length;
 };

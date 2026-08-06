@@ -1,11 +1,12 @@
 import React from 'react';
-import type { ReviewSource } from '../types';
+import type { AgentConfigSelection, ReviewSource } from '../types';
 
 export interface StartGenerationArgs {
   diffText: string;
   agentId: string;
   repoId?: string;
   source?: ReviewSource | null;
+  agentConfig?: AgentConfigSelection[];
 }
 
 export interface GenerationContextValue {

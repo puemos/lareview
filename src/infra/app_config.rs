@@ -31,12 +31,39 @@ pub struct AppConfig {
     pub review_timeout_secs: Option<u64>,
 }
 
+impl AppConfig {
+    fn migrate_legacy_agent_overrides(&mut self) {
+        let uses_legacy_codex_adapter =
+            self.agent_args_overrides.get("codex").is_some_and(|args| {
+                args.iter()
+                    .any(|arg| arg.starts_with("@zed-industries/codex-acp"))
+            });
+
+        if !uses_legacy_codex_adapter {
+            return;
+        }
+
+        self.agent_args_overrides.remove("codex");
+
+        let path_is_npx = self
+            .agent_path_overrides
+            .get("codex")
+            .and_then(|path| PathBuf::from(path).file_name().map(|name| name.to_owned()))
+            .is_some_and(|name| name == "npx" || name == "npx.cmd");
+        if path_is_npx {
+            self.agent_path_overrides.remove("codex");
+        }
+    }
+}
+
 pub fn load_config() -> AppConfig {
     let path = config_path();
     let Ok(contents) = std::fs::read_to_string(&path) else {
         return AppConfig::default();
     };
-    toml::from_str(&contents).unwrap_or_default()
+    let mut config: AppConfig = toml::from_str(&contents).unwrap_or_default();
+    config.migrate_legacy_agent_overrides();
+    config
 }
 
 pub fn save_config(config: &AppConfig) -> std::io::Result<()> {
@@ -200,5 +227,49 @@ mod tests {
         unsafe {
             std::env::remove_var("LAREVIEW_CONFIG_PATH");
         }
+    }
+
+    #[test]
+    fn test_legacy_codex_factory_override_is_discarded() {
+        let mut config = AppConfig::default();
+        config
+            .agent_path_overrides
+            .insert("codex".to_string(), "/opt/node/bin/npx".to_string());
+        config.agent_args_overrides.insert(
+            "codex".to_string(),
+            vec![
+                "-y".to_string(),
+                "@zed-industries/codex-acp@latest".to_string(),
+                "-c".to_string(),
+                "model=\"gpt-5.2\"".to_string(),
+            ],
+        );
+
+        config.migrate_legacy_agent_overrides();
+
+        assert!(!config.agent_path_overrides.contains_key("codex"));
+        assert!(!config.agent_args_overrides.contains_key("codex"));
+    }
+
+    #[test]
+    fn test_custom_codex_override_is_preserved() {
+        let mut config = AppConfig::default();
+        config
+            .agent_path_overrides
+            .insert("codex".to_string(), "/opt/custom/codex-acp".to_string());
+        config
+            .agent_args_overrides
+            .insert("codex".to_string(), vec!["--custom-option".to_string()]);
+
+        config.migrate_legacy_agent_overrides();
+
+        assert_eq!(
+            config.agent_path_overrides.get("codex").map(String::as_str),
+            Some("/opt/custom/codex-acp")
+        );
+        assert_eq!(
+            config.agent_args_overrides.get("codex"),
+            Some(&vec!["--custom-option".to_string()])
+        );
     }
 }

@@ -229,6 +229,39 @@ export interface Agent {
   is_custom?: boolean;
 }
 
+export type AgentConfigValue = string | boolean;
+
+export interface AgentConfigSelection {
+  configId: string;
+  value: AgentConfigValue;
+}
+
+export interface AgentConfigPreference extends AgentConfigSelection {
+  category?: string;
+}
+
+export interface AgentSessionConfigSelectValue {
+  value: string;
+  name: string;
+  description?: string;
+}
+
+export interface AgentSessionConfigSelectGroup {
+  group: string;
+  name: string;
+  options: AgentSessionConfigSelectValue[];
+}
+
+export interface AgentSessionConfigOption {
+  id: string;
+  name: string;
+  description?: string;
+  category?: string;
+  type: 'select' | 'boolean';
+  currentValue: AgentConfigValue;
+  options?: AgentSessionConfigSelectValue[] | AgentSessionConfigSelectGroup[];
+}
+
 export interface VcsStatus {
   id: string;
   name: string;

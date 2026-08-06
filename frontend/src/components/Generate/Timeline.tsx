@@ -130,9 +130,7 @@ export const Timeline: React.FC<TimelineProps> = ({ messages }) => {
 };
 
 function renderMessage(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   msg: { type: string; message: string; data?: any; timestamp: number },
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   virtualizer: any
 ) {
   switch (msg.type) {
@@ -180,7 +178,6 @@ function renderMessage(
 
 // -- Subcomponents --
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ThinkingItem = ({ text, virtualizer }: { text: string; virtualizer: any }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -255,7 +252,6 @@ const MessageItem = ({ text }: { text: string }) => {
   );
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ToolCallItem = ({ data, virtualizer }: { data: any; virtualizer: any }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
