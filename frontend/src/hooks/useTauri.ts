@@ -23,6 +23,7 @@ import type {
   LearningStatus,
   LearningCompactionResult,
   MergeConfidence,
+  ReviewCandidatesResult,
 } from '../types';
 import { useCallback } from 'react';
 
@@ -473,6 +474,10 @@ export const useTauri = () => {
     return invoke('get_vcs_status');
   }, []);
 
+  const listReviewCandidates = useCallback(async (): Promise<ReviewCandidatesResult> => {
+    return invoke('list_review_candidates');
+  }, []);
+
   const getSingleVcsStatus = useCallback(async (providerId: string): Promise<VcsStatus> => {
     return invoke('get_single_vcs_status', { providerId });
   }, []);
@@ -620,6 +625,7 @@ export const useTauri = () => {
     setGitHubToken,
     getVcsStatus,
     getSingleVcsStatus,
+    listReviewCandidates,
     getReviewRules,
     createReviewRule,
     updateReviewRule,
@@ -638,7 +644,9 @@ export const useTauri = () => {
     updateEditorConfig: useCallback(async (editorId: string): Promise<void> => {
       return invoke('update_editor_config', { editorId });
     }, []),
-    getFeedbackFilterConfig: useCallback(async (): Promise<{ confidence_threshold: number | null }> => {
+    getFeedbackFilterConfig: useCallback(async (): Promise<{
+      confidence_threshold: number | null;
+    }> => {
       return invoke('get_feedback_filter_config');
     }, []),
     updateFeedbackFilterConfig: useCallback(async (threshold: number | null): Promise<void> => {
@@ -701,9 +709,12 @@ export const useTauri = () => {
     getRuleLibrary: useCallback(async (): Promise<LibraryRule[]> => {
       return invoke('get_rule_library');
     }, []),
-    getRuleLibraryByCategory: useCallback(async (category: LibraryCategory): Promise<LibraryRule[]> => {
-      return invoke('get_rule_library_by_category', { category });
-    }, []),
+    getRuleLibraryByCategory: useCallback(
+      async (category: LibraryCategory): Promise<LibraryRule[]> => {
+        return invoke('get_rule_library_by_category', { category });
+      },
+      []
+    ),
     getRuleLibraryChecklists: useCallback(async (): Promise<LibraryRule[]> => {
       return invoke('get_rule_library_checklists');
     }, []),
@@ -711,7 +722,11 @@ export const useTauri = () => {
       return invoke('get_rule_library_guidelines');
     }, []),
     addRuleFromLibrary: useCallback(
-      async (libraryRuleId: string, scope: 'global' | 'repo', repoId?: string): Promise<ReviewRule> => {
+      async (
+        libraryRuleId: string,
+        scope: 'global' | 'repo',
+        repoId?: string
+      ): Promise<ReviewRule> => {
         return invoke('add_rule_from_library', { libraryRuleId, scope, repoId });
       },
       []
@@ -736,9 +751,12 @@ export const useTauri = () => {
     getLearnedPatterns: useCallback(async (): Promise<LearnedPattern[]> => {
       return invoke('get_learned_patterns');
     }, []),
-    createLearnedPattern: useCallback(async (input: LearnedPatternInput): Promise<LearnedPattern> => {
-      return invoke('create_learned_pattern', { input });
-    }, []),
+    createLearnedPattern: useCallback(
+      async (input: LearnedPatternInput): Promise<LearnedPattern> => {
+        return invoke('create_learned_pattern', { input });
+      },
+      []
+    ),
     updateLearnedPattern: useCallback(
       async (id: string, input: LearnedPatternInput): Promise<LearnedPattern> => {
         return invoke('update_learned_pattern', { id, input });
@@ -754,9 +772,12 @@ export const useTauri = () => {
     getLearningStatus: useCallback(async (): Promise<LearningStatus> => {
       return invoke('get_learning_status');
     }, []),
-    triggerLearningCompaction: useCallback(async (agentId: string): Promise<LearningCompactionResult> => {
-      return invoke('trigger_learning_compaction', { agentId });
-    }, []),
+    triggerLearningCompaction: useCallback(
+      async (agentId: string): Promise<LearningCompactionResult> => {
+        return invoke('trigger_learning_compaction', { agentId });
+      },
+      []
+    ),
 
     // Merge confidence
     getMergeConfidence: useCallback(async (runId: string): Promise<MergeConfidence | null> => {

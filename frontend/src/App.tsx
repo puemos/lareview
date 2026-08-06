@@ -38,6 +38,11 @@ const SettingsView = lazy(() =>
     default: module.SettingsView,
   }))
 );
+const InboxView = lazy(() =>
+  import('./components/Inbox/InboxView').then(module => ({
+    default: module.InboxView,
+  }))
+);
 const ReposView = lazy(() =>
   import('./components/Repos/ReposView').then(module => ({
     default: module.ReposView,
@@ -56,7 +61,7 @@ const LearningView = lazy(() =>
 
 const queryClient = createQueryClient();
 
-type View = 'generate' | 'review' | 'repos' | 'rules' | 'learning' | 'settings';
+type View = 'generate' | 'review' | 'inbox' | 'repos' | 'rules' | 'learning' | 'settings';
 
 function App() {
   const [currentView, setCurrentView] = useState<View>('generate');
@@ -145,6 +150,8 @@ function App() {
               <ReviewView />
             </ErrorBoundary>
           );
+        case 'inbox':
+          return <InboxView onNavigate={setCurrentView} />;
         case 'repos':
           return <ReposView onNavigate={setCurrentView} />;
         case 'rules':
