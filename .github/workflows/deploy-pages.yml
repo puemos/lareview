@@ -28,7 +28,7 @@ jobs:
           node-version: "24.18.0"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: "11.20.0"
 
