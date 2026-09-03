@@ -476,6 +476,21 @@ fn pr_ref_from_source(source: &ReviewSource) -> Result<GitHubPrRef> {
     }
 }
 
+fn comment_commit_id(source: &ReviewSource) -> Result<&str> {
+    match source {
+        ReviewSource::GitHubPr {
+            head_sha: Some(head_sha),
+            ..
+        } if !head_sha.trim().is_empty() => Ok(head_sha),
+        ReviewSource::GitHubPr { .. } => Err(anyhow::anyhow!(
+            "Could not determine the pull request head commit SHA; fetch the pull request again before posting feedback"
+        )),
+        _ => Err(anyhow::anyhow!(
+            "Review must be from a GitHub PR to post feedback"
+        )),
+    }
+}
+
 pub struct GitHubProvider;
 
 impl GitHubProvider {
@@ -705,13 +720,10 @@ impl VcsProvider for GitHubProvider {
             None,
         );
 
-        let commit_id = pr_ref
-            .clone()
-            .url
-            .split("/")
-            .last()
-            .unwrap_or("")
-            .to_string();
+        // The review-comment API requires a commit SHA from the pull request.
+        // Keep it aligned with the stored diff instead of using the PR number
+        // from the canonical URL or silently moving the comment to a newer head.
+        let commit_id = comment_commit_id(&request.review.source)?;
 
         let position = diff_index
             .find_position_in_diff(
@@ -726,7 +738,7 @@ impl VcsProvider for GitHubProvider {
             &pr_ref.repo,
             pr_ref.number,
             &markdown,
-            &commit_id,
+            commit_id,
             &file_path,
             position as u32,
         )
@@ -869,6 +881,38 @@ mod tests {
     fn test_parse_pr_ref_invalid() {
         assert!(parse_pr_ref("invalid").is_none());
         assert!(parse_pr_ref("owner/repo").is_none());
+    }
+
+    #[test]
+    fn comment_commit_id_uses_stored_head_sha_not_pr_url() {
+        let source = ReviewSource::GitHubPr {
+            owner: "owner".to_string(),
+            repo: "repo".to_string(),
+            number: 123,
+            url: Some("https://github.com/owner/repo/pull/123".to_string()),
+            head_sha: Some("0123456789abcdef0123456789abcdef01234567".to_string()),
+            base_sha: None,
+        };
+
+        assert_eq!(
+            comment_commit_id(&source).unwrap(),
+            "0123456789abcdef0123456789abcdef01234567"
+        );
+    }
+
+    #[test]
+    fn comment_commit_id_rejects_missing_head_sha() {
+        let source = ReviewSource::GitHubPr {
+            owner: "owner".to_string(),
+            repo: "repo".to_string(),
+            number: 123,
+            url: Some("https://github.com/owner/repo/pull/123".to_string()),
+            head_sha: None,
+            base_sha: None,
+        };
+
+        let error = comment_commit_id(&source).unwrap_err().to_string();
+        assert!(error.contains("fetch the pull request again"));
     }
 
     #[test]

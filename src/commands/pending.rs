@@ -79,13 +79,33 @@ pub fn acquire_diff_from_request(state: State<'_, AppState>) -> Result<PendingRe
                 number,
             } => {
                 let pr_url = format!("https://github.com/{}/{}/pull/{}", owner, repo, number);
+                let pr_ref = crate::infra::vcs::github::GitHubPrRef {
+                    owner: owner.clone(),
+                    repo: repo.clone(),
+                    number,
+                    url: pr_url.clone(),
+                };
+                let metadata = tauri::async_runtime::block_on(
+                    crate::infra::vcs::github::fetch_pr_metadata(&pr_ref),
+                )
+                .ok();
+
                 review_source = Some(ReviewSource::GitHubPr {
                     owner: owner.clone(),
                     repo: repo.clone(),
                     number,
-                    url: Some(pr_url),
-                    head_sha: None,
-                    base_sha: None,
+                    url: Some(
+                        metadata
+                            .as_ref()
+                            .map(|metadata| metadata.url.clone())
+                            .unwrap_or(pr_url),
+                    ),
+                    head_sha: metadata
+                        .as_ref()
+                        .and_then(|metadata| metadata.head_sha.clone()),
+                    base_sha: metadata
+                        .as_ref()
+                        .and_then(|metadata| metadata.base_sha.clone()),
                 });
 
                 crate::infra::cli::diff::acquire_diff(
