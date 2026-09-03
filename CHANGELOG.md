@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.1.5] - 2026-09-03
+
+### Fixed
+
+- **GitHub**: Post individual feedback against the reviewed pull request's head commit and retain commit metadata for PRs opened from the CLI (#4).
+
 ## [0.1.4] - 2026-08-06
 
 ### Added
