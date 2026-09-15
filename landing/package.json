@@ -16,7 +16,7 @@
     "@tailwindcss/cli": "^4.3.3",
     "browser-sync": "^3.0.3",
     "chokidar-cli": "^3.0.0",
-    "concurrently": "^10.0.4",
+    "concurrently": "^10.0.5",
     "tailwindcss": "^4.3.3"
   }
 }
