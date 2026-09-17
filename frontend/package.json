@@ -24,7 +24,7 @@
     "@tanstack/react-query-persist-client": "^5.101.4",
     "@tanstack/react-virtual": "^3.14.9",
     "@tauri-apps/api": "^2.11.1",
-    "@tauri-apps/plugin-dialog": "~2.7.2",
+    "@tauri-apps/plugin-dialog": "~2.7.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "framer-motion": "^13.0.0",
