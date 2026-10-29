@@ -1,9 +1,9 @@
 {
   "name": "lareview-landing",
   "private": true,
-  "packageManager": "pnpm@11.20.0",
+  "packageManager": "pnpm@11.28.9",
   "engines": {
-    "node": ">=24.18.0 <25"
+    "node": ">=24.22.2 <25"
   },
   "scripts": {
     "build": "pnpm run build:css && pnpm run build:dist",
@@ -14,9 +14,9 @@
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.3.3",
-    "browser-sync": "^3.0.3",
+    "browser-sync": "^3.0.4",
     "chokidar-cli": "^3.0.0",
-    "concurrently": "^10.0.5",
+    "concurrently": "^10.0.6",
     "tailwindcss": "^4.3.3"
   }
 }

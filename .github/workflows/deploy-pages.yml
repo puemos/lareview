@@ -25,12 +25,12 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: "24.18.0"
+          node-version: "24.22.2"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: "11.20.0"
+          version: "11.28.9"
 
       - name: Install landing dependencies
         working-directory: landing

@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.1.6] - 2026-10-29
+
+### Changed
+
+- **Dependencies**: Refresh Rust, desktop, frontend, and landing-page dependencies, including Tauri 2.12, React 19.3, Vite 8.3, and the ACP client 3.6.
+- **Tooling**: Update Rust to 1.99.1, Node.js to 24.22.2, and pnpm to 11.28.9 while preserving the Rust 1.91 MSRV and Mermaid 11 desktop-webview compatibility.
+- **Security**: Audit both JavaScript lockfiles on pull requests and weekly, and require locked Rust dependency resolution in CI.
+
+### Fixed
+
+- **Security**: Resolve reported JavaScript dependency vulnerabilities, including patched DOMPurify, KaTeX, and selector-parser dependencies.
+- **Dependencies**: Remove unused image codecs and obsolete advisory exceptions; document the remaining upstream Tauri maintenance and soundness warnings.
+- **Tests**: Register DOM matchers through Vitest 5's supported matcher extension API.
+
 ## [0.1.5] - 2026-09-03
 
 ### Fixed
