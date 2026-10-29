@@ -1,7 +1,19 @@
 import React, { useMemo, useState } from 'react';
-import { Asterisk, Check, PencilSimple, Trash, Warning, ChartBar } from '@phosphor-icons/react';
+import { PencilSimple, Trash, Warning, ChartBar } from '@phosphor-icons/react';
 import { ICONS } from '../../constants/icons';
-import { useRules, useRuleRejectionStats, type ReviewRuleInput, type RuleRejectionStats } from '../../hooks/useRules';
+import { PageHeader } from '../Common/PageHeader';
+import { displayDate } from '../../utils/dates';
+import { SearchField } from '../Common/SearchField';
+import { EmptyPanel } from '../Common/EmptyPanel';
+import { Toggle } from '../Common/Toggle';
+import { Dialog } from '../Common/Dialog';
+import { InlineError } from '../Common/InlineError';
+import {
+  useRules,
+  useRuleRejectionStats,
+  type ReviewRuleInput,
+  type RuleRejectionStats,
+} from '../../hooks/useRules';
 import { useRepos } from '../../hooks/useRepos';
 import { RuleLibraryModal } from './RuleLibraryModal';
 import type { LinkedRepo, ReviewRule, RuleScope } from '../../types';
@@ -25,18 +37,41 @@ const emptyDraft: RuleDraft = {
 };
 
 export const RulesView: React.FC = () => {
-  const { data: rules = [], isLoading, createRule, updateRule, removeRule } = useRules();
+  const {
+    data: rules = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isFetching,
+    createRule,
+    updateRule,
+    removeRule,
+  } = useRules();
   const { data: repos = [] } = useRepos();
   const { data: rejectionStats = [] } = useRuleRejectionStats();
 
+  const [ruleToDelete, setRuleToDelete] = useState<ReviewRule | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [draft, setDraft] = useState<RuleDraft>(emptyDraft);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState<RuleDraft>(emptyDraft);
 
-  const globalRules = useMemo(() => rules.filter(rule => rule.scope === 'global'), [rules]);
-  const repoRules = useMemo(() => rules.filter(rule => rule.scope === 'repo'), [rules]);
+  const filteredRules = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return rules.filter(rule =>
+      [
+        rule.text,
+        rule.category ?? '',
+        rule.glob ?? '',
+        repos.find(repo => repo.id === rule.repo_id)?.name ?? '',
+      ].some(value => value.toLowerCase().includes(query))
+    );
+  }, [rules, repos, searchQuery]);
+  const globalRules = filteredRules.filter(rule => rule.scope === 'global');
+  const repoRules = filteredRules.filter(rule => rule.scope === 'repo');
 
   // Create a map of rule_id to stats for quick lookup
   const statsById = useMemo(() => {
@@ -118,73 +153,156 @@ export const RulesView: React.FC = () => {
 
   return (
     <div className="bg-bg-primary flex h-full flex-col">
-      <div className="border-border bg-bg-primary flex h-12 shrink-0 items-center justify-between border-b px-6">
-        <div className="flex items-center gap-3">
-          <Asterisk size={18} weight="fill" className="text-brand" />
-          <h1 className="font-display text-text-primary text-sm font-medium tracking-wide">
-            Rules
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsLibraryOpen(true)}
-            className="bg-bg-tertiary text-text-secondary hover:text-text-primary border-border flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-[10px] font-bold transition-all hover:brightness-110"
-          >
-            <ICONS.ICON_PLAN size={12} />
-            Library
-          </button>
-          <button
-            onClick={openAddModal}
-            className="bg-brand text-bg-primary shadow-custom flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[10px] font-bold transition-all hover:brightness-110"
-          >
-            <ICONS.ICON_PLUS size={12} weight="bold" />
-            Add Rule
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Rules"
+        description="Define what your agents should check during every review."
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={() => setIsLibraryOpen(true)}
+              className="bg-bg-secondary border-border text-text-secondary hover:text-text-primary flex h-9 items-center gap-2 rounded-md border px-3 text-xs transition-colors"
+            >
+              <ICONS.ICON_PLAN size={14} /> Library
+            </button>
+            <button
+              type="button"
+              onClick={openAddModal}
+              className="bg-brand text-brand-fg hover:bg-brand/90 flex h-9 items-center gap-2 rounded-md px-3 text-xs font-medium transition-colors"
+            >
+              <ICONS.ICON_PLUS size={14} /> Add rule
+            </button>
+          </>
+        }
+      />
 
-      <div className="flex-1 overflow-y-auto p-8">
-        <div className="mx-auto max-w-5xl space-y-6">
-          <div className="text-text-tertiary text-xs leading-relaxed">
-            Rules define what the AI should verify during code review. Each rule is checked and
-            findings are reported. Apply them globally or scope them to a repository and optional
-            glob pattern.
+      <div className="product-page-body">
+        <div className="product-page-content space-y-6">
+          {isError && (
+            <InlineError
+              title="Could not load rules"
+              message={String(error)}
+              onRetry={() => {
+                void refetch();
+              }}
+              isRetrying={isFetching}
+            />
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <SearchField
+              label="Search rules"
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Rule text, category, project, or file pattern"
+            />
+            {!isLoading && !isError && (
+              <span className="text-text-disabled text-xs">
+                {filteredRules.length} {filteredRules.length === 1 ? 'rule' : 'rules'}
+              </span>
+            )}
           </div>
+          {!isLoading && !isError && searchQuery.trim() && filteredRules.length === 0 && (
+            <EmptyPanel
+              title="No matching rules"
+              description="Try another phrase, category, project, or file pattern."
+              action={
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="text-text-secondary border-border rounded-md border px-3 py-2 text-xs"
+                >
+                  Clear search
+                </button>
+              }
+            />
+          )}
 
-          <RuleSection
-            title="Global Rules"
-            rules={globalRules}
-            repos={repos}
-            statsById={statsById}
-            editingId={editingId}
-            editingDraft={editingDraft}
-            onEdit={startEdit}
-            onCancelEdit={cancelEdit}
-            onEditChange={setEditingDraft}
-            onUpdate={handleUpdate}
-            onToggle={toggleRule}
-            onDelete={removeRule.mutate}
-            repoName={repoName}
-            isLoading={isLoading}
-          />
-          <RuleSection
-            title="Repository Rules"
-            rules={repoRules}
-            repos={repos}
-            statsById={statsById}
-            editingId={editingId}
-            editingDraft={editingDraft}
-            onEdit={startEdit}
-            onCancelEdit={cancelEdit}
-            onEditChange={setEditingDraft}
-            onUpdate={handleUpdate}
-            onToggle={toggleRule}
-            onDelete={removeRule.mutate}
-            repoName={repoName}
-            isLoading={isLoading}
-          />
+          {!isError && (!searchQuery.trim() || globalRules.length > 0) && (
+            <RuleSection
+              title="Global rules"
+              rules={globalRules}
+              repos={repos}
+              statsById={statsById}
+              editingId={editingId}
+              editingDraft={editingDraft}
+              onEdit={startEdit}
+              onCancelEdit={cancelEdit}
+              onEditChange={setEditingDraft}
+              onUpdate={handleUpdate}
+              onToggle={toggleRule}
+              onDelete={id => {
+                removeRule.reset();
+                setRuleToDelete(rules.find(rule => rule.id === id) ?? null);
+              }}
+              repoName={repoName}
+              isLoading={isLoading}
+              isUpdating={updateRule.isPending || removeRule.isPending}
+            />
+          )}
+          {!isError && (!searchQuery.trim() || repoRules.length > 0) && (
+            <RuleSection
+              title="Repository rules"
+              rules={repoRules}
+              repos={repos}
+              statsById={statsById}
+              editingId={editingId}
+              editingDraft={editingDraft}
+              onEdit={startEdit}
+              onCancelEdit={cancelEdit}
+              onEditChange={setEditingDraft}
+              onUpdate={handleUpdate}
+              onToggle={toggleRule}
+              onDelete={id => {
+                removeRule.reset();
+                setRuleToDelete(rules.find(rule => rule.id === id) ?? null);
+              }}
+              repoName={repoName}
+              isLoading={isLoading}
+              isUpdating={updateRule.isPending || removeRule.isPending}
+            />
+          )}
         </div>
       </div>
+
+      <Dialog
+        isOpen={Boolean(ruleToDelete)}
+        onClose={() => setRuleToDelete(null)}
+        title="Delete rule"
+        busy={removeRule.isPending}
+      >
+        <p className="text-text-secondary text-sm leading-6">
+          Remove this check from future reviews?
+        </p>
+        <blockquote className="text-text-primary border-border mt-4 border-l-2 pl-4 text-sm leading-6">
+          {ruleToDelete?.text}
+        </blockquote>
+        {removeRule.error && (
+          <div className="mt-4">
+            <InlineError title="Could not delete rule" message={String(removeRule.error)} />
+          </div>
+        )}
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={() => setRuleToDelete(null)}
+            disabled={removeRule.isPending}
+            className="text-text-secondary rounded-md px-3 py-2 text-xs"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={removeRule.isPending}
+            onClick={() => {
+              if (ruleToDelete)
+                removeRule.mutate(ruleToDelete.id, { onSuccess: () => setRuleToDelete(null) });
+            }}
+            className="bg-impact-blocking text-brand-fg rounded-md px-3 py-2 text-xs font-medium"
+          >
+            {removeRule.isPending ? 'Deleting…' : 'Delete rule'}
+          </button>
+        </div>
+      </Dialog>
 
       <AddRuleModal
         isOpen={isAddModalOpen}
@@ -227,39 +345,25 @@ const AddRuleModal: React.FC<AddRuleModalProps> = ({
   isSubmitting,
   canSubmit,
 }) => {
-  if (!isOpen) return null;
-
   return (
-    <div className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm duration-200">
-      <div className="bg-bg-primary border-border/50 animate-in zoom-in-95 flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl border shadow-2xl duration-200">
-        <div className="border-border/50 bg-bg-secondary/30 flex items-center justify-between rounded-t-xl border-b px-5 py-4">
-          <div className="flex items-center gap-2.5">
-            <div className="bg-accent/10 text-accent rounded-md p-1.5">
-              <ICONS.ICON_PLUS size={18} />
-            </div>
-            <h3 className="text-text-primary text-sm font-semibold">Add Rule</h3>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary rounded-md p-1 transition-all"
-          >
-            <ICONS.ACTION_CLOSE size={18} />
-          </button>
-        </div>
-        <div className="custom-scrollbar flex-1 overflow-y-auto p-6">
-          <RuleForm
-            draft={draft}
-            repos={repos}
-            onChange={onChange}
-            onSubmit={onSubmit}
-            submitLabel="Add Rule"
-            disabled={!canSubmit}
-            isLoading={isSubmitting}
-            onCancel={onClose}
-          />
-        </div>
-      </div>
-    </div>
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Add rule"
+      description="Give your agent a specific, actionable check."
+      busy={isSubmitting}
+    >
+      <RuleForm
+        draft={draft}
+        repos={repos}
+        onChange={onChange}
+        onSubmit={onSubmit}
+        submitLabel="Add rule"
+        disabled={!canSubmit}
+        isLoading={isSubmitting}
+        onCancel={onClose}
+      />
+    </Dialog>
   );
 };
 
@@ -272,6 +376,7 @@ interface RuleFormProps {
   disabled?: boolean;
   isLoading?: boolean;
   onCancel?: () => void;
+  autoFocus?: boolean;
 }
 
 const RuleForm: React.FC<RuleFormProps> = ({
@@ -283,121 +388,141 @@ const RuleForm: React.FC<RuleFormProps> = ({
   disabled,
   isLoading,
   onCancel,
+  autoFocus = false,
 }) => {
+  const helpId = React.useId();
   const repoRequired = draft.scope === 'repo' && repos.length === 0;
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2">
-        <label className="space-y-1">
-          <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
-            Scope
-          </span>
-          <select
-            value={draft.scope}
-            onChange={e => onChange({ ...draft, scope: e.target.value as RuleScope })}
-            className="bg-bg-tertiary border-border text-text-primary focus:border-brand focus:ring-brand/20 w-full rounded-md border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none"
-          >
-            <option value="global">Global</option>
-            <option value="repo">Repository</option>
-          </select>
-        </label>
+    <form
+      className="product-form"
+      onSubmit={event => {
+        event.preventDefault();
+        if (!disabled && !repoRequired && !isLoading) onSubmit();
+      }}
+    >
+      <fieldset disabled={isLoading} className="min-w-0 space-y-4">
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="space-y-1">
+            <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
+              Scope
+            </span>
+            <select
+              value={draft.scope}
+              onChange={e => onChange({ ...draft, scope: e.target.value as RuleScope })}
+              className="bg-bg-tertiary border-border text-text-primary focus:border-brand focus:ring-brand/20 w-full rounded-md border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none"
+            >
+              <option value="global">Every repository</option>
+              <option value="repo">Repository</option>
+            </select>
+          </label>
 
-        <label className="space-y-1">
-          <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
-            Repository
-          </span>
-          <select
-            value={draft.repo_id}
-            onChange={e => onChange({ ...draft, repo_id: e.target.value })}
-            disabled={draft.scope !== 'repo'}
-            className="bg-bg-tertiary border-border text-text-primary focus:border-brand focus:ring-brand/20 w-full rounded-md border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none disabled:opacity-50"
-          >
-            <option value="">Select a repository</option>
-            {repos.map(repo => (
-              <option key={repo.id} value={repo.id}>
-                {repo.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      {repoRequired && (
-        <div className="text-text-tertiary text-xs">
-          Link a repository to enable repo-scoped rules.
+          <label className="space-y-1">
+            <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
+              Repository
+            </span>
+            <select
+              value={draft.repo_id}
+              onChange={e => onChange({ ...draft, repo_id: e.target.value })}
+              disabled={draft.scope !== 'repo'}
+              className="bg-bg-tertiary border-border text-text-primary focus:border-brand focus:ring-brand/20 w-full rounded-md border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none disabled:opacity-50"
+            >
+              <option value="">Select a repository</option>
+              {repos.map(repo => (
+                <option key={repo.id} value={repo.id}>
+                  {repo.name}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
-      )}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <label className="space-y-1">
-          <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
-            Category (Optional)
-          </span>
-          <input
-            type="text"
-            value={draft.category}
-            onChange={e => onChange({ ...draft, category: e.target.value })}
-            placeholder="e.g., security, performance"
-            className="bg-bg-tertiary border-border text-text-primary focus:border-brand focus:ring-brand/20 w-full rounded-md border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none"
-          />
-        </label>
-
-        <label className="space-y-1">
-          <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
-            Glob Pattern (Optional)
-          </span>
-          <input
-            type="text"
-            value={draft.glob}
-            onChange={e => onChange({ ...draft, glob: e.target.value })}
-            placeholder="src/**/*.rs"
-            className="bg-bg-tertiary border-border text-text-primary focus:border-brand focus:ring-brand/20 w-full rounded-md border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none"
-          />
-        </label>
-      </div>
-
-      <label className="space-y-1">
-        <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
-          Rule Text
-        </span>
-        <textarea
-          value={draft.text}
-          onChange={e => onChange({ ...draft, text: e.target.value })}
-          rows={4}
-          placeholder="Describe what the AI should check for and report on."
-          className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand focus:ring-brand/20 w-full resize-none rounded-md border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none"
-        />
-      </label>
-
-      <label className="text-text-secondary flex items-center gap-2 text-xs">
-        <input
-          type="checkbox"
-          checked={draft.enabled}
-          onChange={e => onChange({ ...draft, enabled: e.target.checked })}
-          className="accent-brand"
-        />
-        Enabled
-      </label>
-
-      <div className="flex items-center gap-2">
-        <button
-          onClick={onSubmit}
-          disabled={disabled || repoRequired || isLoading}
-          className="bg-brand text-bg-primary disabled:bg-bg-tertiary disabled:text-text-disabled rounded-md px-3 py-2 text-xs font-semibold transition-all hover:brightness-110 disabled:cursor-not-allowed"
-        >
-          {submitLabel}
-        </button>
-        {onCancel && (
-          <button
-            onClick={onCancel}
-            className="bg-bg-tertiary text-text-secondary hover:text-text-primary border-border rounded-md border px-3 py-2 text-xs font-semibold transition-all"
-          >
-            Cancel
-          </button>
+        {repoRequired && (
+          <div className="text-text-tertiary text-xs">
+            Link a repository to enable repo-scoped rules.
+          </div>
         )}
-      </div>
-    </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="space-y-1">
+            <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
+              Category (optional)
+            </span>
+            <input
+              type="text"
+              value={draft.category}
+              onChange={e => onChange({ ...draft, category: e.target.value })}
+              placeholder="e.g., security, performance"
+              className="bg-bg-tertiary border-border text-text-primary focus:border-brand focus:ring-brand/20 w-full rounded-md border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none"
+            />
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
+              File pattern (optional)
+            </span>
+            <input
+              type="text"
+              value={draft.glob}
+              onChange={e => onChange({ ...draft, glob: e.target.value })}
+              placeholder="src/**/*.rs"
+              className="bg-bg-tertiary border-border text-text-primary focus:border-brand focus:ring-brand/20 w-full rounded-md border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none"
+            />
+          </label>
+        </div>
+
+        <label className="space-y-1">
+          <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
+            Rule text
+          </span>
+          <textarea
+            value={draft.text}
+            required
+            autoFocus={autoFocus}
+            data-autofocus
+            aria-describedby={helpId}
+            onChange={e => onChange({ ...draft, text: e.target.value })}
+            rows={4}
+            placeholder="Describe what the AI should check for and report on."
+            className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand focus:ring-brand/20 w-full resize-none rounded-md border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none"
+          />
+        </label>
+
+        <p id={helpId} className="text-text-tertiary text-xs leading-5">
+          Write a specific check the agent can verify. Leave the file pattern blank to check every
+          file.
+        </p>
+
+        <label className="text-text-secondary flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={draft.enabled}
+            onChange={e => onChange({ ...draft, enabled: e.target.checked })}
+            className="accent-brand"
+          />
+          Use this rule in new reviews
+        </label>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="submit"
+            disabled={disabled || repoRequired || isLoading}
+            className="bg-brand text-bg-primary disabled:bg-bg-tertiary disabled:text-text-disabled rounded-md px-3 py-2 text-xs font-semibold transition-all hover:brightness-110 disabled:cursor-not-allowed"
+          >
+            {isLoading ? 'Saving…' : submitLabel}
+          </button>
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="bg-bg-tertiary text-text-secondary hover:text-text-primary border-border rounded-md border px-3 py-2 text-xs font-semibold transition-all"
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+      </fieldset>
+    </form>
   );
 };
 
@@ -416,6 +541,7 @@ interface RuleSectionProps {
   onDelete: (id: string) => void;
   repoName: (repoId?: string | null) => string;
   isLoading: boolean;
+  isUpdating: boolean;
 }
 
 const RuleSection: React.FC<RuleSectionProps> = ({
@@ -433,24 +559,45 @@ const RuleSection: React.FC<RuleSectionProps> = ({
   onDelete,
   repoName,
   isLoading,
+  isUpdating,
 }) => {
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-text-primary text-sm font-semibold">{title}</h3>
-        {isLoading && <span className="text-text-tertiary text-[10px]">Loading...</span>}
+        <h3 className="text-text-primary text-[13px] font-medium">{title}</h3>
+        <span className="text-text-disabled text-xs">
+          {isLoading
+            ? 'Loading…'
+            : `${rules.filter(rule => rule.enabled).length} enabled · ${rules.length} ${rules.length === 1 ? 'rule' : 'rules'}`}
+        </span>
       </div>
 
-      {rules.length === 0 ? (
+      {isLoading ? (
+        <div
+          role="status"
+          aria-label={`Loading ${title.toLowerCase()}`}
+          className="animate-pulse space-y-3"
+        >
+          {[1, 2].map(index => (
+            <div
+              key={index}
+              aria-hidden="true"
+              className="bg-bg-secondary border-border/50 h-28 rounded-lg border"
+            />
+          ))}
+        </div>
+      ) : rules.length === 0 ? (
         <div className="text-text-tertiary bg-bg-secondary/40 border-border rounded-lg border p-4 text-xs">
-          No rules configured yet.
+          {title === 'Global rules'
+            ? 'No global rules yet. These apply to every review.'
+            : 'No repository rules yet. Add one to tailor checks to a project.'}
         </div>
       ) : (
         <div className="space-y-3">
           {rules.map(rule => (
             <div
               key={rule.id}
-              className="group bg-bg-secondary/40 hover:bg-bg-secondary hover:border-border relative rounded-lg border border-transparent transition-all"
+              className="group bg-bg-secondary/20 border-border/50 relative overflow-hidden rounded-lg border transition-colors"
             >
               {editingId === rule.id ? (
                 <div className="p-4">
@@ -461,45 +608,42 @@ const RuleSection: React.FC<RuleSectionProps> = ({
                     onSubmit={onUpdate}
                     submitLabel="Save Changes"
                     onCancel={onCancelEdit}
+                    autoFocus
+                    disabled={
+                      !editingDraft.text.trim() ||
+                      (editingDraft.scope === 'repo' && !editingDraft.repo_id)
+                    }
+                    isLoading={isUpdating}
                   />
                 </div>
               ) : (
                 <div className="flex flex-col">
                   {/* Top: Description and Toggle */}
-                  <div className="p-4 space-y-4">
-                    <div className="flex justify-between items-start gap-4">
-                      <div className="text-text-primary text-sm font-medium leading-relaxed flex-1">
-                        {rule.text}
-                      </div>
-                      <button
-                        onClick={() => onToggle(rule)}
-                        className={`shrink-0 rounded-md px-2.5 py-1 text-[10px] font-semibold transition-colors ${
-                          rule.enabled
-                            ? 'bg-status-done/10 text-status-done border border-status-done/20'
-                            : 'bg-bg-tertiary text-text-tertiary border border-border'
-                        }`}
-                      >
-                        {rule.enabled ? 'Enabled' : 'Disabled'}
-                      </button>
+                  <div className="space-y-3 p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="text-text-primary flex-1 text-sm leading-6">{rule.text}</div>
+                      <Toggle
+                        label={`Rule: ${rule.text}`}
+                        checked={rule.enabled}
+                        onChange={() => onToggle(rule)}
+                        disabled={isUpdating}
+                      />
                     </div>
 
                     {/* Middle: Tags */}
-                    <div className="text-text-tertiary flex flex-wrap items-center gap-2 text-[10px]">
-                      <span className="bg-bg-tertiary rounded-md px-2 py-0.5 uppercase font-bold tracking-wider border border-border/50">
-                        {rule.scope}
-                      </span>
+                    <div className="text-text-tertiary flex flex-wrap items-center gap-2 text-[11px]">
                       {rule.scope === 'repo' && (
-                        <span className="bg-bg-tertiary rounded-md px-2 py-0.5 border border-border/50">
+                        <span className="bg-bg-tertiary border-border/50 rounded-md border px-2 py-0.5">
                           {repoName(rule.repo_id)}
                         </span>
                       )}
                       {rule.category && (
-                        <span className="bg-bg-tertiary text-accent font-medium rounded-md px-2 py-0.5 border border-accent/20">
-                          {rule.category.toUpperCase()}
+                        <span className="text-text-tertiary border-border/50 rounded-md border px-2 py-0.5 text-[11px]">
+                          {rule.category}
                         </span>
                       )}
                       {rule.glob && (
-                        <span className="bg-bg-tertiary rounded-md px-2 py-0.5 font-mono border border-border/50">
+                        <span className="bg-bg-tertiary border-border/50 rounded-md border px-2 py-0.5 font-mono">
                           {rule.glob}
                         </span>
                       )}
@@ -507,29 +651,33 @@ const RuleSection: React.FC<RuleSectionProps> = ({
                   </div>
 
                   {/* Bottom: Footer with Meta and Actions */}
-                  <div className="border-t border-border/50 px-4 py-3 flex items-center justify-between">
+                  <div className="border-border/50 flex items-center justify-between border-t px-4 py-3">
                     <div className="text-text-tertiary flex items-center gap-4 text-[10px]">
-                      <span className="flex items-center gap-1.5 opacity-80">
-                        <Check size={12} className="text-status-done" />
-                        Updated {new Date(rule.updated_at).toLocaleDateString()}
-                      </span>
+                      {displayDate(rule.updated_at) && (
+                        <time dateTime={rule.updated_at}>
+                          Updated {displayDate(rule.updated_at)}
+                        </time>
+                      )}
                       {statsById[rule.id] && (
                         <RuleEffectivenessIndicator stats={statsById[rule.id]} />
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+                    <div className="flex items-center gap-2">
                       <button
                         onClick={() => onEdit(rule)}
-                        className="text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary rounded-md p-1.5 transition-colors"
-                        title="Edit rule"
+                        disabled={isUpdating}
+                        className="text-text-secondary hover:text-text-primary hover:bg-bg-tertiary flex h-8 items-center gap-1.5 rounded-md px-2 text-xs transition-colors"
+                        aria-label={`Edit rule: ${rule.text}`}
                       >
-                        <PencilSimple size={14} />
+                        <PencilSimple size={13} /> Edit
                       </button>
                       <button
                         onClick={() => onDelete(rule.id)}
+                        disabled={isUpdating}
                         className="text-text-tertiary hover:text-status-ignored hover:bg-status-ignored/10 rounded-md p-1.5 transition-colors"
                         title="Delete rule"
+                        aria-label={`Delete rule: ${rule.text}`}
                       >
                         <Trash size={14} />
                       </button>
@@ -571,7 +719,7 @@ const RuleEffectivenessIndicator: React.FC<RuleEffectivenessIndicatorProps> = ({
         {acceptancePercent}% accepted
       </span>
       {isNoisy && (
-        <span className="bg-status-ignored/10 text-status-ignored border border-status-ignored/20 rounded-[2px] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tighter">
+        <span className="bg-status-ignored/10 text-status-ignored border-status-ignored/20 rounded-[2px] border px-1.5 py-0.5 text-[9px] font-bold tracking-tighter uppercase">
           Noisy
         </span>
       )}
