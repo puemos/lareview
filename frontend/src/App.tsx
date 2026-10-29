@@ -1,5 +1,6 @@
 import { useEffect, useState, lazy, Suspense, useCallback } from 'react';
 import { Toaster, toast } from 'sonner';
+import { MotionConfig } from 'framer-motion';
 
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useTauri } from './hooks/useTauri';
@@ -182,65 +183,67 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <GenerationProvider>
-        <TooltipProvider>
-          <div className="flex h-screen flex-col overflow-hidden bg-gray-900 text-white">
-            <Toaster
-              position="bottom-right"
-              theme="dark"
-              closeButton
-              icons={{
-                success: <ICONS.STATUS_DONE size={18} className="text-green-400" />,
-                info: <ICONS.ICON_INFO size={18} className="text-blue-400" />,
-                warning: <ICONS.ICON_WARNING size={18} className="text-yellow-400" />,
-                error: <ICONS.STATUS_IGNORED size={18} className="text-red-400" />,
-                loading: <ICONS.ACTION_LOADING size={18} className="text-brand animate-spin" />,
-              }}
-              toastOptions={{
-                classNames: {
-                  title: '!font-semibold',
-                  description: '!text-text-secondary !text-[11px]',
-                },
-                className:
-                  '!shadow-custom !bg-bg-tertiary !text-text-primary !rounded-lg !border !border-border !py-3',
-              }}
-            />
-
-            {error && (
-              <div className="z-50 flex items-center justify-between bg-red-500 px-4 py-2 text-white">
-                <span>{error}</span>
-                <button
-                  onClick={() => setError(null)}
-                  className="ml-4 rounded px-2 hover:bg-red-600"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
-            <div className="flex flex-1 overflow-hidden">
-              <Sidebar
-                currentView={currentView}
-                onViewChange={setCurrentView}
-                currentVersion={currentVersion}
-                updateAvailable={updateAvailable}
-                onUpdateClick={() => setShowUpdateModal(true)}
+      <MotionConfig reducedMotion="user">
+        <GenerationProvider>
+          <TooltipProvider>
+            <div className="flex h-screen flex-col overflow-hidden bg-gray-900 text-white">
+              <Toaster
+                position="bottom-right"
+                theme="dark"
+                closeButton
+                icons={{
+                  success: <ICONS.STATUS_DONE size={18} className="text-green-400" />,
+                  info: <ICONS.ICON_INFO size={18} className="text-blue-400" />,
+                  warning: <ICONS.ICON_WARNING size={18} className="text-yellow-400" />,
+                  error: <ICONS.STATUS_IGNORED size={18} className="text-red-400" />,
+                  loading: <ICONS.ACTION_LOADING size={18} className="text-brand animate-spin" />,
+                }}
+                toastOptions={{
+                  classNames: {
+                    title: '!font-semibold',
+                    description: '!text-text-secondary !text-[11px]',
+                  },
+                  className:
+                    '!shadow-custom !bg-bg-tertiary !text-text-primary !rounded-lg !border !border-border !py-3',
+                }}
               />
-              <main className="relative flex-1 overflow-hidden">
-                <WindowDragRegion className="absolute top-0 right-0 left-0 z-10 h-3" />
-                {renderView()}
-              </main>
+
+              {error && (
+                <div className="z-50 flex items-center justify-between bg-red-500 px-4 py-2 text-white">
+                  <span>{error}</span>
+                  <button
+                    onClick={() => setError(null)}
+                    className="ml-4 rounded px-2 hover:bg-red-600"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+              <div className="flex flex-1 overflow-hidden">
+                <Sidebar
+                  currentView={currentView}
+                  onViewChange={setCurrentView}
+                  currentVersion={currentVersion}
+                  updateAvailable={updateAvailable}
+                  onUpdateClick={() => setShowUpdateModal(true)}
+                />
+                <main className="relative min-w-0 flex-1 overflow-hidden">
+                  <WindowDragRegion className="absolute top-0 right-0 left-0 z-10 h-3" />
+                  {renderView()}
+                </main>
+              </div>
             </div>
-          </div>
-          {updateAvailable && currentVersion && (
-            <UpdateModal
-              isOpen={showUpdateModal}
-              onClose={() => setShowUpdateModal(false)}
-              currentVersion={currentVersion}
-              updateInfo={updateAvailable}
-            />
-          )}
-        </TooltipProvider>
-      </GenerationProvider>
+            {updateAvailable && currentVersion && (
+              <UpdateModal
+                isOpen={showUpdateModal}
+                onClose={() => setShowUpdateModal(false)}
+                currentVersion={currentVersion}
+                updateInfo={updateAvailable}
+              />
+            )}
+          </TooltipProvider>
+        </GenerationProvider>
+      </MotionConfig>
     </QueryClientProvider>
   );
 }

@@ -100,4 +100,21 @@ describe('Sidebar', () => {
     ).toBeTruthy();
     expect(reviews.compareDocumentPosition(inbox) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+
+  it('keeps opening a review separate from its delete action', () => {
+    renderSidebar();
+    const open = screen.getByRole('button', { name: 'Review: Review 1' });
+    const remove = screen.getByRole('button', { name: 'Delete review: Review 1' });
+    expect(open).not.toContainElement(remove);
+    fireEvent.click(open);
+    expect(useAppStore.getState().reviewId).toBe('review-1');
+    expect(
+      screen.queryByText(
+        'Are you sure you want to delete this review? All associated feedback and data will be permanently removed.'
+      )
+    ).not.toBeInTheDocument();
+    fireEvent.click(remove);
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+    expect(mockDeleteReview).not.toHaveBeenCalled();
+  });
 });

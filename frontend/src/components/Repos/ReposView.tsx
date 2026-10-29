@@ -1,15 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Folder,
-  Plus,
-  MagnifyingGlass,
-  ArrowSquareOut,
-  Trash,
-  Asterisk,
-} from '@phosphor-icons/react';
-import { toast } from 'sonner';
+import React, { useState } from 'react';
+import { Folder, Plus, ArrowRight, Trash, SpinnerGap } from '@phosphor-icons/react';
+import { PageHeader } from '../Common/PageHeader';
+import { SearchField } from '../Common/SearchField';
 import type { ViewType } from '../../types';
 import { useRepos } from '../../hooks/useRepos';
+import { useAppStore } from '../../store';
+import { displayDate } from '../../utils/dates';
+import { InlineError } from '../Common/InlineError';
 
 interface ReposViewProps {
   onNavigate: (view: ViewType) => void;
@@ -17,20 +14,23 @@ interface ReposViewProps {
 
 export const ReposView: React.FC<ReposViewProps> = ({ onNavigate }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const { data: repos = [], isLoading, addRepo, removeRepo, selectRepoFolder } = useRepos();
+  const {
+    data: repos = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isFetching,
+    addRepo,
+    removeRepo,
+    selectRepoFolder,
+  } = useRepos();
 
-  useEffect(() => {
-    if (addRepo.isError) {
-      toast.error('Failed to link repository', {
-        description: String(addRepo.error),
-      });
-    }
-  }, [addRepo.isError, addRepo.error]);
-
+  const normalizedQuery = searchQuery.trim().toLowerCase();
   const filteredRepos = repos.filter(
     repo =>
-      repo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      repo.path.toLowerCase().includes(searchQuery.toLowerCase())
+      repo.name.toLowerCase().includes(normalizedQuery) ||
+      repo.path.toLowerCase().includes(normalizedQuery)
   );
 
   const handleAddRepo = async () => {
@@ -40,68 +40,109 @@ export const ReposView: React.FC<ReposViewProps> = ({ onNavigate }) => {
     }
   };
 
+  const startRepositoryReview = (repoId: string) => {
+    useAppStore.setState({
+      selectedRepoId: repoId,
+      diffText: '',
+      parsedDiff: null,
+      pendingSource: null,
+      prRef: '',
+      viewMode: 'raw',
+    });
+    onNavigate('generate');
+  };
+
   return (
     <div className="bg-bg-primary flex h-full flex-col">
-      {/* Header */}
-      <div className="border-border bg-bg-primary flex h-12 shrink-0 items-center justify-between border-b px-6">
-        <div className="flex items-center gap-3">
-          <Asterisk size={18} weight="fill" className="text-brand" />
-          <h1 className="font-display text-text-primary text-sm font-medium tracking-wide">
-            Repositories
-          </h1>
-        </div>
-        <button
-          onClick={handleAddRepo}
-          className="bg-brand text-bg-primary shadow-custom flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[10px] font-bold transition-all hover:brightness-110"
-        >
-          <Plus size={12} weight="bold" />
-          Link Repository
-        </button>
-      </div>
+      <PageHeader
+        title="Repositories"
+        description="Link local projects to give your reviews the right context."
+        actions={
+          <button
+            onClick={handleAddRepo}
+            disabled={addRepo.isPending}
+            aria-busy={addRepo.isPending}
+            className="bg-brand text-brand-fg hover:bg-brand/90 flex h-9 items-center gap-2 rounded-md px-3 text-xs font-medium transition-colors"
+          >
+            {addRepo.isPending ? (
+              <SpinnerGap size={14} className="animate-spin" />
+            ) : (
+              <Plus size={14} />
+            )}{' '}
+            {addRepo.isPending ? 'Linking…' : 'Link repository'}
+          </button>
+        }
+      />
 
-      <div className="flex-1 overflow-y-auto p-8">
-        <div className="mx-auto max-w-5xl space-y-6">
-          <div className="group relative max-w-md">
-            <MagnifyingGlass
-              size={14}
-              className="text-text-disabled group-focus-within:text-brand absolute top-1/2 left-3 -translate-y-1/2 transition-colors"
-            />
-            <input
-              type="text"
+      <div className="product-page-body">
+        <div className="product-page-content space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <SearchField
+              label="Search repositories"
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search repositories..."
-              className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand focus:ring-brand/20 w-full rounded-md border py-2 pr-4 pl-9 text-xs shadow-sm transition-all focus:ring-1 focus:outline-none"
+              onChange={setSearchQuery}
             />
+            {!isLoading && !isError && (
+              <span role="status" className="text-text-disabled text-xs">
+                {filteredRepos.length} {filteredRepos.length === 1 ? 'repository' : 'repositories'}
+              </span>
+            )}
           </div>
 
-          {isLoading ? (
-            <div className="flex items-center justify-center py-20 opacity-50">
-              <div className="border-brand h-5 w-5 animate-spin rounded-full border-2 border-t-transparent" />
+          {isError ? (
+            <InlineError
+              title="Could not load repositories"
+              message={String(error)}
+              onRetry={() => {
+                void refetch();
+              }}
+              isRetrying={isFetching}
+            />
+          ) : isLoading ? (
+            <div
+              role="status"
+              aria-label="Loading repositories"
+              className="repository-grid animate-pulse"
+            >
+              {[1, 2, 3].map(index => (
+                <div
+                  key={index}
+                  aria-hidden="true"
+                  className="border-border/50 space-y-4 rounded-lg border p-5"
+                >
+                  <div className="bg-bg-tertiary h-9 w-9 rounded-md" />
+                  <div className="bg-bg-tertiary h-4 w-1/2 rounded" />
+                  <div className="bg-bg-tertiary h-3 w-3/4 rounded" />
+                  <div className="bg-bg-tertiary h-3 w-1/3 rounded" />
+                </div>
+              ))}
             </div>
           ) : filteredRepos.length === 0 ? (
-            <div className="text-text-disabled border-border bg-bg-secondary/30 flex flex-col items-center justify-center rounded-lg border border-dashed py-24">
+            <div className="text-text-disabled border-border bg-bg-secondary/30 flex flex-col items-center justify-center rounded-lg border border-dashed px-6 py-14 text-center">
               <Folder size={32} className="mb-3 opacity-50" />
-              <p className="mb-3 text-sm font-medium">No repositories found</p>
+              <p className="text-text-primary mb-2 text-sm font-medium">
+                {normalizedQuery ? 'No matching repositories' : 'Link your first repository'}
+              </p>
               <p className="text-text-tertiary mb-6 text-xs">
-                {searchQuery
-                  ? 'Try adjusting your search terms'
+                {normalizedQuery
+                  ? 'Search by repository name or local path.'
                   : 'Get started by linking your first repository'}
               </p>
               <button
-                onClick={handleAddRepo}
+                onClick={normalizedQuery ? () => setSearchQuery('') : handleAddRepo}
+                disabled={addRepo.isPending}
                 className="bg-bg-tertiary text-text-primary hover:bg-bg-primary border-border rounded border px-4 py-2 text-xs font-medium shadow-sm transition-colors"
               >
-                Link Repository
+                {normalizedQuery ? 'Clear search' : 'Link repository'}
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="repository-grid">
               {filteredRepos.map(repo => (
                 <RepoCard
                   key={repo.id}
                   repo={repo}
-                  onNavigate={onNavigate}
+                  onReview={() => startRepositoryReview(repo.id)}
                   onRemove={removeRepo.mutate}
                 />
               ))}
@@ -121,28 +162,29 @@ interface RepoCardProps {
     review_count: number;
     linked_at: string;
   };
-  onNavigate: (view: ViewType) => void;
+  onReview: () => void;
   onRemove: (repoId: string) => void;
 }
 
-const RepoCard: React.FC<RepoCardProps> = ({ repo, onNavigate, onRemove }) => (
-  <div className="group bg-bg-secondary/40 hover:bg-bg-secondary hover:border-border relative rounded-lg border border-transparent p-4 transition-all">
+const RepoCard: React.FC<RepoCardProps> = ({ repo, onReview, onRemove }) => (
+  <div className="group bg-bg-secondary/25 border-border/50 hover:border-border relative min-w-0 rounded-lg border p-5 transition-colors">
     <div className="mb-3 flex items-start justify-between">
-      <div className="bg-bg-tertiary text-brand rounded-md p-2">
-        <Folder size={20} weight="fill" />
+      <div className="bg-bg-tertiary/60 text-text-secondary rounded-md p-2">
+        <Folder size={20} />
       </div>
-      <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="flex items-center gap-2">
         <button
-          onClick={() => onNavigate('review')}
-          className="text-text-tertiary hover:text-brand hover:bg-bg-tertiary rounded-md p-1.5 transition-colors"
-          title="Review"
+          onClick={onReview}
+          className="text-text-secondary hover:text-text-primary hover:bg-bg-tertiary border-border/60 flex h-8 items-center gap-2 rounded-md border px-2.5 text-xs transition-colors"
+          aria-label={`Review changes in ${repo.name}`}
         >
-          <ArrowSquareOut size={14} />
+          Review changes <ArrowRight size={13} />
         </button>
         <button
           onClick={() => onRemove(repo.id)}
-          className="text-text-tertiary hover:text-status-ignored hover:bg-bg-tertiary rounded-md p-1.5 transition-colors"
-          title="Remove"
+          className="text-text-disabled hover:text-status-ignored hover:bg-bg-tertiary flex h-8 w-8 items-center justify-center rounded-md transition-colors"
+          title="Unlink repository"
+          aria-label={`Unlink ${repo.name}`}
         >
           <Trash size={14} />
         </button>
@@ -150,10 +192,11 @@ const RepoCard: React.FC<RepoCardProps> = ({ repo, onNavigate, onRemove }) => (
     </div>
 
     <div>
-      <h3 className="text-text-primary group-hover:text-brand mb-1 truncate text-sm font-medium transition-colors">
-        {repo.name}
-      </h3>
-      <p className="text-text-tertiary bg-bg-primary/50 border-border/50 mb-3 w-fit max-w-full truncate rounded border px-1.5 py-0.5 font-mono text-[10px]">
+      <h3 className="text-text-primary mb-1 truncate text-[15px] font-medium">{repo.name}</h3>
+      <p
+        title={repo.path}
+        className="text-text-tertiary mb-4 line-clamp-2 font-mono text-[11px] leading-5 break-all select-text"
+      >
         {repo.path}
       </p>
 
@@ -162,11 +205,15 @@ const RepoCard: React.FC<RepoCardProps> = ({ repo, onNavigate, onRemove }) => (
           <span
             className={`h-1.5 w-1.5 rounded-full ${repo.review_count > 0 ? 'bg-status-done' : 'bg-status-todo'}`}
           />
-          <span className="text-text-secondary text-[10px]">{repo.review_count} reviews</span>
+          <span className="text-text-secondary text-[11px]">
+            {repo.review_count ?? 0} {repo.review_count === 1 ? 'review' : 'reviews'}
+          </span>
         </div>
-        <span className="text-text-disabled ml-auto text-[10px]">
-          Added {new Date(repo.linked_at).toLocaleDateString()}
-        </span>
+        {displayDate(repo.linked_at) && (
+          <time dateTime={repo.linked_at} className="text-text-disabled ml-auto text-[11px]">
+            Linked {displayDate(repo.linked_at)}
+          </time>
+        )}
       </div>
     </div>
   </div>

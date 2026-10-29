@@ -65,7 +65,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   const viewMode = useAppStore(state => state.viewMode);
   const setViewMode = useAppStore(state => state.setViewMode);
   const [sourceMode, setSourceMode] = useState<'remote' | 'local' | 'paste'>(
-    pendingSource?.type === 'local_git' ? 'local' : 'remote'
+    pendingSource?.type === 'local_git' || (!pendingSource && selectedRepoId) ? 'local' : 'remote'
   );
 
   const [repoLinkCallout, setRepoLinkCallout] = useState<RepoLinkCallout | null>(null);

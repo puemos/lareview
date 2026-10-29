@@ -119,42 +119,45 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {reviews.map(review => (
                 <div
                   key={review.id}
-                  role="button"
-                  tabIndex={0}
-                  className={`group relative ml-2 flex cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 text-left text-xs transition-all ${
+                  className={`group relative ml-2 flex items-center rounded-md text-left text-xs transition-colors ${
                     reviewId === review.id && currentView === 'review'
-                      ? 'bg-blue-500/10 text-blue-400'
+                      ? 'text-text-primary bg-white/[0.065]'
                       : 'text-gray-500 hover:bg-white/5 hover:text-gray-300'
                   }`}
-                  onClick={() => handleReviewClick(review.id)}
-                  onKeyDown={e => e.key === 'Enter' && handleReviewClick(review.id)}
                   onMouseEnter={() => prefetchReview(review.id)}
-                  aria-label={`Review: ${review.title}`}
-                  aria-current={
-                    reviewId === review.id && currentView === 'review' ? 'page' : undefined
-                  }
                 >
-                  <span
-                    className="flex h-4 w-4 shrink-0 items-center justify-center"
-                    aria-hidden="true"
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-3 py-2 text-left"
+                    onClick={() => handleReviewClick(review.id)}
+                    aria-label={`Review: ${review.title}`}
+                    aria-current={
+                      reviewId === review.id && currentView === 'review' ? 'page' : undefined
+                    }
+                    title={review.title}
                   >
-                    {review.active_run_status === 'running' ||
-                    review.active_run_status === 'queued' ? (
-                      <ICONS.ACTION_LOADING
-                        size={10}
-                        className="animate-spin text-blue-400"
-                        aria-hidden="true"
-                      />
-                    ) : (
-                      <span
-                        className={`h-1.5 w-1.5 rounded-full ${review.status === 'done' ? 'bg-green-500/50' : 'bg-blue-500/50'}`}
-                      />
-                    )}
-                  </span>
-                  <span className="flex-1 truncate">{review.title}</span>
+                    <span
+                      className="flex h-4 w-4 shrink-0 items-center justify-center"
+                      aria-hidden="true"
+                    >
+                      {review.active_run_status === 'running' ||
+                      review.active_run_status === 'queued' ? (
+                        <ICONS.ACTION_LOADING
+                          size={10}
+                          className="animate-spin text-blue-400"
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${review.status === 'done' ? 'bg-green-500/50' : 'bg-blue-500/50'}`}
+                        />
+                      )}
+                    </span>
+                    <span className="flex-1 truncate">{review.title}</span>
+                  </button>
                   <button
                     onClick={e => handleDeleteReview(e, review.id)}
-                    className="z-10 shrink-0 rounded-md p-1 text-gray-500/50 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-400/10 hover:text-red-400"
+                    className="text-text-disabled z-10 mr-1 shrink-0 rounded-md p-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-red-400/10 hover:text-red-400"
                     title="Delete Review"
                     type="button"
                     aria-label={`Delete review: ${review.title}`}
@@ -176,7 +179,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ariaLabel="Navigate to Inbox"
       />
 
-      <div className="bg-border/40 mx-5 my-1 h-px shrink-0" aria-hidden="true" />
+      <p className="text-text-disabled mt-5 mb-2 px-5 text-[10px] font-medium tracking-[0.08em] uppercase">
+        Workspace
+      </p>
 
       <SidebarItem
         icon={<ICONS.VIEW_REPOS size={16} />}
@@ -210,7 +215,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       <div className="h-2" />
 
-      <div className="border-border flex h-8 shrink-0 items-center justify-between border-t px-4">
+      <div className="border-border/40 flex h-10 shrink-0 items-center justify-between border-t px-5">
+        <span className="text-text-tertiary text-[11px] font-medium">LaReview</span>
         {currentVersion ? (
           <span className="text-text-disabled text-[10px]">v{currentVersion}</span>
         ) : (
@@ -259,16 +265,16 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
 }) => (
   <button
     onClick={onClick}
-    className={`group mx-2 flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-all select-none ${
+    className={`group mx-2 flex min-h-9 items-center gap-2.5 rounded-md px-3 py-2 text-[13px] transition-colors select-none ${
       isActive
-        ? 'bg-blue-500/10 text-blue-400'
-        : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+        ? 'text-text-primary bg-white/[0.065]'
+        : 'text-text-tertiary hover:text-text-primary hover:bg-white/[0.035]'
     }`}
     aria-label={ariaLabel || label}
     aria-current={isActive ? 'page' : undefined}
   >
     <div
-      className={`transition-colors ${isActive ? 'text-blue-400' : 'text-gray-500 group-hover:text-gray-400'}`}
+      className={`transition-colors ${isActive ? 'text-brand' : 'text-text-disabled group-hover:text-text-secondary'}`}
       aria-hidden="true"
     >
       {icon}
