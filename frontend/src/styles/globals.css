@@ -34,48 +34,48 @@
   --font-mono: 'GeistMono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --font-display: 'Geist', 'Inter', sans-serif;
 
-  --color-bg-primary: #1e1e2e;
-  --color-bg-secondary: #181825;
-  --color-bg-tertiary: #313244;
-  --color-bg-surface: #181825;
-  --color-bg-elevated: #24273a;
+  --color-bg-primary: #17181c;
+  --color-bg-secondary: #121316;
+  --color-bg-tertiary: #25272d;
+  --color-bg-surface: #121316;
+  --color-bg-elevated: #202227;
 
-  --color-text-primary: #e6e9ef;
-  --color-text-secondary: #bac2de;
-  --color-text-tertiary: #a6adc8;
+  --color-text-primary: #ededef;
+  --color-text-secondary: #b7bac3;
+  --color-text-tertiary: #969aa5;
   --color-text-inverse: #ffffff;
-  --color-text-disabled: #7f849c;
+  --color-text-disabled: #737884;
 
-  --color-border: #45475a;
-  --color-border-default: #45475a;
-  --color-border-secondary: #313244;
+  --color-border: #34373f;
+  --color-border-default: #34373f;
+  --color-border-secondary: #25272d;
 
-  --color-brand: #cba6f7;
-  --color-brand-fg: #1e1e2e;
+  --color-brand: #c2adf0;
+  --color-brand-fg: #17181c;
 
-  --color-accent: #89b4fa;
-  --color-accent-fg: #1e1e2e;
+  --color-accent: #90a9d7;
+  --color-accent-fg: #17181c;
 
-  --color-status-todo: #a6adc8;
+  --color-status-todo: #969aa5;
   --color-status-in_progress: #f9e2af;
   --color-status-done: #a6e3a1;
   --color-status-ignored: #f38ba8;
 
-  --color-impact-nitpick: #89b4fa;
+  --color-impact-nitpick: #90a9d7;
   --color-impact-nice_to_have: #f9e2af;
   --color-impact-blocking: #f38ba8;
 
-  --color-risk-low: #89b4fa;
+  --color-risk-low: #90a9d7;
   --color-risk-medium: #f9e2af;
   --color-risk-high: #f38ba8;
 
-  --color-gray-750: #313244;
-  --color-gray-850: #181825;
-  --color-gray-900: #1e1e2e;
-  --color-gray-950: #11111b;
+  --color-gray-750: #25272d;
+  --color-gray-850: #121316;
+  --color-gray-900: #17181c;
+  --color-gray-950: #101114;
 
-  --color-blue-400: #89b4fa;
-  --color-blue-500: #89b4fa;
+  --color-blue-400: #90a9d7;
+  --color-blue-500: #90a9d7;
   --color-blue-600: #74c7ec;
 
   --color-green-400: #a6e3a1;
@@ -119,8 +119,8 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: #1e1e2e;
-  color: #e6e9ef;
+  background-color: #17181c;
+  color: #ededef;
   font-family:
     'Geist',
     'Inter',
@@ -170,15 +170,15 @@ select:disabled {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #313244;
+  background: #25272d;
   border-radius: 5px;
-  border: 2px solid #1e1e2e;
+  border: 2px solid #17181c;
   background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover,
 :hover::-webkit-scrollbar-thumb {
-  background-color: #45475a;
+  background-color: #34373f;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {

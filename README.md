@@ -91,7 +91,7 @@ The CLI launches the GUI in the background and passes your diff/repo info seamle
 
 Clone your repository using your usual Git credentials, then link the local folder in
 **Repositories**. In **Generate Review**, select that repository, choose **Local Git**,
-enter a base and head branch, tag, or commit, and click **Compare refs**. Inspect the diff,
+enter a base and head branch, tag, or commit, and click **Compare changes**. Inspect the diff,
 then click **Start Review** with your chosen agent.
 
 Comparison uses the two commit snapshots (`git diff BASE HEAD`) already present locally.

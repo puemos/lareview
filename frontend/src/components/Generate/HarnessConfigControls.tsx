@@ -90,7 +90,7 @@ const ConfigSelectRow: React.FC<ConfigSelectRowProps> = ({
         aria-label={`${label} updating`}
         className={clsx(
           'flex items-center rounded-md px-3 text-xs',
-          compact ? 'bg-bg-tertiary border-border h-9 w-full border' : 'w-full py-2'
+          compact ? 'bg-bg-tertiary border-border h-8 w-full border' : 'w-full py-2'
         )}
       >
         {!compact && <span className="text-text-secondary font-medium">{label}</span>}
@@ -204,7 +204,7 @@ export const HarnessConfigControls: React.FC<HarnessConfigControlsProps> = ({
         title={config.error instanceof Error ? config.error.message : String(config.error)}
         className={clsx(
           'text-text-disabled hover:text-text-secondary flex items-center justify-between text-[10px] transition-colors disabled:opacity-60',
-          compact ? 'bg-bg-tertiary border-border h-9 w-full rounded-md border px-3' : 'w-full px-1'
+          compact ? 'bg-bg-tertiary border-border h-8 w-full rounded-md border px-3' : 'w-full px-1'
         )}
       >
         <span>Using harness defaults</span>
@@ -227,7 +227,7 @@ export const HarnessConfigControls: React.FC<HarnessConfigControlsProps> = ({
       <div
         className={clsx(
           'text-text-disabled flex items-center gap-2 text-[10px]',
-          compact ? 'bg-bg-tertiary border-border h-9 w-full rounded-md border px-3' : 'px-1'
+          compact ? 'bg-bg-tertiary border-border h-8 w-full rounded-md border px-3' : 'px-1'
         )}
       >
         <Spinner size={11} className="animate-spin" />

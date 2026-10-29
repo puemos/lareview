@@ -43,12 +43,12 @@ export const VcsInputCard: React.FC<VcsInputCardProps> = ({
 
   return (
     <div
-      className={`ring-border pointer-events-auto flex max-w-full items-center overflow-hidden border text-xs font-medium backdrop-blur-md transition-[background-color,border-color,box-shadow] duration-200 ${
-        prominent ? 'h-10 w-full min-w-0 rounded-lg' : 'h-8 w-fit min-w-52 rounded-md'
+      className={`pointer-events-auto flex max-w-full items-center overflow-hidden border text-xs font-medium transition-[background-color,border-color] duration-150 ${
+        prominent ? 'h-11 w-full min-w-0 rounded-md' : 'h-8 w-fit min-w-52 rounded-md'
       } ${
         hasRemoteSource
           ? 'border-green-500/20 bg-green-500/10 text-green-400 shadow-sm'
-          : 'border-border bg-bg-secondary/90 text-text-primary shadow-lg shadow-black/20'
+          : 'border-border/70 bg-bg-primary text-text-primary'
       }`}
     >
       {hasRemoteSource ? (

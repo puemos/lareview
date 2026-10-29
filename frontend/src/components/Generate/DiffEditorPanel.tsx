@@ -44,8 +44,11 @@ export const DiffEditorPanel: React.FC<DiffEditorPanelProps> = ({
       inherit: true,
       rules: [],
       colors: {
-        'editor.background': '#1e1e2e',
-        'editor.lineHighlightBackground': '#313244',
+        'editor.background': '#17181c',
+        'editor.lineHighlightBackground': '#202227',
+        'editorGutter.background': '#17181c',
+        'diffEditor.insertedLineBackground': '#25433355',
+        'diffEditor.removedLineBackground': '#4b293355',
       },
     });
     monaco.editor.setTheme('lareview-dark');
@@ -88,12 +91,10 @@ export const DiffEditorPanel: React.FC<DiffEditorPanelProps> = ({
 
   const language = selectedFile ? getLanguageFromPath(selectedFile.new_path) : 'plaintext';
 
-  const paddingClass = 'pt-4';
-
   return (
-    <div className={`relative flex flex-1 overflow-hidden ${paddingClass}`}>
+    <div className="relative flex flex-1 overflow-hidden">
       {viewMode === 'diff' && parsedDiff && parsedDiff.files && (
-        <div className="border-border bg-bg-secondary/30 flex w-64 flex-col border-r">
+        <div className="border-border bg-bg-secondary/30 flex w-52 flex-col border-r max-[1000px]:w-40">
           <div
             className="border-border hover:bg-bg-secondary flex cursor-pointer items-center justify-between border-b px-3 py-2"
             onClick={() => setIsFileListExpanded(!isFileListExpanded)}
@@ -130,9 +131,11 @@ export const DiffEditorPanel: React.FC<DiffEditorPanelProps> = ({
                       {file.name.split('/').pop()}
                     </span>
                   </div>
-                  <div className="text-text-disabled ml-5 truncate font-mono text-[10px] opacity-60">
-                    {file.name}
-                  </div>
+                  {file.name.includes('/') && (
+                    <div className="text-text-disabled mt-0.5 ml-5 truncate text-[10px]">
+                      {file.name}
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
@@ -152,6 +155,8 @@ export const DiffEditorPanel: React.FC<DiffEditorPanelProps> = ({
             modifiedLanguage={language}
             options={{
               readOnly: true,
+              renderLineHighlight: 'none',
+              renderOverviewRuler: false,
               minimap: { enabled: false },
               fontSize: 12,
               lineHeight: 20,

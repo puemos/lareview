@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { GitBranch, Spinner } from '@phosphor-icons/react';
+import { useId, useState } from 'react';
+import { GitBranch, ArrowRight, Spinner, WarningCircle } from '@phosphor-icons/react';
 import type { ReviewSource } from '../../types';
 
 interface LocalGitInputProps {
@@ -7,9 +7,11 @@ interface LocalGitInputProps {
   source: ReviewSource | null;
   isLoading: boolean;
   disabled: boolean;
+  compact?: boolean;
   error: string | null;
-  onCompare: (base: string, head: string) => void;
+  onCompare: (base: string, head: string) => Promise<boolean>;
   onLinkRepo: () => void;
+  onCancelEdit?: () => void;
 }
 
 export function LocalGitInput({
@@ -17,20 +19,56 @@ export function LocalGitInput({
   source,
   isLoading,
   disabled,
+  compact = false,
   error,
   onCompare,
   onLinkRepo,
+  onCancelEdit,
 }: LocalGitInputProps) {
   const [base, setBase] = useState(source?.type === 'local_git' ? source.base_ref : 'main');
   const [head, setHead] = useState(source?.type === 'local_git' ? source.head_ref : 'HEAD');
+  const inputId = useId();
+  const helperId = `${inputId}-help`;
+  const errorId = `${inputId}-error`;
   const busy = disabled || isLoading;
+  const [editing, setEditing] = useState(false);
+
+  if (compact && source?.type === 'local_git' && !editing) {
+    return (
+      <div className="local-source-summary flex min-w-0 items-center gap-3">
+        <GitBranch size={15} className="text-text-tertiary shrink-0" />
+        <span className="local-source-repo text-text-primary max-w-40 truncate text-xs font-medium">
+          {repoName}
+        </span>
+        <span className="text-text-disabled">/</span>
+        <span
+          className="local-source-refs text-text-secondary flex min-w-0 items-center gap-2 font-mono text-[11px]"
+          title={`${source.base_sha} → ${source.head_sha}`}
+        >
+          <span className="max-w-36 truncate">{source.base_ref}</span>
+          <ArrowRight size={12} className="shrink-0" />
+          <span className="max-w-36 truncate">{source.head_ref}</span>
+        </span>
+        <span className="local-source-ready text-status-done ml-1 text-[10px]">Ready</span>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => setEditing(true)}
+          className="text-text-tertiary hover:text-text-primary rounded px-2 py-1 text-[11px] transition-colors"
+          aria-label="Edit comparison"
+        >
+          Change
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="w-full space-y-3">
+    <div className="local-git-input w-full space-y-4">
       <div className="text-text-secondary flex items-center gap-2 text-xs">
         <GitBranch size={15} />
         {repoName ? (
-          <span>Compare refs in {repoName}</span>
+          <span className="text-text-primary font-medium">{repoName}</span>
         ) : (
           <span>
             Select a repository above or{' '}
@@ -42,46 +80,79 @@ export function LocalGitInput({
         )}
       </div>
       <form
-        className="flex flex-wrap items-end gap-2"
-        onSubmit={event => {
+        className="local-git-form grid gap-4"
+        onSubmit={async event => {
           event.preventDefault();
-          if (repoName && base.trim() && head.trim() && !busy) onCompare(base.trim(), head.trim());
+          if (repoName && base.trim() && head.trim() && !busy) {
+            const loaded = await onCompare(base.trim(), head.trim());
+            if (loaded) setEditing(false);
+          }
         }}
       >
-        <label className="min-w-28 flex-1 space-y-1 text-xs">
-          <span className="text-text-tertiary">Base ref</span>
-          <input
-            aria-label="Base ref"
-            value={base}
-            onChange={e => setBase(e.target.value)}
-            disabled={busy}
-            placeholder="main"
-            className="border-border bg-bg-secondary text-text-primary focus:border-brand h-9 w-full rounded-md border px-3 font-mono outline-none"
-          />
-        </label>
-        <label className="min-w-28 flex-1 space-y-1 text-xs">
-          <span className="text-text-tertiary">Head ref</span>
-          <input
-            aria-label="Head ref"
-            value={head}
-            onChange={e => setHead(e.target.value)}
-            disabled={busy}
-            placeholder="HEAD or feature/branch"
-            className="border-border bg-bg-secondary text-text-primary focus:border-brand h-9 w-full rounded-md border px-3 font-mono outline-none"
-          />
-        </label>
-        <button
-          type="submit"
-          disabled={!repoName || !base.trim() || !head.trim() || busy}
-          className="bg-brand hover:bg-brand/90 flex h-9 items-center gap-2 rounded-md px-4 text-xs font-medium text-white disabled:opacity-50"
-        >
-          {isLoading && <Spinner size={14} className="animate-spin" />}
-          {isLoading ? 'Comparing…' : 'Compare refs'}
-        </button>
+        <div className="local-ref-pair">
+          <label className="local-ref-field">
+            <span>Base</span>
+            <input
+              aria-label="Base ref"
+              aria-invalid={Boolean(error)}
+              aria-describedby={error ? errorId : helperId}
+              value={base}
+              onChange={e => setBase(e.target.value)}
+              disabled={busy}
+              placeholder="main"
+              className="text-text-primary w-full min-w-0 bg-transparent font-mono text-[13px] outline-none"
+            />
+          </label>
+          <ArrowRight size={15} className="text-text-disabled self-center" />
+          <label className="local-ref-field">
+            <span>Head</span>
+            <input
+              aria-label="Head ref"
+              aria-invalid={Boolean(error)}
+              aria-describedby={error ? errorId : helperId}
+              value={head}
+              onChange={e => setHead(e.target.value)}
+              disabled={busy}
+              placeholder="HEAD or feature/branch"
+              className="text-text-primary w-full min-w-0 bg-transparent font-mono text-[13px] outline-none"
+            />
+          </label>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <p id={helperId} className="text-text-disabled text-[11px]">
+            Branches, tags, or commit hashes.
+          </p>
+          <div className="flex items-center gap-2">
+            {compact && editing && (
+              <button
+                type="button"
+                className="text-text-secondary hover:text-text-primary rounded px-3 py-2 text-xs"
+                disabled={busy}
+                onClick={() => {
+                  if (source?.type === 'local_git') {
+                    setBase(source.base_ref);
+                    setHead(source.head_ref);
+                  }
+                  setEditing(false);
+                  onCancelEdit?.();
+                }}
+              >
+                Cancel
+              </button>
+            )}
+            <button
+              type="submit"
+              aria-busy={isLoading}
+              disabled={!repoName || !base.trim() || !head.trim() || busy}
+              className="generate-primary-button flex h-9 min-w-[152px] shrink-0 items-center justify-center gap-2 rounded-md px-4 text-xs font-medium whitespace-nowrap"
+            >
+              {isLoading && <Spinner size={14} className="animate-spin" />}
+              {isLoading ? 'Comparing…' : 'Compare changes'}
+              {!isLoading && <ArrowRight size={13} />}
+            </button>
+          </div>
+        </div>
       </form>
-      <p className="text-text-disabled text-[11px]">
-        Compare two local branch, tag, or commit snapshots. Fetch remote refs with Git first.
-      </p>
       {source?.type === 'local_git' && (
         <p className="text-text-secondary font-mono text-[11px]">
           Loaded {source.base_ref} ({source.base_sha.slice(0, 7)}) → {source.head_ref} (
@@ -89,9 +160,14 @@ export function LocalGitInput({
         </p>
       )}
       {error && (
-        <p role="alert" className="text-xs text-red-400">
-          {error}
-        </p>
+        <div
+          id={errorId}
+          role="alert"
+          className="flex items-start gap-2 rounded-md border border-red-400/15 bg-red-400/5 px-3 py-2.5 text-xs leading-5 text-red-400"
+        >
+          <WarningCircle size={15} className="mt-0.5 shrink-0" />
+          <p>{error}</p>
+        </div>
       )}
     </div>
   );

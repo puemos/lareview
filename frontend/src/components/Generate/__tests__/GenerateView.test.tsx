@@ -11,10 +11,11 @@ const localGitMock = vi.hoisted(() => ({
   fetch: vi.fn(),
   repos: [] as Array<{ id: string; name: string; path: string; remotes: string[] }>,
 }));
+const remoteMock = vi.hoisted(() => ({ fetch: vi.fn() }));
 
 vi.mock('../../../store');
 vi.mock('../../../hooks/useTauri', () => ({
-  useTauri: () => ({ fetchRemotePr: vi.fn(), fetchLocalGitDiff: localGitMock.fetch }),
+  useTauri: () => ({ fetchRemotePr: remoteMock.fetch, fetchLocalGitDiff: localGitMock.fetch }),
 }));
 vi.mock('../../../hooks/useAgents', () => ({
   useAgents: () => ({ data: [{ id: 'test-agent', name: 'Test Agent', available: true }] }),
@@ -43,8 +44,10 @@ vi.mock('../AgentConfigPanel', () => ({
   ),
 }));
 vi.mock('../VcsInputCard', () => ({
-  VcsInputCard: ({ prominent }: { prominent?: boolean }) => (
-    <div data-testid="vcs-input-card" data-prominent={prominent ? 'true' : 'false'} />
+  VcsInputCard: ({ prominent, onFetch }: { prominent?: boolean; onFetch: () => void }) => (
+    <div data-testid="vcs-input-card" data-prominent={prominent ? 'true' : 'false'}>
+      <button onClick={onFetch}>Fetch</button>
+    </div>
   ),
 }));
 vi.mock('../ViewModeToggle', () => ({
@@ -149,7 +152,7 @@ describe('GenerateView', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Base ref' }), {
       target: { value: 'release/v1' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Compare refs' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Compare changes' }));
     await waitFor(() =>
       expect(localGitMock.fetch).toHaveBeenCalledWith('on-prem', 'release/v1', 'HEAD')
     );
@@ -169,9 +172,32 @@ describe('GenerateView', () => {
     const navigate = vi.fn();
     render(<GenerateView onNavigate={navigate} />);
     fireEvent.click(screen.getByRole('button', { name: 'Local Git' }));
-    expect(screen.getByRole('button', { name: 'Compare refs' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Compare changes' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'link a repository' }));
     expect(navigate).toHaveBeenCalledWith('repos');
+  });
+
+  it('opens the paste editor without remounting it when content arrives', () => {
+    store.diffText = '';
+    const { rerender } = render(<GenerateView onNavigate={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Paste diff' }));
+    expect(screen.queryByText('Start a review')).not.toBeInTheDocument();
+    const editor = screen.getByTestId('diff-editor-panel');
+    expect(editor.parentElement).not.toHaveClass('invisible');
+    store.diffText = 'diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts\n+const a = 1;';
+    rerender(<GenerateView onNavigate={vi.fn()} />);
+    expect(screen.getByTestId('diff-editor-panel')).toBe(editor);
+  });
+
+  it('shows remote fetch errors inside the empty composer', async () => {
+    store.diffText = '';
+    store.prRef = 'owner/repo#1';
+    remoteMock.fetch.mockRejectedValue('Pull request not found');
+    render(<GenerateView onNavigate={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Pull request not found');
+    expect(screen.getByText('Start a review')).toBeInTheDocument();
+    expect(screen.getByTestId('start-review')).toBeDisabled();
   });
 
   it('shows Git errors and prevents starting a review after a failed comparison', async () => {
@@ -181,7 +207,7 @@ describe('GenerateView', () => {
     localGitMock.fetch.mockRejectedValue('Could not resolve ref: missing-branch');
     render(<GenerateView onNavigate={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Local Git' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Compare refs' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Compare changes' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not resolve ref');
     expect(screen.getByTestId('start-review')).toBeDisabled();
     expect(store.setPendingSource).not.toHaveBeenCalled();

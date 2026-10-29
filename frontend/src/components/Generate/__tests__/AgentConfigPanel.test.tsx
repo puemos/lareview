@@ -36,6 +36,28 @@ describe('AgentConfigPanel', () => {
     useAppStore.getState().reset();
   });
 
+  it('requires an available agent and locks source controls during loading', () => {
+    const props = {
+      agents: [{ id: 'codex', name: 'Codex', available: false }],
+      repos: [],
+      selectedAgentId: 'codex',
+      selectedRepoId: '',
+      onAgentSelect: vi.fn(),
+      onRepoSelect: vi.fn(),
+      isStarting: false,
+      onGenerate: vi.fn(),
+      isDiffValid: true,
+    };
+    const { rerender } = render(<AgentConfigPanel {...props} />);
+    expect(screen.getByRole('button', { name: 'Start Review' })).toBeDisabled();
+    props.agents[0].available = true;
+    rerender(<AgentConfigPanel {...props} />);
+    expect(screen.getByRole('button', { name: 'Start Review' })).toBeEnabled();
+    rerender(<AgentConfigPanel {...props} isLoadingSource />);
+    expect(screen.getByRole('button', { name: 'Start Review' })).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'Repository' })).toBeDisabled();
+  });
+
   it('uses one field rhythm across the compact configuration strip', () => {
     const { container } = render(
       <TooltipProvider>
@@ -66,7 +88,7 @@ describe('AgentConfigPanel', () => {
     }
 
     for (const name of ['Agent', 'Model', 'Effort', 'Repository']) {
-      expect(screen.getByRole('combobox', { name })).toHaveClass('h-9', 'rounded-md');
+      expect(screen.getByRole('combobox', { name })).toHaveClass('h-8', 'rounded-md');
     }
 
     const modelControl = screen.getByRole('combobox', { name: 'Model' });

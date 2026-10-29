@@ -20,7 +20,9 @@ const FeedbackItem: React.FC<FeedbackItemProps> = ({ feedback, onClick }) => {
       className="hover:bg-bg-tertiary/30 border-border/30 flex w-full items-center gap-2 border-b px-3 py-2 text-left transition-colors last:border-b-0"
     >
       <ICONS.ICON_FEEDBACK size={14} className="text-text-secondary flex-shrink-0" />
-      <span className="text-text-primary min-w-0 flex-1 truncate text-sm">{feedback.title}</span>
+      <span className="text-text-primary min-w-0 flex-1 truncate text-[13px]">
+        {feedback.title}
+      </span>
       <ImpactBadge impact={feedback.impact} size="sm" />
     </button>
   );
@@ -35,24 +37,32 @@ export const KeyFeedback: React.FC<KeyFeedbackProps> = ({ feedbacks, onSelectFee
 
   if (feedbacks.length === 0) {
     return (
-      <div className="bg-bg-secondary/30 border-border/50 rounded-lg border">
-        <div className="border-border/50 flex items-center gap-2 border-b px-4 py-3">
-          <ICONS.ICON_FEEDBACK size={16} className="text-text-secondary" />
-          <h3 className="text-text-primary text-sm font-medium">Feedback</h3>
+      <div className="review-section rounded-lg border">
+        <div className="review-section-heading">
+          <div className="flex items-center gap-2">
+            <ICONS.ICON_FEEDBACK size={14} className="text-text-tertiary" />
+            <h3 className="text-text-primary text-[13px] font-medium">Feedback</h3>
+          </div>
         </div>
-        <div className="text-text-disabled px-4 py-6 text-center text-sm">
-          No feedback items yet.
+        <div className="flex items-start gap-3 px-4 py-4">
+          <ICONS.ICON_FEEDBACK size={16} className="text-text-disabled mt-0.5 shrink-0" />
+          <div>
+            <p className="text-text-secondary text-xs">No feedback items yet</p>
+            <p className="text-text-disabled mt-1 text-[11px] leading-5">
+              Feedback you add during review appears here.
+            </p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-bg-secondary/30 border-border/50 flex max-h-80 flex-col overflow-hidden rounded-lg border">
-      <div className="border-border/50 flex flex-shrink-0 items-center justify-between border-b px-4 py-3">
+    <div className="review-section flex max-h-80 flex-col overflow-hidden rounded-lg border">
+      <div className="review-section-heading">
         <div className="flex items-center gap-2">
-          <ICONS.ICON_FEEDBACK size={16} className="text-text-secondary" />
-          <h3 className="text-text-primary text-sm font-medium">Feedback</h3>
+          <ICONS.ICON_FEEDBACK size={14} className="text-text-tertiary" />
+          <h3 className="text-text-primary text-[13px] font-medium">Feedback</h3>
         </div>
         <span className="text-text-disabled text-xs">
           {feedbacks.length} {feedbacks.length === 1 ? 'item' : 'items'}

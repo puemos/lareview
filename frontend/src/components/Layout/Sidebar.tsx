@@ -81,7 +81,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
-      className="border-border flex max-h-screen w-64 flex-col gap-0.5 overflow-hidden border-r bg-gray-950/50"
+      className="border-border flex max-h-screen w-56 shrink-0 flex-col gap-0.5 overflow-hidden border-r bg-gray-950/50 max-[1000px]:w-48"
       role="navigation"
       aria-label="Main sidebar"
     >

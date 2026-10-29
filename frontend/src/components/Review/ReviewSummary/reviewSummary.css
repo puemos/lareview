@@ -1,0 +1,38 @@
+.review-section {
+  border-color: rgb(255 255 255 / 0.065);
+  background: rgb(255 255 255 / 0.012);
+  border-radius: 10px;
+}
+.review-section-heading {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-bottom: 1px solid rgb(255 255 255 / 0.055);
+}
+
+.review-check-grid > div {
+  border-color: rgb(255 255 255 / 0.045);
+}
+.review-check-grid > div:nth-child(odd) {
+  border-right: 1px solid rgb(255 255 255 / 0.045);
+}
+.review-check-grid > div:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+.review-section button:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: -3px;
+}
+@media (max-width: 1000px) {
+  [aria-label='Review overview'] > div:first-child {
+    padding: 20px 24px;
+  }
+  [aria-label='Review overview'] > div:nth-child(2) > div {
+    padding: 24px;
+  }
+}
