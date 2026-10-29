@@ -14,7 +14,7 @@ export function useTimeoutConfig() {
   const { getTimeoutConfig, updateTimeoutConfig } = useTauri();
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: queryKeys.timeoutConfig,
     queryFn: async () => {
       const config = await getTimeoutConfig();
@@ -35,6 +35,8 @@ export function useTimeoutConfig() {
   return {
     config: data ?? { timeoutSecs: null },
     isLoading,
+    error,
+    refetch,
     updateTimeout: updateMutation.mutate,
     isUpdating: updateMutation.isPending,
   };
@@ -44,7 +46,7 @@ export function useFeedbackFilterConfig() {
   const { getFeedbackFilterConfig, updateFeedbackFilterConfig } = useTauri();
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: queryKeys.feedbackFilterConfig,
     queryFn: async () => {
       const config = await getFeedbackFilterConfig();
@@ -65,6 +67,8 @@ export function useFeedbackFilterConfig() {
   return {
     config: data ?? { confidenceThreshold: null },
     isLoading,
+    error,
+    refetch,
     updateThreshold: updateMutation.mutate,
     isUpdating: updateMutation.isPending,
   };

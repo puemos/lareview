@@ -2,22 +2,18 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Gear,
   Terminal,
-  Database,
-  Asterisk,
+  Code,
+  Copy,
   CaretRight,
   CheckCircle,
   Warning,
   FloppyDisk,
   ArrowsClockwise,
   Check,
-  X,
   GithubLogo,
   GitlabLogo,
   GitDiff,
   Funnel,
-  Eye,
-  ShieldCheck,
-  Target,
   Plus,
   Trash,
   Robot,
@@ -32,6 +28,16 @@ import type {
   CliStatus,
 } from '../../types';
 import { toast } from 'sonner';
+import { PageHeader } from '../Common/PageHeader';
+import { InlineError } from '../Common/InlineError';
+import { SearchField } from '../Common/SearchField';
+import { EmptyPanel } from '../Common/EmptyPanel';
+import { Dialog } from '../Common/Dialog';
+import {
+  agentArgumentError,
+  formatAgentArguments,
+  parseAgentArguments,
+} from '../../lib/agent-arguments';
 import { useTauri } from '../../hooks/useTauri';
 import { useDelayedLoading } from '../../hooks/useDelayedLoading';
 import { useFeedbackFilterConfig, useTimeoutConfig } from '../../hooks/useSettings';
@@ -42,37 +48,33 @@ interface SettingsViewProps {
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = () => {
-  const [activeTab, setActiveTab] = useState<'vcs' | 'cli' | 'editor' | 'feedback' | 'agents'>('vcs');
+  const [activeTab, setActiveTab] = useState<'vcs' | 'cli' | 'editor' | 'feedback' | 'agents'>(
+    'vcs'
+  );
 
   return (
     <div className="bg-bg-primary flex h-full flex-col">
-      {/* Header */}
-      <div className="border-border flex h-12 shrink-0 items-center gap-3 border-b px-6">
-        <Asterisk size={18} weight="fill" className="text-brand" />
-        <h1 className="font-display text-text-primary text-sm font-medium tracking-wide">
-          Settings
-        </h1>
-      </div>
+      <PageHeader title="Settings" description="Connect your tools and tune review behavior." />
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="settings-layout flex min-h-0 flex-1 overflow-hidden">
         {/* Sidebar */}
-        <div className="border-border bg-bg-secondary/30 flex w-[240px] flex-col border-r pt-4">
-          <nav className="flex-1 space-y-1 px-3">
+        <div className="settings-navigation">
+          <nav aria-label="Settings sections">
             <TabButton
               icon={<Gear size={14} />}
-              label="VCS Integration"
+              label="Git providers"
               isActive={activeTab === 'vcs'}
               onClick={() => setActiveTab('vcs')}
             />
             <TabButton
               icon={<Terminal size={14} />}
-              label="CLI Tools"
+              label="Command line"
               isActive={activeTab === 'cli'}
               onClick={() => setActiveTab('cli')}
             />
 
             <TabButton
-              icon={<Database size={14} />}
+              icon={<Code size={14} />}
               label="Editor"
               isActive={activeTab === 'editor'}
               onClick={() => setActiveTab('editor')}
@@ -83,7 +85,7 @@ export const SettingsView: React.FC<SettingsViewProps> = () => {
               isActive={activeTab === 'feedback'}
               onClick={() => setActiveTab('feedback')}
             />
-            <div className="pt-3 pb-1">
+            <div className="settings-nav-divider pt-3 pb-1">
               <div className="bg-border/50 mx-2 h-px" />
             </div>
             <TabButton
@@ -96,8 +98,8 @@ export const SettingsView: React.FC<SettingsViewProps> = () => {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="animate-fade-in max-w-3xl space-y-8 p-8 md:p-12">
+        <div className="settings-content" key={activeTab}>
+          <div className="settings-section space-y-8">
             {activeTab === 'vcs' && <VcsSettings />}
             {activeTab === 'cli' && <CliSettings />}
             {activeTab === 'editor' && <EditorSettings />}
@@ -120,7 +122,8 @@ interface TabButtonProps {
 const TabButton: React.FC<TabButtonProps> = ({ icon, label, isActive, onClick }) => (
   <button
     onClick={onClick}
-    className={`group relative flex w-full items-center gap-3 rounded-md px-3 py-2 text-xs font-medium transition-all ${
+    aria-current={isActive ? 'page' : undefined}
+    className={`group relative flex min-h-9 w-full shrink-0 items-center gap-2 rounded-md px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
       isActive
         ? 'bg-bg-tertiary text-text-primary shadow-sm'
         : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary'
@@ -144,27 +147,27 @@ const SectionHeader: React.FC<{ title: string; description: string }> = ({
   description,
 }) => (
   <div className="mb-6">
-    <h2 className="text-text-primary mb-1 text-lg font-medium">{title}</h2>
-    <p className="text-text-tertiary text-xs leading-relaxed">{description}</p>
+    <h2 className="text-text-primary mb-2 text-lg font-semibold tracking-[-0.015em]">{title}</h2>
+    <p className="text-text-tertiary text-[13px] leading-6">{description}</p>
   </div>
 );
 
 const VcsSettings: React.FC = () => {
   const { getVcsStatus, getSingleVcsStatus } = useTauri();
+  const [error, setError] = useState<string | null>(null);
+  const [refreshErrors, setRefreshErrors] = useState<Record<string, string | undefined>>({});
   const [status, setStatus] = useState<VcsStatusType[]>([]);
   const [isChecking, setIsChecking] = useState(true);
   const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
 
   const checkStatus = useCallback(async () => {
     setIsChecking(true);
+    setError(null);
     try {
       const result = await getVcsStatus();
       setStatus(result);
     } catch (error) {
-      console.error('Failed to check VCS status:', error);
-      toast('Failed to refresh status', {
-        description: error instanceof Error ? error.message : String(error),
-      });
+      setError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsChecking(false);
     }
@@ -172,6 +175,7 @@ const VcsSettings: React.FC = () => {
 
   const refreshSingle = async (id: string, name: string) => {
     setLoadingMap(prev => ({ ...prev, [id]: true }));
+    setRefreshErrors(prev => ({ ...prev, [id]: undefined }));
     try {
       const updatedStatus = await getSingleVcsStatus(id);
       setStatus(prev => prev.map(item => (item.id === id ? updatedStatus : item)));
@@ -179,10 +183,10 @@ const VcsSettings: React.FC = () => {
         description: `${name} connection status updated.`,
       });
     } catch (error) {
-      console.error(`Failed to refresh ${name} status:`, error);
-      toast('Failed to refresh status', {
-        description: error instanceof Error ? error.message : String(error),
-      });
+      setRefreshErrors(prev => ({
+        ...prev,
+        [id]: error instanceof Error ? error.message : String(error),
+      }));
     } finally {
       setLoadingMap(prev => ({ ...prev, [id]: false }));
     }
@@ -195,132 +199,88 @@ const VcsSettings: React.FC = () => {
   const shouldShowSkeleton = useDelayedLoading(isChecking && status.length === 0);
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <SectionHeader
-          title="VCS Integration"
-          description="Connect your VCS accounts to enable remote reviews and feedback synchronization."
+    <div className="space-y-6">
+      <SectionHeader
+        title="Git providers"
+        description="Connect GitHub or GitLab to load pull requests and share review feedback."
+      />
+      {error && (
+        <InlineError
+          title="Could not load Git connections"
+          message={error}
+          onRetry={() => {
+            void checkStatus();
+          }}
+          isRetrying={isChecking}
         />
-        <div className="flex items-center gap-3">
-          {shouldShowSkeleton ? (
-            <div className="bg-bg-secondary h-6 w-16 animate-pulse rounded" />
-          ) : isChecking ? (
-            <span className="text-text-tertiary bg-bg-secondary border-border flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-medium">
-              <ArrowsClockwise size={12} className="animate-spin" />
-              Checking...
-            </span>
-          ) : status.some(item => item.login && !item.error) ? (
-            <span className="text-status-done bg-status-done/10 border-status-done/20 flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-medium">
-              <Check size={12} weight="bold" />
-              Ready
-            </span>
-          ) : (
-            <span className="text-status-in_progress bg-status-in_progress/10 border-status-in_progress/20 flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-medium">
-              <X size={12} weight="bold" />
-              Disconnected
-            </span>
-          )}
-        </div>
-      </div>
-
+      )}
       {shouldShowSkeleton ? (
         <VcsSkeleton />
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-4" aria-busy={isChecking}>
           {status.map(item => {
-            const isReady = item.login && !item.error;
+            const isReady = Boolean(item.login && !item.error);
             const isLoading = loadingMap[item.id] || false;
-
             return (
-              <div
+              <section
                 key={item.id}
-                className="bg-bg-secondary/40 border-border space-y-6 rounded-lg border p-6"
+                aria-label={`${item.name} connection`}
+                className="settings-card"
               >
-                <div className="border-border mb-4 flex items-center gap-4 border-b pb-4">
-                  <div className="bg-bg-tertiary border-border text-text-primary flex h-10 w-10 items-center justify-center rounded-lg border">
-                    {item.id === 'github' ? (
-                      <GithubLogo size={20} weight="fill" />
-                    ) : item.id === 'gitlab' ? (
-                      <GitlabLogo size={20} weight="fill" />
-                    ) : (
-                      <GitDiff size={20} weight="fill" />
-                    )}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="bg-bg-tertiary/60 text-text-secondary flex h-9 w-9 shrink-0 items-center justify-center rounded-md">
+                      {item.id === 'github' ? (
+                        <GithubLogo size={20} />
+                      ) : item.id === 'gitlab' ? (
+                        <GitlabLogo size={20} />
+                      ) : (
+                        <GitDiff size={20} />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-text-primary text-sm font-medium">{item.name}</h3>
+                      <p
+                        className={`mt-1 text-xs ${isReady ? 'text-status-done' : 'text-text-tertiary'}`}
+                      >
+                        {isReady ? `Connected as @${item.login}` : 'Not connected'}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-text-primary text-sm font-medium">{item.name}</h3>
-                    <p className="text-text-tertiary text-xs">
-                      {item.id === 'github' && 'Integration via gh CLI'}
-                      {item.id === 'gitlab' && 'Integration via glab CLI'}
-                      {item.id !== 'github' && item.id !== 'gitlab' && 'VCS Provider'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-[120px_1fr] items-center gap-x-8 gap-y-4">
-                  <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
-                    Connection
-                  </span>
-                  <div className="flex items-center gap-2">
-                    {isLoading ? (
-                      <div className="text-text-tertiary flex items-center gap-2">
-                        <ArrowsClockwise size={14} className="animate-spin" />
-                        <span className="text-xs">Checking status...</span>
-                      </div>
-                    ) : item.login ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-status-done text-xs font-medium">Connected</span>
-                        <span className="text-text-tertiary font-mono text-xs">
-                          (@{item.login})
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span className="text-status-in_progress text-xs font-medium">
-                          Disconnected
-                        </span>
-                        {item.error && (
-                          <span className="text-text-tertiary text-[10px]">
-                            (Error: {item.error})
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {item.cliPath && (
-                    <>
-                      <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
-                        Executable
-                      </span>
-                      <span className="text-text-secondary truncate font-mono text-xs">
-                        {item.cliPath}
-                      </span>
-                    </>
-                  )}
-
-                  <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
-                    Status
-                  </span>
-                  <span
-                    className={`text-xs font-medium ${
-                      isReady ? 'text-status-done' : 'text-status-in_progress'
-                    }`}
-                  >
-                    {isReady ? 'Ready' : 'Needs setup'}
-                  </span>
-                </div>
-
-                <div className="pt-2">
                   <button
+                    type="button"
                     onClick={() => refreshSingle(item.id, item.name)}
                     disabled={isLoading}
-                    className="bg-bg-tertiary hover:bg-bg-secondary flex items-center gap-2 rounded-md px-4 py-2 text-xs font-medium transition-colors disabled:opacity-50"
+                    aria-label={`Refresh ${item.name} status`}
+                    aria-busy={isLoading}
+                    className="text-text-secondary hover:text-text-primary border-border flex h-8 items-center gap-2 rounded-md border px-3 text-xs disabled:opacity-50"
                   >
-                    <ArrowsClockwise size={14} className={isLoading ? 'animate-spin' : ''} />
-                    Refresh Status
+                    <ArrowsClockwise size={13} className={isLoading ? 'animate-spin' : ''} />
+                    {isLoading ? 'Checking…' : 'Refresh'}
                   </button>
                 </div>
-              </div>
+                {item.cliPath && (
+                  <dl className="border-border/50 mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t pt-4 text-xs">
+                    <dt className="text-text-disabled">Executable</dt>
+                    <dd className="text-text-secondary min-w-0 font-mono text-[11px] break-all select-text">
+                      {item.cliPath}
+                    </dd>
+                  </dl>
+                )}
+                {!isReady && (
+                  <p className="text-text-tertiary mt-3 text-xs leading-5">
+                    Sign in with your provider’s CLI, then refresh the connection.
+                  </p>
+                )}
+                {(refreshErrors[item.id] || item.error) && (
+                  <div className="mt-3">
+                    <InlineError
+                      title={`${item.name} connection needs attention`}
+                      message={refreshErrors[item.id] ?? item.error ?? undefined}
+                    />
+                  </div>
+                )}
+              </section>
             );
           })}
         </div>
@@ -332,227 +292,277 @@ const VcsSettings: React.FC = () => {
 const CliSettings: React.FC = () => {
   const { getCliStatus, installCli, getVersion } = useTauri();
   const [status, setStatus] = useState<CliStatus | null>(null);
-  const [appVersion, setAppVersion] = useState<string>('');
+  const [appVersion, setAppVersion] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
   const [isInstalling, setIsInstalling] = useState(false);
-  const [installError, setInstallError] = useState<string | null>(null);
-
+  const [error, setError] = useState<string | null>(null);
   const fetchStatus = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
     try {
-      const [cliStatus, version] = await Promise.all([getCliStatus(), getVersion()]);
-      setStatus(cliStatus);
+      const [next, version] = await Promise.all([getCliStatus(), getVersion()]);
+      setStatus(next);
       setAppVersion(version);
     } catch (error) {
-      console.error('Failed to fetch CLI status:', error);
+      setError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsLoading(false);
     }
   }, [getCliStatus, getVersion]);
-
   useEffect(() => {
-    fetchStatus();
+    void fetchStatus();
   }, [fetchStatus]);
-
   const handleInstall = async () => {
+    if (isInstalling) return;
     setIsInstalling(true);
-    setInstallError(null);
+    setError(null);
     try {
       await installCli();
       await fetchStatus();
-      toast('CLI Tools Installed', {
-        description: 'The lareview command is now available in your terminal.',
-      });
+      toast('Command installed', { description: 'Open a new terminal to use lareview.' });
     } catch (error) {
-      setInstallError(error as string);
-      toast('Installation Failed', {
-        description: String(error),
-      });
+      setError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsInstalling(false);
     }
   };
-
-  const isInstalled = status?.isInstalled;
-  const version = status?.version || appVersion;
-  const shouldShowSkeleton = useDelayedLoading(!status && !appVersion);
-
+  const showSkeleton = useDelayedLoading(isLoading && !status);
   return (
-    <div>
+    <div className="space-y-6">
       <SectionHeader
-        title="CLI Configuration"
-        description="Install command-line tools to generate reviews directly from your terminal."
+        title="Command line"
+        description="Start a review from the terminal, then continue in the app."
       />
-
-      {shouldShowSkeleton ? (
+      {error && (
+        <InlineError
+          title="Could not update command-line tools"
+          message={error}
+          onRetry={() => {
+            void fetchStatus();
+          }}
+          isRetrying={isLoading}
+        />
+      )}
+      {showSkeleton ? (
         <CliSkeleton />
       ) : (
-        <div className="space-y-4">
-          <div className="bg-bg-secondary/40 border-border flex items-center justify-between rounded-lg border p-6">
-            <div className="flex items-center gap-4">
-              <div className="bg-bg-tertiary border-border text-brand flex h-10 w-10 items-center justify-center rounded-lg border">
-                <Terminal size={20} weight="fill" />
+        status && (
+          <section className="settings-card">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Terminal size={21} className="text-text-tertiary" />
+                <div>
+                  <h3 className="text-text-primary text-sm font-medium">LaReview command</h3>
+                  <p className="text-text-tertiary mt-1 text-xs">
+                    {(status.version ?? appVersion)
+                      ? `Version ${status.version ?? appVersion}`
+                      : 'Version unavailable'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-text-primary text-sm font-medium">LaReview CLI</h3>
-                <p className="text-text-tertiary mt-0.5 text-xs">Version {version}</p>
-              </div>
+              {status.isInstalled ? (
+                <span className="text-status-done flex items-center gap-1.5 text-xs">
+                  <Check size={14} /> Installed
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleInstall}
+                  disabled={isInstalling || isLoading}
+                  aria-busy={isInstalling}
+                  className="bg-brand text-brand-fg flex h-9 items-center gap-2 rounded-md px-3 text-xs font-medium"
+                >
+                  {isInstalling && <ArrowsClockwise size={13} className="animate-spin" />}
+                  {isInstalling ? 'Installing…' : 'Install command'}
+                </button>
+              )}
             </div>
-            {isInstalled ? (
-              <div className="bg-status-done/10 text-status-done border-status-done/20 flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium">
-                <span className="bg-status-done h-1.5 w-1.5 rounded-full" />
-                Installed
-              </div>
-            ) : (
-              <button
-                onClick={handleInstall}
-                disabled={isInstalling}
-                className="bg-bg-tertiary text-text-primary hover:bg-bg-secondary border-border rounded-md border px-4 py-2 text-xs font-medium shadow-sm transition-colors disabled:opacity-50"
-              >
-                {isInstalling ? 'Installing...' : 'Install Tools'}
-              </button>
+            {status.path && (
+              <p className="text-text-tertiary border-border/50 mt-4 border-t pt-4 font-mono text-[11px] break-all select-text">
+                {status.path}
+              </p>
             )}
-          </div>
-
-          {installError && (
-            <div className="bg-status-in_progress/10 border-status-in_progress/20 text-status-in_progress flex items-center gap-2 rounded-md border px-4 py-2 text-xs">
-              <Warning size={14} />
-              {installError}
-            </div>
-          )}
-
-          {status?.path && (
-            <div className="text-text-tertiary flex items-center gap-1 text-[10px]">
-              <Check size={10} className="text-status-done" />
-              Active binary at: <span className="text-text-secondary font-mono">{status.path}</span>
-            </div>
-          )}
-
-          <div className="border-border bg-bg-primary overflow-hidden rounded-lg border">
-            <div className="bg-bg-secondary border-border flex items-center gap-2 border-b px-3 py-1.5">
-              <div className="flex gap-1.5">
-                <div className="bg-status-ignored h-2.5 w-2.5 rounded-full" />
-                <div className="bg-status-in_progress h-2.5 w-2.5 rounded-full" />
-                <div className="bg-status-done h-2.5 w-2.5 rounded-full" />
-              </div>
-              <span className="text-text-disabled ml-2 font-mono text-[10px]">Example Usage</span>
-            </div>
-            <div className="bg-bg-primary text-text-secondary space-y-2 p-4 font-mono text-xs">
-              <CommandLine cmd="lareview diff <from> <to>" desc="Review changes between commits" />
-              <CommandLine cmd="lareview pr <owner/repo#number>" desc="Review a GitHub change" />
-              <CommandLine cmd="lareview pr <group/project!number>" desc="Review a GitLab change" />
-              <CommandLine cmd="lareview status" desc="Review uncommitted changes" />
-            </div>
-          </div>
-        </div>
+          </section>
+        )
       )}
+      <section className="settings-card space-y-4">
+        <div>
+          <h3 className="text-text-primary text-sm font-medium">Common commands</h3>
+          <p className="text-text-tertiary mt-2 text-xs leading-5">
+            Replace the example refs and repositories with your own.
+          </p>
+        </div>
+        <CommandLine cmd="lareview diff main HEAD" desc="Compare two commits" />
+        <CommandLine cmd="lareview pr owner/repo#123" desc="Review a GitHub pull request" />
+        <CommandLine cmd="lareview pr 'group/project!123'" desc="Review a GitLab merge request" />
+        <CommandLine cmd="lareview status" desc="Review uncommitted changes" />
+      </section>
     </div>
   );
 };
 
-const CommandLine: React.FC<{ cmd: string; desc: string }> = ({ cmd, desc }) => (
-  <div className="flex items-center gap-4">
-    <span className="text-brand shrink-0">$</span>
-    <span className="text-text-primary">{cmd}</span>
-    <span className="text-text-disabled ml-auto text-[10px]"># {desc}</span>
-  </div>
-);
+const CommandLine: React.FC<{ cmd: string; desc: string }> = ({ cmd, desc }) => {
+  const { copyToClipboard } = useTauri();
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 1500);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  const copy = async () => {
+    try {
+      await copyToClipboard(cmd);
+      setCopied(true);
+    } catch (error) {
+      toast.error('Could not copy command', { description: String(error) });
+    }
+  };
+  return (
+    <div className="border-border/40 flex items-start justify-between gap-4 border-t pt-4">
+      <div className="min-w-0">
+        <p className="text-text-tertiary mb-1.5 text-xs">{desc}</p>
+        <code className="text-text-primary font-mono text-xs leading-5 break-all select-text">
+          {cmd}
+        </code>
+      </div>
+      <button
+        type="button"
+        aria-label={`Copy ${cmd}`}
+        title={copied ? 'Copied' : 'Copy command'}
+        onClick={() => {
+          void copy();
+        }}
+        className="text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
+      >
+        {copied ? <Check size={14} /> : <Copy size={14} />}
+      </button>
+      <span className="sr-only" role="status">
+        {copied ? 'Command copied' : ''}
+      </span>
+    </div>
+  );
+};
 
 const EditorSettings: React.FC = () => {
   const { getAvailableEditors, getEditorConfig, updateEditorConfig } = useTauri();
   const [editors, setEditors] = useState<EditorCandidate[]>([]);
   const [config, setConfig] = useState<EditorConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fieldId = React.useId();
   const fetchData = useCallback(async () => {
     setIsLoading(true);
+    setError(null);
     try {
-      const [availableEditors, currentConfig] = await Promise.all([
-        getAvailableEditors(),
-        getEditorConfig(),
-      ]);
-      setEditors(availableEditors);
-      setConfig(currentConfig);
+      const [found, current] = await Promise.all([getAvailableEditors(), getEditorConfig()]);
+      setEditors(found);
+      setConfig(current);
     } catch (error) {
-      console.error('Failed to fetch editor settings:', error);
+      setError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsLoading(false);
     }
   }, [getAvailableEditors, getEditorConfig]);
-
   useEffect(() => {
-    fetchData();
+    void fetchData();
   }, [fetchData]);
-
-  const handleEditorChange = async (editorId: string) => {
+  const save = async (editorId: string) => {
+    if (isSaving || !editors.some(editor => editor.id === editorId)) return;
+    setIsSaving(true);
+    setError(null);
     try {
       await updateEditorConfig(editorId);
       setConfig({ preferred_editor_id: editorId });
-      const editorLabel = editors.find(e => e.id === editorId)?.label;
-      toast('Editor Updated', {
-        description: editorLabel ? `${editorLabel} set as default.` : 'Default editor updated.',
-      });
+      toast('Editor saved');
     } catch (error) {
-      console.error('Failed to update editor preference:', error);
-      toast('Failed to update editor', {
-        description: error instanceof Error ? error.message : String(error),
-      });
+      setError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsSaving(false);
     }
   };
-
-  const shouldShowSkeleton = useDelayedLoading(isLoading && editors.length === 0);
-
+  const selected = editors.find(editor => editor.id === config?.preferred_editor_id);
+  const showSkeleton = useDelayedLoading(isLoading && !config);
   return (
-    <div>
+    <div className="space-y-6">
       <SectionHeader
-        title="Editor Configuration"
-        description="Choose your preferred editor for opening files from reviews. Available editors are discovered automatically."
+        title="Editor"
+        description="Choose where files open when you jump from a review into code."
       />
-      {shouldShowSkeleton ? (
+      {error && (
+        <InlineError
+          title="Could not update editor settings"
+          message={error}
+          onRetry={() => {
+            void fetchData();
+          }}
+          isRetrying={isLoading}
+        />
+      )}
+      {showSkeleton ? (
         <EditorSkeleton />
       ) : (
-        <div className="bg-bg-secondary/40 border-border rounded-lg border p-6">
-          {isLoading ? (
-            <div className="text-text-tertiary flex items-center gap-2 text-xs">
-              <ArrowsClockwise size={14} className="animate-spin" />
-              Discovering editors...
-            </div>
-          ) : (
-            <div>
-              <label className="text-text-disabled mb-2 block text-[10px] font-bold tracking-wider uppercase">
-                Default Editor
-              </label>
-              <div className="group relative max-w-xs">
-                <select
-                  value={config?.preferred_editor_id || ''}
-                  onChange={e => handleEditorChange(e.target.value)}
-                  className="bg-bg-tertiary border-border text-text-primary focus:border-brand focus:ring-brand/20 w-full cursor-pointer appearance-none rounded-md border py-2 pr-8 pl-3 text-xs transition-all focus:ring-1 focus:outline-none"
-                >
-                  <option value="" disabled>
-                    Select an editor
-                  </option>
-                  {editors.map(editor => (
-                    <option key={editor.id} value={editor.id}>
-                      {editor.label}
-                    </option>
-                  ))}
-                </select>
-                <div className="text-text-disabled group-hover:text-text-secondary pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2">
-                  <CaretRight size={12} className="rotate-90" />
-                </div>
-              </div>
-              {editors.length === 0 && (
-                <p className="text-status-in_progress mt-3 flex items-center gap-1.5 text-xs">
-                  <Warning size={14} />
-                  No supported editors found in your PATH.
-                </p>
+        <div className="settings-card space-y-4">
+          <div className="product-form">
+            <label htmlFor={fieldId} className="text-text-secondary mb-2 block text-xs font-medium">
+              Default editor
+            </label>
+            <select
+              id={fieldId}
+              value={config?.preferred_editor_id ?? ''}
+              onChange={event => {
+                void save(event.target.value);
+              }}
+              disabled={isLoading || isSaving || editors.length === 0}
+              className="text-text-primary border-border w-full rounded-md border"
+            >
+              <option value="" disabled>
+                Choose an editor
+              </option>
+              {config?.preferred_editor_id && !selected && (
+                <option value={config.preferred_editor_id} disabled>
+                  {config.preferred_editor_id} (unavailable)
+                </option>
               )}
-              {config?.preferred_editor_id && (
-                <p className="text-text-tertiary mt-3 text-[10px]">
-                  Selected:{' '}
-                  <span className="text-text-secondary font-mono">
-                    {editors.find(e => e.id === config.preferred_editor_id)?.path}
-                  </span>
-                </p>
-              )}
-            </div>
+              {editors.map(editor => (
+                <option key={editor.id} value={editor.id}>
+                  {editor.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {isSaving && (
+            <p role="status" className="text-text-tertiary text-xs">
+              Saving editor preference…
+            </p>
           )}
+          {selected && (
+            <p className="text-text-tertiary font-mono text-[11px] leading-5 break-all select-text">
+              {selected.path}
+            </p>
+          )}
+          {!isLoading && !error && editors.length === 0 && (
+            <p className="text-text-tertiary text-xs leading-5">
+              No supported editors were found. Install an editor, then refresh this list.
+            </p>
+          )}
+          {config?.preferred_editor_id && !selected && !isLoading && (
+            <p className="text-status-in_progress text-xs leading-5">
+              Your configured editor is unavailable. Choose an installed editor or restore its
+              executable.
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              void fetchData();
+            }}
+            disabled={isLoading || isSaving}
+            className="text-text-secondary hover:text-text-primary border-border flex h-8 items-center gap-2 rounded-md border px-3 text-xs"
+          >
+            <ArrowsClockwise size={13} className={isLoading ? 'animate-spin' : ''} />
+            {isLoading ? 'Discovering…' : 'Refresh editors'}
+          </button>
         </div>
       )}
     </div>
@@ -560,192 +570,169 @@ const EditorSettings: React.FC = () => {
 };
 
 const FeedbackFilterSettings: React.FC = () => {
-  const { config, updateThreshold, isUpdating } = useFeedbackFilterConfig();
-  const [localThreshold, setLocalThreshold] = useState<string>('');
-
+  const { config, updateThreshold, isUpdating, isLoading, error, refetch } =
+    useFeedbackFilterConfig();
+  const [draft, setDraft] = useState('');
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const inputId = React.useId();
   useEffect(() => {
-    if (config.confidenceThreshold != null) {
-      setLocalThreshold(String(Math.round(config.confidenceThreshold * 100)));
-    } else {
-      setLocalThreshold('');
-    }
+    setDraft(
+      config.confidenceThreshold == null ? '' : String(Math.round(config.confidenceThreshold * 100))
+    );
   }, [config.confidenceThreshold]);
-
-  const handleThresholdChange = (value: string) => {
-    setLocalThreshold(value);
+  const numeric = draft.trim() === '' ? null : Number(draft);
+  const valid = numeric === null || (Number.isFinite(numeric) && numeric >= 0 && numeric <= 100);
+  const next = numeric === null ? null : numeric / 100;
+  const dirty = next !== config.confidenceThreshold;
+  const busy = isUpdating || isLoading || Boolean(error);
+  const change = (value: string) => {
+    setDraft(value);
+    setSaveError(null);
   };
-
-  const handleThresholdSave = () => {
-    const numValue = localThreshold === '' ? null : parseInt(localThreshold, 10) / 100;
-    if (numValue != null && (numValue < 0 || numValue > 1)) {
-      toast.error('Invalid threshold', {
-        description: 'Threshold must be between 0 and 100',
-      });
-      return;
-    }
-    updateThreshold(numValue, {
-      onSuccess: () => {
-        toast('Threshold Updated', {
-          description:
-            numValue == null
-              ? 'Showing all feedback regardless of confidence.'
-              : `Feedback with confidence below ${Math.round(numValue * 100)}% will be hidden.`,
-        });
-      },
-      onError: (error: Error) => {
-        toast.error('Failed to update threshold', {
-          description: error.message,
-        });
-      },
+  const save = () => {
+    if (!valid || !dirty || busy) return;
+    setSaveError(null);
+    updateThreshold(next, {
+      onSuccess: () => toast('Feedback filter saved'),
+      onError: (error: Error) => setSaveError(error.message),
     });
   };
-
-  const presetOptions = [
-    { label: 'Show All', value: null, description: 'No filtering applied', icon: <Eye size={18} /> },
-    { label: 'Medium+', value: 0.7, description: 'Hide low confidence', icon: <ShieldCheck size={18} /> },
-    { label: 'High Only', value: 0.9, description: 'Most confident items only', icon: <Target size={18} /> },
-  ];
-
   return (
-    <div>
+    <div className="space-y-6">
       <SectionHeader
-        title="Feedback Filters"
-        description="Control which feedback items are shown based on AI confidence level. Lower confidence feedback may contain more false positives."
+        title="Feedback filters"
+        description="Choose a minimum confidence level. Higher thresholds reduce noise and can hide useful findings."
       />
-
-      <div className="space-y-6">
-        <div className="bg-bg-secondary/40 border-border rounded-lg border p-6">
-          <label className="text-text-disabled mb-3 block text-[10px] font-bold tracking-wider uppercase">
-            Confidence Threshold
-          </label>
-          <p className="text-text-tertiary mb-4 text-xs">
-            Hide feedback with confidence below this threshold. Higher thresholds reduce noise but
-            may hide valid issues.
-          </p>
-
-          <div className="mb-4 flex flex-wrap gap-2">
-            {presetOptions.map(option => {
-              const isSelected =
-                (option.value === null && config.confidenceThreshold == null) ||
-                (option.value != null && config.confidenceThreshold === option.value);
-              return (
-                <button
-                  key={option.label}
-                  onClick={() => {
-                    setLocalThreshold(option.value == null ? '' : String(Math.round(option.value * 100)));
-                    updateThreshold(option.value);
-                  }}
-                  className={`group relative flex flex-1 flex-col items-center gap-3 rounded-xl border p-4 text-center transition-all ${
-                    isSelected
-                      ? 'border-brand bg-brand/10 text-text-primary shadow-lg ring-1 ring-brand/30'
-                      : 'border-border bg-bg-tertiary text-text-secondary hover:border-brand/40 hover:bg-bg-secondary/60'
-                  }`}
-                >
-                  <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-lg border transition-all ${
-                      isSelected
-                        ? 'bg-brand text-bg-primary border-brand'
-                        : 'bg-bg-secondary text-text-tertiary border-border group-hover:border-brand/30 group-hover:text-text-secondary'
-                    }`}
-                  >
-                    {option.icon}
-                  </div>
-                  <div>
-                    <span className="block text-xs font-semibold">{option.label}</span>
-                    <span className="text-text-tertiary text-[10px] line-clamp-1">{option.description}</span>
-                  </div>
-                  {isSelected && (
-                    <div className="bg-brand absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full text-white shadow-sm">
-                      <Check size={12} weight="bold" />
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex-1">
-              <div className="mb-4 flex items-center justify-between">
-                <label className="text-text-tertiary block text-[10px] font-medium uppercase tracking-wider">
-                  Adjust Threshold
-                </label>
-                <div className="flex items-center gap-2">
-                  <span className="text-text-primary text-sm font-semibold">
-                    {localThreshold || '0'}
-                  </span>
-                  <span className="text-text-tertiary text-xs">%</span>
-                </div>
-              </div>
-
-              <div className="relative mb-8 h-6 w-full px-2">
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={localThreshold || '0'}
-                  onChange={e => handleThresholdChange(e.target.value)}
-                  onMouseUp={handleThresholdSave}
-                  onTouchEnd={handleThresholdSave}
-                  className="accent-brand bg-bg-tertiary h-1.5 w-full cursor-pointer appearance-none rounded-full outline-none"
-                />
-                <div className="text-text-disabled mt-2 flex justify-between text-[10px]">
-                  <span>0%</span>
-                  <span>25%</span>
-                  <span>50%</span>
-                  <span>75%</span>
-                  <span>100%</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="flex-1">
-                  <label className="text-text-tertiary mb-1.5 block text-[10px]">
-                    Custom threshold
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={localThreshold}
-                      onChange={e => handleThresholdChange(e.target.value)}
-                      placeholder="e.g. 70"
-                      className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand w-24 rounded-md border px-3 py-2 text-xs transition-all focus:outline-none"
-                    />
-                    <span className="text-text-tertiary text-xs">%</span>
-                    <button
-                      onClick={handleThresholdSave}
-                      disabled={isUpdating}
-                      className="bg-brand text-bg-primary hover:bg-brand/90 flex items-center gap-1.5 rounded-md px-4 py-2 text-xs font-medium transition-all disabled:opacity-50"
-                    >
-                      {isUpdating ? <ArrowsClockwise size={14} className="animate-spin" /> : <Check size={14} weight="bold" />}
-                      Apply
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {config.confidenceThreshold != null && (
-            <p className="text-text-tertiary mt-4 text-[10px]">
-              Currently hiding feedback with confidence below{' '}
-              <span className="text-text-secondary font-medium">
-                {Math.round(config.confidenceThreshold * 100)}%
+      {error && (
+        <InlineError
+          title="Could not load feedback preferences"
+          message={String(error)}
+          onRetry={() => {
+            void refetch();
+          }}
+          isRetrying={isLoading}
+        />
+      )}
+      <form
+        className="settings-card space-y-5"
+        onSubmit={event => {
+          event.preventDefault();
+          save();
+        }}
+      >
+        <p className="text-text-secondary text-sm">
+          Choose a preset or adjust the value, then apply your changes.
+        </p>
+        <div className="settings-presets" role="group" aria-label="Confidence presets">
+          {[
+            { label: 'All feedback', value: '', description: 'No confidence filter' },
+            { label: '70% and above', value: '70', description: 'Hide lower confidence' },
+            { label: '90% and above', value: '90', description: 'Keep high confidence' },
+          ].map(preset => (
+            <button
+              type="button"
+              key={preset.label}
+              aria-pressed={draft === preset.value}
+              disabled={busy}
+              onClick={() => change(preset.value)}
+              className={`rounded-md border p-3 text-left transition-colors ${draft === preset.value ? 'border-brand/70 bg-brand/5 text-text-primary' : 'border-border text-text-secondary hover:bg-bg-tertiary'}`}
+            >
+              <span className="block text-xs font-medium">{preset.label}</span>
+              <span className="text-text-tertiary mt-1 block text-[11px] leading-5">
+                {preset.description}
               </span>
-            </p>
-          )}
+            </button>
+          ))}
         </div>
-      </div>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label htmlFor={`${inputId}-slider`} className="text-text-secondary text-xs">
+              Minimum confidence
+            </label>
+            <output className="text-text-primary font-mono text-xs">
+              {valid ? (numeric ?? 0) : '—'}%
+            </output>
+          </div>
+          <input
+            id={`${inputId}-slider`}
+            type="range"
+            aria-valuetext={`${valid ? (numeric ?? 0) : 0}% confidence`}
+            min="0"
+            max="100"
+            step="1"
+            value={valid ? (numeric ?? 0) : 0}
+            onChange={event => change(event.target.value)}
+            disabled={busy}
+            className="accent-brand w-full"
+          />
+        </div>
+        <div className="product-form">
+          <label htmlFor={inputId} className="text-text-secondary mb-2 block text-xs">
+            Custom threshold (%)
+          </label>
+          <input
+            id={inputId}
+            type="number"
+            min="0"
+            max="100"
+            step="any"
+            placeholder="No filter"
+            value={draft}
+            onChange={event => change(event.target.value)}
+            disabled={busy}
+            aria-invalid={!valid}
+            aria-describedby={`${inputId}-help`}
+            className="text-text-primary border-border w-32 rounded-md border"
+          />
+          <p
+            id={`${inputId}-help`}
+            className={`mt-2 text-xs leading-5 ${valid ? 'text-text-tertiary' : 'text-red-400'}`}
+          >
+            {valid
+              ? 'Enter a percentage from 0 to 100, or leave blank to show all feedback.'
+              : 'Enter a valid percentage from 0 to 100.'}
+          </p>
+        </div>
+        {saveError && <InlineError title="Could not save feedback filter" message={saveError} />}
+        <div className="border-border/50 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+          <p className="text-text-tertiary text-xs">
+            Current:{' '}
+            {config.confidenceThreshold == null
+              ? 'All feedback'
+              : `${Math.round(config.confidenceThreshold * 100)}% and above`}
+          </p>
+          <button
+            type="submit"
+            disabled={busy || !valid || !dirty}
+            aria-busy={isUpdating}
+            className="bg-brand text-brand-fg disabled:bg-bg-tertiary disabled:text-text-disabled flex h-9 items-center gap-2 rounded-md px-4 text-xs font-medium"
+          >
+            {isUpdating && <ArrowsClockwise size={13} className="animate-spin" />}
+            {isUpdating ? 'Applying…' : 'Apply changes'}
+          </button>
+        </div>
+      </form>
     </div>
   );
 };
 
 const AgentsSettings: React.FC = () => {
   const { getAgents, updateAgentConfig, addCustomAgent, deleteCustomAgent } = useTauri();
-  const { config: timeoutConfig, updateTimeout, isUpdating: isUpdatingTimeout } = useTimeoutConfig();
+  const {
+    config: timeoutConfig,
+    updateTimeout,
+    isUpdating: isUpdatingTimeout,
+    isLoading: isLoadingTimeout,
+    error: timeoutLoadError,
+  } = useTimeoutConfig();
+  const [editError, setEditError] = useState<string | null>(null);
+  const [addError, setAddError] = useState<string | null>(null);
+  const customId = React.useId();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [availableOnly, setAvailableOnly] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [timeoutError, setTimeoutError] = useState<string | null>(null);
+  const timeoutId = React.useId();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -768,11 +755,17 @@ const AgentsSettings: React.FC = () => {
   }, [timeoutConfig.timeoutSecs]);
 
   const handleTimeoutSave = () => {
-    const secs = parseInt(localTimeout, 10);
-    if (isNaN(secs) || secs < 60 || secs > 7200) {
-      toast.error('Invalid timeout', { description: 'Must be between 60 and 7200 seconds.' });
+    const secs = Number(localTimeout);
+    if (
+      !Number.isInteger(secs) ||
+      secs < 60 ||
+      secs > 7200 ||
+      isUpdatingTimeout ||
+      isLoadingTimeout ||
+      timeoutLoadError
+    )
       return;
-    }
+    setTimeoutError(null);
     updateTimeout(secs, {
       onSuccess: () => {
         toast('Timeout Updated', {
@@ -780,27 +773,31 @@ const AgentsSettings: React.FC = () => {
         });
       },
       onError: (error: Error) => {
-        toast.error('Failed to update timeout', { description: error.message });
+        setTimeoutError(error.message);
       },
     });
   };
 
   const handleTimeoutReset = () => {
+    if (isUpdatingTimeout || isLoadingTimeout || timeoutLoadError) return;
+    setTimeoutError(null);
     setLocalTimeout(String(DEFAULT_TIMEOUT_SECS));
     updateTimeout(null, {
       onSuccess: () => {
-        toast('Timeout Reset', { description: 'Reverted to default (1000s).' });
+        toast('Timeout reset');
       },
+      onError: (error: Error) => setTimeoutError(error.message),
     });
   };
 
   const fetchAgents = useCallback(async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const data = await getAgents();
       setAgents(data);
     } catch (error) {
-      console.error('Failed to fetch agents:', error);
+      setLoadError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsLoading(false);
     }
@@ -818,10 +815,11 @@ const AgentsSettings: React.FC = () => {
   }, [savedId]);
 
   const handleEdit = (agent: Agent) => {
+    setEditError(null);
     setEditingId(agent.id);
     setEditState({
       path: agent.path || '',
-      args: (agent.args || []).join(' '),
+      args: formatAgentArguments(agent.args || []),
     });
   };
 
@@ -831,14 +829,13 @@ const AgentsSettings: React.FC = () => {
   };
 
   const handleSave = async (agentId: string) => {
+    if (savingId || !editState.path.trim() || agentArgumentError(editState.args)) return;
+    setEditError(null);
     setSavingId(agentId);
     try {
-      const argsArray = editState.args
-        .split(' ')
-        .map(s => s.trim())
-        .filter(s => s.length > 0);
+      const argsArray = parseAgentArguments(editState.args);
 
-      await updateAgentConfig(agentId, editState.path, argsArray);
+      await updateAgentConfig(agentId, editState.path.trim(), argsArray);
       await fetchAgents();
       setEditingId(null);
       setSavedId(agentId);
@@ -846,24 +843,33 @@ const AgentsSettings: React.FC = () => {
         description: 'Configuration saved successfully.',
       });
     } catch (error) {
-      console.error('Failed to update agent:', error);
-      toast('Failed to update agent', {
-        description: error instanceof Error ? error.message : String(error),
-      });
+      setEditError(error instanceof Error ? error.message : String(error));
     } finally {
       setSavingId(null);
     }
   };
 
   const handleAddAgent = async () => {
+    if (
+      isAdding ||
+      !addForm.id.trim() ||
+      !addForm.label.trim() ||
+      !addForm.command.trim() ||
+      agentArgumentError(addForm.args) ||
+      agents.some(agent => agent.id === addForm.id.trim())
+    )
+      return;
+    setAddError(null);
     setIsAdding(true);
     try {
-      const argsArray = addForm.args
-        .split(' ')
-        .map(s => s.trim())
-        .filter(s => s.length > 0);
+      const argsArray = parseAgentArguments(addForm.args);
 
-      await addCustomAgent(addForm.id, addForm.label, addForm.command, argsArray);
+      await addCustomAgent(
+        addForm.id.trim(),
+        addForm.label.trim(),
+        addForm.command.trim(),
+        argsArray
+      );
       await fetchAgents();
       setShowAddForm(false);
       setAddForm({ id: '', label: '', command: '', args: '' });
@@ -871,10 +877,7 @@ const AgentsSettings: React.FC = () => {
         description: `Custom agent "${addForm.label}" has been added.`,
       });
     } catch (error) {
-      console.error('Failed to add custom agent:', error);
-      toast('Failed to add agent', {
-        description: error instanceof Error ? error.message : String(error),
-      });
+      setAddError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsAdding(false);
     }
@@ -899,27 +902,40 @@ const AgentsSettings: React.FC = () => {
     }
   };
 
+  const visibleAgents = agents.filter(
+    agent =>
+      (!availableOnly || agent.available) &&
+      [agent.id, agent.name, agent.path ?? ''].some(value =>
+        value.toLowerCase().includes(searchQuery.trim().toLowerCase())
+      )
+  );
   const shouldShowSkeleton = useDelayedLoading(isLoading && agents.length === 0);
 
   return (
     <div>
-      <div className="mb-6 flex items-start justify-between gap-4">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-md">
           <SectionHeader
-            title="Review Agents"
-            description="Manage and configure the AI agents available for code reviews. Built-in agents can be configured with custom executable paths."
+            title="Review agents"
+            description="Choose an installed agent or configure your own."
           />
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <button
-            onClick={() => setShowAddForm(prev => !prev)}
-            className="bg-brand text-bg-primary flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-2 text-xs font-bold transition-all hover:brightness-110"
+            onClick={() => {
+              setAddError(null);
+              setAddForm({ id: '', label: '', command: '', args: '' });
+              setShowAddForm(true);
+            }}
+            disabled={Boolean(savingId || deletingId || isAdding)}
+            className="bg-brand text-bg-primary flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-bold whitespace-nowrap transition-all hover:brightness-110"
           >
             <Plus size={14} weight="bold" />
-            Add Custom Agent
+            Add custom agent
           </button>
           <button
             onClick={fetchAgents}
+            disabled={isLoading || Boolean(savingId || deletingId || isAdding)}
             className="text-text-tertiary hover:text-text-primary bg-bg-secondary rounded-md p-2 transition-colors"
             title="Refresh agents"
           >
@@ -928,149 +944,243 @@ const AgentsSettings: React.FC = () => {
         </div>
       </div>
 
-      {/* Review Timeout */}
-      <div className="mb-6 flex items-center gap-3">
-        <label className="text-text-tertiary flex items-center gap-1.5 text-xs whitespace-nowrap">
-          <Timer size={12} />
-          Timeout
-        </label>
-        <input
-          type="number"
-          min="60"
-          max="7200"
-          value={localTimeout}
-          onChange={e => setLocalTimeout(e.target.value)}
-          className="bg-bg-tertiary border-border text-text-primary focus:border-brand w-20 rounded-md border px-2 py-1.5 font-mono text-xs transition-all focus:outline-none"
-        />
-        <span className="text-text-disabled text-[10px]">
-          sec (~{Math.round((parseInt(localTimeout, 10) || 0) / 60)} min)
-        </span>
-        <div className="ml-auto flex items-center gap-2">
-          <button
-            onClick={handleTimeoutReset}
-            disabled={isUpdatingTimeout}
-            className="text-text-tertiary hover:text-text-primary text-xs transition-colors disabled:opacity-50"
+      <form
+        className="settings-card product-form mb-6 space-y-4"
+        onSubmit={event => {
+          event.preventDefault();
+          handleTimeoutSave();
+        }}
+      >
+        <div>
+          <label
+            htmlFor={timeoutId}
+            className="text-text-primary flex items-center gap-2 text-sm font-medium"
           >
-            Reset
-          </button>
-          <button
-            onClick={handleTimeoutSave}
-            disabled={isUpdatingTimeout}
-            className="bg-brand text-bg-primary hover:bg-brand/90 rounded-md px-3 py-1.5 text-xs font-medium transition-all disabled:opacity-50"
+            <Timer size={14} />
+            Review timeout
+          </label>
+          <p
+            id={`${timeoutId}-help`}
+            className={`mt-2 text-xs leading-5 ${Number.isInteger(Number(localTimeout)) && Number(localTimeout) >= 60 && Number(localTimeout) <= 7200 ? 'text-text-tertiary' : 'text-red-400'}`}
           >
-            Save
-          </button>
+            Stop a run after this many seconds. Enter a whole number from 60 to 7,200.
+          </p>
         </div>
-      </div>
-
-      {showAddForm && (
-        <div className="bg-bg-secondary/40 border-border mb-4 rounded-lg border p-5">
-          <h3 className="text-text-primary mb-4 text-sm font-semibold">New Custom Agent</h3>
-          <div className="grid gap-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-text-disabled mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
-                  ID
-                </label>
-                <input
-                  type="text"
-                  value={addForm.id}
-                  onChange={e => setAddForm(prev => ({ ...prev, id: e.target.value }))}
-                  placeholder="e.g. my-agent"
-                  className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand w-full rounded-md border px-3 py-2 font-mono text-xs transition-all focus:outline-none"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="text-text-disabled mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
-                  Label
-                </label>
-                <input
-                  type="text"
-                  value={addForm.label}
-                  onChange={e => setAddForm(prev => ({ ...prev, label: e.target.value }))}
-                  placeholder="e.g. My Agent"
-                  className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand w-full rounded-md border px-3 py-2 font-mono text-xs transition-all focus:outline-none"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="text-text-disabled mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
-                Command
-              </label>
-              <input
-                type="text"
-                value={addForm.command}
-                onChange={e => setAddForm(prev => ({ ...prev, command: e.target.value }))}
-                placeholder="e.g. /usr/local/bin/my-agent"
-                className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand w-full rounded-md border px-3 py-2 font-mono text-xs transition-all focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-text-disabled mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
-                Arguments
-              </label>
-              <input
-                type="text"
-                value={addForm.args}
-                onChange={e => setAddForm(prev => ({ ...prev, args: e.target.value }))}
-                placeholder="e.g. --model=gpt-4 --temperature=0.7"
-                className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand w-full rounded-md border px-3 py-2 font-mono text-xs transition-all focus:outline-none"
-              />
-              <p className="text-text-tertiary mt-1 text-[10px]">
-                Space-separated arguments passed to the agent command.
-              </p>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            id={timeoutId}
+            type="number"
+            min="60"
+            max="7200"
+            step="1"
+            required
+            value={localTimeout}
+            onChange={event => {
+              setLocalTimeout(event.target.value);
+              setTimeoutError(null);
+            }}
+            disabled={isUpdatingTimeout || isLoadingTimeout || Boolean(timeoutLoadError)}
+            aria-invalid={
+              !Number.isInteger(Number(localTimeout)) ||
+              Number(localTimeout) < 60 ||
+              Number(localTimeout) > 7200
+            }
+            aria-describedby={`${timeoutId}-help`}
+            className="text-text-primary border-border w-32 rounded-md border font-mono"
+          />
+          <span className="text-text-tertiary text-xs">seconds</span>
+          <div className="ml-auto flex items-center gap-3">
             <button
-              onClick={() => {
-                setShowAddForm(false);
-                setAddForm({ id: '', label: '', command: '', args: '' });
-              }}
-              disabled={isAdding}
-              className="text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+              type="button"
+              onClick={handleTimeoutReset}
+              disabled={isUpdatingTimeout || isLoadingTimeout || Boolean(timeoutLoadError)}
+              className="text-text-secondary rounded-md px-2 py-2 text-xs"
             >
-              Cancel
+              Use default
             </button>
             <button
-              onClick={handleAddAgent}
-              disabled={isAdding || !addForm.id.trim() || !addForm.command.trim() || !addForm.label.trim()}
-              className="bg-brand text-bg-primary shadow-custom flex items-center gap-2 rounded-md px-4 py-2 text-xs font-bold transition-all hover:brightness-110 disabled:opacity-50"
+              type="submit"
+              disabled={
+                isUpdatingTimeout ||
+                isLoadingTimeout ||
+                Boolean(timeoutLoadError) ||
+                !Number.isInteger(Number(localTimeout)) ||
+                Number(localTimeout) < 60 ||
+                Number(localTimeout) > 7200 ||
+                Number(localTimeout) === (timeoutConfig.timeoutSecs ?? DEFAULT_TIMEOUT_SECS)
+              }
+              className="bg-brand text-brand-fg disabled:bg-bg-tertiary disabled:text-text-disabled rounded-md px-3 py-2 text-xs font-medium"
             >
-              {isAdding ? (
-                <ArrowsClockwise size={14} className="animate-spin" />
-              ) : (
-                <Plus size={14} weight="bold" />
-              )}
-              Add Agent
+              {isUpdatingTimeout ? 'Saving…' : 'Save timeout'}
             </button>
           </div>
+        </div>
+        {(timeoutError || timeoutLoadError) && (
+          <InlineError
+            title="Could not update review timeout"
+            message={timeoutError ?? String(timeoutLoadError)}
+          />
+        )}
+      </form>
+      {loadError && (
+        <div className="mb-4">
+          <InlineError
+            title="Could not load agents"
+            message={loadError}
+            onRetry={() => {
+              void fetchAgents();
+            }}
+            isRetrying={isLoading}
+          />
         </div>
       )}
 
+      <Dialog
+        isOpen={showAddForm}
+        onClose={() => setShowAddForm(false)}
+        title="Add custom agent"
+        description="Use an unused ID and a command that supports ACP."
+        busy={isAdding}
+      >
+        <form
+          className="product-form"
+          onSubmit={event => {
+            event.preventDefault();
+            void handleAddAgent();
+          }}
+        >
+          <fieldset disabled={isAdding} className="min-w-0 space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span>Display name</span>
+                <input
+                  data-autofocus
+                  required
+                  value={addForm.label}
+                  onChange={event => setAddForm(prev => ({ ...prev, label: event.target.value }))}
+                  placeholder="My agent"
+                  className="text-text-primary border-border w-full rounded-md border"
+                />
+              </label>
+              <label className="block">
+                <span>Agent ID</span>
+                <input
+                  required
+                  value={addForm.id}
+                  onChange={event => setAddForm(prev => ({ ...prev, id: event.target.value }))}
+                  aria-invalid={agents.some(agent => agent.id === addForm.id.trim())}
+                  aria-describedby={`${customId}-help`}
+                  placeholder="my-agent"
+                  className="text-text-primary border-border w-full rounded-md border font-mono"
+                />
+              </label>
+            </div>
+            <p id={`${customId}-help`} className="text-text-tertiary text-xs">
+              {agents.some(agent => agent.id === addForm.id.trim())
+                ? 'That ID is already used. Choose a unique agent ID.'
+                : 'The ID identifies this configuration and must be unique.'}
+            </p>
+            <AgentCommandFields
+              command={addForm.command}
+              args={addForm.args}
+              onCommandChange={command => setAddForm(prev => ({ ...prev, command }))}
+              onArgsChange={args => setAddForm(prev => ({ ...prev, args }))}
+            />
+            {addError && <InlineError title="Could not add agent" message={addError} />}
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowAddForm(false)}
+                className="text-text-secondary rounded-md px-3 py-2 text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={
+                  !addForm.id.trim() ||
+                  !addForm.label.trim() ||
+                  !addForm.command.trim() ||
+                  Boolean(agentArgumentError(addForm.args)) ||
+                  agents.some(agent => agent.id === addForm.id.trim()) ||
+                  isAdding
+                }
+                className="bg-brand text-brand-fg disabled:bg-bg-tertiary disabled:text-text-disabled rounded-md px-4 py-2 text-xs font-medium"
+              >
+                {isAdding ? 'Adding…' : 'Add agent'}
+              </button>
+            </div>
+          </fieldset>
+        </form>
+      </Dialog>
+
+      {agents.length > 0 && (
+        <div className="mb-4 space-y-3">
+          <SearchField
+            label="Search agents"
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Agent name or command"
+          />
+          <div className="text-text-tertiary flex flex-wrap items-center justify-between gap-3 text-xs">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={availableOnly}
+                onChange={event => setAvailableOnly(event.target.checked)}
+                className="accent-brand"
+              />
+              Available only
+            </label>
+            <span>
+              {agents.filter(agent => agent.available).length} of {agents.length} available
+            </span>
+          </div>
+        </div>
+      )}
+      {!isLoading && agents.length > 0 && visibleAgents.length === 0 && (
+        <EmptyPanel
+          title="No matching agents"
+          description="Try another name or show unavailable agents."
+          action={
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setAvailableOnly(false);
+              }}
+              className="text-text-secondary border-border rounded-md border px-3 py-2 text-xs"
+            >
+              Clear filters
+            </button>
+          }
+        />
+      )}
       {shouldShowSkeleton ? (
         <AgentsSkeleton />
       ) : (
         <div className="space-y-4">
-          {agents.map(agent => (
+          {visibleAgents.map(agent => (
             <div
               key={agent.id}
-              className={`bg-bg-secondary/40 border-border rounded-lg border p-5 transition-all ${
-                editingId === agent.id ? 'ring-brand/20 ring-2' : 'hover:border-brand/30'
-              }`}
+              className={`settings-card ${editingId === agent.id ? 'border-brand/50' : ''}`}
             >
-              <div className="mb-4 flex items-start justify-between">
-                <div className="flex items-start gap-4">
-                  <div className="bg-bg-tertiary border-border mt-1 flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="bg-bg-tertiary border-border mt-0.5 flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg border">
                     {agent.logo ? (
-                      <img src={agent.logo} alt={agent.name} className="h-6 w-6 object-contain" />
+                      <img
+                        src={agent.logo}
+                        alt=""
+                        aria-hidden="true"
+                        className="h-5 w-5 object-contain"
+                      />
                     ) : (
                       <Robot size={20} weight="fill" className="text-brand" />
                     )}
                   </div>
                   <div>
-                    <h3 className="text-text-primary flex items-center gap-2 text-sm font-semibold">
+                    <h3 className="text-text-primary flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-medium">
                       {agent.name}
                       {agent.available ? (
                         <span className="text-status-done flex items-center gap-1 text-[10px] font-medium">
@@ -1087,35 +1197,36 @@ const AgentsSettings: React.FC = () => {
                     <p className="text-text-tertiary mt-1 text-xs">
                       {agent.id === 'default'
                         ? 'Standard review agent'
-                        : agent.description || `${agent.name} ACP Agent`}
+                        : agent.description ||
+                          (agent.is_custom ? 'Custom agent' : 'Built-in agent')}
                     </p>
                   </div>
                 </div>
                 {editingId !== agent.id && (
                   <div className="flex items-center gap-2">
                     {savedId === agent.id && (
-                      <span className="text-status-done animate-in fade-in zoom-in text-xs font-medium duration-300">
-                        Saved!
-                      </span>
+                      <span className="text-status-done text-xs font-medium">Saved</span>
                     )}
                     <button
                       onClick={() => handleEdit(agent)}
+                      aria-label={`Edit ${agent.name}`}
+                      disabled={Boolean(savingId || deletingId || isAdding)}
                       className="text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded px-3 py-1.5 text-xs font-medium transition-colors"
                     >
                       Edit
                     </button>
-                    {agent.is_custom && (
-                      confirmDeleteId === agent.id ? (
+                    {agent.is_custom &&
+                      (confirmDeleteId === agent.id ? (
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => handleDeleteAgent(agent.id)}
                             disabled={deletingId === agent.id}
-                            className="text-status-error hover:bg-status-error/10 rounded px-2 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+                            className="text-impact-blocking hover:bg-impact-blocking/10 rounded px-2 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
                           >
                             {deletingId === agent.id ? (
                               <ArrowsClockwise size={14} className="animate-spin" />
                             ) : (
-                              'Confirm'
+                              'Delete agent'
                             )}
                           </button>
                           <button
@@ -1129,87 +1240,76 @@ const AgentsSettings: React.FC = () => {
                       ) : (
                         <button
                           onClick={() => setConfirmDeleteId(agent.id)}
-                          className="text-text-tertiary hover:text-status-error hover:bg-status-error/10 rounded p-1.5 transition-colors"
+                          className="text-text-tertiary hover:text-impact-blocking hover:bg-impact-blocking/10 rounded p-1.5 transition-colors"
                           title="Delete custom agent"
                         >
                           <Trash size={14} />
                         </button>
-                      )
-                    )}
+                      ))}
                   </div>
                 )}
               </div>
 
               <div className="space-y-3">
                 {editingId === agent.id ? (
-                  <div className="animate-in fade-in slide-in-from-top-1 duration-200">
-                    <div className="grid gap-3">
-                      <div>
-                        <label className="text-text-disabled mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
-                          Executable Path / Command
-                        </label>
-                        <input
-                          type="text"
-                          value={editState.path}
-                          onChange={e => setEditState(prev => ({ ...prev, path: e.target.value }))}
-                          placeholder="e.g. /usr/local/bin/agent-bin"
-                          className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand w-full rounded-md border px-3 py-2 font-mono text-xs transition-all focus:outline-none"
-                          autoFocus
-                        />
+                  <form
+                    className="product-form"
+                    onSubmit={event => {
+                      event.preventDefault();
+                      void handleSave(agent.id);
+                    }}
+                  >
+                    <fieldset disabled={Boolean(savingId)} className="min-w-0 space-y-4">
+                      <AgentCommandFields
+                        command={editState.path}
+                        args={editState.args}
+                        onCommandChange={path => setEditState(prev => ({ ...prev, path }))}
+                        onArgsChange={args => setEditState(prev => ({ ...prev, args }))}
+                        autoFocus
+                      />
+                      {editError && (
+                        <InlineError title="Could not save agent" message={editError} />
+                      )}
+                      <div className="flex justify-end gap-3">
+                        <button
+                          type="button"
+                          onClick={handleCancel}
+                          className="text-text-secondary rounded-md px-3 py-2 text-xs"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={
+                            Boolean(savingId) ||
+                            !editState.path.trim() ||
+                            Boolean(agentArgumentError(editState.args))
+                          }
+                          className="bg-brand text-brand-fg disabled:bg-bg-tertiary disabled:text-text-disabled flex items-center gap-2 rounded-md px-4 py-2 text-xs font-medium"
+                        >
+                          {savingId ? (
+                            <ArrowsClockwise size={13} className="animate-spin" />
+                          ) : (
+                            <FloppyDisk size={13} />
+                          )}
+                          {savingId ? 'Saving…' : 'Save changes'}
+                        </button>
                       </div>
-
-                      <div>
-                        <label className="text-text-disabled mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
-                          Arguments
-                        </label>
-                        <input
-                          type="text"
-                          value={editState.args}
-                          onChange={e => setEditState(prev => ({ ...prev, args: e.target.value }))}
-                          placeholder="e.g. --model=gpt-4 --temperature=0.7"
-                          className="bg-bg-tertiary border-border text-text-primary placeholder-text-disabled focus:border-brand w-full rounded-md border px-3 py-2 font-mono text-xs transition-all focus:outline-none"
-                        />
-                        <p className="text-text-tertiary mt-1 text-[10px]">
-                          Space-separated arguments passed to the agent command.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-4">
-                      <button
-                        onClick={handleCancel}
-                        disabled={savingId === agent.id}
-                        className="text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => handleSave(agent.id)}
-                        disabled={savingId === agent.id}
-                        className="bg-brand text-bg-primary shadow-custom flex items-center gap-2 rounded-md px-4 py-2 text-xs font-bold transition-all hover:brightness-110 disabled:opacity-50"
-                      >
-                        {savingId === agent.id ? (
-                          <ArrowsClockwise size={14} className="animate-spin" />
-                        ) : (
-                          <FloppyDisk size={14} weight="fill" />
-                        )}
-                        Save Changes
-                      </button>
-                    </div>
-                  </div>
+                    </fieldset>
+                  </form>
                 ) : (
                   <div className="space-y-4">
                     <div>
                       <span className="text-text-disabled mb-1 block text-[10px] font-bold tracking-wider uppercase">
-                        Path
+                        Command
                       </span>
-                      <code className="bg-bg-tertiary text-text-secondary block truncate rounded px-2 py-1 font-mono text-xs">
+                      <code className="text-text-secondary block font-mono text-[11px] leading-5 break-all select-text">
                         {agent.path || '(Default)'}
                       </code>
                     </div>
                     <div>
                       <span className="text-text-disabled mb-1 block text-[10px] font-bold tracking-wider uppercase">
-                        Args
+                        Arguments
                       </span>
                       {agent.args && agent.args.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
@@ -1232,7 +1332,7 @@ const AgentsSettings: React.FC = () => {
             </div>
           ))}
 
-          {agents.length === 0 && !isLoading && (
+          {agents.length === 0 && !isLoading && !loadError && (
             <div className="border-border rounded-lg border border-dashed py-12 text-center">
               <Robot size={32} weight="thin" className="text-text-disabled mx-auto mb-3" />
               <p className="text-text-tertiary text-sm">No agents discovered</p>
@@ -1240,7 +1340,62 @@ const AgentsSettings: React.FC = () => {
           )}
         </div>
       )}
-
     </div>
   );
 };
+
+interface AgentCommandFieldsProps {
+  command: string;
+  args: string;
+  onCommandChange: (value: string) => void;
+  onArgsChange: (value: string) => void;
+  autoFocus?: boolean;
+}
+function AgentCommandFields({
+  command,
+  args,
+  onCommandChange,
+  onArgsChange,
+  autoFocus,
+}: AgentCommandFieldsProps) {
+  const id = React.useId();
+  const error = agentArgumentError(args);
+  return (
+    <div className="space-y-4">
+      <label className="block">
+        <span>Command</span>
+        <input
+          required
+          autoFocus={autoFocus}
+          value={command}
+          onChange={event => onCommandChange(event.target.value)}
+          placeholder="Executable or full path"
+          aria-describedby={`${id}-command`}
+          className="text-text-primary border-border w-full rounded-md border font-mono"
+        />
+      </label>
+      <p id={`${id}-command`} className="text-text-tertiary text-xs leading-5">
+        Enter the command or executable path without quotes. Put flags in Arguments.
+      </p>
+      <label className="block">
+        <span>Arguments</span>
+        <textarea
+          value={args}
+          onChange={event => onArgsChange(event.target.value)}
+          rows={3}
+          placeholder="--acp --stdio"
+          aria-invalid={Boolean(error)}
+          aria-describedby={`${id}-args`}
+          className="text-text-primary border-border w-full rounded-md border font-mono"
+        />
+      </label>
+      <p
+        id={`${id}-args`}
+        className={`text-xs leading-5 ${error ? 'text-red-400' : 'text-text-tertiary'}`}
+      >
+        {error ??
+          'Use quotes around values containing spaces. Arguments are passed literally to the agent.'}
+      </p>
+    </div>
+  );
+}

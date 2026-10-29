@@ -72,7 +72,7 @@ describe('Learning', () => {
     render(<LearningView />);
     fireEvent.click(screen.getByRole('button', { name: 'New pattern' }));
     const dialog = screen.getByRole('dialog', { name: 'New pattern' });
-    const field = within(dialog).getByRole('textbox', { name: 'Pattern', exact: true });
+    const field = within(dialog).getByRole('textbox', { name: 'Pattern' });
     expect(field).toHaveFocus();
     expect(within(dialog).getByRole('button', { name: 'Add pattern' })).toBeDisabled();
     fireEvent.change(field, { target: { value: '  Avoid cosmetic findings  ' } });
@@ -93,10 +93,10 @@ describe('Learning', () => {
   it('explains zero pending items and enables analysis only when there is work', () => {
     const { rerender } = render(<LearningView />);
     fireEvent.click(screen.getByRole('button', { name: 'Analyze rejections' }));
-    expect(screen.getByRole('button', { name: 'Analyze', exact: true })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Analyze' })).toBeDisabled();
     pending = 1;
     rerender(<LearningView />);
-    fireEvent.click(screen.getByRole('button', { name: 'Analyze', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Analyze' }));
     expect(mocks.compact).toHaveBeenCalledWith('copilot', expect.any(Object));
   });
   it('cancels deletion and recovers query errors without showing an empty collection', () => {
