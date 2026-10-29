@@ -1,6 +1,9 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { RulesView } from './RulesView';
+import { mockNativeDialog } from '../../test/mockNativeDialog';
+
+mockNativeDialog();
 
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
@@ -36,30 +39,6 @@ vi.mock('../../hooks/useRepos', () => ({
 vi.mock('../../hooks/useRuleLibrary', () => ({
   useRuleLibrary: () => ({ allRules: { data: [] }, addFromLibrary: { isPending: false } }),
 }));
-
-const originalShowModal = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'showModal');
-const originalClose = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'close');
-beforeAll(() => {
-  Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
-    configurable: true,
-    value() {
-      this.setAttribute('open', '');
-    },
-  });
-  Object.defineProperty(HTMLDialogElement.prototype, 'close', {
-    configurable: true,
-    value() {
-      this.removeAttribute('open');
-    },
-  });
-});
-afterAll(() => {
-  if (originalShowModal)
-    Object.defineProperty(HTMLDialogElement.prototype, 'showModal', originalShowModal);
-  else delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>).showModal;
-  if (originalClose) Object.defineProperty(HTMLDialogElement.prototype, 'close', originalClose);
-  else delete (HTMLDialogElement.prototype as Partial<HTMLDialogElement>).close;
-});
 
 describe('Rules', () => {
   beforeEach(() => vi.clearAllMocks());

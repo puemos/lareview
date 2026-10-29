@@ -38,6 +38,7 @@ export function useLearnedPatterns() {
       updateLearnedPattern(id, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.learnedPatterns });
+      queryClient.invalidateQueries({ queryKey: queryKeys.learningStatus });
     },
   });
 

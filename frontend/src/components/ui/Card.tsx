@@ -9,7 +9,7 @@ interface CardProps {
 export const Card: React.FC<CardProps> = ({ children, className, style }) => (
   <div
     className={clsx(
-      "group bg-bg-secondary/40 hover:bg-bg-secondary hover:border-border rounded-lg border border-transparent transition-all",
+      'group bg-bg-secondary/20 border-border/50 rounded-lg border transition-colors',
       className
     )}
     style={style}
