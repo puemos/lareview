@@ -16,6 +16,7 @@ const riskConfig: Record<RiskLevel, { color: string; bg: string; label: string }
 };
 
 const statusConfig = {
+  todo: { icon: ICONS.STATUS_TODO, color: 'text-text-disabled' },
   pending: { icon: ICONS.STATUS_TODO, color: 'text-text-disabled' },
   in_progress: { icon: ICONS.STATUS_IN_PROGRESS, color: 'text-status-in_progress' },
   done: { icon: ICONS.STATUS_DONE, color: 'text-status-done' },
@@ -78,16 +79,25 @@ const TaskGroupSection: React.FC<TaskGroupSectionProps> = ({
               <button
                 key={task.id}
                 onClick={() => onSelectTask(task.id)}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors outline-none hover:bg-white/[0.025] focus-visible:bg-white/[0.04]"
+                className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors outline-none hover:bg-white/[0.025] focus-visible:bg-white/[0.04]"
               >
-                <StatusIcon size={13} className={status.color} />
-                <span className="text-text-primary min-w-0 flex-1 text-[13px] leading-5">
-                  {task.title}
-                </span>
-                <span
-                  className={`${risk.bg} ${risk.color} flex-shrink-0 rounded-full px-2 py-1 text-[10px] font-medium`}
-                >
-                  {risk.label}
+                <StatusIcon size={15} className={`${status.color} mt-1 shrink-0`} />
+                <span className="min-w-0 flex-1">
+                  <span className="text-text-primary block text-[13px] leading-5">
+                    {task.title}
+                  </span>
+                  <span className="text-text-tertiary mt-1.5 flex gap-3 text-[11px]">
+                    <span>
+                      {task.status === 'done'
+                        ? 'Done'
+                        : task.status === 'in_progress'
+                          ? 'In progress'
+                          : task.status === 'ignored'
+                            ? 'Ignored'
+                            : 'To do'}
+                    </span>
+                    <span className={risk.color}>{risk.label}</span>
+                  </span>
                 </span>
                 <ICONS.ICON_ARROW_RIGHT size={12} className="text-text-disabled shrink-0" />
               </button>
@@ -162,6 +172,12 @@ export const TaskFlow: React.FC<TaskFlowProps> = ({ tasks, onSelectTask }) => {
           {completedCount > 0 && `, ${completedCount} done`}
         </span>
       </div>
+      <progress
+        className="review-task-progress"
+        aria-label="Review task completion"
+        value={completedCount}
+        max={tasks.length}
+      />
       <div className="divide-border/30 flex-1 divide-y overflow-y-auto">
         {taskGroups.map((group, idx) => (
           <TaskGroupSection

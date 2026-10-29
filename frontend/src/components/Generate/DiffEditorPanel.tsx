@@ -28,7 +28,12 @@ export const DiffEditorPanel: React.FC<DiffEditorPanelProps> = ({
   }, [diffText, viewMode]);
 
   useEffect(() => {
-    if (parsedDiff && parsedDiff.files && parsedDiff.files.length > 0 && !selectedFileName) {
+    if (
+      parsedDiff &&
+      parsedDiff.files &&
+      parsedDiff.files.length > 0 &&
+      !parsedDiff.files.some(file => file.name === selectedFileName)
+    ) {
       setSelectedFileName(parsedDiff.files[0].name);
     }
   }, [parsedDiff, selectedFileName]);
@@ -63,10 +68,10 @@ export const DiffEditorPanel: React.FC<DiffEditorPanelProps> = ({
     selectedFile.hunks.forEach(hunk => {
       const content = hunk.content || '';
       content.split('\n').forEach(line => {
-        if (line.startsWith('@@')) return;
-        if (line.startsWith('-') && !line.startsWith('---')) {
+        if (line.startsWith('@@') || line.startsWith('\\ No newline') || !line) return;
+        if (line.startsWith('-')) {
           original.push(line.slice(1));
-        } else if (line.startsWith('+') && !line.startsWith('+++')) {
+        } else if (line.startsWith('+')) {
           modified.push(line.slice(1));
         } else if (line.startsWith(' ')) {
           original.push(line.slice(1));
@@ -92,11 +97,12 @@ export const DiffEditorPanel: React.FC<DiffEditorPanelProps> = ({
   const language = selectedFile ? getLanguageFromPath(selectedFile.new_path) : 'plaintext';
 
   return (
-    <div className="relative flex flex-1 overflow-hidden">
+    <div className="generate-diff-layout relative flex min-h-0 flex-1 overflow-hidden">
       {viewMode === 'diff' && parsedDiff && parsedDiff.files && (
-        <div className="border-border bg-bg-secondary/30 flex w-52 flex-col border-r max-[1000px]:w-40">
-          <div
-            className="border-border hover:bg-bg-secondary flex cursor-pointer items-center justify-between border-b px-3 py-2"
+        <div className="generate-diff-files border-border bg-bg-secondary/30 flex w-52 shrink-0 flex-col border-r">
+          <button
+            aria-expanded={isFileListExpanded}
+            className="border-border hover:bg-bg-secondary flex min-h-10 items-center justify-between border-b px-3 py-2"
             onClick={() => setIsFileListExpanded(!isFileListExpanded)}
           >
             <span className="text-text-secondary text-xs font-bold tracking-wider uppercase">
@@ -105,17 +111,17 @@ export const DiffEditorPanel: React.FC<DiffEditorPanelProps> = ({
             <div className="text-text-disabled">
               {isFileListExpanded ? <CaretDown size={14} /> : <CaretRight size={14} />}
             </div>
-          </div>
+          </button>
           {isFileListExpanded && (
             <div className="custom-scrollbar flex-1 overflow-y-auto">
               {parsedDiff.files.map(file => (
                 <button
                   key={file.name}
                   onClick={() => setSelectedFileName(file.name)}
+                  aria-label={file.name}
+                  aria-current={selectedFile?.name === file.name ? 'true' : undefined}
                   className={`group border-border/50 hover:bg-bg-secondary w-full border-b px-3 py-2 text-left transition-colors ${
-                    selectedFileName === file.name
-                      ? 'bg-bg-secondary border-l-brand border-l-2'
-                      : ''
+                    selectedFileName === file.name ? 'bg-bg-secondary' : ''
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -143,7 +149,17 @@ export const DiffEditorPanel: React.FC<DiffEditorPanelProps> = ({
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+        {viewMode === 'raw' && !diffText.trim() && (
+          <div className="pointer-events-none absolute top-14 left-16 z-10 max-w-sm pr-5">
+            <h2 className="text-text-secondary text-base font-medium">Paste a unified diff</h2>
+            <p className="text-text-tertiary mt-2 text-[13px] leading-6">
+              Copy the output of <code className="text-text-secondary">git diff main...HEAD</code>,
+              then paste it here. Use Preview to inspect the changed files.
+            </p>
+          </div>
+        )}
+
         {viewMode === 'diff' ? (
           <DiffEditor
             height="100%"
@@ -163,7 +179,7 @@ export const DiffEditorPanel: React.FC<DiffEditorPanelProps> = ({
               fontFamily: "'GeistMono', 'Monaco', monospace",
               scrollBeyondLastLine: false,
               padding: { top: 16, bottom: 16 },
-              renderSideBySide: true,
+              renderSideBySide: false,
               automaticLayout: true,
             }}
           />
@@ -176,6 +192,7 @@ export const DiffEditorPanel: React.FC<DiffEditorPanelProps> = ({
             value={diffText}
             onChange={value => onDiffTextChange(value || '')}
             options={{
+              ariaLabel: 'Unified diff input',
               minimap: { enabled: false },
               fontSize: 12,
               lineHeight: 20,
@@ -209,9 +226,9 @@ export const DiffEditorPanel: React.FC<DiffEditorPanelProps> = ({
 };
 
 export const countAdditions = (diff: string): number => {
-  return diff.split('\n').filter(line => line.startsWith('+') && !line.startsWith('+++')).length;
+  return parseDiffLocally(diff).total_additions;
 };
 
 export const countDeletions = (diff: string): number => {
-  return diff.split('\n').filter(line => line.startsWith('-') && !line.startsWith('---')).length;
+  return parseDiffLocally(diff).total_deletions;
 };

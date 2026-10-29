@@ -159,6 +159,7 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         toast.error('Failed to stop review', {
           description: error instanceof Error ? error.message : String(error),
         });
+        throw error;
       }
     },
     [stop_generation]

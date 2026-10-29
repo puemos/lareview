@@ -36,3 +36,12 @@
     padding: 24px;
   }
 }
+
+@media (max-width: 1100px) {
+  .review-check-grid {
+    grid-template-columns: 1fr;
+  }
+  .review-check-grid > div:nth-child(odd) {
+    border-right: 0;
+  }
+}

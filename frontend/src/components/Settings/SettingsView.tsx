@@ -5,6 +5,7 @@ import {
   Code,
   Copy,
   CaretRight,
+  CaretDown,
   CheckCircle,
   Warning,
   FloppyDisk,
@@ -125,15 +126,14 @@ const TabButton: React.FC<TabButtonProps> = ({ icon, label, isActive, onClick })
     aria-current={isActive ? 'page' : undefined}
     className={`group relative flex min-h-9 w-full shrink-0 items-center gap-2 rounded-md px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
       isActive
-        ? 'bg-bg-tertiary text-text-primary shadow-sm'
+        ? 'bg-bg-tertiary text-text-primary'
         : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary'
     }`}
   >
-    {isActive && (
-      <div className="bg-brand absolute top-1.5 bottom-1.5 left-0 w-[2px] rounded-r-full" />
-    )}
     <span
-      className={isActive ? 'text-brand' : 'text-text-tertiary group-hover:text-text-secondary'}
+      className={
+        isActive ? 'text-text-secondary' : 'text-text-tertiary group-hover:text-text-secondary'
+      }
     >
       {icon}
     </span>
@@ -146,7 +146,7 @@ const SectionHeader: React.FC<{ title: string; description: string }> = ({
   title,
   description,
 }) => (
-  <div className="mb-6">
+  <div className="settings-section-heading">
     <h2 className="text-text-primary mb-2 text-lg font-semibold tracking-[-0.015em]">{title}</h2>
     <p className="text-text-tertiary text-[13px] leading-6">{description}</p>
   </div>
@@ -913,7 +913,7 @@ const AgentsSettings: React.FC = () => {
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+      <div className="settings-agents-heading">
         <div className="max-w-md">
           <SectionHeader
             title="Review agents"
@@ -928,7 +928,7 @@ const AgentsSettings: React.FC = () => {
               setShowAddForm(true);
             }}
             disabled={Boolean(savingId || deletingId || isAdding)}
-            className="bg-brand text-bg-primary flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-bold whitespace-nowrap transition-all hover:brightness-110"
+            className="settings-secondary-action"
           >
             <Plus size={14} weight="bold" />
             Add custom agent
@@ -936,7 +936,7 @@ const AgentsSettings: React.FC = () => {
           <button
             onClick={fetchAgents}
             disabled={isLoading || Boolean(savingId || deletingId || isAdding)}
-            className="text-text-tertiary hover:text-text-primary bg-bg-secondary rounded-md p-2 transition-colors"
+            className="settings-secondary-action settings-icon-action"
             title="Refresh agents"
           >
             <ArrowsClockwise size={16} className={isLoading ? 'animate-spin' : ''} />
@@ -944,84 +944,96 @@ const AgentsSettings: React.FC = () => {
         </div>
       </div>
 
-      <form
-        className="settings-card product-form mb-6 space-y-4"
-        onSubmit={event => {
-          event.preventDefault();
-          handleTimeoutSave();
-        }}
-      >
-        <div>
-          <label
-            htmlFor={timeoutId}
-            className="text-text-primary flex items-center gap-2 text-sm font-medium"
-          >
-            <Timer size={14} />
+      <details className="settings-timeout mb-6">
+        <summary>
+          <span className="flex items-center gap-2">
+            <Timer size={15} />
             Review timeout
-          </label>
-          <p
-            id={`${timeoutId}-help`}
-            className={`mt-2 text-xs leading-5 ${Number.isInteger(Number(localTimeout)) && Number(localTimeout) >= 60 && Number(localTimeout) <= 7200 ? 'text-text-tertiary' : 'text-red-400'}`}
-          >
-            Stop a run after this many seconds. Enter a whole number from 60 to 7,200.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <input
-            id={timeoutId}
-            type="number"
-            min="60"
-            max="7200"
-            step="1"
-            required
-            value={localTimeout}
-            onChange={event => {
-              setLocalTimeout(event.target.value);
-              setTimeoutError(null);
-            }}
-            disabled={isUpdatingTimeout || isLoadingTimeout || Boolean(timeoutLoadError)}
-            aria-invalid={
-              !Number.isInteger(Number(localTimeout)) ||
-              Number(localTimeout) < 60 ||
-              Number(localTimeout) > 7200
-            }
-            aria-describedby={`${timeoutId}-help`}
-            className="text-text-primary border-border w-32 rounded-md border font-mono"
-          />
-          <span className="text-text-tertiary text-xs">seconds</span>
-          <div className="ml-auto flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleTimeoutReset}
-              disabled={isUpdatingTimeout || isLoadingTimeout || Boolean(timeoutLoadError)}
-              className="text-text-secondary rounded-md px-2 py-2 text-xs"
+          </span>
+          <span className="text-text-tertiary ml-auto text-xs">
+            {timeoutConfig.timeoutSecs ?? DEFAULT_TIMEOUT_SECS} seconds
+          </span>
+          <CaretDown size={13} className="text-text-tertiary" />
+        </summary>
+        <form
+          className="product-form space-y-4 pb-5"
+          onSubmit={event => {
+            event.preventDefault();
+            handleTimeoutSave();
+          }}
+        >
+          <div>
+            <label
+              htmlFor={timeoutId}
+              className="text-text-primary flex items-center gap-2 text-sm font-medium"
             >
-              Use default
-            </button>
-            <button
-              type="submit"
-              disabled={
-                isUpdatingTimeout ||
-                isLoadingTimeout ||
-                Boolean(timeoutLoadError) ||
+              <Timer size={14} />
+              Review timeout
+            </label>
+            <p
+              id={`${timeoutId}-help`}
+              className={`mt-2 text-xs leading-5 ${Number.isInteger(Number(localTimeout)) && Number(localTimeout) >= 60 && Number(localTimeout) <= 7200 ? 'text-text-tertiary' : 'text-red-400'}`}
+            >
+              Stop a run after this many seconds. Enter a whole number from 60 to 7,200.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              id={timeoutId}
+              type="number"
+              min="60"
+              max="7200"
+              step="1"
+              required
+              value={localTimeout}
+              onChange={event => {
+                setLocalTimeout(event.target.value);
+                setTimeoutError(null);
+              }}
+              disabled={isUpdatingTimeout || isLoadingTimeout || Boolean(timeoutLoadError)}
+              aria-invalid={
                 !Number.isInteger(Number(localTimeout)) ||
                 Number(localTimeout) < 60 ||
-                Number(localTimeout) > 7200 ||
-                Number(localTimeout) === (timeoutConfig.timeoutSecs ?? DEFAULT_TIMEOUT_SECS)
+                Number(localTimeout) > 7200
               }
-              className="bg-brand text-brand-fg disabled:bg-bg-tertiary disabled:text-text-disabled rounded-md px-3 py-2 text-xs font-medium"
-            >
-              {isUpdatingTimeout ? 'Saving…' : 'Save timeout'}
-            </button>
+              aria-describedby={`${timeoutId}-help`}
+              className="text-text-primary border-border w-32 rounded-md border font-mono"
+            />
+            <span className="text-text-tertiary text-xs">seconds</span>
+            <div className="ml-auto flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleTimeoutReset}
+                disabled={isUpdatingTimeout || isLoadingTimeout || Boolean(timeoutLoadError)}
+                className="text-text-secondary rounded-md px-2 py-2 text-xs"
+              >
+                Use default
+              </button>
+              <button
+                type="submit"
+                disabled={
+                  isUpdatingTimeout ||
+                  isLoadingTimeout ||
+                  Boolean(timeoutLoadError) ||
+                  !Number.isInteger(Number(localTimeout)) ||
+                  Number(localTimeout) < 60 ||
+                  Number(localTimeout) > 7200 ||
+                  Number(localTimeout) === (timeoutConfig.timeoutSecs ?? DEFAULT_TIMEOUT_SECS)
+                }
+                className="bg-brand text-brand-fg disabled:bg-bg-tertiary disabled:text-text-disabled rounded-md px-3 py-2 text-xs font-medium"
+              >
+                {isUpdatingTimeout ? 'Saving…' : 'Save timeout'}
+              </button>
+            </div>
           </div>
-        </div>
-        {(timeoutError || timeoutLoadError) && (
-          <InlineError
-            title="Could not update review timeout"
-            message={timeoutError ?? String(timeoutLoadError)}
-          />
-        )}
-      </form>
+          {(timeoutError || timeoutLoadError) && (
+            <InlineError
+              title="Could not update review timeout"
+              message={timeoutError ?? String(timeoutLoadError)}
+            />
+          )}
+        </form>
+      </details>
       {loadError && (
         <div className="mb-4">
           <InlineError
@@ -1133,6 +1145,7 @@ const AgentsSettings: React.FC = () => {
               Available only
             </label>
             <span>
+              {visibleAgents.length} {visibleAgents.length === 1 ? 'result' : 'results'} ·{' '}
               {agents.filter(agent => agent.available).length} of {agents.length} available
             </span>
           </div>
@@ -1161,13 +1174,10 @@ const AgentsSettings: React.FC = () => {
       ) : (
         <div className="space-y-4">
           {visibleAgents.map(agent => (
-            <div
-              key={agent.id}
-              className={`settings-card ${editingId === agent.id ? 'border-brand/50' : ''}`}
-            >
-              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div key={agent.id} className="settings-agent-row">
+              <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
                 <div className="flex min-w-0 items-start gap-3">
-                  <div className="bg-bg-tertiary border-border mt-0.5 flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg border">
+                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden">
                     {agent.logo ? (
                       <img
                         src={agent.logo}
@@ -1298,35 +1308,31 @@ const AgentsSettings: React.FC = () => {
                     </fieldset>
                   </form>
                 ) : (
-                  <div className="space-y-4">
-                    <div>
-                      <span className="text-text-disabled mb-1 block text-[10px] font-bold tracking-wider uppercase">
-                        Command
-                      </span>
-                      <code className="text-text-secondary block font-mono text-[11px] leading-5 break-all select-text">
-                        {agent.path || '(Default)'}
-                      </code>
+                  <details className="settings-agent-details">
+                    <summary>Command details</summary>
+                    <div className="space-y-4 pt-3">
+                      <div>
+                        <span className="text-text-tertiary mb-1 block text-xs font-medium">
+                          Command
+                        </span>
+                        <code className="text-text-secondary block font-mono text-[11px] leading-5 break-all select-text">
+                          {agent.path || '(Default)'}
+                        </code>
+                      </div>
+                      <div>
+                        <span className="text-text-tertiary mb-1 block text-xs font-medium">
+                          Arguments
+                        </span>
+                        {agent.args && agent.args.length > 0 ? (
+                          <code className="text-text-secondary block font-mono text-xs leading-6 break-all select-text">
+                            {formatAgentArguments(agent.args)}
+                          </code>
+                        ) : (
+                          <span className="text-text-tertiary text-xs italic">None</span>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-text-disabled mb-1 block text-[10px] font-bold tracking-wider uppercase">
-                        Arguments
-                      </span>
-                      {agent.args && agent.args.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {agent.args.map((arg, i) => (
-                            <span
-                              key={i}
-                              className="bg-bg-tertiary border-border text-text-secondary rounded border px-1.5 py-0.5 font-mono text-[10px]"
-                            >
-                              {arg}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-text-tertiary text-xs italic">None</span>
-                      )}
-                    </div>
-                  </div>
+                  </details>
                 )}
               </div>
             </div>

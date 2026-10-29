@@ -1,3 +1,4 @@
+import { mockNativeDialog } from '../../../test/mockNativeDialog';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -65,6 +66,8 @@ const renderSidebar = () => {
     </QueryClientProvider>
   );
 };
+
+mockNativeDialog();
 
 describe('Sidebar', () => {
   beforeEach(() => {

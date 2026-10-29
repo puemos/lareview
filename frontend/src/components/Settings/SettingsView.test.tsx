@@ -14,18 +14,16 @@ const mocks = vi.hoisted(() => ({
   editors: vi.fn().mockResolvedValue([{ id: 'code', label: 'VS Code', path: '/bin/code' }]),
   editorConfig: vi.fn().mockResolvedValue({ preferred_editor_id: null }),
   saveEditor: vi.fn().mockResolvedValue(undefined),
-  agents: vi
-    .fn()
-    .mockResolvedValue([
-      {
-        id: 'copilot',
-        name: 'Copilot',
-        available: true,
-        path: '/bin/copilot',
-        args: ['--model', 'review model', ''],
-        is_custom: false,
-      },
-    ]),
+  agents: vi.fn().mockResolvedValue([
+    {
+      id: 'copilot',
+      name: 'Copilot',
+      available: true,
+      path: '/bin/copilot',
+      args: ['--model', 'review model', ''],
+      is_custom: false,
+    },
+  ]),
   saveAgent: vi.fn().mockResolvedValue(undefined),
   addAgent: vi.fn(),
   deleteAgent: vi.fn(),
@@ -115,6 +113,7 @@ describe('Settings', () => {
     render(<SettingsView onNavigate={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Agents' }));
     await screen.findByRole('button', { name: 'Edit Copilot' });
+    fireEvent.click(screen.getByText('Review timeout', { selector: 'summary span' }));
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Review timeout' }), {
       target: { value: '60.5' },
     });

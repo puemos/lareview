@@ -54,7 +54,7 @@ export const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
           agents={agents}
           selectedAgentId={selectedAgentId}
           onSelect={onAgentSelect}
-          disabled={isStarting}
+          disabled={isStarting || isLoadingSource}
         />
       </div>
 
@@ -119,7 +119,7 @@ export const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
         onClick={onGenerate}
         disabled={isStarting || isLoadingSource || !canGenerate}
         aria-busy={isStarting}
-        className="generate-primary-button flex h-8 min-w-[132px] shrink-0 items-center justify-center gap-2 rounded-md px-3 text-xs font-medium"
+        className="generate-primary-button flex h-9 min-w-[132px] shrink-0 items-center justify-center gap-2 rounded-md px-3 text-xs font-medium"
       >
         {isStarting ? (
           <SpinnerGap size={14} className="animate-spin" />

@@ -49,7 +49,7 @@ export const LiveActivityFeed: React.FC<LiveActivityFeedProps> = ({ messages, is
   return (
     <div className="bg-bg-primary/50 relative flex min-h-[150px] flex-1 flex-col">
       <div className="border-border bg-bg-secondary flex items-center justify-between border-b px-4 py-2">
-        <h2 className="text-text-disabled flex items-center gap-2 text-[10px] font-bold tracking-wider uppercase">
+        <h2 className="text-text-secondary flex items-center gap-2 text-xs font-medium">
           <TerminalWindow size={14} />
           Activity
         </h2>
@@ -64,12 +64,13 @@ export const LiveActivityFeed: React.FC<LiveActivityFeedProps> = ({ messages, is
         ref={scrollRef}
         onScroll={updateFollowState}
         data-testid="activity-scroll"
+        role="log"
+        aria-label="Review activity"
+        aria-live="off"
         className="custom-scrollbar flex-1 overflow-y-auto"
       >
         {messages.length === 0 ? (
-          <div className="text-text-disabled p-8 text-center text-xs opacity-50">
-            No activity yet
-          </div>
+          <div className="text-text-tertiary p-8 text-center text-xs">No activity yet</div>
         ) : (
           <Timeline messages={messages} />
         )}
@@ -105,41 +106,46 @@ const TimelineItem: React.FC<{ message: ProgressMessage }> = ({ message }) => {
   const getTypeStyles = () => {
     switch (message.type) {
       case 'agent_message':
-        return 'text-blue-400 bg-blue-400/10';
+        return 'text-text-tertiary';
       case 'agent_thought':
-        return 'text-purple-400 bg-purple-400/10';
+        return 'text-text-tertiary';
       case 'tool_call':
-        return 'text-yellow-400 bg-yellow-400/10';
+        return 'text-text-tertiary';
       case 'error':
         return 'text-red-400 bg-red-400/10';
       case 'completed':
         return 'text-green-400 bg-green-400/10';
       case 'log':
-        return 'text-gray-400 bg-gray-400/10';
+        return 'text-text-tertiary';
       default:
         return 'text-text-secondary bg-bg-tertiary';
     }
   };
 
   return (
-    <div className="animate-fade-in group flex flex-col gap-1.5 rounded-md p-2 transition-colors hover:bg-white/5">
+    <div className="group flex flex-col gap-1.5 rounded-md p-2 transition-colors hover:bg-white/5">
       {/* Header row: Tag and Timestamp */}
-      <div className="flex items-center justify-between border-b border-white/5 pb-1">
-        <span
-          className={clsx(
-            'rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wider uppercase',
-            getTypeStyles()
-          )}
-        >
-          {message.type.replace(/_/g, ' ')}
+      <div className="flex items-center justify-between pb-1">
+        <span className={clsx('rounded px-1 py-0.5 text-[11px] font-medium', getTypeStyles())}>
+          {{
+            agent_message: 'Agent',
+            agent_thought: 'Reasoning',
+            tool_call: 'Tool',
+            log: 'Update',
+            completed: 'Complete',
+            error: 'Error',
+          }[message.type] ?? message.type.replace(/_/g, ' ')}
+          {message.type === 'tool_call' && typeof message.data?.status === 'string'
+            ? ` · ${message.data.status}`
+            : ''}
         </span>
-        <span className="text-text-disabled font-mono text-[9px] opacity-50 transition-opacity group-hover:opacity-80">
+        <span className="text-text-tertiary font-mono text-[11px]">
           {formatTimestamp(message.timestamp)}
         </span>
       </div>
 
       {/* Content row */}
-      <div className="text-text-secondary pl-1 text-xs leading-relaxed break-words whitespace-pre-wrap">
+      <div className="text-text-secondary pl-1 text-[13px] leading-6 break-words whitespace-pre-wrap">
         {message.message}
       </div>
     </div>
@@ -148,7 +154,8 @@ const TimelineItem: React.FC<{ message: ProgressMessage }> = ({ message }) => {
 
 const formatTimestamp = (timestamp: number): string => {
   const date = new Date(timestamp);
-  return date.toLocaleTimeString('en-US', {
+  if (!Number.isFinite(date.getTime())) return 'Time unavailable';
+  return date.toLocaleTimeString(undefined, {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',

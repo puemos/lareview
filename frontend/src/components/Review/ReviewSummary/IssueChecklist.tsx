@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { ICONS } from '../../../constants/icons';
+import { InlineError } from '../../Common/InlineError';
 import { ImpactBadge } from '../../Common/ImpactBadge';
 import type { IssueCheckWithFindings, CheckStatus, Feedback } from '../../../types';
 
 interface IssueChecklistProps {
   checks: IssueCheckWithFindings[];
   isLoading: boolean;
+  error?: unknown;
+  onRetry?: () => void;
   feedbacks: Feedback[];
   onSelectFeedback: (id: string) => void;
 }
@@ -31,17 +34,18 @@ const CheckItem: React.FC<CheckItemProps> = ({ check, feedbacks, onSelectFeedbac
   const config = statusConfig[check.status];
   const StatusIcon = config.icon;
   const hasFindings = check.findings.length > 0;
+  const hasDetails = hasFindings || Boolean(check.summary);
 
   return (
     <div className="border-border/30 border-b last:border-b-0">
       <button
-        onClick={() => hasFindings && setExpanded(!expanded)}
+        onClick={() => hasDetails && setExpanded(!expanded)}
         className={`flex min-h-11 w-full items-center gap-2 px-4 py-2.5 text-left transition-colors outline-none hover:enabled:bg-white/[0.025] ${
-          hasFindings ? 'cursor-pointer' : 'cursor-default'
+          hasDetails ? 'cursor-pointer' : 'cursor-default'
         }`}
         aria-label={`${check.display_name}: ${config.label}`}
-        aria-expanded={hasFindings ? expanded : undefined}
-        disabled={!hasFindings}
+        aria-expanded={hasDetails ? expanded : undefined}
+        disabled={!hasDetails}
       >
         <StatusIcon size={13} className={config.color} weight="bold" />
         <span className="text-text-secondary min-w-0 flex-1 text-xs">{check.display_name}</span>
@@ -51,7 +55,7 @@ const CheckItem: React.FC<CheckItemProps> = ({ check, feedbacks, onSelectFeedbac
             {check.findings.length} {check.findings.length === 1 ? 'issue' : 'issues'}
           </span>
         )}
-        {hasFindings && (
+        {hasDetails && (
           <ICONS.CHEVRON_DOWN
             size={12}
             className={`text-text-disabled transition-transform ${expanded ? 'rotate-180' : ''}`}
@@ -59,8 +63,11 @@ const CheckItem: React.FC<CheckItemProps> = ({ check, feedbacks, onSelectFeedbac
         )}
       </button>
 
-      {expanded && hasFindings && (
+      {expanded && hasDetails && (
         <div className="bg-bg-tertiary/20 border-border/20 border-t">
+          {check.summary && (
+            <p className="text-text-tertiary px-4 py-3 text-xs leading-6">{check.summary}</p>
+          )}
           {check.findings.map(finding => {
             const linkedFeedback = feedbacks.find(f => f.finding_id === finding.id);
 
@@ -75,7 +82,7 @@ const CheckItem: React.FC<CheckItemProps> = ({ check, feedbacks, onSelectFeedbac
                 }`}
                 disabled={!linkedFeedback}
               >
-                <span className="text-text-primary min-w-0 flex-1 truncate text-sm">
+                <span className="text-text-primary min-w-0 flex-1 text-[13px] leading-5">
                   {finding.title}
                 </span>
                 <ImpactBadge impact={finding.impact} size="sm" />
@@ -91,9 +98,13 @@ const CheckItem: React.FC<CheckItemProps> = ({ check, feedbacks, onSelectFeedbac
 export const IssueChecklist: React.FC<IssueChecklistProps> = ({
   checks,
   isLoading,
+  error,
+  onRetry,
   feedbacks,
   onSelectFeedback,
 }) => {
+  if (error)
+    return <InlineError title="Could not load checks" message={String(error)} onRetry={onRetry} />;
   if (isLoading) {
     return (
       <div className="review-section rounded-lg border">
@@ -125,7 +136,7 @@ export const IssueChecklist: React.FC<IssueChecklistProps> = ({
           No issue checks for this review.
           <br />
           <span className="text-xs">
-            Add checklist rules in Settings to enable systematic issue verification.
+            Add rules in Rules, then start a new review to run systematic checks.
           </span>
         </div>
       </div>

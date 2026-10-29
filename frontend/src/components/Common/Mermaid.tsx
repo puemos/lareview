@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
 import { ICONS } from '../../constants/icons';
 import { cleanMermaidChart } from '../../utils/mermaidUtils';
-import { Modal } from './Modal';
+import { Dialog } from './Dialog';
 
 mermaid.initialize({
   startOnLoad: false,
@@ -95,15 +95,7 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className }) => {
   };
 
   const handleWheel = (e: React.WheelEvent) => {
-    // Only zoom when ctrl key is pressed (common pattern) or always?
-    // User requested "mouse wheel/trackpad zoom".
-    // Usually trackpad pinch triggers wheel event with ctrlKey=true on some browsers, or just wheel.
-    // To avoid interfering with page scroll (though fullscreen is fixed), let's just zoom.
-    // In fullscreen we definitely want zoom. Inline maybe dangerous if it captures scroll.
-
-    // For now, let's enable it always but prevent default only if we are zooming.
-    // Actually, simply zooming on wheel is fine for this component if it's the specific intention.
-
+    if (!e.ctrlKey && !e.metaKey) return;
     e.preventDefault();
     e.stopPropagation();
 
@@ -143,7 +135,14 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className }) => {
   }
 
   if (!svg) {
-    return null;
+    return (
+      <div
+        role="status"
+        className={`text-text-tertiary flex min-h-32 items-center justify-center text-xs ${className}`}
+      >
+        Rendering diagram…
+      </div>
+    );
   }
 
   const controls = (
@@ -151,7 +150,8 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className }) => {
       <button
         onClick={handleZoomOut}
         className="text-text-secondary hover:bg-bg-secondary hover:text-text-primary rounded p-1.5 transition-colors"
-        title="Zoom Out"
+        aria-label="Zoom out"
+        title="Zoom out"
       >
         <ICONS.ACTION_ZOOM_OUT size={16} />
       </button>
@@ -161,7 +161,8 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className }) => {
       <button
         onClick={handleZoomIn}
         className="text-text-secondary hover:bg-bg-secondary hover:text-text-primary rounded p-1.5 transition-colors"
-        title="Zoom In"
+        aria-label="Zoom in"
+        title="Zoom in"
       >
         <ICONS.ACTION_ZOOM_IN size={16} />
       </button>
@@ -169,29 +170,21 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className }) => {
       <button
         onClick={handleReset}
         className="text-text-secondary hover:bg-bg-secondary hover:text-text-primary rounded p-1.5 transition-colors"
-        title="Reset View"
+        aria-label="Reset diagram view"
+        title="Reset view"
       >
         <ICONS.ACTION_REFRESH size={16} />
       </button>
       <button
         onClick={toggleFullscreen}
         className="text-text-secondary hover:bg-bg-secondary hover:text-text-primary rounded p-1.5 transition-colors"
-        title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+        aria-label={isFullscreen ? 'Exit fullscreen' : 'Expand diagram'}
+        title={isFullscreen ? 'Exit fullscreen' : 'Expand diagram'}
       >
         {isFullscreen ? <ICONS.ACTION_COLLAPSE size={16} /> : <ICONS.ACTION_EXPAND size={16} />}
       </button>
     </div>
   );
-
-  const closeButton = isFullscreen ? (
-    <button
-      onClick={toggleFullscreen}
-      className="bg-bg-surface text-text-tertiary hover:bg-bg-secondary hover:text-text-primary border-border/50 absolute top-4 left-4 z-50 rounded-lg border p-2 shadow-lg transition-colors"
-      title="Close Fullscreen"
-    >
-      <ICONS.ACTION_CLOSE size={20} />
-    </button>
-  ) : null;
 
   const renderContent = (fullscreen: boolean) => (
     <div
@@ -211,6 +204,7 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className }) => {
         onMouseLeave={handleMouseUp}
       >
         <div
+          className="review-diagram-chart"
           style={{
             transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
             transition: isDragging ? 'none' : 'transform 0.1s ease-out',
@@ -220,29 +214,27 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className }) => {
         />
       </div>
       {controls}
-      {fullscreen && closeButton}
     </div>
   );
 
-  if (isFullscreen) {
-    return (
-      <>
-        {/* Placeholder to keep layout stability when docked if needed, or just render modal */}
-        <div
-          className={`mermaid-container bg-bg-secondary/20 text-text-disabled border-border flex items-center justify-center rounded-lg border border-dashed p-4 text-xs ${className}`}
-        >
-          Diagram is open in full screen
-          <button onClick={toggleFullscreen} className="text-brand ml-2 hover:underline">
-            Reopen here
-          </button>
-        </div>
-
-        <Modal isOpen={isFullscreen} onClose={toggleFullscreen} hideCloseButton>
-          {renderContent(true)}
-        </Modal>
-      </>
-    );
-  }
-
-  return renderContent(false);
+  return (
+    <>
+      <div
+        className={isFullscreen ? 'invisible h-full' : 'contents'}
+        aria-hidden={isFullscreen || undefined}
+      >
+        {renderContent(false)}
+      </div>
+      <Dialog
+        isOpen={isFullscreen}
+        onClose={toggleFullscreen}
+        title="Review diagram"
+        description="Drag to pan. Use the controls or Control + scroll to zoom."
+        className="product-diagram-dialog"
+        bodyClassName="product-diagram-body"
+      >
+        {renderContent(true)}
+      </Dialog>
+    </>
+  );
 };

@@ -1,4 +1,5 @@
 import React from 'react';
+import { sortFeedback } from '../../../lib/feedback-order';
 import { ICONS } from '../../../constants/icons';
 import { ImpactBadge } from '../../Common/ImpactBadge';
 import type { Feedback } from '../../../types';
@@ -20,20 +21,21 @@ const FeedbackItem: React.FC<FeedbackItemProps> = ({ feedback, onClick }) => {
       className="hover:bg-bg-tertiary/30 border-border/30 flex w-full items-center gap-2 border-b px-3 py-2 text-left transition-colors last:border-b-0"
     >
       <ICONS.ICON_FEEDBACK size={14} className="text-text-secondary flex-shrink-0" />
-      <span className="text-text-primary min-w-0 flex-1 truncate text-[13px]">
+      <span className="text-text-primary min-w-0 flex-1 text-[13px] leading-5">
         {feedback.title}
       </span>
-      <ImpactBadge impact={feedback.impact} size="sm" />
+      <span className="flex shrink-0 flex-col items-end gap-1">
+        <ImpactBadge impact={feedback.impact} size="sm" />
+        <span className="text-text-tertiary text-[11px]">
+          {feedback.status === 'todo' ? 'To do' : feedback.status.replace('_', ' ')}
+        </span>
+      </span>
     </button>
   );
 };
 
 export const KeyFeedback: React.FC<KeyFeedbackProps> = ({ feedbacks, onSelectFeedback }) => {
-  // Sort by impact: blocking first, then nice_to_have, then nitpick
-  const sortedFeedbacks = [...feedbacks].sort((a, b) => {
-    const order = { blocking: 0, nice_to_have: 1, nitpick: 2 };
-    return order[a.impact] - order[b.impact];
-  });
+  const sortedFeedbacks = sortFeedback(feedbacks);
 
   if (feedbacks.length === 0) {
     return (

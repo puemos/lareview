@@ -1,9 +1,10 @@
 import React, { useMemo } from 'react';
 import { ICONS } from '../../../constants/icons';
-import type { ReviewTask } from '../../../types';
+import type { ReviewTask, DiffFile } from '../../../types';
 
 interface FilesHeatmapProps {
   tasks: ReviewTask[];
+  diffFiles?: DiffFile[];
   onSelectFile: (fileName: string) => void;
 }
 
@@ -15,25 +16,32 @@ const riskColor: Record<RiskLevel, string> = {
   low: 'bg-risk-low',
 };
 
-export const FilesHeatmap: React.FC<FilesHeatmapProps> = ({ tasks, onSelectFile }) => {
+export const FilesHeatmap: React.FC<FilesHeatmapProps> = ({
+  tasks,
+  diffFiles = [],
+  onSelectFile,
+}) => {
   const files = useMemo(() => {
-    const grouped = new Map<string, { name: string; risk: RiskLevel; taskCount: number }>();
+    const grouped = new Map<string, { name: string; risk: RiskLevel | null; taskCount: number }>();
+    for (const file of diffFiles)
+      grouped.set(file.name, { name: file.name, risk: null, taskCount: 0 });
     for (const task of tasks) {
       for (const name of task.files) {
         const risk = task.risk_level || task.stats?.risk || 'low';
         const existing = grouped.get(name);
         if (existing) {
           existing.taskCount++;
-          if (riskOrder.indexOf(risk) < riskOrder.indexOf(existing.risk)) existing.risk = risk;
+          if (!existing.risk || riskOrder.indexOf(risk) < riskOrder.indexOf(existing.risk))
+            existing.risk = risk;
         } else {
           grouped.set(name, { name, risk, taskCount: 1 });
         }
       }
     }
     return [...grouped.values()].sort(
-      (a, b) => riskOrder.indexOf(a.risk) - riskOrder.indexOf(b.risk)
+      (a, b) => (a.risk ? riskOrder.indexOf(a.risk) : 3) - (b.risk ? riskOrder.indexOf(b.risk) : 3)
     );
-  }, [tasks]);
+  }, [tasks, diffFiles]);
 
   return (
     <section className="review-section flex max-h-80 flex-col overflow-hidden border">
@@ -52,6 +60,7 @@ export const FilesHeatmap: React.FC<FilesHeatmapProps> = ({ tasks, onSelectFile 
             key={file.name}
             type="button"
             title={file.name}
+            aria-label={file.name}
             onClick={() => onSelectFile(file.name)}
             className="border-border/30 flex min-h-12 w-full items-center gap-3 border-b px-4 py-3 text-left transition-colors outline-none last:border-0 hover:bg-white/[0.025] focus-visible:bg-white/[0.04]"
           >
@@ -61,14 +70,16 @@ export const FilesHeatmap: React.FC<FilesHeatmapProps> = ({ tasks, onSelectFile 
                 {file.name.split('/').pop()}
               </span>
               {file.name.includes('/') && (
-                <span className="text-text-disabled mt-0.5 block truncate text-[11px]">
+                <span className="text-text-tertiary mt-0.5 block text-[11px] leading-5 break-all">
                   {file.name}
                 </span>
               )}
             </span>
-            <span className="text-text-tertiary flex items-center gap-1.5 text-[10px] capitalize">
-              <span className={`${riskColor[file.risk]} h-1.5 w-1.5 rounded-full`} />
-              {file.risk}
+            <span className="text-text-tertiary flex items-center gap-1.5 text-[11px] capitalize">
+              <span
+                className={`${file.risk ? riskColor[file.risk] : 'bg-text-disabled'} h-1.5 w-1.5 rounded-full`}
+              />
+              {file.risk ?? 'Not assessed'}
             </span>
             <ICONS.ICON_ARROW_RIGHT size={12} className="text-text-disabled shrink-0" />
           </button>

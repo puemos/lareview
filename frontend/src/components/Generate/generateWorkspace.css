@@ -167,3 +167,27 @@
     transition-duration: 0ms;
   }
 }
+
+@media (max-width: 1000px) {
+  .generate-diff-layout {
+    flex-direction: column;
+  }
+  .generate-diff-files {
+    width: 100%;
+    min-height: 0;
+    max-height: 150px;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+}
+
+.local-ref-pair input:focus-visible,
+.vcs-input-card input:focus-visible {
+  outline: none;
+}
+.local-ref-pair:focus-within {
+  box-shadow: none;
+}
+.vcs-input-card:focus-within {
+  border-color: var(--color-brand);
+}

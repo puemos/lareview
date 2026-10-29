@@ -114,6 +114,23 @@ describe('GenerateView', () => {
     expect(screen.queryByText('Activity')).not.toBeInTheDocument();
   });
 
+  it('releases Start and explains a thrown generation failure', async () => {
+    generationMock.startGeneration.mockRejectedValueOnce(new Error('Agent disconnected'));
+    render(<GenerateView onNavigate={vi.fn()} />);
+    fireEvent.click(await screen.findByTestId('start-review'));
+    await screen.findByText(/Agent disconnected/);
+    expect(screen.getByTestId('start-review')).toBeEnabled();
+  });
+
+  it('detaches loaded source metadata when switching to editable pasted input', () => {
+    store.pendingSource = { type: 'github_pr', owner: 'team', repo: 'app', number: 1 };
+    render(<GenerateView onNavigate={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Paste diff' }));
+    expect(store.setPendingSource).toHaveBeenCalledWith(null);
+    expect(store.setPrRef).toHaveBeenCalledWith('');
+    expect(store.setViewMode).toHaveBeenCalledWith('raw');
+  });
+
   it('centers the remote input only while the composer is empty', async () => {
     store.diffText = '';
     const { rerender } = render(<GenerateView onNavigate={vi.fn()} />);

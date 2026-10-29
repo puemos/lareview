@@ -60,7 +60,7 @@ export function UsagePopover({
         <ReviewHeaderBadge
           aria-label={triggerLabel}
           aria-busy={isLoading || undefined}
-          className="border-brand/30 bg-brand/10 text-brand data-[state=open]:brightness-110"
+          className="border-border text-text-secondary hover:bg-bg-tertiary data-[state=open]:bg-bg-tertiary bg-transparent"
           icon={
             isLoading ? <CircleNotch size={16} className="animate-spin" /> : <ChartBar size={16} />
           }

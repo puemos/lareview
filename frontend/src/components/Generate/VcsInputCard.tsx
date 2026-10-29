@@ -43,26 +43,28 @@ export const VcsInputCard: React.FC<VcsInputCardProps> = ({
 
   return (
     <div
-      className={`pointer-events-auto flex max-w-full items-center overflow-hidden border text-xs font-medium transition-[background-color,border-color] duration-150 ${
+      className={`vcs-input-card pointer-events-auto flex max-w-full items-center overflow-hidden border text-xs font-medium transition-[background-color,border-color] duration-150 ${
         prominent ? 'h-11 w-full min-w-0 rounded-md' : 'h-8 w-fit min-w-52 rounded-md'
       } ${
         hasRemoteSource
-          ? 'border-green-500/20 bg-green-500/10 text-green-400 shadow-sm'
+          ? 'border-border bg-bg-primary text-text-secondary'
           : 'border-border/70 bg-bg-primary text-text-primary'
       }`}
     >
       {hasRemoteSource ? (
         <>
-          <div className="flex flex-shrink-0 items-center border-r border-green-500/20 px-2">
+          <div className="border-border flex flex-shrink-0 items-center border-r px-2">
             {vcsSourceIcon}
           </div>
           <span className="max-w-[400px] min-w-0 truncate px-3 font-mono text-xs">
             {vcsSourceLabel}
           </span>
           <div className="flex-1" />
-          <div className="flex h-[14px] flex-shrink-0 items-center border-l border-green-500/20" />
+          <div className="border-border flex h-[14px] flex-shrink-0 items-center border-l" />
           <button
             onClick={onClear}
+            disabled={disabled || isLoading}
+            aria-label="Clear loaded pull request"
             className="flex flex-shrink-0 items-center justify-center px-3 py-1.5 text-[10px] font-medium opacity-80 transition-colors hover:opacity-100"
           >
             <X size={12} />

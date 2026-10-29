@@ -6,19 +6,19 @@ const impactConfig = {
     icon: ICONS.IMPACT_BLOCKING,
     color: 'text-impact-blocking',
     bg: 'bg-impact-blocking/10',
-    label: 'MUST',
+    label: 'Blocking',
   },
   nice_to_have: {
     icon: ICONS.IMPACT_NICE_TO_HAVE,
     color: 'text-impact-nice_to_have',
     bg: 'bg-impact-nice_to_have/10',
-    label: 'NICE',
+    label: 'Nice to have',
   },
   nitpick: {
     icon: ICONS.IMPACT_NITPICK,
     color: 'text-impact-nitpick',
     bg: 'bg-impact-nitpick/10',
-    label: 'NIT',
+    label: 'Nitpick',
   },
 };
 
@@ -35,12 +35,12 @@ export const ImpactBadge: React.FC<ImpactBadgeProps> = ({
 }) => {
   const config = impactConfig[impact];
   const Icon = config.icon;
-  const textSize = size === 'sm' ? 'text-[8px]' : 'text-[10px]';
+  const textSize = size === 'sm' ? 'text-[11px]' : 'text-xs';
   const iconSize = size === 'sm' ? 10 : 12;
 
   return (
     <span
-      className={`${config.bg} ${config.color} inline-flex items-center gap-1 rounded px-1.5 py-0.5 ${textSize} font-bold`}
+      className={`${config.color} inline-flex items-center gap-1 rounded px-1.5 py-0.5 ${textSize} font-medium`}
     >
       {showIcon && <Icon size={iconSize} weight="bold" />}
       {config.label}

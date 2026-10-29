@@ -11,6 +11,7 @@ import { UncoveredFiles } from './UncoveredFiles';
 import { MergeConfidenceBadge } from './MergeConfidenceBadge';
 import { useIssueChecks } from '../../../hooks/useIssueChecks';
 import { useTauri } from '../../../hooks/useTauri';
+import { countOpenBlockers } from '../../../lib/review-summary';
 import { sourceUrl } from './sourceUrl';
 import { ReviewUsagePopover } from '../ReviewUsagePopover';
 import { reviewHeaderControlClass } from '../reviewHeaderStyles';
@@ -50,7 +51,7 @@ const SourceBadge: React.FC<SourceBadgeProps> = ({ source }) => {
   if (source.type === 'local_git') {
     return (
       <span
-        className="text-text-tertiary truncate text-[11px]"
+        className="text-text-tertiary text-xs break-words"
         title={`${source.base_sha} → ${source.head_sha}`}
       >
         Local Git · {source.base_ref} → {source.head_ref}
@@ -108,9 +109,12 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
   onSelectTask,
   onStartReview,
 }) => {
-  const [isExpanded, setIsExpanded] = React.useState(false);
-  const hasLongSummary = (review?.summary?.length ?? 0) > 600;
-  const { data: issueChecks = [], isLoading: isChecksLoading } = useIssueChecks(runId);
+  const {
+    data: issueChecks = [],
+    isLoading: isChecksLoading,
+    error: checksError,
+    refetch: refetchChecks,
+  } = useIssueChecks(runId);
 
   const uncoveredFiles = useMemo(() => {
     const allDiffFiles = parsedDiff?.files?.map(f => f.new_path) ?? [];
@@ -120,9 +124,7 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
 
   const fileCount = parsedDiff?.files?.length ?? new Set(tasks.flatMap(task => task.files)).size;
 
-  const blockingCount =
-    feedbacks.filter(f => f.impact === 'blocking').length +
-    issueChecks.reduce((sum, c) => sum + c.findings.filter(f => f.impact === 'blocking').length, 0);
+  const blockingCount = countOpenBlockers(feedbacks, issueChecks);
 
   return (
     <div
@@ -135,12 +137,12 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
         <div className="min-w-0 flex-1">
           {review?.source && <SourceBadge source={review.source} />}
           <h2
-            className="text-text-primary mt-2 line-clamp-2 text-[22px] leading-tight font-semibold tracking-[-0.025em] break-words"
+            className="text-text-primary mt-2 text-[22px] leading-tight font-semibold tracking-[-0.025em] break-words"
             title={review?.title || parsedDiff?.title || 'Review Summary'}
           >
             {review?.title || parsedDiff?.title || 'Review Summary'}
           </h2>
-          <p className="text-text-disabled mt-2 text-[11px]">
+          <p className="text-text-tertiary mt-2 text-xs">
             {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
             <span className="mx-2">·</span>
             {fileCount} {fileCount === 1 ? 'file' : 'files'}
@@ -156,7 +158,7 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
             onClick={onStartReview}
             className={`${reviewHeaderControlClass} bg-brand text-brand-fg hover:bg-brand/90 border-transparent px-4 text-sm font-medium`}
           >
-            Start Review
+            Open review
             <ArrowRight size={16} className="opacity-70" />
           </button>
         </div>
@@ -167,15 +169,15 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
         <div className="mx-auto w-full max-w-[1120px] space-y-6 px-8 py-8">
           {/* Blocking Issues */}
           {blockingCount > 0 && (
-            <div className="bg-status-error/5 border-status-error/20 flex items-center gap-3 rounded-lg border px-4 py-3">
-              <div className="bg-status-error/10 flex h-8 w-8 items-center justify-center rounded-full">
-                <span className="text-status-error text-lg font-bold">{blockingCount}</span>
+            <div className="bg-impact-blocking/5 border-impact-blocking/20 flex items-center gap-3 rounded-lg border px-4 py-3">
+              <div className="bg-impact-blocking/10 flex h-8 w-8 items-center justify-center rounded-full">
+                <span className="text-impact-blocking text-lg font-bold">{blockingCount}</span>
               </div>
               <div>
-                <p className="text-status-error text-sm font-medium">
-                  {blockingCount} Blocking {blockingCount === 1 ? 'Issue' : 'Issues'}
+                <p className="text-impact-blocking text-sm font-medium">
+                  {blockingCount} open blocking {blockingCount === 1 ? 'issue' : 'issues'}
                 </p>
-                <p className="text-status-error/70 text-xs">Review these items before approving</p>
+                <p className="text-text-tertiary text-xs">Review these items before approving</p>
               </div>
             </div>
           )}
@@ -183,50 +185,25 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
           {/* Summary */}
           {review?.summary && (
             <div className="border-border/50 relative border-b pb-7">
-              <h3 className="text-text-tertiary mb-3 text-[11px] font-medium tracking-[0.08em] uppercase">
-                Summary
-              </h3>
-              <div
-                className={`prose prose-sm prose-invert text-text-secondary prose-p:my-0 max-w-[78ch] text-[14px] leading-6 ${
-                  !isExpanded && hasLongSummary
-                    ? 'max-h-36 overflow-hidden [mask-image:linear-gradient(to_bottom,black_50%,transparent_100%)]'
-                    : ''
-                }`}
-              >
+              <h3 className="text-text-primary mb-3 text-[13px] font-medium">Summary</h3>
+              <div className="prose prose-sm prose-invert text-text-secondary prose-p:my-2 max-w-[78ch] text-[14px] leading-6">
                 <ReactMarkdown>{review.summary}</ReactMarkdown>
               </div>
-              {hasLongSummary && (
-                <button
-                  aria-expanded={isExpanded}
-                  onClick={() => setIsExpanded(!isExpanded)}
-                  className="text-brand hover:text-brand/80 mt-2 flex items-center gap-1 text-xs font-medium transition-colors"
-                >
-                  {isExpanded ? (
-                    <>
-                      <ICONS.CHEVRON_UP size={12} />
-                      Show less
-                    </>
-                  ) : (
-                    <>
-                      <ICONS.CHEVRON_DOWN size={12} />
-                      Show more
-                    </>
-                  )}
-                </button>
-              )}
             </div>
           )}
 
           {/* Two-column layout for Task Flow and Files Heatmap */}
           <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
             <TaskFlow tasks={tasks} onSelectTask={onSelectTask} />
-            <FilesHeatmap tasks={tasks} onSelectFile={onSelectFile} />
+            <FilesHeatmap diffFiles={parsedDiff?.files} tasks={tasks} onSelectFile={onSelectFile} />
           </div>
 
           {/* Two-column layout for Issue Checklist and Key Feedback */}
           <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
             <IssueChecklist
               checks={issueChecks}
+              error={checksError}
+              onRetry={() => void refetchChecks()}
               isLoading={isChecksLoading}
               feedbacks={feedbacks}
               onSelectFeedback={onSelectFeedback}

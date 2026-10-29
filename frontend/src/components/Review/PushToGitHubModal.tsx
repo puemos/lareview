@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ICONS } from '../../constants/icons';
 import { useTauri } from '../../hooks/useTauri';
+import { Dialog } from '../Common/Dialog';
+import { InlineError } from '../Common/InlineError';
 
 interface PushToVcsModalProps {
   isOpen: boolean;
@@ -19,133 +20,66 @@ export const PushToVcsModal: React.FC<PushToVcsModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const RemoteIcon = providerName === 'GitLab' ? ICONS.ICON_GITLAB : ICONS.ICON_GITHUB;
-
-  // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
       setResultUrl(null);
       setError(null);
-      setIsProcessing(false);
     }
   }, [isOpen]);
-
-  if (!isOpen) return null;
-
   const handleConfirm = async () => {
+    if (isProcessing) return;
     setIsProcessing(true);
     setError(null);
     try {
       const result = await onConfirm();
-      if (result) {
-        setResultUrl(result);
-      } else {
-        onClose();
-      }
-    } catch (e) {
-      setError(String(e));
+      if (result) setResultUrl(result);
+      else onClose();
+    } catch (error) {
+      setError(String(error));
     } finally {
       setIsProcessing(false);
     }
   };
-
-  if (resultUrl) {
-    return (
-      <div className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm duration-200">
-        <div className="bg-bg-primary border-border/50 animate-in zoom-in-95 flex w-full max-w-sm flex-col rounded-xl border p-8 text-center shadow-2xl duration-200">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10 text-green-500 ring-1 ring-green-500/20">
-            <ICONS.ICON_CHECK size={32} weight="bold" />
-          </div>
-          <h3 className="text-text-primary mb-2 text-xl font-bold">Feedback Pushed!</h3>
-          <p className="text-text-secondary mb-8 text-sm leading-relaxed">
-            The feedback has been posted to your remote review.
-          </p>
-          <div className="space-y-3">
-            <button
-              onClick={() => resultUrl && openUrl(resultUrl)}
-              className="bg-accent hover:bg-accent/90 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]"
-            >
-              <ICONS.ACTION_OPEN_WINDOW size={16} weight="bold" />
-              Open remote review
-            </button>
-            <button
-              onClick={onClose}
-              className="text-text-secondary hover:text-text-primary block w-full py-2.5 text-sm font-medium transition-colors"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm duration-200">
-      <div className="bg-bg-primary border-border/50 animate-in zoom-in-95 flex w-full max-w-md flex-col rounded-xl border shadow-2xl duration-200">
-        <div className="border-border/50 bg-bg-secondary/30 flex items-center justify-between rounded-t-xl border-b px-5 py-4">
-          <div className="flex items-center gap-2.5">
-            <div className="bg-accent/10 text-accent rounded-md p-1.5">
-              <RemoteIcon size={18} />
-            </div>
-            <h3 className="text-text-primary text-sm font-semibold">Post to remote review</h3>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary rounded p-1 transition-all"
-          >
-            <ICONS.ACTION_CLOSE size={18} />
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      busy={isProcessing}
+      title={resultUrl ? 'Feedback posted' : 'Post feedback'}
+      description={
+        resultUrl
+          ? 'Your feedback is now on the remote review.'
+          : `This publishes the selected feedback to the linked ${providerName ?? 'remote'} review.`
+      }
+    >
+      {error && (
+        <div className="mb-5">
+          <InlineError title="Could not post feedback" message={error} />
+        </div>
+      )}
+      <div className="flex justify-end gap-3">
+        <button
+          data-autofocus
+          onClick={onClose}
+          disabled={isProcessing}
+          className="settings-secondary-action"
+        >
+          {resultUrl ? 'Close' : 'Cancel'}
+        </button>
+        {resultUrl ? (
+          <button className="settings-secondary-action" onClick={() => openUrl(resultUrl)}>
+            Open remote review
           </button>
-        </div>
-
-        <div className="p-6">
-          <div className="mb-6 flex items-start gap-4 rounded-lg border border-blue-500/10 bg-blue-500/5 p-4">
-            <div className="text-accent mt-0.5">
-              <ICONS.ICON_INFO size={20} />
-            </div>
-            <div>
-              <h4 className="text-text-primary mb-1 text-sm font-medium">Confirmation</h4>
-              <p className="text-text-secondary text-xs leading-relaxed">
-                Are you sure you want to post this feedback to the linked review?
-              </p>
-            </div>
-          </div>
-
-          {error && (
-            <div className="mb-6 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-500">
-              <ICONS.ICON_WARNING size={16} />
-              {error}
-            </div>
-          )}
-
-          <div className="flex justify-end gap-3">
-            <button
-              onClick={onClose}
-              className="text-text-secondary hover:text-text-primary px-4 py-2 text-xs font-medium transition-colors"
-              disabled={isProcessing}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleConfirm}
-              disabled={isProcessing}
-              className="bg-accent hover:bg-accent/90 flex min-w-[140px] items-center justify-center gap-2 rounded-lg px-6 py-2 text-xs font-semibold text-white shadow-sm transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isProcessing ? (
-                <>
-                  <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  Pushing...
-                </>
-              ) : (
-                <>
-                  <RemoteIcon size={14} weight="bold" />
-                  Post Comment
-                </>
-              )}
-            </button>
-          </div>
-        </div>
+        ) : (
+          <button
+            onClick={handleConfirm}
+            disabled={isProcessing}
+            className="bg-brand text-brand-fg rounded-md px-4 py-2 text-xs font-medium disabled:opacity-50"
+          >
+            {isProcessing ? 'Posting…' : 'Post feedback'}
+          </button>
+        )}
       </div>
-    </div>
+    </Dialog>
   );
 };

@@ -64,7 +64,7 @@ export const ReviewSidebar: React.FC<ReviewSidebarProps> = ({
   };
 
   return (
-    <div className="border-border bg-bg-secondary/30 flex w-[300px] flex-col border-r">
+    <div className="review-workspace-sidebar border-border bg-bg-secondary/30 flex w-[280px] shrink-0 flex-col border-r">
       <div className="border-border bg-bg-secondary/50 border-b p-3">
         {/* Back to Summary link */}
         <button
@@ -76,23 +76,15 @@ export const ReviewSidebar: React.FC<ReviewSidebarProps> = ({
         </button>
 
         <div className="mb-3 flex">
-          <div
-            className={`flex items-center overflow-hidden transition-all duration-300 ease-in-out ${
-              sidebarTab === 'feedback' ? 'mr-2 flex-1 opacity-100' : 'mr-0 flex-[0_0_0] opacity-0'
-            }`}
-          >
-            <button
-              onClick={onAddGlobalFeedback}
-              className="bg-brand text-brand-fg border-brand hover:bg-brand/90 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded border px-3 py-1.5 text-[10px] font-medium whitespace-nowrap transition-all"
-              title="Add Global Feedback"
-            >
-              <ICONS.ICON_FEEDBACK size={12} weight="bold" />
-              Add Feedback
+          {sidebarTab === 'feedback' && (
+            <button onClick={onAddGlobalFeedback} className="settings-secondary-action mr-2 flex-1">
+              <ICONS.ICON_FEEDBACK size={14} />
+              Add feedback
             </button>
-          </div>
+          )}
           <button
             onClick={onOpenExportModal}
-            className="bg-bg-tertiary hover:bg-bg-tertiary/80 text-text-secondary hover:text-text-primary border-border/50 flex flex-1 cursor-pointer items-center justify-center gap-1.5 overflow-hidden rounded border py-1.5 text-[10px] font-medium whitespace-nowrap transition-all"
+            className="settings-secondary-action flex-1"
             title="Export Review"
           >
             <ICONS.ACTION_EXPORT size={12} />
@@ -157,7 +149,8 @@ interface TabButtonProps {
 const TabButton: React.FC<TabButtonProps> = ({ active, onClick, icon: Icon, label, count }) => (
   <button
     onClick={onClick}
-    className={`relative flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[3px] py-1.5 text-[10px] font-medium transition-colors ${
+    aria-pressed={active}
+    className={`relative flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[3px] py-2 text-xs font-medium transition-colors ${
       active ? 'text-text-primary' : 'text-text-disabled hover:text-text-secondary'
     }`}
   >
@@ -171,7 +164,9 @@ const TabButton: React.FC<TabButtonProps> = ({ active, onClick, icon: Icon, labe
     <div className="relative z-10 flex items-center gap-1.5">
       <Icon size={12} />
       {label}
-      {count !== undefined && count > 0 && <span className="text-[10px] opacity-60">({count})</span>}
+      {count !== undefined && count > 0 && (
+        <span className="text-[10px] opacity-60">({count})</span>
+      )}
     </div>
   </button>
 );

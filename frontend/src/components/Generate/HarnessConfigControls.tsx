@@ -120,7 +120,7 @@ const ConfigSelectRow: React.FC<ConfigSelectRowProps> = ({
           'data-[state=open]:bg-white/7',
           compact
             ? `${configFieldTriggerClass} w-full`
-            : 'focus-visible:ring-brand/40 flex w-full items-center rounded-md px-3 py-2 text-xs transition-colors outline-none hover:bg-white/5 focus-visible:ring-1 disabled:cursor-not-allowed disabled:opacity-60'
+            : 'flex w-full items-center rounded-md px-3 py-2 text-xs transition-colors outline-none hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-60'
         )}
       >
         {!compact && <span className="text-text-secondary font-medium">{label}</span>}

@@ -6,7 +6,7 @@ interface GutterMenuProps {
   position: { x: number; y: number } | null;
   onClose: () => void;
   onAddFeedback: () => void;
-  onOpenInEditor: () => void;
+  onOpenInEditor?: () => void;
 }
 
 export const GutterMenu: React.FC<GutterMenuProps> = ({
@@ -56,16 +56,18 @@ export const GutterMenu: React.FC<GutterMenuProps> = ({
               <Chat size={16} className="text-text-secondary" />
               Add Feedback
             </button>
-            <button
-              onClick={() => {
-                onOpenInEditor();
-                onClose();
-              }}
-              className="text-text-primary hover:bg-bg-tertiary flex items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors"
-            >
-              <ArrowSquareOut size={16} className="text-text-secondary" />
-              Open in Editor
-            </button>
+            {onOpenInEditor && (
+              <button
+                onClick={() => {
+                  onOpenInEditor();
+                  onClose();
+                }}
+                className="text-text-primary hover:bg-bg-tertiary flex items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors"
+              >
+                <ArrowSquareOut size={16} className="text-text-secondary" />
+                Open in editor
+              </button>
+            )}
           </div>
         </Popover.Content>
       </Popover.Portal>

@@ -15,6 +15,7 @@ import { ViewModeToggle } from './ViewModeToggle';
 import { DiffStats } from './DiffStats';
 import { countAdditions, countDeletions } from './DiffEditorPanel';
 import { toAgentConfigSelections } from '../../lib/agent-config';
+import { InlineError } from '../Common/InlineError';
 import { findSourceRepository } from '../../lib/source-repository';
 
 interface GenerateViewProps {
@@ -35,15 +36,15 @@ const isVcsSource = (
 
 export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavigate }) => {
   const [diffText, setDiffText] = useState('');
-  const lastAutoSwitchedTextRef = React.useRef('');
   const [isLoadingPr, setIsLoadingPr] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
 
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
 
   const { fetchRemotePr, fetchLocalGitDiff } = useTauri();
   const { startGeneration } = useGeneration();
-  const { data: agents = [] } = useAgents();
+  const { data: agents = [], isLoading: isAgentsLoading, error: agentsError } = useAgents();
   const { data: repos = [], addRepo, cloneRepo, selectRepoFolder } = useRepos();
 
   const setDiffTextStore = useAppStore(state => state.setDiffText);
@@ -80,8 +81,12 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   }, [globalDiffText]);
 
   useEffect(() => {
-    if (agents.length > 0 && !agentId) {
-      setAgentIdStore(agents[0].id);
+    if (
+      agents.length > 0 &&
+      !agents.some(agent => agent.id === agentId && agent.available !== false)
+    ) {
+      const available = agents.find(agent => agent.available !== false);
+      if (available) setAgentIdStore(available.id);
     }
   }, [agents, agentId, setAgentIdStore]);
 
@@ -108,14 +113,6 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
 
   const isDiffValid = diffText.trim().length > 0 && !diffValidationError;
   const isComposerEmpty = !diffText.trim() && !pendingSource;
-
-  // Auto-switch to diff mode on valid pasting
-  useEffect(() => {
-    if (viewMode === 'raw' && isDiffValid && diffText !== lastAutoSwitchedTextRef.current) {
-      setViewMode('diff');
-      lastAutoSwitchedTextRef.current = diffText;
-    }
-  }, [diffText, viewMode, isDiffValid, setViewMode]);
 
   const findMatchingRepo = useCallback(
     (source: Extract<ReviewSource, { type: 'github_pr' | 'gitlab_mr' }>) => {
@@ -181,7 +178,9 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   }, [addRepo, selectRepoFolder, setSelectedRepoId]);
 
   const handleGenerate = useCallback(async () => {
+    if (isStarting || isLoadingPr) return;
     setValidationError(null);
+    setStartError(null);
 
     const error = validateDiff(diffText);
     if (error) {
@@ -192,30 +191,37 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     setDiffTextStore(diffText);
     setAgentIdStore(agentId);
     setIsStarting(true);
-    const result = await startGeneration({
-      diffText,
-      agentId,
-      repoId: selectedRepoId || undefined,
-      source: pendingSource,
-      agentConfig: toAgentConfigSelections(agentConfigPreferences[agentId] || []),
-    });
-    setIsStarting(false);
-    if (result) {
-      setReviewId(result.review_id);
-      setTasks([]);
-      selectTask(null);
-      selectFeedback(null);
-      selectFile(null);
-      setReviewViewMode('summary');
-      setDiffText('');
-      setDiffTextStore('');
-      setParsedDiff(null);
-      setPendingSource(null);
-      setPrRef('');
-      setViewMode('raw');
-      _onNavigate('review');
+    try {
+      const result = await startGeneration({
+        diffText,
+        agentId,
+        repoId: selectedRepoId || undefined,
+        source: pendingSource,
+        agentConfig: toAgentConfigSelections(agentConfigPreferences[agentId] || []),
+      });
+      if (result) {
+        setReviewId(result.review_id);
+        setTasks([]);
+        selectTask(null);
+        selectFeedback(null);
+        selectFile(null);
+        setReviewViewMode('summary');
+        setDiffText('');
+        setDiffTextStore('');
+        setParsedDiff(null);
+        setPendingSource(null);
+        setPrRef('');
+        setViewMode('raw');
+        _onNavigate('review');
+      }
+    } catch (error) {
+      setStartError(String(error));
+    } finally {
+      setIsStarting(false);
     }
   }, [
+    isStarting,
+    isLoadingPr,
     diffText,
     agentId,
     validateDiff,
@@ -247,7 +253,6 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     await Promise.resolve();
     try {
       const diff = await fetchRemotePr(prRef, null);
-      lastAutoSwitchedTextRef.current = diff.diff_text;
       setDiffText(diff.diff_text);
       if (diff.source) {
         setPendingSource(diff.source);
@@ -287,9 +292,9 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   ]);
 
   const handleClear = useCallback(() => {
-    lastAutoSwitchedTextRef.current = '';
     setDiffText('');
     setDiffTextStore('');
+    setStartError(null);
     setParsedDiff(null);
     setPendingSource(null);
     setPrRef('');
@@ -304,7 +309,6 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     setValidationError(null);
     try {
       const diff = await fetchLocalGitDiff(selectedRepoId, base, head);
-      lastAutoSwitchedTextRef.current = diff.diff_text;
       setDiffText(diff.diff_text);
       setParsedDiff(diff);
       setPendingSource(diff.source ?? null);
@@ -343,6 +347,14 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
           aria-pressed={sourceMode === mode}
           disabled={isStarting || isLoadingPr}
           onClick={() => {
+            if (mode !== sourceMode) {
+              if (mode === 'paste') {
+                setPendingSource(null);
+                setPrRef('');
+                setRepoLinkCallout(null);
+                setViewMode('raw');
+              } else handleClear();
+            }
             setSourceMode(mode);
             setValidationError(null);
           }}
@@ -363,18 +375,18 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     <>
       {' '}
       {repoLinkCallout && (
-        <div className="pointer-events-auto flex items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200 shadow-sm">
+        <div className="border-border bg-bg-secondary text-text-secondary pointer-events-auto flex flex-wrap items-center justify-between gap-3 rounded-md border px-4 py-3 text-xs">
           <div className="min-w-0">
-            <div className="font-medium text-amber-100">No linked repo found</div>
-            <div className="truncate text-amber-200/80">
-              Link or clone {repoLinkCallout.label} to enable snapshots.
+            <div className="text-text-primary font-medium">Add repository context</div>
+            <div className="text-text-tertiary mt-1 leading-5 break-words">
+              Link {repoLinkCallout.label} to review with repository context.
             </div>
           </div>
           <div className="flex flex-shrink-0 items-center gap-2">
             <button
               onClick={handleCloneAndLink}
               disabled={isStarting || isRepoLinking}
-              className="flex items-center gap-1 rounded bg-amber-500/20 px-2 py-1 text-[10px] font-semibold text-amber-100 transition-colors hover:bg-amber-500/30 disabled:opacity-60"
+              className="settings-secondary-action"
             >
               {isRepoLinking ? <Spinner size={12} className="animate-spin" /> : null}
               <span>Clone &amp; Link</span>
@@ -382,7 +394,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
             <button
               onClick={handleLinkExisting}
               disabled={isStarting || isRepoLinking}
-              className="bg-bg-secondary/80 hover:bg-bg-tertiary text-text-primary rounded px-2 py-1 text-[10px] font-semibold transition-colors disabled:opacity-60"
+              className="settings-secondary-action"
             >
               Link Existing
             </button>
@@ -418,7 +430,33 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
         onGenerate={handleGenerate}
         isDiffValid={isDiffValid && !isLoadingPr && !validationError}
       />
+      {!isAgentsLoading && (agentsError || !agents.some(agent => agent.available !== false)) && (
+        <div className="border-border border-b px-6 py-3">
+          <InlineError
+            title="No available review agent"
+            message={
+              agentsError
+                ? String(agentsError)
+                : 'Install an agent or configure its command in Settings.'
+            }
+          />
+          <button
+            className="text-text-secondary mt-2 rounded py-1 text-xs underline underline-offset-4"
+            onClick={() => _onNavigate('settings')}
+          >
+            Open settings
+          </button>
+        </div>
+      )}
       <div className="relative flex min-h-0 flex-1 flex-col">
+        {(startError || (validationError && !isSourceEmpty && sourceMode !== 'local')) && (
+          <div className="px-5 pt-3">
+            <InlineError
+              title="Could not prepare review"
+              message={startError ?? validationError ?? ''}
+            />
+          </div>
+        )}
         {isSourceEmpty ? (
           <div className="generate-empty pointer-events-none absolute inset-0 z-10 px-8">
             <div className="pointer-events-auto mx-auto w-full max-w-[600px]">
@@ -498,7 +536,16 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
           <DiffEditorPanel
             diffText={diffText}
             viewMode={viewMode}
-            onDiffTextChange={setDiffText}
+            onDiffTextChange={value => {
+              setDiffText(value);
+              setDiffTextStore(value);
+              setPendingSource(null);
+              setParsedDiff(null);
+              setPrRef('');
+              setRepoLinkCallout(null);
+              setSourceMode('paste');
+              setValidationError(null);
+            }}
             validationError={
               diffValidationError || (sourceMode === 'remote' ? validationError : null)
             }

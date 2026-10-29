@@ -51,7 +51,7 @@ export interface ReviewTask {
   insight?: string;
   diagram?: string;
   ai_generated: boolean;
-  status: 'pending' | 'in_progress' | 'done' | 'ignored';
+  status: 'todo' | 'pending' | 'in_progress' | 'done' | 'ignored';
   sub_flow?: string;
   risk_level: 'low' | 'medium' | 'high';
   file_path?: string | null;
