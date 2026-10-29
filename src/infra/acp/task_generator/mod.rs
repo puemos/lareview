@@ -6,6 +6,7 @@
 mod client;
 mod prompt;
 mod types;
+mod usage;
 mod validation;
 mod worker;
 

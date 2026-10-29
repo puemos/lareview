@@ -41,6 +41,7 @@ index 0000000..1111111 100644\n\
         created_at: None,
     };
 
+    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::unbounded_channel();
     let input = GenerateTasksInput {
         run_context,
         rules: Vec::new(),
@@ -49,7 +50,7 @@ index 0000000..1111111 100644\n\
         agent_command: agent_path.to_string(),
         agent_args: Vec::new(),
         agent_config: Vec::new(),
-        progress_tx: None,
+        progress_tx: Some(progress_tx),
         mcp_server_binary: Some(std::path::PathBuf::from(env!("CARGO_BIN_EXE_lareview"))),
         timeout_secs: Some(10),
         cancel_token: None,
@@ -58,6 +59,28 @@ index 0000000..1111111 100644\n\
 
     let result = generate_tasks_with_acp(input).await;
     let output = result.expect("generation should succeed even with uncovered files");
+    let mut usage_updates = Vec::new();
+    while let Ok(event) = progress_rx.try_recv() {
+        if let lareview::infra::acp::ProgressEvent::UsageUpdated(usage) = event {
+            usage_updates.push(usage);
+        }
+    }
+    assert!(
+        usage_updates
+            .iter()
+            .any(|usage| usage.model.as_deref() == Some("Fake Standard"))
+    );
+    assert!(
+        usage_updates
+            .iter()
+            .any(|usage| usage.cost.as_ref().is_some_and(|cost| cost.amount == 0.42))
+    );
+    assert!(
+        usage_updates
+            .iter()
+            .any(|usage| usage.total_tokens == Some(128_400)
+                && usage.cached_read_tokens == Some(104_000))
+    );
     // Warning about uncovered files should appear in logs
     assert!(
         output

@@ -45,6 +45,8 @@ pub struct GenerateTasksResult {
 /// Different types of progress updates that can be streamed from the agent.
 #[derive(Debug, Clone)]
 pub enum ProgressEvent {
+    /// Incremental, cumulative usage reported by the agent for this run.
+    UsageUpdated(crate::domain::ReviewUsage),
     /// Delta for agent message text (only new characters since last update).
     MessageDelta { id: String, delta: String },
     /// Delta for agent thought text (only new characters since last update).

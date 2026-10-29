@@ -3,6 +3,7 @@ import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import { motion } from 'framer-motion';
 import { ICONS } from '../../../constants/icons';
 import { useMergeConfidence } from '../../../hooks/useMergeConfidence';
+import { ReviewHeaderBadge } from '../ReviewHeaderBadge';
 
 interface MergeConfidenceBadgeProps {
   runId: string | undefined;
@@ -28,16 +29,26 @@ const getBorderColor = (score: number): string => {
 
 const getReasonIcon = (reason: string) => {
   if (reason.startsWith('✓') || reason.startsWith('✔')) {
-    return <ICONS.ICON_CHECK size={10} className="mt-0.5 flex-shrink-0 text-status-done" weight="bold" />;
+    return (
+      <ICONS.ICON_CHECK size={10} className="text-status-done mt-0.5 flex-shrink-0" weight="bold" />
+    );
   }
   if (reason.startsWith('✗') || reason.startsWith('✘') || reason.startsWith('❌')) {
     return (
-      <ICONS.ACTION_CLOSE size={10} className="mt-0.5 flex-shrink-0 text-impact-blocking" weight="bold" />
+      <ICONS.ACTION_CLOSE
+        size={10}
+        className="text-impact-blocking mt-0.5 flex-shrink-0"
+        weight="bold"
+      />
     );
   }
   if (reason.startsWith('⚠') || reason.startsWith('⚡')) {
     return (
-      <ICONS.ICON_WARNING size={10} className="mt-0.5 flex-shrink-0 text-yellow-500" weight="bold" />
+      <ICONS.ICON_WARNING
+        size={10}
+        className="mt-0.5 flex-shrink-0 text-yellow-500"
+        weight="bold"
+      />
     );
   }
   return <ICONS.STATUS_TODO size={10} className="text-text-disabled mt-0.5 flex-shrink-0" />;
@@ -59,14 +70,13 @@ export const MergeConfidenceBadge: React.FC<MergeConfidenceBadgeProps> = ({ runI
   return (
     <TooltipPrimitive.Root delayDuration={0}>
       <TooltipPrimitive.Trigger asChild>
-        <button
-          className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors hover:opacity-80 ${scoreBgColor} ${borderColor}`}
+        <ReviewHeaderBadge
+          aria-label={`Merge confidence ${data.score} out of 5`}
+          className={`${scoreColor} ${scoreBgColor} ${borderColor}`}
+          icon={<ICONS.GAUGE size={16} />}
         >
-          <ICONS.GAUGE size={12} className={scoreColor} />
-          <span className={scoreColor}>
-            {Number.isInteger(data.score) ? data.score : data.score.toFixed(1)}/5
-          </span>
-        </button>
+          {Number.isInteger(data.score) ? data.score : data.score.toFixed(1)}/5
+        </ReviewHeaderBadge>
       </TooltipPrimitive.Trigger>
       <TooltipPrimitive.Portal>
         <TooltipPrimitive.Content side="bottom" align="end" sideOffset={8} asChild>
@@ -99,14 +109,16 @@ export const MergeConfidenceBadge: React.FC<MergeConfidenceBadgeProps> = ({ runI
               {/* Reasons */}
               {hasReasons && (
                 <div className="border-border/30 mt-3 border-t pt-3">
-                  <p className="text-text-disabled mb-2 text-[10px] font-medium uppercase tracking-wide">
+                  <p className="text-text-disabled mb-2 text-[10px] font-medium tracking-wide uppercase">
                     Assessment
                   </p>
                   <ul className="max-h-40 space-y-1.5 overflow-y-auto">
                     {data.reasons.slice(0, 6).map((reason, i) => (
                       <li key={i} className="text-text-secondary flex items-start gap-1.5 text-xs">
                         {getReasonIcon(reason)}
-                        <span className="leading-tight">{reason.replace(/^[✓✔✗✘❌⚠⚡]\s*/, '')}</span>
+                        <span className="leading-tight">
+                          {reason.replace(/^[✓✔✗✘❌⚠⚡]\s*/, '')}
+                        </span>
                       </li>
                     ))}
                     {data.reasons.length > 6 && (

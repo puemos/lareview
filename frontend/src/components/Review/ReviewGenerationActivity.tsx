@@ -7,6 +7,9 @@ import type { ProgressEventPayload } from '../../hooks/useTauri';
 import { LiveActivityFeed, type ProgressMessage } from '../Generate/LiveActivityFeed';
 import { PlanOverview } from '../Generate/PlanOverview';
 import type { Review, ReviewRun, ReviewRunEvent } from '../../types';
+import { UsagePopover } from './ReviewUsagePopover';
+import { usageFromEvents } from '../../lib/review-usage';
+import { reviewHeaderControlClass } from './reviewHeaderStyles';
 
 interface ReviewGenerationActivityProps {
   review: Review | null;
@@ -185,9 +188,15 @@ export const ReviewGenerationActivity: React.FC<ReviewGenerationActivityProps> =
   run,
 }) => {
   const { stopGeneration } = useGeneration();
-  const { data: events = [] } = useReviewRunEvents(run.id);
+  const {
+    data: events = [],
+    isLoading: isUsageLoading,
+    isError: isUsageError,
+    refetch: refetchUsage,
+  } = useReviewRunEvents(run.id);
   const [isStopping, setIsStopping] = useState(false);
   const { plan, messages } = useMemo(() => activityFromEvents(events), [events]);
+  const usage = useMemo(() => usageFromEvents(events, run.id), [events, run.id]);
   const isActive = run.status === 'queued' || run.status === 'running';
 
   const handleStop = async () => {
@@ -197,7 +206,7 @@ export const ReviewGenerationActivity: React.FC<ReviewGenerationActivityProps> =
 
   return (
     <div className="bg-bg-primary flex h-full flex-col">
-      <div className="border-border bg-bg-secondary/50 flex items-center justify-between border-b px-6 py-4">
+      <div className="border-border bg-bg-secondary/50 flex items-center justify-between gap-4 border-b px-6 py-4">
         <div className="min-w-0">
           <div className="text-text-disabled mb-1 flex items-center gap-2 text-[10px] font-bold tracking-wider uppercase">
             {isActive && <SpinnerGap size={12} className="text-brand animate-spin" />}
@@ -216,19 +225,29 @@ export const ReviewGenerationActivity: React.FC<ReviewGenerationActivityProps> =
                 : 'Generation stopped before the review was completed.'}
           </p>
         </div>
-        {isActive && (
-          <button
-            type="button"
-            onClick={handleStop}
-            disabled={isStopping}
-            className="border-status-ignored/20 bg-status-ignored/10 text-status-ignored hover:bg-status-ignored/20 flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors active:scale-[0.97] disabled:cursor-wait disabled:opacity-60"
-          >
-            {isStopping ? <SpinnerGap size={14} className="animate-spin" /> : <Stop size={14} />}
-            {isStopping ? 'Stopping…' : 'Stop'}
-          </button>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          <UsagePopover
+            key={run.id}
+            usage={usage}
+            agentId={run.agent_id}
+            isActive={isActive}
+            isLoading={isUsageLoading}
+            isError={isUsageError}
+            onRetry={() => void refetchUsage()}
+          />
+          {isActive && (
+            <button
+              type="button"
+              onClick={handleStop}
+              disabled={isStopping}
+              className={`${reviewHeaderControlClass} border-status-ignored/20 bg-status-ignored/10 text-status-ignored hover:bg-status-ignored/20 px-3 text-sm font-medium disabled:cursor-wait disabled:opacity-60`}
+            >
+              {isStopping ? <SpinnerGap size={16} className="animate-spin" /> : <Stop size={16} />}
+              {isStopping ? 'Stopping…' : 'Stop'}
+            </button>
+          )}
+        </div>
       </div>
-
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="border-border flex min-w-0 flex-1 border-r">
           <LiveActivityFeed messages={messages} isRunning={isActive} />

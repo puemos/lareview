@@ -171,6 +171,38 @@ pub struct ReviewRunEvent {
     pub created_at: String,
 }
 
+/// An incremental usage snapshot reported by the agent. Missing fields are unknown, not zero.
+/// Session costs and token totals are cumulative; snapshots must never be added together.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ReviewUsage {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_tokens: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_tokens: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_tokens: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cached_read_tokens: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cached_write_tokens: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thought_tokens: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_used: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_size: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost: Option<ReviewUsageCost>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewUsageCost {
+    pub amount: f64,
+    pub currency: String,
+}
+
 /// A single generation run for a review (diff + agent output).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReviewRun {

@@ -1,10 +1,11 @@
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::schema::v1::{
-    AgentCapabilities, Implementation, InitializeRequest, InitializeResponse, NewSessionRequest,
-    NewSessionResponse, Plan, PromptRequest, PromptResponse, SessionConfigOption,
-    SessionConfigOptionCategory, SessionConfigSelectOption, SessionId, SessionNotification,
-    SessionUpdate, SetSessionConfigOptionRequest, SetSessionConfigOptionResponse, StopReason,
-    ToolCall, ToolCallId, ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields,
+    AgentCapabilities, Cost, Implementation, InitializeRequest, InitializeResponse,
+    NewSessionRequest, NewSessionResponse, Plan, PromptRequest, PromptResponse,
+    SessionConfigOption, SessionConfigOptionCategory, SessionConfigSelectOption, SessionId,
+    SessionNotification, SessionUpdate, SetSessionConfigOptionRequest,
+    SetSessionConfigOptionResponse, StopReason, ToolCall, ToolCallId, ToolCallStatus,
+    ToolCallUpdate, ToolCallUpdateFields, Usage, UsageUpdate,
 };
 use agent_client_protocol::{Agent, Stdio};
 use std::sync::{Arc, Mutex};
@@ -172,6 +173,13 @@ async fn main() -> anyhow::Result<()> {
                     ))?;
                 }
 
+                connection.send_notification(SessionNotification::new(
+                    session_id.clone(),
+                    SessionUpdate::UsageUpdate(
+                        UsageUpdate::new(42_000, 200_000).cost(Cost::new(0.42, "USD")),
+                    ),
+                ))?;
+
                 let tool_call_id = ToolCallId::new("finalize_review");
                 connection.send_notification(SessionNotification::new(
                     session_id.clone(),
@@ -190,7 +198,14 @@ async fn main() -> anyhow::Result<()> {
                     SessionUpdate::ToolCallUpdate(ToolCallUpdate::new(tool_call_id, fields)),
                 ))?;
 
-                responder.respond(PromptResponse::new(StopReason::EndTurn))
+                responder.respond(
+                    PromptResponse::new(StopReason::EndTurn).usage(
+                        Usage::new(128_400, 16_400, 8_000)
+                            .cached_read_tokens(104_000)
+                            .cached_write_tokens(0)
+                            .thought_tokens(2_000),
+                    ),
+                )
             },
             agent_client_protocol::on_receive_request!(),
         )

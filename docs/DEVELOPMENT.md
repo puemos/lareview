@@ -39,6 +39,21 @@
 - **Components**: React components live in `frontend/src/components/`.
 - **Testing**: Frontend tests run with Vitest and Testing Library.
 
+## Review usage
+
+The review summary and generation activity headers show a compact cost button that opens a
+usage popover for the displayed generation. ACP
+`usage_update` notifications provide context window usage and optional cumulative cost; the
+optional end-of-turn `usage` response provides token totals, cache, and reasoning counts. The
+effective session configuration supplies the model. Sparse `UsageUpdated` snapshots are saved in
+`review_run_events`, so they survive restarts and remain scoped to their generation, including
+failed or cancelled runs. Consumers replace reported fields rather than summing snapshots.
+
+The popover preserves the agent's totals because providers account for cache and reasoning differently.
+Context occupancy is separate from total tokens. Missing values remain unknown. Cost is labeled
+as an agent-reported estimate; LaReview does not infer subscription charges, remaining plan limits,
+or prices for agents that do not report cost. Older reviews cannot recover unrecorded usage.
+
 ## Tool Discovery and Requirements
 
 - LaReview depends on external tools like `d2` for diagram generation and `gh` for GitHub integration.

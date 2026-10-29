@@ -105,7 +105,13 @@ export const ReviewView: React.FC = () => {
   }>({ type: 'global' });
 
   useEffect(() => {
-    if (tasks.length > 0 && !selectedTaskId && !isTasksLoading && reviewViewMode === 'review' && sidebarTab === 'tasks') {
+    if (
+      tasks.length > 0 &&
+      !selectedTaskId &&
+      !isTasksLoading &&
+      reviewViewMode === 'review' &&
+      sidebarTab === 'tasks'
+    ) {
       selectTask(tasks[0].id);
     }
   }, [tasks, selectedTaskId, isTasksLoading, selectTask, reviewViewMode, sidebarTab]);
@@ -324,6 +330,7 @@ export const ReviewView: React.FC = () => {
           ) : (
             <ReviewSummary
               runId={runId ?? undefined}
+              run={firstRun}
               tasks={tasks}
               feedbacks={feedbacks}
               parsedDiff={parsedDiff ?? null}

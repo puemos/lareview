@@ -104,6 +104,20 @@ export interface ReviewRunEvent {
   created_at: string;
 }
 
+/** Cumulative agent snapshots. Omitted values are unknown, not zero. */
+export interface ReviewUsage {
+  model?: string;
+  total_tokens?: number;
+  input_tokens?: number;
+  output_tokens?: number;
+  cached_read_tokens?: number;
+  cached_write_tokens?: number;
+  thought_tokens?: number;
+  context_used?: number;
+  context_size?: number;
+  cost?: { amount: number; currency: string };
+}
+
 export interface Feedback {
   id: string;
   review_id: string;
