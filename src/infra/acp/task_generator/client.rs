@@ -736,6 +736,20 @@ impl LaReviewClient {
         let update = notification.update.clone();
 
         match &update {
+            SessionUpdate::UsageUpdate(update) => {
+                if let Some(tx) = &self.progress {
+                    let _ = tx.send(ProgressEvent::UsageUpdated(super::usage::context_usage(
+                        update,
+                    )));
+                }
+            }
+            SessionUpdate::ConfigOptionUpdate(update) => {
+                if let Some(usage) = super::usage::model_usage(&update.config_options)
+                    && let Some(tx) = &self.progress
+                {
+                    let _ = tx.send(ProgressEvent::UsageUpdated(usage));
+                }
+            }
             SessionUpdate::AgentMessageChunk(chunk) => {
                 if let ContentBlock::Text(text) = &chunk.content {
                     let (full_text, _is_new) = self.append_streamed_content(

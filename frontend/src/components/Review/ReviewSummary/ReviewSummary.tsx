@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { ArrowRight } from '@phosphor-icons/react';
 import { ICONS } from '../../../constants/icons';
 import { TaskFlow } from './TaskFlow';
 import { IssueChecklist } from './IssueChecklist';
@@ -10,10 +11,20 @@ import { MergeConfidenceBadge } from './MergeConfidenceBadge';
 import { useIssueChecks } from '../../../hooks/useIssueChecks';
 import { useTauri } from '../../../hooks/useTauri';
 import { sourceUrl } from './sourceUrl';
-import type { ReviewTask, Feedback, ParsedDiff, Review, ReviewSource } from '../../../types';
+import { ReviewUsagePopover } from '../ReviewUsagePopover';
+import { reviewHeaderControlClass } from '../reviewHeaderStyles';
+import type {
+  ReviewTask,
+  Feedback,
+  ParsedDiff,
+  Review,
+  ReviewSource,
+  ReviewRun,
+} from '../../../types';
 
 interface ReviewSummaryProps {
   runId: string | undefined;
+  run?: ReviewRun | null;
   tasks: ReviewTask[];
   feedbacks: Feedback[];
   parsedDiff: ParsedDiff | null;
@@ -48,7 +59,7 @@ const SourceBadge: React.FC<SourceBadgeProps> = ({ source }) => {
       ) : (
         <ICONS.ICON_GITLAB size={14} className="text-text-secondary" />
       )}
-      <span className="text-text-secondary">{label}</span>
+      <span className="text-text-secondary truncate">{label}</span>
     </>
   );
 
@@ -62,7 +73,7 @@ const SourceBadge: React.FC<SourceBadgeProps> = ({ source }) => {
       onClick={() => openUrl(url)}
       title={`Open ${label} in browser`}
       aria-label={`Open ${label} in browser`}
-      className="text-text-secondary hover:text-text-primary hover:bg-bg-tertiary group -mx-1.5 flex items-center gap-1.5 rounded px-1.5 py-0.5 text-xs transition-colors"
+      className="text-text-secondary hover:text-text-primary hover:bg-bg-tertiary group -mx-1.5 flex max-w-full items-center gap-1.5 rounded px-1.5 py-0.5 text-xs transition-colors"
     >
       {content}
       <ICONS.ACTION_OPEN_WINDOW
@@ -75,6 +86,7 @@ const SourceBadge: React.FC<SourceBadgeProps> = ({ source }) => {
 
 export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
   runId,
+  run,
   tasks,
   feedbacks,
   parsedDiff,
@@ -100,21 +112,26 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
-      <div className="border-border bg-bg-secondary/50 flex items-center justify-between border-b px-6 py-4">
-        <div>
+      <div className="border-border bg-bg-secondary/50 flex items-center justify-between gap-4 border-b px-6 py-4">
+        <div className="min-w-0">
           {review?.source && <SourceBadge source={review.source} />}
-          <h2 className="text-text-primary text-lg font-semibold">
+          <h2
+            className="text-text-primary truncate text-lg font-semibold"
+            title={review?.title || parsedDiff?.title || 'Review Summary'}
+          >
             {review?.title || parsedDiff?.title || 'Review Summary'}
           </h2>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2">
+          {run && <ReviewUsagePopover run={run} />}
           <MergeConfidenceBadge runId={runId} />
           <button
+            type="button"
             onClick={onStartReview}
-            className="bg-brand text-brand-fg hover:bg-brand/90 flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors"
+            className={`${reviewHeaderControlClass} bg-brand text-brand-fg hover:bg-brand/90 border-transparent px-4 text-sm font-medium`}
           >
             Start Review
-            <span className="opacity-70">→</span>
+            <ArrowRight size={16} className="opacity-70" />
           </button>
         </div>
       </div>

@@ -28,6 +28,7 @@ import type {
   AgentSessionConfigOption,
   ReviewRunEvent,
   ReviewRunStatus,
+  ReviewUsage,
 } from '../types';
 import { useCallback } from 'react';
 
@@ -163,6 +164,7 @@ export function isCurrentModeUpdate(update: SessionUpdate): update is SessionUpd
 export interface ProgressEventPayload {
   event:
     | 'Status'
+    | 'UsageUpdated'
     | 'Log'
     | 'MessageDelta'
     | 'ThoughtDelta'
@@ -189,6 +191,7 @@ export interface ProgressEventPayload {
     | { task_id: string }
     | { task_count: number }
     | { message: string }
+    | ReviewUsage
     | Plan;
 }
 

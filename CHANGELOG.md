@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented here. This project follows SemVer once we reach 1.0.
 
+## [0.1.7] - 2026-10-29
+
+### Added
+
+- **Usage**: Show each generation's agent-reported cost estimate in the review header. Open the badge for model details, exact token counts, cache and reasoning usage, and context-window usage (#56).
+- **Usage**: Persist cumulative usage snapshots with review activity so reported data remains available after restart, including stopped or failed generations. Missing data stays visibly unavailable.
+
+### Changed
+
+- **Review header**: Share badge styling with quality results, align header controls, and keep usage details available by click and keyboard without a dropdown chevron.
+
+Cost estimates depend on what the selected agent reports and may differ from subscription-plan billing. Earlier reviews cannot recover usage that was not recorded.
+
 ## [0.1.6] - 2026-10-29
 
 ### Changed

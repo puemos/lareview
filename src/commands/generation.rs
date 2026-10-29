@@ -20,6 +20,7 @@ pub const REVIEW_RUN_EVENT: &str = "review-run-event";
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "event", content = "data")]
 pub enum ProgressEventPayload {
+    UsageUpdated(crate::domain::ReviewUsage),
     Status {
         status: String,
     },
@@ -567,6 +568,7 @@ async fn execute_generation(
 
 fn progress_payload(event: ProgressEvent) -> ProgressEventPayload {
     match event {
+        ProgressEvent::UsageUpdated(usage) => ProgressEventPayload::UsageUpdated(usage),
         ProgressEvent::LocalLog(message) => ProgressEventPayload::Log(message),
         ProgressEvent::MessageDelta { id, delta } => {
             ProgressEventPayload::MessageDelta { id, delta }

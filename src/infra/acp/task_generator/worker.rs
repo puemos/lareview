@@ -383,11 +383,12 @@ async fn generate_tasks_with_acp_inner_impl(
         push_log(&logs, "new_session ok", debug);
 
         let session_id = session.session_id;
+        let mut effective_options = session.config_options.unwrap_or_default();
         if !agent_config.is_empty() {
-            let _effective_options = apply_session_config_options(
+            effective_options = apply_session_config_options(
                 &connection,
                 &session_id,
-                session.config_options.unwrap_or_default(),
+                effective_options,
                 &agent_config,
                 |selection| {
                     push_log(
@@ -403,6 +404,11 @@ async fn generate_tasks_with_acp_inner_impl(
             .await
             .with_context(|| "ACP session configuration failed")?;
             push_log(&logs, "session config ok", debug);
+        }
+        if let Some(usage) = super::usage::model_usage(&effective_options)
+            && let Some(tx) = &progress_tx
+        {
+            let _ = tx.send(ProgressEvent::UsageUpdated(usage));
         }
 
         // Send prompt
@@ -446,6 +452,12 @@ async fn generate_tasks_with_acp_inner_impl(
                 debug,
             );
         } else {
+            if let Ok(response) = &prompt_result
+                && let Some(usage) = &response.usage
+                && let Some(tx) = &progress_tx
+            {
+                let _ = tx.send(ProgressEvent::UsageUpdated(super::usage::token_usage(usage)));
+            }
             push_log(&logs, "prompt ok", debug);
         }
 

@@ -1,6 +1,6 @@
 [package]
 name = "lareview"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2024"
 rust-version = "1.91"
 default-run = "lareview"
@@ -24,7 +24,7 @@ dirs = "7"
 log = "0.4"
 env_logger = "0.11.3"
 
-agent-client-protocol = { version = "3.6.0", features = ["process", "stdio"] }
+agent-client-protocol = { version = "3.6.0", features = ["process", "stdio", "unstable_end_turn_token_usage"] }
 grep = "0.4"
 ignore = "0.4"
 globset = "0.4"
