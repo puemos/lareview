@@ -2,8 +2,8 @@
 
 ## Prerequisites
 
-- Rust 1.97.1: see `rust-toolchain.toml` (includes `rustfmt` and `clippy`; MSRV 1.91)
-- Node.js 24.18.0 and pnpm 11.20.0
+- Rust 1.99.1: see `rust-toolchain.toml` (includes `rustfmt` and `clippy`; MSRV 1.91)
+- Node.js 24.22.2 and pnpm 11.28.9
 - Linux system deps: `libxkbcommon-dev`, `libxkbcommon-x11-dev`
 
 ## Common commands
@@ -15,6 +15,15 @@
 - Supply chain: `cargo deny check`
 - Frontend: `cd frontend && pnpm install --frozen-lockfile && pnpm lint && pnpm test && pnpm build`
 - Landing page: `cd landing && pnpm install --frozen-lockfile && pnpm build`
+
+## Dependency security
+
+- Run `pnpm audit` in both `frontend/` and `landing/`; CI checks both lockfiles on pull requests and weekly.
+- Run `cargo deny --locked check` for Rust advisories, licenses, and dependency sources.
+- `frontend/pnpm-workspace.yaml` overrides Monaco's DOMPurify, Mermaid's KaTeX, and Tailwind Typography's selector parser with patched releases. Remove these overrides once upstream requirements include the fixes.
+- Mermaid stays on the latest 11.x release to preserve support for existing desktop webviews; Mermaid 12 requires Safari 17.4 or newer.
+- `deny.toml` documents upstream exceptions for Tauri's GTK3 stack (`proc-macro-error`, `glib`) and its Linux single-instance plugin (`zbus_names`, `zvariant`, `zvariant_derive`). These remain maintenance/soundness warnings with no compatible upstream fix.
+- Keep the Rust 1.91 MSRV when updating dependencies. `parking_lot` 0.13 requires Rust 1.95, so this project uses the maintained 0.12 series.
 
 ## Useful environment variables
 

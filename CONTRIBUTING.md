@@ -4,8 +4,8 @@ Thanks for your interest in improving LaReview! This document outlines the basic
 
 ## Quick start
 
-- Install Rust 1.97.1 with `rustup` and ensure `rustfmt` and `clippy` components are available. The crate's MSRV is 1.91.
-- Install Node.js 24.18.0 and pnpm 11.20.0 for frontend and landing-page work.
+- Install Rust 1.99.1 with `rustup` and ensure `rustfmt` and `clippy` components are available. The crate's MSRV is 1.91.
+- Install Node.js 24.22.2 and pnpm 11.28.9 for frontend and landing-page work.
 - System deps: `libxkbcommon-dev` and `libxkbcommon-x11-dev` (for Tauri on Linux).
 - Clone the repo, then run:
   - `cargo fmt -- --check`

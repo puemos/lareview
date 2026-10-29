@@ -1,6 +1,6 @@
 [package]
 name = "lareview"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2024"
 rust-version = "1.91"
 default-run = "lareview"
@@ -15,23 +15,23 @@ keywords = ["code-review", "gui", "ai", "acp", "developer-tools"]
 categories = ["development-tools", "gui"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2.7.4", features = [] }
 
 [dependencies]
-arboard = "3.4"
+arboard = { version = "3.7.0", default-features = false }
 clap = { version = "4.4", features = ["derive"] }
-dirs = "6"
+dirs = "7"
 log = "0.4"
 env_logger = "0.11.3"
 
-agent-client-protocol = "2.0.0"
+agent-client-protocol = { version = "3.6.0", features = ["process", "stdio"] }
 grep = "0.4"
 ignore = "0.4"
 globset = "0.4"
-rusqlite = { version = "0.40", features = ["bundled"] }
+rusqlite = { version = "0.41.1", features = ["bundled"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tokio = { version = "1", features = ["full", "process"] }
+tokio = { version = "1.54.1", features = ["full", "process"] }
 tokio-util = { version = "0.7", features = ["compat"] }
 futures = "0.3"
 which = "8"
@@ -39,7 +39,7 @@ anyhow = "1.0"
 thiserror = "2"
 async-trait = "0.1"
 libc = "0.2"
-pmcp = "2.17.0"
+pmcp = "2.23.0"
 tempfile = "3"
 chrono = { version = "0.4", features = ["clock"] }
 unidiff = "0.4.0"
@@ -47,13 +47,12 @@ handlebars = "6.3.2"
 once_cell = "1.21.3"
 toml = "1"
 home = "0.5"
-image = "0.25"
 regex = "1"
 lazy_static = "1.4"
 twox-hash = "2"
 uuid = { version = "1", features = ["v4"] }
 
-tauri = { version = "2.11.5", features = [] }
+tauri = { version = "2.12.5", features = [] }
 tauri-plugin-cli = "2"
 tauri-plugin-deep-link = "2"
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }

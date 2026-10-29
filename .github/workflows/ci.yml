@@ -29,11 +29,11 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.97.1
+          toolchain: 1.99.1
       - name: Install cargo-deny
         uses: taiki-e/install-action@cargo-deny
       - name: Run cargo-deny
-        run: cargo deny check
+        run: cargo deny --locked check
 
   check:
     name: Check & Lint
@@ -58,7 +58,7 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.97.1
+          toolchain: 1.99.1
           components: rustfmt, clippy
 
       - name: Cache Rust build artifacts
@@ -75,7 +75,7 @@ jobs:
           touch frontend/dist/index.html
 
       - name: Lint
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
 
   test:
     name: Tests
@@ -101,7 +101,7 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.97.1
+          toolchain: 1.99.1
 
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
@@ -114,7 +114,7 @@ jobs:
           touch frontend/dist/index.html
 
       - name: Build helper agent
-        run: cargo build --example fake_acp_agent
+        run: cargo build --locked --example fake_acp_agent
 
       - name: Run tests
         env:
@@ -122,7 +122,7 @@ jobs:
           LAREVIEW_DATA_HOME: ${{ runner.temp }}/lareview-test-data
           LAREVIEW_DB_PATH: ${{ runner.temp }}/lareview-test.sqlite
           RUST_TEST_THREADS: "1"
-        run: cargo test --all-targets --verbose
+        run: cargo test --locked --all-targets --verbose
 
   build:
     name: Build Check
@@ -148,17 +148,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: "24.18.0"
+          node-version: "24.22.2"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: 11.20.0
+          version: 11.28.9
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.97.1
+          toolchain: 1.99.1
 
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
@@ -167,6 +167,10 @@ jobs:
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
+        working-directory: frontend
+
+      - name: Audit frontend dependencies
+        run: pnpm audit
         working-directory: frontend
 
       - name: Lint frontend
@@ -182,7 +186,7 @@ jobs:
         working-directory: frontend
 
       - name: Build release binary
-        run: cargo build --release
+        run: cargo build --locked --release
 
   msrv:
     name: Minimum Supported Rust
@@ -215,7 +219,7 @@ jobs:
           touch frontend/dist/index.html
 
       - name: Check MSRV
-        run: cargo check --all-targets
+        run: cargo check --locked --all-targets
 
   landing:
     name: Landing Page
@@ -229,15 +233,19 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: "24.18.0"
+          node-version: "24.22.2"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: 11.20.0
+          version: 11.28.9
 
       - name: Install landing dependencies
         run: pnpm install --frozen-lockfile
+        working-directory: landing
+
+      - name: Audit landing dependencies
+        run: pnpm audit
         working-directory: landing
 
       - name: Build landing page

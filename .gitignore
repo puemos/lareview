@@ -11,6 +11,7 @@ gen/schemas/_detected*
 # Frontend (Vite / pnpm)
 node_modules/
 dist/
+.vitest/
 *.local
 
 # Landing page build artifacts

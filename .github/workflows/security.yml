@@ -5,23 +5,45 @@ on:
   schedule:
     - cron: "0 6 * * 1" # Mondays
 
+permissions:
+  contents: read
+
 jobs:
   cargo-deny:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.97.1
-      - uses: actions/cache@v6
-        with:
-          path: ~/.cargo/bin/cargo-deny
-          key: cargo-deny-bin-v0
+          toolchain: 1.99.1
       - name: Install cargo-deny
-        run: |
-          if ! command -v cargo-deny >/dev/null; then
-            cargo install cargo-deny --locked
-          fi
+        uses: taiki-e/install-action@cargo-deny
       - name: Run cargo-deny
-        run: cargo-deny check
+        run: cargo deny --locked check
+
+  javascript-audit:
+    name: Audit ${{ matrix.directory }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        directory: [frontend, landing]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.28.9
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: ${{ matrix.directory }}
+      - name: Audit dependencies
+        run: pnpm audit
+        working-directory: ${{ matrix.directory }}
