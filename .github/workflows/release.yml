@@ -19,8 +19,10 @@ jobs:
         include:
           - platform: "macos-latest"
             args: "--target aarch64-apple-darwin"
+            archive_arch: "aarch64"
           - platform: "macos-latest"
             args: "--target x86_64-apple-darwin"
+            archive_arch: "x64"
           - platform: "ubuntu-22.04"
             args: ""
 
@@ -85,6 +87,23 @@ jobs:
           releaseDraft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           args: ${{ matrix.args }}
+
+      - name: Preserve Homebrew macOS archive names
+        if: matrix.platform == 'macos-latest'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LAREVIEW_ARCH: ${{ matrix.archive_arch }}
+        run: |
+          lareview_version=$(jq -r .version tauri.conf.json)
+          lareview_alias_dir="$RUNNER_TEMP/lareview-archive-alias"
+          mkdir -p "$lareview_alias_dir"
+          gh release download "v${lareview_version}" \
+            --pattern "LaReview_${lareview_version}_${LAREVIEW_ARCH}.app.tar.gz" \
+            --dir "$lareview_alias_dir"
+          mv "$lareview_alias_dir/LaReview_${lareview_version}_${LAREVIEW_ARCH}.app.tar.gz" \
+            "$lareview_alias_dir/LaReview_${LAREVIEW_ARCH}.app.tar.gz"
+          gh release upload "v${lareview_version}" \
+            "$lareview_alias_dir/LaReview_${LAREVIEW_ARCH}.app.tar.gz" --clobber
 
       - name: Create Linux tarball
         if: matrix.platform == 'ubuntu-22.04'
