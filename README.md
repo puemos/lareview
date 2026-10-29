@@ -95,6 +95,7 @@ LaReview launches compatible harnesses through commands already available on you
 | --- | --- |
 | Claude | `npx -y @agentclientprotocol/claude-agent-acp@0.65.0` |
 | Codex | `npx -y @agentclientprotocol/codex-acp@1.1.9` |
+| GitHub Copilot | `copilot --acp --stdio` |
 | Gemini | `gemini --acp` |
 | Grok | `grok --no-auto-update agent stdio` |
 | Kimi | `kimi acp` |
@@ -120,6 +121,20 @@ General ACP support is not sufficient: the harness must forward LaReview's clien
 
 > [!NOTE]
 > LaReview does not require a custom LaReview server. Your PR data is fetched locally via `gh` or `glab`, and plan generation runs via your chosen AI agent.
+
+### GitHub Copilot setup
+
+Install the [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli)
+and sign in by running `copilot` and using `/login`. Restart LaReview, then select
+**GitHub Copilot** in the Agent picker. If the executable is outside your `PATH`, set its
+path in Settings. LaReview uses Copilot's native [ACP stdio server](https://docs.github.com/en/copilot/reference/copilot-cli-reference/acp-server);
+no additional adapter or `gh copilot` extension is needed. Models and session options are
+discovered from the installed CLI, and require an authenticated Copilot account or a
+configured bring-your-own-key provider.
+
+For each review, LaReview supplies its local task server through Copilot's
+`--additional-mcp-config` launch option, because Copilot's ACP session API accepts
+only HTTP/SSE MCP entries. This uses the same local stdio task server as the other agents.
 
 ## Installation
 

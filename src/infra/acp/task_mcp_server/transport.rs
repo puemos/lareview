@@ -48,41 +48,39 @@ impl Transport for LineDelimitedStdioTransport {
     }
 
     async fn receive(&mut self) -> pmcp::Result<TransportMessage> {
-        let mut stdin = self.stdin.lock().await;
-        let mut line = String::new();
-
-        let bytes = stdin
-            .read_line(&mut line)
-            .await
-            .map_err(|e| pmcp::Error::Transport(TransportError::Io(e.to_string())))?;
-
-        if bytes == 0 {
-            return Err(pmcp::Error::Transport(TransportError::ConnectionClosed));
-        }
-
-        let json_value: serde_json::Value = serde_json::from_str(&line).map_err(|e| {
-            pmcp::Error::Transport(TransportError::InvalidMessage(format!("Invalid JSON: {e}")))
-        })?;
-
-        // Log every inbound message for debugging failed tool calls (schema validation, etc).
-        log_raw_line(&format!("IN {}", line.trim_end()));
-
-        if json_value.get("method").is_some() {
-            if json_value.get("id").is_some() {
-                let _request: pmcp::types::JSONRPCRequest<serde_json::Value> =
-                    serde_json::from_value(json_value).map_err(|e| {
-                        pmcp::Error::Transport(TransportError::InvalidMessage(format!(
-                            "Invalid request: {e}"
-                        )))
-                    })?;
-
-                return StdioTransport::parse_message(line.as_bytes());
+        loop {
+            let mut line = String::new();
+            let bytes = {
+                let mut stdin = self.stdin.lock().await;
+                stdin
+                    .read_line(&mut line)
+                    .await
+                    .map_err(|e| pmcp::Error::Transport(TransportError::Io(e.to_string())))?
+            };
+            if bytes == 0 {
+                return Err(pmcp::Error::Transport(TransportError::ConnectionClosed));
             }
 
+            // Answer the modern stdio probe so dual-era clients can fall back to
+            // initialize. pmcp's typed stdio parser does not support discovery;
+            // passing it through would close the pipe before fallback is possible.
+            log_raw_line(&format!("IN {}", line.trim_end()));
+            let value: serde_json::Value = serde_json::from_str(&line).map_err(|e| {
+                pmcp::Error::Transport(TransportError::InvalidMessage(format!("Invalid JSON: {e}")))
+            })?;
+            if value.get("method").and_then(|v| v.as_str()) == Some("server/discover") {
+                if let Some(id) = value.get("id") {
+                    let response: pmcp::types::JSONRPCResponse = serde_json::from_value(serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "error": {"code": -32601, "message": "Use initialize to negotiate a supported MCP version"}
+                    })).map_err(|e| pmcp::Error::Transport(TransportError::InvalidMessage(e.to_string())))?;
+                    self.send(TransportMessage::Response(response)).await?;
+                }
+                continue;
+            }
             return StdioTransport::parse_message(line.as_bytes());
         }
-
-        StdioTransport::parse_message(line.as_bytes())
     }
 
     async fn close(&mut self) -> pmcp::Result<()> {

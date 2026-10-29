@@ -64,6 +64,22 @@ async fn main() -> anyhow::Result<()> {
         .position(|arg| arg == "--expect-config")
         .and_then(|index| Some((args.get(index + 1)?.clone(), args.get(index + 2)?.clone())));
     let config = Arc::new(Mutex::new(FakeConfig::default()));
+    let expect_copilot_mcp = args.iter().any(|arg| arg == "--expect-copilot-mcp");
+    if expect_copilot_mcp {
+        let index = args
+            .iter()
+            .position(|arg| arg == "--additional-mcp-config")
+            .expect("Copilot must receive its MCP server at launch");
+        let config: serde_json::Value = serde_json::from_str(&args[index + 1])?;
+        let server = &config["mcpServers"]["lareview-tasks"];
+        assert_eq!(server["type"], "local");
+        assert_eq!(server["tools"], serde_json::json!(["*"]));
+        assert!(std::path::Path::new(server["command"].as_str().unwrap()).exists());
+        let mcp_args = server["args"].as_array().unwrap();
+        assert_eq!(mcp_args[0], "--task-mcp-server");
+        assert_eq!(mcp_args[1], "--pr-context");
+        assert!(std::path::Path::new(mcp_args[2].as_str().unwrap()).exists());
+    }
     let new_session_config = config.clone();
     let set_config = config.clone();
     let prompt_config = config.clone();
@@ -82,7 +98,13 @@ async fn main() -> anyhow::Result<()> {
             agent_client_protocol::on_receive_request!(),
         )
         .on_receive_request(
-            async move |_request: NewSessionRequest, responder, _connection| {
+            async move |request: NewSessionRequest, responder, _connection| {
+                if expect_copilot_mcp {
+                    assert!(
+                        request.mcp_servers.is_empty(),
+                        "Copilot rejects ACP stdio MCP entries"
+                    );
+                }
                 let options = session_config_options(&new_session_config.lock().unwrap());
                 responder.respond(
                     NewSessionResponse::new(SessionId::new("fake-session")).config_options(options),
