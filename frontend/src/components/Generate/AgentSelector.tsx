@@ -13,6 +13,7 @@ import qwenIcon from '../../assets/icons/qwen.svg';
 import grokIcon from '../../assets/icons/grok.svg';
 import opencodeIcon from '../../assets/icons/opencode.svg';
 import codexIcon from '../../assets/icons/codex.svg';
+import copilotIcon from '../../assets/icons/copilot.svg';
 import {
   configFieldLabelClass,
   configFieldTriggerClass,
@@ -30,6 +31,7 @@ const AGENT_ICONS: Record<string, string> = {
   grok: grokIcon,
   opencode: opencodeIcon,
   codex: codexIcon,
+  copilot: copilotIcon,
 };
 
 interface Agent {

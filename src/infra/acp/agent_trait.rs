@@ -59,6 +59,7 @@ impl Default for AgentRegistry {
         // Register all known agents
         registry.register_agent(Box::new(super::agents::claude::ClaudeAgent));
         registry.register_agent(Box::new(super::agents::codex::CodexAgent));
+        registry.register_agent(Box::new(super::agents::copilot::CopilotAgent));
         registry.register_agent(Box::new(super::agents::gemini::GeminiAgent));
         registry.register_agent(Box::new(super::agents::grok::GrokAgent));
         registry.register_agent(Box::new(super::agents::kimi::KimiAgent));
