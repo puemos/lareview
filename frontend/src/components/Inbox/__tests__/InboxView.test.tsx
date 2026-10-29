@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useAppStore } from '../../../store';
 import { InboxView } from '../InboxView';
+import type { ParsedDiff } from '../../../types';
+
+const mocks = vi.hoisted(() => ({ fetch: vi.fn(), refetch: vi.fn(), openUrl: vi.fn() }));
+let queryError: Error | null = null;
 
 const candidates = [
   {
@@ -47,24 +51,33 @@ const candidates = [
 
 vi.mock('../../../hooks/useReviewCandidates', () => ({
   useReviewCandidates: () => ({
-    candidates,
+    candidates: queryError ? [] : candidates,
+    error: queryError,
     errors: [],
     unsupportedProviders: [],
     isLoading: false,
     isFetching: false,
-    refetch: vi.fn(),
+    refetch: mocks.refetch,
   }),
 }));
 
 vi.mock('../../../hooks/useTauri', () => ({
   useTauri: () => ({
-    fetchRemotePr: vi.fn(),
-    openUrl: vi.fn(),
+    fetchRemotePr: mocks.fetch,
+    openUrl: mocks.openUrl,
+  }),
+}));
+
+vi.mock('../../../hooks/useRepos', () => ({
+  useRepos: () => ({
+    data: [{ id: 'matching-repo', remotes: ['git@github.com:puemos/lareview.git'] }],
   }),
 }));
 
 describe('InboxView', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
+    queryError = null;
     useAppStore.getState().reset();
   });
 
@@ -102,5 +115,44 @@ describe('InboxView', () => {
 
     expect(screen.getByText('Refresh the navigation shell')).toBeInTheDocument();
     expect(screen.queryByText('Harden external URL validation')).not.toBeInTheDocument();
+  });
+
+  it('preserves the fetched source, replaces an unrelated repository, and prevents competing loads', async () => {
+    let finish!: (value: ParsedDiff) => void;
+    mocks.fetch.mockReturnValue(
+      new Promise<ParsedDiff>(resolve => {
+        finish = resolve;
+      })
+    );
+    useAppStore.setState({ selectedRepoId: 'unrelated' });
+    const navigate = vi.fn();
+    render(<InboxView onNavigate={navigate} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Review puemos/lareview#28' }));
+    expect(screen.getByRole('button', { name: 'Review puemos/web#41' })).toBeDisabled();
+    const diff: ParsedDiff = {
+      diff_text: 'new diff',
+      source: candidates[0].source,
+      total_additions: 1,
+      total_deletions: 0,
+    };
+    await act(async () => finish(diff));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('generate'));
+    expect(useAppStore.getState()).toMatchObject({
+      pendingSource: diff.source,
+      parsedDiff: diff,
+      diffText: 'new diff',
+      selectedRepoId: 'matching-repo',
+      viewMode: 'diff',
+    });
+    expect(mocks.fetch).toHaveBeenCalledOnce();
+  });
+
+  it('shows a query failure with recovery instead of an empty inbox', () => {
+    queryError = new Error('Connection unavailable');
+    render(<InboxView onNavigate={vi.fn()} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Connection unavailable');
+    expect(screen.queryByText('No review requests')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(mocks.refetch).toHaveBeenCalledOnce();
   });
 });

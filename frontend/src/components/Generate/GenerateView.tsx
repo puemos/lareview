@@ -15,6 +15,7 @@ import { ViewModeToggle } from './ViewModeToggle';
 import { DiffStats } from './DiffStats';
 import { countAdditions, countDeletions } from './DiffEditorPanel';
 import { toAgentConfigSelections } from '../../lib/agent-config';
+import { findSourceRepository } from '../../lib/source-repository';
 
 interface GenerateViewProps {
   onNavigate: (view: ViewType) => void;
@@ -118,34 +119,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
 
   const findMatchingRepo = useCallback(
     (source: Extract<ReviewSource, { type: 'github_pr' | 'gitlab_mr' }>) => {
-      if (source.type === 'github_pr') {
-        const target = `${source.owner}/${source.repo}`.toLowerCase();
-        let matchingRepo = repos.find(r =>
-          r.remotes.some((url: string) => url.toLowerCase().includes(target))
-        );
-
-        if (!matchingRepo) {
-          matchingRepo = repos.find(r => r.name.toLowerCase() === source.repo.toLowerCase());
-        }
-
-        return matchingRepo || null;
-      }
-
-      const targetHost = source.host.toLowerCase();
-      const targetPath = source.project_path.toLowerCase();
-      let matchingRepo = repos.find(r =>
-        r.remotes.some((url: string) => {
-          const lower = url.toLowerCase();
-          return lower.includes(targetHost) && lower.includes(targetPath);
-        })
-      );
-
-      if (!matchingRepo) {
-        const repoName = source.project_path.split('/').pop() || source.project_path;
-        matchingRepo = repos.find(r => r.name.toLowerCase() === repoName.toLowerCase());
-      }
-
-      return matchingRepo || null;
+      return findSourceRepository(source, repos) ?? null;
     },
     [repos]
   );

@@ -6,9 +6,10 @@ interface SearchFieldProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  clearLabel?: string;
 }
 
-export function SearchField({ label, value, onChange, placeholder }: SearchFieldProps) {
+export function SearchField({ label, value, onChange, placeholder, clearLabel }: SearchFieldProps) {
   const input = useRef<HTMLInputElement>(null);
   const clear = () => {
     onChange('');
@@ -33,7 +34,11 @@ export function SearchField({ label, value, onChange, placeholder }: SearchField
         }}
       />
       {value && (
-        <button type="button" aria-label={`Clear ${label.toLowerCase()}`} onClick={clear}>
+        <button
+          type="button"
+          aria-label={clearLabel ?? `Clear ${label.toLowerCase()}`}
+          onClick={clear}
+        >
           <X size={13} />
         </button>
       )}

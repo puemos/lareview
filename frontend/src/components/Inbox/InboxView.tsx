@@ -3,9 +3,15 @@ import { formatDistanceToNow } from 'date-fns';
 import * as Select from '@radix-ui/react-select';
 import { ICONS } from '../../constants/icons';
 import { toast } from 'sonner';
+import { PageHeader } from '../Common/PageHeader';
+import { SearchField } from '../Common/SearchField';
+import { EmptyPanel } from '../Common/EmptyPanel';
+import { InlineError } from '../Common/InlineError';
 import { useReviewCandidates } from '../../hooks/useReviewCandidates';
 import { useTauri } from '../../hooks/useTauri';
 import { useAppStore } from '../../store';
+import { useRepos } from '../../hooks/useRepos';
+import { findSourceRepository } from '../../lib/source-repository';
 import type { AnnotatedCandidate, CandidateStatus, ViewType } from '../../types';
 
 interface InboxViewProps {
@@ -25,15 +31,26 @@ function statusLabel(status: CandidateStatus): {
     return { label: 'Not reviewed', tone: 'text-text-secondary', canGenerate: true };
   }
   if ('stale' in status) {
-    return { label: 'Moved on since review', tone: 'text-status-in_progress', canGenerate: true };
+    return { label: 'Updated since review', tone: 'text-status-in_progress', canGenerate: true };
   }
   return { label: 'Reviewed', tone: 'text-status-done', canGenerate: false };
 }
 
 export const InboxView: React.FC<InboxViewProps> = ({ onNavigate }) => {
-  const { candidates, errors, unsupportedProviders, isLoading, isFetching, refetch } =
-    useReviewCandidates();
+  const {
+    candidates,
+    errors,
+    unsupportedProviders,
+    isLoading,
+    isFetching,
+    error: queryError,
+    refetch,
+  } = useReviewCandidates();
   const { fetchRemotePr } = useTauri();
+  const { data: repos = [] } = useRepos();
+  const setSelectedRepoId = useAppStore(state => state.setSelectedRepoId);
+  const setParsedDiff = useAppStore(state => state.setParsedDiff);
+  const setViewMode = useAppStore(state => state.setViewMode);
   const setDiffText = useAppStore(state => state.setDiffText);
   const setPendingSource = useAppStore(state => state.setPendingSource);
   const setPrRef = useAppStore(state => state.setPrRef);
@@ -86,13 +103,18 @@ export const InboxView: React.FC<InboxViewProps> = ({ onNavigate }) => {
    * selection and the generation trigger.
    */
   const handleGenerate = async (candidate: AnnotatedCandidate) => {
-    const key = `${candidate.repo}#${candidate.number}`;
+    if (loadingKey) return;
+    const key = `${candidate.providerId}:${candidate.url}`;
     setLoadingKey(key);
     try {
       const parsed = await fetchRemotePr(candidate.url, candidate.providerId);
       setDiffText(parsed.diff_text);
       setPrRef(candidate.url);
-      if (parsed.source) setPendingSource(parsed.source);
+      const source = parsed.source ?? candidate.source;
+      setPendingSource(source);
+      setParsedDiff(parsed);
+      setViewMode('diff');
+      setSelectedRepoId(findSourceRepository(source, repos)?.id ?? '');
       onNavigate('generate');
     } catch (error) {
       toast('Could not load pull request', {
@@ -105,27 +127,29 @@ export const InboxView: React.FC<InboxViewProps> = ({ onNavigate }) => {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <header className="border-border flex items-center justify-between border-b px-6 py-4">
-        <div>
-          <h1 className="text-text-primary text-lg font-semibold">Inbox</h1>
-          <p className="text-text-secondary text-xs">
-            Pull requests where you have been asked to review
-          </p>
-        </div>
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="bg-bg-tertiary hover:bg-bg-secondary text-text-secondary hover:text-text-primary border-border flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-xs transition-colors disabled:opacity-50"
-        >
-          <ICONS.ACTION_REFRESH size={14} className={isFetching ? 'animate-spin' : undefined} />
-          Refresh
-        </button>
-      </header>
+      <PageHeader
+        title="Inbox"
+        description="Pull requests waiting for your review."
+        actions={
+          <button
+            type="button"
+            onClick={() => {
+              void refetch();
+            }}
+            disabled={isFetching}
+            aria-busy={isFetching}
+            className="bg-bg-secondary text-text-secondary hover:text-text-primary border-border flex h-9 items-center gap-2 rounded-md border px-3 text-xs transition-colors disabled:opacity-50"
+          >
+            <ICONS.ACTION_REFRESH size={14} className={isFetching ? 'animate-spin' : undefined} />
+            {isFetching ? 'Refreshing…' : 'Refresh'}
+          </button>
+        }
+      />
 
       {!isLoading && candidates.length > 0 && (
-        <div className="border-border bg-bg-secondary/20 flex flex-wrap items-center gap-3 border-b px-6 py-3">
+        <div className="inbox-toolbar border-border bg-bg-secondary/20 flex flex-wrap items-center gap-3 border-b px-8 py-4">
           <div
-            className="border-border bg-bg-secondary flex h-8 shrink-0 items-center rounded-md border p-0.5"
+            className="border-border bg-bg-secondary flex h-9 shrink-0 items-center rounded-md border p-0.5"
             role="group"
             aria-label="Filter inbox by review status"
           >
@@ -136,7 +160,7 @@ export const InboxView: React.FC<InboxViewProps> = ({ onNavigate }) => {
                 aria-pressed={filter === option}
                 aria-label={`${option[0].toUpperCase()}${option.slice(1)} (${counts[option]})`}
                 onClick={() => setFilter(option)}
-                className={`h-7 rounded-[4px] px-2.5 text-[10px] font-medium transition-[background-color,color,box-shadow] ${
+                className={`h-8 rounded-[4px] px-3 text-xs font-medium transition-[background-color,color,box-shadow] ${
                   filter === option
                     ? 'bg-bg-tertiary text-text-primary shadow-sm'
                     : 'text-text-disabled hover:text-text-secondary'
@@ -185,113 +209,131 @@ export const InboxView: React.FC<InboxViewProps> = ({ onNavigate }) => {
             </Select.Root>
           )}
 
-          <div className="relative max-w-sm min-w-[220px] flex-1">
-            <ICONS.ACTION_SEARCH
-              size={13}
-              className="text-text-disabled pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"
-            />
-            <input
-              type="search"
-              value={query}
-              onChange={event => setQuery(event.target.value)}
-              placeholder="Filter by title, repository, author, or PR number"
-              aria-label="Search inbox"
-              className="bg-bg-tertiary border-border text-text-primary placeholder:text-text-disabled focus:border-brand focus:ring-brand/20 h-8 w-full rounded-md border pr-8 pl-8 text-xs transition-[border-color,box-shadow] focus:ring-1 focus:outline-none"
-            />
-            {query && (
-              <button
-                type="button"
-                onClick={() => setQuery('')}
-                aria-label="Clear inbox search"
-                className="text-text-disabled hover:text-text-primary absolute top-1/2 right-2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded transition-colors"
-              >
-                <ICONS.ACTION_CLOSE size={11} />
-              </button>
-            )}
-          </div>
+          <SearchField
+            label="Search inbox"
+            clearLabel="Clear inbox search"
+            value={query}
+            onChange={setQuery}
+            placeholder="Title, repository, author, or PR number"
+          />
         </div>
       )}
 
-      <div className="custom-scrollbar flex-1 overflow-y-auto px-6 py-4">
-        {errors.map(err => (
-          <div
-            key={err.providerId}
-            className="border-status-error/20 bg-status-error/5 text-status-error mb-3 rounded-lg border px-3 py-2 text-xs"
-          >
-            <span className="font-medium">{err.providerName}</span> could not be reached:{' '}
-            {err.message}
-          </div>
-        ))}
-
-        {unsupportedProviders.length > 0 && (
-          <div className="border-border bg-bg-secondary/40 text-text-secondary mb-3 rounded-lg border px-3 py-2 text-xs">
-            {unsupportedProviders.join(', ')} cannot list review requests yet, so nothing from{' '}
-            {unsupportedProviders.length === 1 ? 'it' : 'them'} appears here.
-          </div>
-        )}
-
-        {isLoading && <p className="text-text-secondary text-sm">Checking for review requests…</p>}
-
-        {!isLoading && candidates.length === 0 && errors.length === 0 && (
-          <div className="text-text-secondary flex flex-col items-center justify-center py-16 text-center">
-            <ICONS.STATUS_SUCCESS size={40} className="mb-3 opacity-40" />
-            <p className="text-sm">Nothing is waiting on you.</p>
-          </div>
-        )}
-
-        {!isLoading && candidates.length > 0 && filteredCandidates.length === 0 && (
-          <div className="text-text-secondary flex flex-col items-center justify-center py-16 text-center">
-            <ICONS.ACTION_SEARCH size={32} className="mb-3 opacity-30" />
-            <p className="text-sm">No review requests match these filters.</p>
-            <button
-              type="button"
-              onClick={() => {
-                setFilter('all');
-                setRepository(ALL_REPOSITORIES);
-                setQuery('');
-              }}
-              className="text-brand hover:text-brand/80 mt-2 text-xs font-medium transition-colors"
-            >
-              Show all requests
-            </button>
-          </div>
-        )}
-
-        {grouped.actionable.length > 0 && (
-          <section className="mb-6">
-            <h2 className="text-text-secondary mb-2 text-xs font-bold tracking-wider uppercase">
-              Awaiting your review ({grouped.actionable.length})
-            </h2>
-            <div className="flex flex-col gap-2">
-              {grouped.actionable.map(candidate => (
-                <CandidateRow
-                  key={`${candidate.repo}#${candidate.number}`}
-                  candidate={candidate}
-                  onGenerate={handleGenerate}
-                  isLoading={loadingKey === `${candidate.repo}#${candidate.number}`}
-                />
-              ))}
+      <div className="product-page-body custom-scrollbar" aria-busy={isFetching}>
+        <div className="product-page-content">
+          {queryError && (
+            <div className="mb-4">
+              <InlineError
+                title={candidates.length ? 'Could not refresh inbox' : 'Could not load inbox'}
+                message={String(queryError)}
+                onRetry={() => {
+                  void refetch();
+                }}
+                isRetrying={isFetching}
+              />
             </div>
-          </section>
-        )}
-
-        {grouped.done.length > 0 && (
-          <section>
-            <h2 className="text-text-secondary mb-2 text-xs font-bold tracking-wider uppercase">
-              Already reviewed ({grouped.done.length})
-            </h2>
-            <div className="flex flex-col gap-2">
-              {grouped.done.map(candidate => (
-                <CandidateRow
-                  key={`${candidate.repo}#${candidate.number}`}
-                  candidate={candidate}
-                  onGenerate={handleGenerate}
-                  isLoading={loadingKey === `${candidate.repo}#${candidate.number}`}
-                />
-              ))}
+          )}
+          {errors.map(err => (
+            <div key={err.providerId} className="mb-4">
+              <InlineError
+                title={`${err.providerName} is unavailable`}
+                message={err.message}
+                onRetry={() => {
+                  void refetch();
+                }}
+                isRetrying={isFetching}
+              />
             </div>
-          </section>
-        )}
+          ))}
+
+          {unsupportedProviders.length > 0 && (
+            <div className="border-border/60 bg-bg-secondary/40 text-text-tertiary mb-4 rounded-lg border px-4 py-3 text-xs leading-5">
+              {unsupportedProviders.join(', ')} cannot list review requests yet, so nothing from{' '}
+              {unsupportedProviders.length === 1 ? 'it' : 'them'} appears here.
+            </div>
+          )}
+
+          {isLoading && (
+            <p className="text-text-secondary text-sm">Checking for review requests…</p>
+          )}
+
+          {!isLoading && !queryError && candidates.length === 0 && errors.length === 0 && (
+            <EmptyPanel
+              icon={<ICONS.VIEW_INBOX size={28} />}
+              title="No review requests"
+              description="Requests from your connected Git providers will appear here. Refresh to check for new work."
+            />
+          )}
+
+          {!isLoading && candidates.length > 0 && filteredCandidates.length === 0 && (
+            <EmptyPanel
+              icon={<ICONS.ACTION_SEARCH size={26} />}
+              title={
+                query.trim() || repository !== ALL_REPOSITORIES
+                  ? 'No matching review requests'
+                  : filter === 'reviewed'
+                    ? 'No reviewed requests yet'
+                    : 'Nothing is waiting on you'
+              }
+              description={
+                query.trim() || repository !== ALL_REPOSITORIES
+                  ? 'Try another title, repository, author, or PR number.'
+                  : 'You can still browse all requests.'
+              }
+              action={
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilter('all');
+                    setRepository(ALL_REPOSITORIES);
+                    setQuery('');
+                  }}
+                  className="text-text-secondary hover:text-text-primary border-border rounded-md border px-3 py-2 text-xs transition-colors"
+                >
+                  Show all requests
+                </button>
+              }
+            />
+          )}
+
+          {grouped.actionable.length > 0 && (
+            <section className="mb-6">
+              <h2 className="text-text-secondary mb-3 text-[13px] font-medium">
+                Awaiting your review ({grouped.actionable.length})
+              </h2>
+              <div className="flex flex-col gap-2">
+                {grouped.actionable.map(candidate => (
+                  <CandidateRow
+                    key={`${candidate.providerId}:${candidate.url}`}
+                    candidate={candidate}
+                    onGenerate={handleGenerate}
+                    isLoading={loadingKey === `${candidate.providerId}:${candidate.url}`}
+                    disabled={loadingKey !== null}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {grouped.done.length > 0 && (
+            <section>
+              <h2 className="text-text-secondary mb-3 text-[13px] font-medium">
+                Already reviewed ({grouped.done.length})
+              </h2>
+              <div className="flex flex-col gap-2">
+                {grouped.done.map(candidate => (
+                  <CandidateRow
+                    key={`${candidate.providerId}:${candidate.url}`}
+                    candidate={candidate}
+                    onGenerate={handleGenerate}
+                    isLoading={loadingKey === `${candidate.providerId}:${candidate.url}`}
+                    disabled={loadingKey !== null}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -316,49 +358,80 @@ interface CandidateRowProps {
   candidate: AnnotatedCandidate;
   onGenerate: (candidate: AnnotatedCandidate) => void;
   isLoading: boolean;
+  disabled: boolean;
 }
 
-const CandidateRow: React.FC<CandidateRowProps> = ({ candidate, onGenerate, isLoading }) => {
+const CandidateRow: React.FC<CandidateRowProps> = ({
+  candidate,
+  onGenerate,
+  isLoading,
+  disabled,
+}) => {
   const { openUrl } = useTauri();
   const { label, tone, canGenerate } = statusLabel(candidate.status);
+  const updated = new Date(candidate.updatedAt);
+  const updatedLabel = Number.isFinite(updated.getTime())
+    ? formatDistanceToNow(updated, { addSuffix: true })
+    : null;
 
   return (
-    <div className="border-border bg-bg-secondary/30 hover:bg-bg-secondary flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors">
+    <div className="inbox-request border-border/60 bg-bg-secondary/20 hover:bg-bg-secondary/40 flex items-center gap-4 rounded-lg border px-4 py-4 transition-colors">
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="text-text-disabled font-mono text-[10px]">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-text-tertiary font-mono text-[11px]">
             {candidate.repo}#{candidate.number}
           </span>
           {candidate.isDraft && (
-            <span className="text-text-disabled border-border rounded border px-1 text-[10px]">
-              DRAFT
+            <span className="text-text-tertiary border-border rounded border px-1.5 py-0.5 text-[11px]">
+              Draft
             </span>
           )}
-          <span className={`text-[10px] ${tone}`}>{label}</span>
+          <span className={`flex items-center gap-1.5 text-[11px] ${tone}`}>
+            <span className="h-1 w-1 rounded-full bg-current" aria-hidden="true" />
+            {label}
+          </span>
         </div>
-        <p className="text-text-primary mt-0.5 truncate text-sm">{candidate.title}</p>
-        <p className="text-text-secondary mt-0.5 text-[11px]">
-          {candidate.author} · updated {formatDistanceToNow(new Date(candidate.updatedAt))} ago
+        <p
+          title={candidate.title}
+          className="text-text-primary mt-2 line-clamp-2 text-[15px] leading-6 font-medium"
+        >
+          {candidate.title}
+        </p>
+        <p className="text-text-tertiary mt-2 text-xs">
+          {candidate.author}
+          {updatedLabel && (
+            <>
+              <span className="mx-2">·</span>
+              <time dateTime={candidate.updatedAt} title={updated.toLocaleString()}>
+                Updated {updatedLabel}
+              </time>
+            </>
+          )}
         </p>
       </div>
 
-      <button
-        onClick={() => openUrl(candidate.url)}
-        className="text-text-secondary hover:text-text-primary shrink-0 rounded p-1.5 transition-colors"
-        title="Open in browser"
-      >
-        <ICONS.ACTION_OPEN_WINDOW size={14} />
-      </button>
-
-      {canGenerate && (
+      <div className="inbox-request-actions flex shrink-0 items-center gap-2">
         <button
-          onClick={() => onGenerate(candidate)}
-          disabled={isLoading}
-          className="bg-brand/10 text-brand hover:bg-brand/20 border-brand/20 shrink-0 rounded border px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+          onClick={() => openUrl(candidate.url)}
+          className="text-text-secondary hover:text-text-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors"
+          title="Open in browser"
+          aria-label={`Open ${candidate.repo}#${candidate.number} in browser`}
         >
-          {isLoading ? 'Loading…' : 'Generate'}
+          <ICONS.ACTION_OPEN_WINDOW size={14} />
         </button>
-      )}
+
+        {canGenerate && (
+          <button
+            onClick={() => onGenerate(candidate)}
+            disabled={disabled}
+            aria-busy={isLoading}
+            aria-label={`Review ${candidate.repo}#${candidate.number}`}
+            className="bg-brand/10 text-brand hover:bg-brand/20 border-brand/20 flex h-8 min-w-20 shrink-0 items-center justify-center rounded-md border px-3 text-xs font-medium transition-colors disabled:opacity-50"
+          >
+            {isLoading ? 'Loading…' : 'Review'}
+          </button>
+        )}
+      </div>
     </div>
   );
 };
