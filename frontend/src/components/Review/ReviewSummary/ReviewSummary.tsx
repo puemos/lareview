@@ -46,6 +46,17 @@ const SourceBadge: React.FC<SourceBadgeProps> = ({ source }) => {
     return <span className="text-text-disabled text-xs">Diff paste</span>;
   }
 
+  if (source.type === 'local_git') {
+    return (
+      <span
+        className="text-text-secondary truncate text-xs"
+        title={`${source.base_sha} → ${source.head_sha}`}
+      >
+        Local Git · {source.base_ref} → {source.head_ref}
+      </span>
+    );
+  }
+
   const isGitHub = source.type === 'github_pr';
   const label = isGitHub
     ? `${source.owner}/${source.repo}#${source.number}`

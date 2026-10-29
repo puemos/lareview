@@ -1,6 +1,82 @@
 use std::path::Path;
 use std::process::Command;
 
+/// Compare two locally available commits without depending on a hosting service.
+pub struct LocalGitDiff {
+    pub diff_text: String,
+    pub base_sha: String,
+    pub head_sha: String,
+}
+
+pub async fn compare_refs(
+    repo_path: &Path,
+    base: &str,
+    head: &str,
+) -> anyhow::Result<LocalGitDiff> {
+    use anyhow::{Context, bail};
+
+    let git = crate::infra::shell::find_bin("git").context("Could not find 'git' executable")?;
+    let command = || {
+        let mut command = tokio::process::Command::new(&git);
+        command
+            .arg("-C")
+            .arg(repo_path)
+            .env("LC_ALL", "C")
+            .env("GIT_NO_LAZY_FETCH", "1")
+            .kill_on_drop(true);
+        command
+    };
+
+    let mut commits = Vec::new();
+    for reference in [base, head] {
+        let reference = reference.trim();
+        if reference.is_empty() || reference.starts_with('-') {
+            bail!("Enter a branch, tag, or commit for both refs");
+        }
+        let revision = format!("{reference}^{{commit}}");
+        let output = command()
+            .args(["rev-parse", "--verify", "--end-of-options", &revision])
+            .output()
+            .await
+            .context("Failed to resolve Git ref")?;
+        if !output.status.success() {
+            bail!(
+                "Could not resolve ref '{reference}'. Fetch it with git first, then compare again."
+            );
+        }
+        commits.push(String::from_utf8(output.stdout)?.trim().to_string());
+    }
+
+    let output = command()
+        .args([
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--no-color",
+            &commits[0],
+            &commits[1],
+            "--",
+        ])
+        .output()
+        .await
+        .context("Failed to run git diff")?;
+    if !output.status.success() {
+        bail!(
+            "git diff failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
+    }
+    let diff_text = String::from_utf8(output.stdout)?;
+    if diff_text.trim().is_empty() {
+        bail!("No changes between '{base}' and '{head}'");
+    }
+    Ok(LocalGitDiff {
+        diff_text,
+        base_sha: commits.remove(0),
+        head_sha: commits.remove(0),
+    })
+}
+
 /// Extract remote URLs from a git repository
 pub fn extract_git_remotes(repo_path: &Path) -> Vec<String> {
     let output = Command::new("git")

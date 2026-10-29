@@ -7,17 +7,21 @@ const generationMock = vi.hoisted(() => ({
   startGeneration: vi.fn(),
   stopGeneration: vi.fn(),
 }));
+const localGitMock = vi.hoisted(() => ({
+  fetch: vi.fn(),
+  repos: [] as Array<{ id: string; name: string; path: string; remotes: string[] }>,
+}));
 
 vi.mock('../../../store');
 vi.mock('../../../hooks/useTauri', () => ({
-  useTauri: () => ({ fetchRemotePr: vi.fn() }),
+  useTauri: () => ({ fetchRemotePr: vi.fn(), fetchLocalGitDiff: localGitMock.fetch }),
 }));
 vi.mock('../../../hooks/useAgents', () => ({
   useAgents: () => ({ data: [{ id: 'test-agent', name: 'Test Agent', available: true }] }),
 }));
 vi.mock('../../../hooks/useRepos', () => ({
   useRepos: () => ({
-    data: [],
+    data: localGitMock.repos,
     addRepo: { isPending: false, mutateAsync: vi.fn() },
     cloneRepo: { isPending: false, mutateAsync: vi.fn() },
     selectRepoFolder: vi.fn(),
@@ -55,6 +59,7 @@ describe('GenerateView', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    localGitMock.repos = [];
     generationMock.startGeneration.mockResolvedValue({
       review_id: 'review-new',
       run_id: 'run-new',
@@ -120,5 +125,84 @@ describe('GenerateView', () => {
       expect(screen.getByTestId('vcs-input-card')).toHaveAttribute('data-prominent', 'false');
     });
     expect(screen.queryByText('Start a review')).not.toBeInTheDocument();
+  });
+
+  it('loads local refs into the diff preview and keeps their resolved source', async () => {
+    store.diffText = '';
+    store.selectedRepoId = 'on-prem';
+    localGitMock.repos = [{ id: 'on-prem', name: 'Internal repo', path: '/repo', remotes: [] }];
+    const source = {
+      type: 'local_git',
+      repo_id: 'on-prem',
+      base_ref: 'release/v1',
+      head_ref: 'HEAD',
+      base_sha: 'abc',
+      head_sha: 'def',
+    };
+    const diff = {
+      diff_text: 'diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts\n+const a = 1;',
+      source,
+    };
+    localGitMock.fetch.mockResolvedValue(diff);
+    const { rerender } = render(<GenerateView onNavigate={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Local Git' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Base ref' }), {
+      target: { value: 'release/v1' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Compare refs' }));
+    await waitFor(() =>
+      expect(localGitMock.fetch).toHaveBeenCalledWith('on-prem', 'release/v1', 'HEAD')
+    );
+    await waitFor(() => expect(store.setPendingSource).toHaveBeenCalledWith(source));
+    expect(store.setParsedDiff).toHaveBeenCalledWith(diff);
+    expect(store.setViewMode).toHaveBeenCalledWith('diff');
+    expect(screen.getByTestId('start-review')).toBeEnabled();
+    // Switching a fetched diff to Raw must not immediately switch back to Preview.
+    (store.setViewMode as ReturnType<typeof vi.fn>).mockClear();
+    store.viewMode = 'raw';
+    rerender(<GenerateView onNavigate={vi.fn()} />);
+    expect(store.setViewMode).not.toHaveBeenCalled();
+  });
+
+  it('requires a linked repository and links to the repositories view', () => {
+    store.diffText = '';
+    const navigate = vi.fn();
+    render(<GenerateView onNavigate={navigate} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Local Git' }));
+    expect(screen.getByRole('button', { name: 'Compare refs' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'link a repository' }));
+    expect(navigate).toHaveBeenCalledWith('repos');
+  });
+
+  it('shows Git errors and prevents starting a review after a failed comparison', async () => {
+    store.diffText = '';
+    store.selectedRepoId = 'on-prem';
+    localGitMock.repos = [{ id: 'on-prem', name: 'Internal repo', path: '/repo', remotes: [] }];
+    localGitMock.fetch.mockRejectedValue('Could not resolve ref: missing-branch');
+    render(<GenerateView onNavigate={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Local Git' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Compare refs' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not resolve ref');
+    expect(screen.getByTestId('start-review')).toBeDisabled();
+    expect(store.setPendingSource).not.toHaveBeenCalled();
+  });
+
+  it('passes the local Git source and repository into review generation', async () => {
+    store.selectedRepoId = 'on-prem';
+    store.pendingSource = {
+      type: 'local_git',
+      repo_id: 'on-prem',
+      base_ref: 'main',
+      head_ref: 'HEAD',
+      base_sha: 'abc',
+      head_sha: 'def',
+    };
+    render(<GenerateView onNavigate={vi.fn()} />);
+    fireEvent.click(await screen.findByTestId('start-review'));
+    await waitFor(() =>
+      expect(generationMock.startGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({ repoId: 'on-prem', source: store.pendingSource })
+      )
+    );
   });
 });

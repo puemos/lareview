@@ -37,7 +37,8 @@ fn status_for(candidate: &ReviewCandidate, reviews: &[Review]) -> CandidateStatu
     let reviewed_head = match &review.source {
         crate::domain::ReviewSource::GitHubPr { head_sha, .. }
         | crate::domain::ReviewSource::GitLabMr { head_sha, .. } => head_sha.as_deref(),
-        crate::domain::ReviewSource::DiffPaste { .. } => None,
+        crate::domain::ReviewSource::DiffPaste { .. }
+        | crate::domain::ReviewSource::LocalGit { .. } => None,
     };
 
     match (candidate.head_sha(), reviewed_head) {

@@ -175,6 +175,14 @@ pub fn get_repo_root_for_review(
 
     // Build the expected remote URL pattern based on source type
     let expected_patterns: Vec<String> = match &review.source {
+        ReviewSource::LocalGit { repo_id, .. } => {
+            return Ok(db
+                .get_linked_repos()
+                .map_err(|e| e.to_string())?
+                .into_iter()
+                .find(|repo| repo.id == *repo_id)
+                .map(|repo| repo.path));
+        }
         ReviewSource::GitHubPr { owner, repo, .. } => {
             vec![
                 format!("github.com/{}/{}", owner, repo),

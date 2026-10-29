@@ -331,6 +331,14 @@ export interface Review {
 }
 
 export type ReviewSource =
+  | {
+      type: 'local_git';
+      repo_id: string;
+      base_ref: string;
+      head_ref: string;
+      base_sha: string;
+      head_sha: string;
+    }
   | { type: 'diff_paste'; diff_hash: string }
   | {
       type: 'github_pr';

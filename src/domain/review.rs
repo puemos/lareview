@@ -35,6 +35,14 @@ pub struct Review {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ReviewSource {
+    /// Two commit snapshots from a linked repository on any Git host.
+    LocalGit {
+        repo_id: String,
+        base_ref: String,
+        head_ref: String,
+        base_sha: String,
+        head_sha: String,
+    },
     /// Review is based purely on a pasted diff.
     DiffPaste {
         /// Hash of the unified diff used for the run that created this review.
@@ -86,7 +94,7 @@ pub enum ReviewSource {
 impl ReviewSource {
     pub fn url(&self) -> Option<String> {
         match self {
-            ReviewSource::DiffPaste { .. } => None,
+            ReviewSource::DiffPaste { .. } | ReviewSource::LocalGit { .. } => None,
             ReviewSource::GitHubPr { url, .. } => url.clone(),
             ReviewSource::GitLabMr { url, .. } => url.clone(),
         }
@@ -94,6 +102,7 @@ impl ReviewSource {
 
     pub fn head_sha(&self) -> Option<String> {
         match self {
+            ReviewSource::LocalGit { head_sha, .. } => Some(head_sha.clone()),
             ReviewSource::DiffPaste { .. } => None,
             ReviewSource::GitHubPr { head_sha, .. } => head_sha.clone(),
             ReviewSource::GitLabMr { head_sha, .. } => head_sha.clone(),
@@ -102,7 +111,7 @@ impl ReviewSource {
 
     pub fn provider_id(&self) -> Option<&str> {
         match self {
-            ReviewSource::DiffPaste { .. } => None,
+            ReviewSource::DiffPaste { .. } | ReviewSource::LocalGit { .. } => None,
             ReviewSource::GitHubPr { .. } => Some("github"),
             ReviewSource::GitLabMr { .. } => Some("gitlab"),
         }

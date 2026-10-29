@@ -420,6 +420,13 @@ export const useTauri = () => {
     return invoke('delete_review', { reviewId });
   }, []);
 
+  const fetchLocalGitDiff = useCallback(
+    async (repoId: string, base: string, head: string): Promise<ParsedDiff> => {
+      return invoke('fetch_local_git_diff', { repoId, base, head });
+    },
+    []
+  );
+
   const fetchRemotePr = useCallback(
     async (prRef: string, providerHint?: string | null): Promise<ParsedDiff> => {
       return invoke('fetch_remote_pr', { prRef, providerHint });
@@ -632,6 +639,7 @@ export const useTauri = () => {
     getFeedbackDiffSnippet,
     exportReview,
     fetchRemotePr,
+    fetchLocalGitDiff,
     exportReviewMarkdown,
     pushRemoteReview,
     pushRemoteFeedback,

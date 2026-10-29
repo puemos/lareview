@@ -10,6 +10,7 @@ import { useGeneration } from '../../contexts/useGeneration';
 import { DiffEditorPanel } from './DiffEditorPanel';
 import { AgentConfigPanel } from './AgentConfigPanel';
 import { VcsInputCard } from './VcsInputCard';
+import { LocalGitInput } from './LocalGitInput';
 import { ViewModeToggle } from './ViewModeToggle';
 import { DiffStats } from './DiffStats';
 import { countAdditions, countDeletions } from './DiffEditorPanel';
@@ -40,7 +41,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   const [validationError, setValidationError] = useState<string | null>(null);
   const shouldReduceMotion = useReducedMotion();
 
-  const { fetchRemotePr } = useTauri();
+  const { fetchRemotePr, fetchLocalGitDiff } = useTauri();
   const { startGeneration } = useGeneration();
   const { data: agents = [] } = useAgents();
   const { data: repos = [], addRepo, cloneRepo, selectRepoFolder } = useRepos();
@@ -64,6 +65,9 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   const setPrRef = useAppStore(state => state.setPrRef);
   const viewMode = useAppStore(state => state.viewMode);
   const setViewMode = useAppStore(state => state.setViewMode);
+  const [sourceMode, setSourceMode] = useState<'remote' | 'local'>(
+    pendingSource?.type === 'local_git' ? 'local' : 'remote'
+  );
 
   const [repoLinkCallout, setRepoLinkCallout] = useState<RepoLinkCallout | null>(null);
 
@@ -270,6 +274,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     await Promise.resolve();
     try {
       const diff = await fetchRemotePr(prRef, null);
+      lastAutoSwitchedTextRef.current = diff.diff_text;
       setDiffText(diff.diff_text);
       if (diff.source) {
         setPendingSource(diff.source);
@@ -309,6 +314,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   ]);
 
   const handleClear = useCallback(() => {
+    lastAutoSwitchedTextRef.current = '';
     setDiffText('');
     setDiffTextStore('');
     setParsedDiff(null);
@@ -319,6 +325,38 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     setRepoLinkCallout(null);
   }, [setDiffTextStore, setParsedDiff, setPendingSource, setPrRef, setViewMode]);
 
+  const handleCompareRefs = async (base: string, head: string) => {
+    if (!selectedRepoId) return;
+    setIsLoadingPr(true);
+    setValidationError(null);
+    try {
+      const diff = await fetchLocalGitDiff(selectedRepoId, base, head);
+      lastAutoSwitchedTextRef.current = diff.diff_text;
+      setDiffText(diff.diff_text);
+      setParsedDiff(diff);
+      setPendingSource(diff.source ?? null);
+      setPrRef('');
+      setRepoLinkCallout(null);
+      setViewMode('diff');
+    } catch (error) {
+      setValidationError(String(error));
+    } finally {
+      setIsLoadingPr(false);
+    }
+  };
+
+  const localGitInput = (
+    <LocalGitInput
+      repoName={repos.find(repo => repo.id === selectedRepoId)?.name}
+      source={pendingSource}
+      isLoading={isLoadingPr}
+      disabled={isStarting}
+      error={validationError}
+      onCompare={handleCompareRefs}
+      onLinkRepo={() => _onNavigate('repos')}
+    />
+  );
+
   return (
     <div className="bg-bg-primary flex h-full flex-col">
       <AgentConfigPanel
@@ -327,10 +365,14 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
         selectedAgentId={agentId}
         selectedRepoId={selectedRepoId}
         onAgentSelect={setAgentIdStore}
-        onRepoSelect={setSelectedRepoId}
+        onRepoSelect={repoId => {
+          if (pendingSource?.type === 'local_git' && repoId !== selectedRepoId) handleClear();
+          setSelectedRepoId(repoId);
+        }}
         isStarting={isStarting}
+        isLoadingSource={isLoadingPr}
         onGenerate={handleGenerate}
-        isDiffValid={isDiffValid}
+        isDiffValid={isDiffValid && !isLoadingPr && !validationError}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -338,7 +380,28 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
           <div className="bg-bg-primary relative flex min-w-0 flex-1 flex-col">
             <div className="flex flex-col gap-2 p-4 pb-0">
               <div className="flex items-center gap-3">
-                {!isComposerEmpty && (
+                <div
+                  className="border-border flex shrink-0 gap-1 rounded-md border p-1"
+                  role="group"
+                  aria-label="Review input source"
+                >
+                  {(['remote', 'local'] as const).map(mode => (
+                    <button
+                      key={mode}
+                      type="button"
+                      aria-pressed={sourceMode === mode}
+                      disabled={isStarting || isLoadingPr}
+                      onClick={() => {
+                        setSourceMode(mode);
+                        setValidationError(null);
+                      }}
+                      className={`rounded px-2 py-1 text-[11px] transition-colors ${sourceMode === mode ? 'bg-bg-tertiary text-text-primary' : 'text-text-tertiary hover:text-text-primary'}`}
+                    >
+                      {mode === 'remote' ? 'Remote request' : 'Local Git'}
+                    </button>
+                  ))}
+                </div>
+                {!isComposerEmpty && sourceMode === 'remote' && (
                   <motion.div
                     layoutId="review-source-input"
                     transition={{
@@ -367,6 +430,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
                   {(diffText.trim() || prRef.trim()) && (
                     <button
                       onClick={handleClear}
+                      disabled={isStarting || isLoadingPr}
                       className="bg-bg-secondary/90 hover:bg-bg-tertiary text-text-secondary hover:text-text-primary ring-border flex h-8 items-center gap-1.5 rounded-md px-3 text-[10px] font-medium shadow-sm ring-1 backdrop-blur-sm transition-[background-color,color,transform] active:scale-[0.97]"
                     >
                       <Trash size={13} />
@@ -381,6 +445,10 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
                   />
                 </div>
               </div>
+
+              {!isComposerEmpty && sourceMode === 'local' && (
+                <div className="max-w-xl pb-2">{localGitInput}</div>
+              )}
 
               {repoLinkCallout && (
                 <div className="pointer-events-auto flex items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200 shadow-sm">
@@ -424,29 +492,35 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
                   <div className="mb-4 text-center">
                     <h1 className="text-text-primary text-base font-semibold">Start a review</h1>
                     <p className="text-text-tertiary mt-1 text-xs">
-                      Paste a pull request or merge request link
+                      {sourceMode === 'local'
+                        ? 'Review changes from any Git host, including on-prem repositories'
+                        : 'Paste a pull request or merge request link'}
                     </p>
                   </div>
-                  <motion.div
-                    layoutId="review-source-input"
-                    transition={{
-                      layout: {
-                        duration: shouldReduceMotion ? 0 : 0.22,
-                        ease: [0.23, 1, 0.32, 1],
-                      },
-                    }}
-                  >
-                    <VcsInputCard
-                      pendingSource={pendingSource}
-                      prRef={prRef}
-                      onPrRefChange={setPrRef}
-                      onFetch={handleFetchPr}
-                      isLoading={isLoadingPr}
-                      disabled={isStarting}
-                      onClear={handleClear}
-                      prominent
-                    />
-                  </motion.div>
+                  {sourceMode === 'local' ? (
+                    localGitInput
+                  ) : (
+                    <motion.div
+                      layoutId="review-source-input"
+                      transition={{
+                        layout: {
+                          duration: shouldReduceMotion ? 0 : 0.22,
+                          ease: [0.23, 1, 0.32, 1],
+                        },
+                      }}
+                    >
+                      <VcsInputCard
+                        pendingSource={pendingSource}
+                        prRef={prRef}
+                        onPrRefChange={setPrRef}
+                        onFetch={handleFetchPr}
+                        isLoading={isLoadingPr}
+                        disabled={isStarting}
+                        onClear={handleClear}
+                        prominent
+                      />
+                    </motion.div>
+                  )}
                   <p className="text-text-disabled mt-3 text-center text-[11px]">
                     Or paste a unified diff directly into the editor
                   </p>
@@ -458,7 +532,9 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
               diffText={diffText}
               viewMode={viewMode}
               onDiffTextChange={setDiffText}
-              validationError={diffValidationError || validationError}
+              validationError={
+                diffValidationError || (sourceMode === 'remote' ? validationError : null)
+              }
             />
 
             <DiffStats

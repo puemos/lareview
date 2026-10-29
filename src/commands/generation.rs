@@ -191,6 +191,17 @@ pub async fn generate_review(
         diff_hash: diff_hash.clone(),
     });
     let initial_title = match &source {
+        ReviewSource::LocalGit {
+            repo_id: source_repo,
+            base_ref,
+            head_ref,
+            ..
+        } => {
+            if repo_id.as_ref() != Some(source_repo) {
+                return Err("The repository changed. Compare the local refs again before starting a review.".to_string());
+            }
+            format!("{base_ref} → {head_ref}")
+        }
         ReviewSource::GitHubPr { repo, number, .. } => format!("PR {repo}#{number}"),
         ReviewSource::GitLabMr {
             project_path,

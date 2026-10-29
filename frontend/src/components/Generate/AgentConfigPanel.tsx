@@ -24,6 +24,7 @@ interface AgentConfigPanelProps {
   onAgentSelect: (agentId: string) => void;
   onRepoSelect: (repoId: string) => void;
   isStarting: boolean;
+  isLoadingSource?: boolean;
   onGenerate: () => void;
   isDiffValid: boolean;
 }
@@ -36,6 +37,7 @@ export const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
   onAgentSelect,
   onRepoSelect,
   isStarting,
+  isLoadingSource = false,
   onGenerate,
   isDiffValid,
 }) => {
@@ -54,7 +56,7 @@ export const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({
         <HarnessConfigControls
           agentId={selectedAgentId}
           enabled={agents.some(agent => agent.id === selectedAgentId && agent.available !== false)}
-          disabled={isStarting}
+          disabled={isStarting || isLoadingSource}
           compact
         />
       </div>

@@ -87,6 +87,23 @@ lareview --agent claude
 
 The CLI launches the GUI in the background and passes your diff/repo info seamlessly.
 
+## On-prem and other Git hosts
+
+Clone your repository using your usual Git credentials, then link the local folder in
+**Repositories**. In **Generate Review**, select that repository, choose **Local Git**,
+enter a base and head branch, tag, or commit, and click **Compare refs**. Inspect the diff,
+then click **Start Review** with your chosen agent.
+
+Comparison uses the two commit snapshots (`git diff BASE HEAD`) already present locally.
+Fetch remote branches with Git first. LaReview does not change your checkout or staged
+changes. The review records both resolved commit IDs and can use the head commit through
+the existing snapshot permission flow. This works with on-prem Git, Bitbucket, Gitea,
+Azure DevOps, GitHub Enterprise, and repositories without a remote. Host-specific PR
+metadata, inbox, and posting comments remain available through the GitHub/GitLab integrations.
+
+The terminal workflow also works from any local clone: `lareview main feature` or
+`git diff main feature | lareview`.
+
 ## Supported Agents
 
 LaReview launches compatible harnesses through commands already available on your `PATH`, or an executable override configured in Settings. It does not provide an in-app harness installer.
