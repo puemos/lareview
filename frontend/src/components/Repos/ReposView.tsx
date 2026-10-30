@@ -201,16 +201,8 @@ const RepoCard: React.FC<RepoCardProps> = ({ repo, onReview, onRemove }) => (
       </p>
 
       <div className="border-border/50 mt-2 flex w-full items-center gap-3 border-t pt-3">
-        <div className="flex items-center gap-1.5">
-          <span
-            className={`h-1.5 w-1.5 rounded-full ${repo.review_count > 0 ? 'bg-status-done' : 'bg-status-todo'}`}
-          />
-          <span className="text-text-secondary text-[11px]">
-            {repo.review_count ?? 0} {repo.review_count === 1 ? 'review' : 'reviews'}
-          </span>
-        </div>
         {displayDate(repo.linked_at) && (
-          <time dateTime={repo.linked_at} className="text-text-disabled ml-auto text-[11px]">
+          <time dateTime={repo.linked_at} className="text-text-disabled text-[11px]">
             Linked {displayDate(repo.linked_at)}
           </time>
         )}

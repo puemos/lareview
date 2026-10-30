@@ -1,6 +1,6 @@
 # Product screenshots
 
-The website and README share the assets in `assets/screenshots/`. They show the current workbench with an **authored, illustrative review**, not customer data or a claimed benchmark of agent performance.
+The website and README share focused UI captures in `assets/screenshots/`. The hero uses the original recorded walkthrough in `assets/video/demo.mp4`, with a poster taken from that same video. They show the current workbench with an **authored, illustrative review**, not customer data or a claimed benchmark of agent performance.
 
 ## Example scenario
 
@@ -14,7 +14,7 @@ Four review tasks cover atomic claims, acknowledgment after commit, concurrent/r
 - **Error handling:** the unawaited transaction allows a successful response before the payment commits.
 - **Test coverage:** sequential replay does not exercise concurrent delivery or rollback followed by redelivery.
 
-Feedback and issue checks refer to the same findings, so the summary counts two blockers once. The merge-confidence score is 2/5. The diagram describes the code as written, including the unawaited branch; it does not imply that the proposed fix is already implemented. The reviewer reply describes the next action, rather than claiming the fix has shipped.
+Feedback and issue checks refer to the same findings, so the summary counts two blockers once. The merge-confidence score is 2/5. The diagram focuses on the new-delivery failure path, including the unawaited branch and the receipt that remains after rollback; it does not imply that the proposed fix is already implemented. The [diagram source](examples/webhook-review.mmd) preserves the illustrated failure path. The reviewer reply in the example data describes the next action, rather than claiming the fix has shipped.
 
 The rules use the same transaction and retry requirements. Learning patterns illustrate prior feedback preferences: prioritize observable order-state failures, skip generated-client formatting comments, and recognize explicit test fixture IDs. Their rejection counts are example history, with no pending rejections.
 
@@ -22,26 +22,28 @@ The rules use the same transaction and retry requirements. Learning patterns ill
 
 | Asset | Content |
 | --- | --- |
-| `generate` | Copilot, linked repository, loaded merge request, actual parsed diff |
-| `review` | Overview, task progress, changed-file risk, checks, feedback |
+| `generate` | Local Git composer with the same commerce-api checkout and valid main / feat/webhook-retries refs |
+| `review` | Review-task component, grouped by flow with progress and risk |
 | `review-analysis` | Atomic-claim verification plan and insight |
 | `review-changes` | Actual handler hunk referenced by the task |
-| `review-feedback-item` | Receipt-write anchor, evidence, reviewer reply |
-| `review-diagram` | Current webhook execution flow |
+| `review-feedback-item` | Complete finding header, receipt-write anchor, and supporting explanation |
+| `review-diagram` | Current new-delivery failure path |
 | `rules` | Transaction rules, filtered using the real search control |
-| `repos` | Linked example repository and local-review entry point |
-| `learnings` | Three enabled feedback preferences |
-| `export-github` | Seven items selected for GitLab export; legacy filename retained for existing links |
-| `settings` | Current agent settings, with command paths collapsed |
+| `repos` | Linked example repository card and local-review entry point |
+| `learnings` | Two enabled preferences shown in full; the example has three patterns in total |
+| `export-github` | Feedback selection and explicit publish controls for the seven selected items; legacy filename retained |
+| `settings` | Neutral Copilot agent row, with command details collapsed |
 
 ## Capturing and publishing
 
-Capture the running frontend using an isolated example database and the real diff parser. Keep sample transport adapters outside production code. Navigate with the visible UI, wait for data and diagrams to finish rendering, and capture the entire app viewport. Do not paint over UI, add invented controls, or publish loading/error states. Export selection is shown before posting; no sample review is published to a remote provider.
+Capture the running frontend using an isolated example database and the real diff parser. Keep sample transport adapters outside production code. Navigate with the visible UI and wait for loaded content. Capture the complete feature component or a clearly bounded detail, keeping the finding, code, and explanation together. Avoid unrelated navigation, empty canvas, partial text, recording overlays, or invented controls.
 
-Update both PNG and WebP for each asset. The current captures are 1430 × 914 pixels, and the WebP files use quality 92. When an image changes, update its `?v=` URL suffix in the landing page, social-card source, and README to the first 12 characters of its SHA-256 hash. This refreshes browser and image-proxy caches without breaking the existing asset paths.
+Use lossless PNG captures at high display resolution, then create WebP copies at quality 92. Most current component captures use four output pixels per CSS pixel. Image dimensions follow the actual content rather than forcing every feature into a full application-window rectangle. Preserve that aspect ratio in the website and lightbox.
 
-Preserve the whole image on the website; the hero must not crop it or autoplay a recording of an older interface.
+When an image changes, update its `?v=` URL suffix in the landing page, social-card source, and README to the first 12 characters of its SHA-256 hash. This refreshes browser and image-proxy caches without breaking existing asset paths.
 
-`landing/social-card.html` is the 1200 × 630 source for `assets/og-image.jpg`. Render it from a local repository server, wait for its screenshot image to load, and capture the full card. It uses the same overview asset, without editing the workbench pixels.
+Keep the original hero video. Its poster must be a clean frame from the recording, rather than an unrelated app screenshot. Feature images use the current authored example; the original video remains a recorded product walkthrough.
+
+`landing/social-card.html` is the 1200 × 630 source for `assets/og-image.jpg`. Render it from a local repository server, wait for its screenshot image to load, and capture the full card. It uses the same review-task asset, without editing the workbench pixels.
 
 After replacing assets, build `landing`, check the desktop and mobile page, and open screenshot previews with both the keyboard and pointer. Confirm that Escape and the close button dismiss the preview and return focus to its trigger.

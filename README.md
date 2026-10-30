@@ -17,7 +17,7 @@
   <a href="https://www.rust-lang.org"><img alt="Rust" src="https://img.shields.io/badge/rust-1.99.1-orange?style=flat-square" /></a>
 </p>
 
-[![Example payment webhook review with four tasks, six files, and two blockers](assets/screenshots/review.webp?v=f8a055e48b36)](assets/screenshots/review.webp?v=f8a055e48b36)
+[![Watch the LaReview workflow](assets/video/demo-poster.webp?v=a25c238b7035)](https://github.com/user-attachments/assets/28abaf1e-9100-4484-b6a5-18d8dfec427e)
 
 ---
 
@@ -27,26 +27,40 @@ Unlike auto-review bots that post comment spam, LaReview is a local-first tool t
 
 ## Example review
 
-The screenshots follow an illustrative payment-webhook review: six changed files, four tasks, and two blockers. [See the example scenario](docs/SCREENSHOTS.md).
+The feature screenshots follow an illustrative payment-webhook review: six changed files, four tasks, and two blockers. [See the example scenario](docs/SCREENSHOTS.md).
 
 ## Key Features
 
 LaReview is designed for a local-first, secure, and focused review experience.
 
-| Screenshot                                                                                    | Feature                                                                                                                                                                                                                   |
-| :-------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| <img src="assets/screenshots/generate.webp?v=86c4b35f5812" width="400" alt="Plan Generation View" />         | **AI-Powered Planning**<br>Load a GitHub or GitLab pull request, compare local Git refs, or paste a diff. LaReview acts as a staff engineer, looking for flows (e.g. auth, api) and risks to build a structured review plan.                                         |
-| <img src="assets/screenshots/review.webp?v=f8a055e48b36" width="400" alt="Review Summary View" />             | **Review Summary**<br>Get a bird's-eye view of your review with Issue Checklist, Feedback items, Review Tasks grouped by flow, and a file list showing risk distribution.                                             |
-| <img src="assets/screenshots/review-analysis.webp?v=7441fda461dd" width="400" alt="Review task analysis with an actionable verification plan" /> | **Task Analysis**<br>Work through a focused verification plan for each logical concern. Mark tasks as **To Do**, **In Progress**, or **Done**. Attach contextual notes to specific tasks or lines of code to keep track of your thoughts. |
-| <img src="assets/screenshots/review-changes.webp?v=061e18650ff9" width="400" alt="Task-focused Diff" />      | **Task-Focused Diffs**<br>Review one logical concern at a time. The workbench isolates relevant code hunks for each task, eliminating noise.                                                                              |
-| <img src="assets/screenshots/review-feedback-item.webp?v=19c6f7cf3ea5" width="400" alt="Feedback Items" />   | **High-Signal Framework**<br>The AI proactively identifies bugs and authenticates them against your rules. No comment spam—just focused feedback threads anchored to specific lines.                                      |
-| <img src="assets/screenshots/repos.webp?v=349a6c7a17a8" width="400" alt="Linked Repositories" />             | **Local Context**<br>Link local Git repos to give the agent full access to search your codebase. Works with your existing AI coding agent using context from your local checkout.                 |
-| <img src="assets/screenshots/review-diagram.webp?v=77bde6537802" width="400" alt="Diagram Viewer" />         | **Visual Diagrams**<br>Visualize the flow. Automatically generate diagrams to see architectural changes before you read a single line of code. Rendered with Mermaid.                                                             |
-| <img src="assets/screenshots/rules.webp?v=d394e3140ac9" width="400" alt="Rules View" />                      | **Team Rules**<br>Define rules like "DB queries must have timeouts" or "API changes need a migration note" to enforce standards automatically.                                                                            |
-| <img src="assets/screenshots/learnings.webp?v=4f15958d9285" width="400" alt="Learning Patterns View" />      | **Learning Patterns**<br>The AI learns from rejected feedback. Mark suggestions as "ignored" during reviews, then analyze rejections to discover patterns that calibrate future reviews—fewer nitpicks, more signal.      |
-| <img src="assets/screenshots/export-github.webp?v=5277b02ea74f" width="400" alt="GitLab export selection for the example webhook review" />             | **Git Host Sync**<br>Submit your review feedback directly to GitHub or GitLab PRs with automatic summary generation.                                                                                                      |
-| <img src="assets/screenshots/export-github.webp?v=5277b02ea74f" width="400" alt="Export & Share" />          | **Export & Share**<br>Export your review summary to Markdown with diagrams and code insights. Copy the selected tasks and feedback to your clipboard.                                                                                          |
-| <img src="assets/screenshots/generate.webp?v=86c4b35f5812" width="400" alt="CLI Support" />                  | **CLI Support**<br>Launch reviews from the terminal: `lareview`, `lareview pr owner/repo#123`, `git diff &#124; lareview`, or `lareview --agent claude`.                                                                  |
+| Feature | Workflow |
+| :--- | :--- |
+| **AI-Powered Planning** | Load a GitHub or GitLab pull request, compare local Git refs, or paste a diff. LaReview acts as a staff engineer, looking for flows (e.g. auth, api) and risks to build a structured review plan. |
+| **Review Tasks** | Follow the review plan by flow, track progress, and focus on the highest-risk concerns first. |
+| **Task Analysis** | Work through a focused verification plan for each logical concern. Mark tasks as **To Do**, **In Progress**, or **Done**. Attach contextual notes to specific tasks or lines of code to keep track of your thoughts. |
+| **Task-Focused Diffs** | Review one logical concern at a time. The workbench isolates relevant code hunks for each task, eliminating noise. |
+| **High-Signal Framework** | The AI proactively identifies bugs and authenticates them against your rules. No comment spam—just focused feedback threads anchored to specific lines. |
+| **Local Context** | Link local Git repos to give the agent full access to search your codebase. Works with your existing AI coding agent using context from your local checkout. |
+| **Visual Diagrams** | Visualize the flow. Automatically generate diagrams to see architectural changes before you read a single line of code. Rendered with Mermaid. |
+| **Team Rules** | Define rules like "DB queries must have timeouts" or "API changes need a migration note" to enforce standards automatically. |
+| **Learning Patterns** | The AI learns from rejected feedback. Mark suggestions as "ignored" during reviews, then analyze rejections to discover patterns that calibrate future reviews—fewer nitpicks, more signal. |
+| **Git Host Sync** | Submit your review feedback directly to GitHub or GitLab PRs with automatic summary generation. |
+| **Export & Share** | Export your review summary to Markdown with diagrams and code insights. Copy the selected tasks and feedback to your clipboard. |
+| **CLI Support** | Launch reviews from the terminal: `lareview`, `lareview pr owner/repo#123`, `git diff &#124; lareview`, or `lareview --agent claude`. |
+
+## Inside the workbench
+
+### A focused review plan
+
+![A focused review plan](assets/screenshots/review.webp?v=403b2e4d42e0)
+
+### A finding with its code and evidence
+
+![A finding with its code and evidence](assets/screenshots/review-feedback-item.webp?v=75148d4a882c)
+
+### The task’s relevant code changes
+
+![The task’s relevant code changes](assets/screenshots/review-changes.webp?v=f57f9b8dd191)
 
 ## How it works
 

@@ -1,0 +1,6 @@
+flowchart TD
+    A[New, verified payment event] --> B[Save delivery receipt]
+    B --> C[Start payment transaction]
+    C -. Not awaited .-> D[Update order]
+    C --> E[Return 204 to provider]
+    D -->|If rolled back| F[Receipt remains; retry is skipped]
