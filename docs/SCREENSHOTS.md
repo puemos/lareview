@@ -46,4 +46,6 @@ Keep the original hero video. Its poster must be a clean frame from the recordin
 
 `landing/social-card.html` is the 1200 × 630 source for `assets/og-image.jpg`. Render it from a local repository server, wait for its screenshot image to load, and capture the full card. It uses the same review-task asset, without editing the workbench pixels.
 
+The landing production build automatically versions the stylesheet using its content hash, so a cached CSS file cannot leave a new feature layout unstyled.
+
 After replacing assets, build `landing`, check the desktop and mobile page, and open screenshot previews with both the keyboard and pointer. Confirm that Escape and the close button dismiss the preview and return focus to its trigger.
