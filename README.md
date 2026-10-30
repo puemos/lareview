@@ -17,7 +17,7 @@
   <a href="https://www.rust-lang.org"><img alt="Rust" src="https://img.shields.io/badge/rust-1.99.1-orange?style=flat-square" /></a>
 </p>
 
-[![LaReview hero screenshot](assets/screenshots/review.webp)](assets/screenshots/review.webp)
+[![Completed Local Git review with tasks, file risk, and issue checks](assets/screenshots/review.webp)](assets/screenshots/review.webp)
 
 ---
 
