@@ -8,7 +8,7 @@
   "scripts": {
     "build": "pnpm run build:css && pnpm run build:dist",
     "build:css": "mkdir -p ./styles && tailwindcss -i ./landing.css -o ./styles/landing.css --minify",
-    "build:dist": "rm -rf ./dist && mkdir -p ./dist/styles && cp ./index.html ./dist/index.html && cp -R ../assets ./dist/assets && cp ./styles/landing.css ./dist/styles/landing.css",
+    "build:dist": "rm -rf ./dist && mkdir -p ./dist/styles && cp ./index.html ./dist/index.html && cp -R ../assets ./dist/assets && cp ./styles/landing.css ./dist/styles/landing.css && node ./version-styles.mjs",
     "dev": "pnpm run sync && concurrently -k -n css,sync,serve -c blue,green,yellow \"tailwindcss -i ./landing.css -o ./dist/styles/landing.css --watch\" \"chokidar './index.html' '../assets/**/*' -c 'pnpm run sync'\" \"browser-sync start --server dist --files 'dist/**/*' --no-open\"",
     "sync": "mkdir -p ./dist/styles && cp ./index.html ./dist/index.html && rm -rf ./dist/assets && cp -R ../assets ./dist/assets"
   },
