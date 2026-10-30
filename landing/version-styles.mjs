@@ -10,4 +10,6 @@ if ((html.match(stylesheet) ?? []).length !== 1) {
   throw new Error('Expected one local landing stylesheet to version.');
 }
 const version = createHash('sha256').update(css).digest('hex').slice(0, 12);
-await writeFile('dist/index.html', html.replace(stylesheet, `href="./styles/landing.css?v=${version}"`));
+const filename = `landing.${version}.css`;
+await writeFile(`dist/styles/${filename}`, css);
+await writeFile('dist/index.html', html.replace(stylesheet, `href="./styles/${filename}"`));
