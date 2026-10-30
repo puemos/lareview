@@ -38,7 +38,9 @@ The rules use the same transaction and retry requirements. Learning patterns ill
 
 Capture the running frontend using an isolated example database and the real diff parser. Keep sample transport adapters outside production code. Navigate with the visible UI, wait for data and diagrams to finish rendering, and capture the entire app viewport. Do not paint over UI, add invented controls, or publish loading/error states. Export selection is shown before posting; no sample review is published to a remote provider.
 
-Update both PNG and WebP for each asset. The current captures are 1430 × 914 pixels, and the WebP files use quality 92. Preserve the whole image on the website; the hero must not crop it or autoplay a recording of an older interface.
+Update both PNG and WebP for each asset. The current captures are 1430 × 914 pixels, and the WebP files use quality 92. When an image changes, update its `?v=` URL suffix in the landing page, social-card source, and README to the first 12 characters of its SHA-256 hash. This refreshes browser and image-proxy caches without breaking the existing asset paths.
+
+Preserve the whole image on the website; the hero must not crop it or autoplay a recording of an older interface.
 
 `landing/social-card.html` is the 1200 × 630 source for `assets/og-image.jpg`. Render it from a local repository server, wait for its screenshot image to load, and capture the full card. It uses the same overview asset, without editing the workbench pixels.
 
