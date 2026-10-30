@@ -11,6 +11,10 @@
 }
 
 @layer base {
+  html {
+    scroll-padding-top: 4rem;
+  }
+
   ::-webkit-scrollbar {
     width: 8px;
   }
