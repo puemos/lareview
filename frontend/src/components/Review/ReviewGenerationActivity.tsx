@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { SpinnerGap, Stop } from '@phosphor-icons/react';
+import { SpinnerGap, Stop, ArrowsClockwise } from '@phosphor-icons/react';
 import { useGeneration } from '../../contexts/useGeneration';
 import { useReviewRunEvents } from '../../hooks/useReviewRunEvents';
 import type { Plan } from '../../types';
@@ -9,6 +9,7 @@ import { PlanOverview } from '../Generate/PlanOverview';
 import type { Review, ReviewRun, ReviewRunEvent } from '../../types';
 import { UsagePopover } from './ReviewUsagePopover';
 import { usageFromEvents } from '../../lib/review-usage';
+import { InlineError } from '../Common/InlineError';
 import { reviewHeaderControlClass } from './reviewHeaderStyles';
 
 interface ReviewGenerationActivityProps {
@@ -195,26 +196,34 @@ export const ReviewGenerationActivity: React.FC<ReviewGenerationActivityProps> =
     refetch: refetchUsage,
   } = useReviewRunEvents(run.id);
   const [isStopping, setIsStopping] = useState(false);
+  const [stopError, setStopError] = useState<string | null>(null);
   const { plan, messages } = useMemo(() => activityFromEvents(events), [events]);
   const usage = useMemo(() => usageFromEvents(events, run.id), [events, run.id]);
   const isActive = run.status === 'queued' || run.status === 'running';
 
   const handleStop = async () => {
+    if (isStopping) return;
     setIsStopping(true);
-    await stopGeneration(run.id);
+    setStopError(null);
+    try {
+      await stopGeneration(run.id);
+    } catch (error) {
+      setStopError(String(error));
+      setIsStopping(false);
+    }
   };
 
   return (
     <div className="bg-bg-primary flex h-full flex-col">
-      <div className="border-border bg-bg-secondary/50 flex items-center justify-between gap-4 border-b px-6 py-4">
+      <div className="border-border flex flex-wrap items-start justify-between gap-4 border-b px-6 py-5">
         <div className="min-w-0">
-          <div className="text-text-disabled mb-1 flex items-center gap-2 text-[10px] font-bold tracking-wider uppercase">
+          <div className="text-text-tertiary mb-2 flex items-center gap-2 text-xs font-medium">
             {isActive && <SpinnerGap size={12} className="text-brand animate-spin" />}
             <span>{statusCopy[run.status]}</span>
             <span className="text-border">·</span>
             <span>{run.agent_id}</span>
           </div>
-          <h2 className="text-text-primary truncate text-lg font-semibold">
+          <h2 className="text-text-primary text-xl leading-snug font-semibold break-words">
             {review?.title || 'New Review'}
           </h2>
           <p className="text-text-tertiary mt-0.5 text-xs">
@@ -222,10 +231,17 @@ export const ReviewGenerationActivity: React.FC<ReviewGenerationActivityProps> =
               ? 'Waiting for an available review slot'
               : run.status === 'running'
                 ? 'You can leave this page. The review will keep running in the background.'
-                : 'Generation stopped before the review was completed.'}
+                : 'Recorded activity and the agent’s plan are available below.'}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <button
+            className="settings-secondary-action settings-icon-action"
+            aria-label="Refresh activity"
+            onClick={() => void refetchUsage()}
+          >
+            <ArrowsClockwise size={15} />
+          </button>
           <UsagePopover
             key={run.id}
             usage={usage}
@@ -248,12 +264,42 @@ export const ReviewGenerationActivity: React.FC<ReviewGenerationActivityProps> =
           )}
         </div>
       </div>
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      {!isActive && run.status !== 'completed' && (
+        <div role="status" className="border-border border-b px-6 py-4">
+          <p className="text-text-primary text-sm font-medium">
+            {run.status === 'failed'
+              ? 'This review did not finish'
+              : run.status === 'cancelled'
+                ? 'Review cancelled'
+                : 'Review interrupted'}
+          </p>
+          <p className="text-text-tertiary mt-1 text-xs leading-6">
+            {run.status === 'failed'
+              ? 'Read the error below, check the agent configuration, then start a new review.'
+              : run.status === 'cancelled'
+                ? 'The run stopped before completion. Its activity is saved for reference.'
+                : 'The run ended unexpectedly. Start a new review to get a complete result.'}
+          </p>
+        </div>
+      )}
+      {(stopError || isUsageError) && (
+        <div className="px-6 py-3">
+          <InlineError
+            title={stopError ? 'Could not stop review' : 'Could not load activity'}
+            message={
+              stopError ?? 'Check your connection and retry. Existing activity is preserved.'
+            }
+            onRetry={stopError ? undefined : () => void refetchUsage()}
+          />
+        </div>
+      )}
+      <div className="review-activity-layout flex min-h-0 flex-1 overflow-hidden">
         <div className="border-border flex min-w-0 flex-1 border-r">
           <LiveActivityFeed messages={messages} isRunning={isActive} />
         </div>
-        <div className="bg-bg-secondary flex w-[380px] flex-col">
+        <div className="review-activity-plan bg-bg-secondary flex w-[340px] shrink-0 flex-col">
           <PlanOverview
+            isRunning={isActive}
             items={
               plan?.entries.map(entry => ({
                 content: entry.content,

@@ -71,11 +71,12 @@ export const PrInput: React.FC<PrInputProps> = ({
       <div className={expanded ? 'grid min-w-0 flex-1' : 'grid max-w-[400px] min-w-0 flex-shrink'}>
         <input
           type="text"
+          aria-label="Pull request URL or shorthand"
           value={prRef}
           onChange={e => onPrRefChange(e.target.value)}
           placeholder="Paste a remote link or shorthand..."
           className="text-text-primary placeholder-text-disabled col-start-1 row-start-1 bg-transparent px-3 py-1.5 font-mono text-xs focus:outline-none"
-          disabled={isLoading}
+          disabled={isLoading || disabled}
         />
         <span className="pointer-events-none invisible col-start-1 row-start-1 truncate px-3 py-1.5 font-mono text-xs whitespace-pre">
           {prRef || 'Paste a remote link or shorthand...'}

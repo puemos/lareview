@@ -1,11 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Dialog } from '../Common/Dialog';
+import { InlineError } from '../Common/InlineError';
 import { ICONS } from '../../constants/icons';
 import { Select } from '../Common/Select';
 
 interface AddFeedbackModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (title: string, impact: 'blocking' | 'nice_to_have' | 'nitpick', content: string) => void;
+  onAdd: (
+    title: string,
+    impact: 'blocking' | 'nice_to_have' | 'nitpick',
+    content: string
+  ) => Promise<void>;
   context: {
     type: 'global' | 'line';
     file?: string;
@@ -46,28 +52,42 @@ export const AddFeedbackModal: React.FC<AddFeedbackModalProps> = ({
   const [impact, setImpact] = useState<'blocking' | 'nice_to_have' | 'nitpick'>('nitpick');
   const [content, setContent] = useState('');
 
-  if (!isOpen) return null;
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  useEffect(() => {
+    if (isOpen) {
+      setTitle('');
+      setContent('');
+      setImpact('nitpick');
+      setError(null);
+    }
+  }, [isOpen]);
+  const busy = isAdding || submitting;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !content.trim()) return;
-    onAdd(title, impact, content);
+    if (!title.trim() || !content.trim() || busy) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onAdd(title.trim(), impact, content.trim());
+    } catch (error) {
+      setError(String(error));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-bg-primary border-border w-full max-w-lg rounded-xl border shadow-xl">
-        <div className="border-border flex items-center justify-between border-b px-4 py-3">
-          <h2 className="text-text-primary text-sm font-medium">Add Feedback</h2>
-          <button
-            onClick={onClose}
-            className="text-text-tertiary hover:text-text-primary cursor-pointer transition-colors"
-          >
-            <ICONS.ACTION_CLOSE size={16} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4 p-4">
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      busy={busy}
+      title="Add feedback"
+      description="Describe an actionable issue. Markdown is supported."
+    >
+      <form onSubmit={handleSubmit} className="product-form">
+        <fieldset disabled={busy} className="min-w-0 space-y-5">
           {context.type !== 'global' && (
             <div className="bg-bg-secondary/50 border-border/50 rounded border p-2">
               <div className="text-text-tertiary mb-1 text-xs">Context</div>
@@ -81,20 +101,25 @@ export const AddFeedbackModal: React.FC<AddFeedbackModalProps> = ({
           )}
 
           <div className="space-y-1">
-            <label className="text-text-secondary text-xs font-medium">Title</label>
+            <label htmlFor="feedback-title" className="text-text-secondary text-xs font-medium">
+              Title
+            </label>
             <input
+              id="feedback-title"
+              required
+              data-autofocus
               type="text"
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="Brief summary of the issue"
               className="border-border bg-bg-tertiary text-text-primary placeholder:text-text-disabled focus:border-brand w-full rounded border px-3 py-2 text-sm focus:outline-none"
-              autoFocus
             />
           </div>
 
           <div className="space-y-1">
             <label className="text-text-secondary text-xs font-medium">Impact</label>
             <Select
+              aria-label="Feedback impact"
               value={impact}
               onChange={val => setImpact(val as typeof impact)}
               options={impactOptions}
@@ -103,8 +128,12 @@ export const AddFeedbackModal: React.FC<AddFeedbackModalProps> = ({
           </div>
 
           <div className="space-y-1">
-            <label className="text-text-secondary text-xs font-medium">Details</label>
+            <label htmlFor="feedback-content" className="text-text-secondary text-xs font-medium">
+              Details
+            </label>
             <textarea
+              id="feedback-content"
+              required
               value={content}
               onChange={e => setContent(e.target.value)}
               placeholder="Describe the issue in detail (Markdown supported)"
@@ -112,6 +141,7 @@ export const AddFeedbackModal: React.FC<AddFeedbackModalProps> = ({
             />
           </div>
 
+          {error && <InlineError title="Feedback was not added" message={error} />}
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
@@ -125,11 +155,11 @@ export const AddFeedbackModal: React.FC<AddFeedbackModalProps> = ({
               disabled={!title.trim() || !content.trim() || isAdding}
               className="text-brand-fg bg-brand hover:bg-brand/90 flex cursor-pointer items-center gap-2 rounded px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isAdding ? 'Adding...' : 'Add Feedback'}
+              {busy ? 'Adding…' : 'Add feedback'}
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+        </fieldset>
+      </form>
+    </Dialog>
   );
 };

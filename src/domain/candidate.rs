@@ -77,6 +77,7 @@ impl ReviewCandidate {
                 head_sha.as_deref()
             }
             ReviewSource::DiffPaste { .. } => None,
+            ReviewSource::LocalGit { head_sha, .. } => Some(head_sha),
         }
     }
 

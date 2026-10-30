@@ -51,7 +51,7 @@ export interface ReviewTask {
   insight?: string;
   diagram?: string;
   ai_generated: boolean;
-  status: 'pending' | 'in_progress' | 'done' | 'ignored';
+  status: 'todo' | 'pending' | 'in_progress' | 'done' | 'ignored';
   sub_flow?: string;
   risk_level: 'low' | 'medium' | 'high';
   file_path?: string | null;
@@ -331,6 +331,14 @@ export interface Review {
 }
 
 export type ReviewSource =
+  | {
+      type: 'local_git';
+      repo_id: string;
+      base_ref: string;
+      head_ref: string;
+      base_sha: string;
+      head_sha: string;
+    }
   | { type: 'diff_paste'; diff_hash: string }
   | {
       type: 'github_pr';

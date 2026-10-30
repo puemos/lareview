@@ -218,6 +218,55 @@ async fn generate_tasks_with_acp_inner_impl(
         log_fn("repo access: disabled (diff-only)".to_string());
     }
 
+    let current_exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("lareview"));
+    let task_mcp_server_path =
+        resolve_task_mcp_server_path(mcp_server_binary.as_ref(), &current_exe);
+
+    let pr_context_file =
+        tempfile::NamedTempFile::new().context("create run context file for MCP server")?;
+    std::fs::write(
+        pr_context_file.path(),
+        serde_json::to_string(&run_context).context("serialize run context")?,
+    )
+    .context("write run context file")?;
+
+    let mut mcp_args = vec![
+        "--task-mcp-server".to_string(),
+        "--pr-context".to_string(),
+        pr_context_file.path().to_string_lossy().to_string(),
+    ];
+    if let Ok(db_path) = std::env::var("LAREVIEW_DB_PATH") {
+        mcp_args.push("--db-path".to_string());
+        mcp_args.push(db_path);
+    }
+    if let Some(root) = &repo_root {
+        mcp_args.push("--repo-root".to_string());
+        mcp_args.push(root.to_string_lossy().to_string());
+    }
+
+    // Copilot accepts only HTTP/SSE MCP entries from ACP clients. Its launch-time
+    // configuration supports local stdio servers without opening a network listener.
+    let copilot_mcp_config = (run_context.agent_id == "copilot").then(|| {
+        serde_json::json!({
+            "mcpServers": {
+                "lareview-tasks": {
+                    "type": "local",
+                    "command": task_mcp_server_path,
+                    "args": mcp_args,
+                    "tools": ["*"]
+                }
+            }
+        })
+        .to_string()
+    });
+    let mcp_servers = if copilot_mcp_config.is_some() {
+        Vec::new()
+    } else {
+        vec![McpServer::Stdio(
+            McpServerStdio::new("lareview-tasks", task_mcp_server_path.clone()).args(mcp_args),
+        )]
+    };
+
     log_fn(format!("spawn: {} {}", agent_command, agent_args.join(" ")));
 
     let mut cmd = Command::new(&agent_command);
@@ -226,6 +275,10 @@ async fn generate_tasks_with_acp_inner_impl(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
+
+    if let Some(config) = copilot_mcp_config {
+        cmd.arg("--additional-mcp-config").arg(config);
+    }
 
     #[cfg(unix)]
     {
@@ -341,35 +394,6 @@ async fn generate_tasks_with_acp_inner_impl(
         let temp_cwd = tempfile::tempdir().context("create temp working directory")?;
         let cwd: PathBuf = temp_cwd.path().to_path_buf();
 
-        let current_exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("lareview"));
-        let task_mcp_server_path =
-            resolve_task_mcp_server_path(mcp_server_binary.as_ref(), &current_exe);
-
-        let pr_context_file =
-            tempfile::NamedTempFile::new().context("create run context file for MCP server")?;
-        std::fs::write(
-            pr_context_file.path(),
-            serde_json::to_string(&run_context).context("serialize run context")?,
-        )
-        .context("write run context file")?;
-
-        let mut mcp_args = vec![
-            "--task-mcp-server".to_string(),
-            "--pr-context".to_string(),
-            pr_context_file.path().to_string_lossy().to_string(),
-        ];
-        if let Ok(db_path) = std::env::var("LAREVIEW_DB_PATH") {
-            mcp_args.push("--db-path".to_string());
-            mcp_args.push(db_path);
-        }
-        if let Some(root) = &repo_root {
-            mcp_args.push("--repo-root".to_string());
-            mcp_args.push(root.to_string_lossy().to_string());
-        }
-
-        let mcp_servers = vec![McpServer::Stdio(
-            McpServerStdio::new("lareview-tasks", task_mcp_server_path.clone()).args(mcp_args),
-        )];
 
         log_fn(format!(
             "new_session (mcp server: {} --task-mcp-server --pr-context ...)",

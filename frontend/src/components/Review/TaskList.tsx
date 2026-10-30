@@ -1,7 +1,6 @@
 import React from 'react';
 import type { ReviewTask } from '../../types';
 import { ICONS } from '../../constants/icons';
-import { Tooltip } from '../Common/Tooltip';
 
 interface TaskListProps {
   tasks: ReviewTask[];
@@ -18,7 +17,7 @@ export const TaskList: React.FC<TaskListProps> = ({
   isLoading,
   isFetching,
 }) => {
-  if (isLoading || isFetching) {
+  if (isLoading && tasks.length === 0) {
     return <TaskListSkeleton />;
   }
 
@@ -55,7 +54,7 @@ export const TaskList: React.FC<TaskListProps> = ({
   };
 
   return (
-    <div className="custom-scrollbar flex-1 overflow-y-auto">
+    <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto" aria-busy={isFetching}>
       {tasks.map((task: ReviewTask) => {
         const RiskIcon = getRiskIcon(task.stats.risk);
         const riskColor = getRiskColor(task.stats.risk);
@@ -64,30 +63,35 @@ export const TaskList: React.FC<TaskListProps> = ({
           <button
             key={task.id}
             onClick={() => onSelectTask(task.id)}
+            aria-current={selectedTaskId === task.id ? 'true' : undefined}
             className={`group border-border/50 hover:bg-bg-secondary/80 relative w-full border-b px-4 py-3 text-left transition-colors ${
-              selectedTaskId === task.id ? 'bg-bg-secondary shadow-inner' : ''
+              selectedTaskId === task.id ? 'bg-bg-secondary' : ''
             }`}
           >
-            {selectedTaskId === task.id && (
-              <div className="bg-brand absolute top-0 bottom-0 left-0 w-[2px]" />
-            )}
-            <div className="flex w-full min-w-0 items-center gap-2.5">
-              <div className="flex-shrink-0">
-                <Tooltip content={`Risk: ${task.stats.risk.toUpperCase()}`}>
-                  <div className="cursor-help">
-                    <RiskIcon size={14} className={riskColor} />
-                  </div>
-                </Tooltip>
+            <div className="flex w-full min-w-0 items-start gap-2.5">
+              <div className="mt-1 flex-shrink-0">
+                <span title={`${task.stats.risk} risk`}>
+                  <RiskIcon size={14} className={riskColor} />
+                </span>
               </div>
               <h3
-                className={`flex-1 truncate text-xs leading-relaxed font-medium ${
+                className={`flex-1 text-[13px] leading-relaxed font-medium ${
                   selectedTaskId === task.id
                     ? 'text-text-primary'
                     : 'text-text-secondary group-hover:text-text-primary'
-                } ${task.status === 'done' ? 'text-text-disabled line-through opacity-50' : ''}`}
+                } `}
               >
                 {task.title}
               </h3>
+              <span className="text-text-tertiary shrink-0 pt-0.5 text-[11px]">
+                {task.status === 'done'
+                  ? 'Done'
+                  : task.status === 'in_progress'
+                    ? 'In progress'
+                    : task.status === 'ignored'
+                      ? 'Ignored'
+                      : 'To do'}
+              </span>
             </div>
           </button>
         );

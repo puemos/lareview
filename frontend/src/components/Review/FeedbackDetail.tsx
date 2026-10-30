@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import type { Feedback, Comment, ReviewRule, DefaultIssueCategory } from '../../types';
 import { ICONS } from '../../constants/icons';
 import { MarkdownRenderer } from '../ui/MarkdownRenderer';
 import { useQuery } from '@tanstack/react-query';
 import { useTauri } from '../../hooks/useTauri';
 
+import { InlineError } from '../Common/InlineError';
+import { displayDate } from '../../utils/dates';
 import { Select } from '../Common/Select';
 
 interface FeedbackDetailProps {
@@ -12,17 +14,19 @@ interface FeedbackDetailProps {
   rulesById: Record<string, ReviewRule>;
   categoriesById: Record<string, DefaultIssueCategory>;
   comments: Comment[];
+  isCommentsLoading?: boolean;
+  commentsError?: unknown;
+  onRetryComments?: () => void;
   onUpdateStatus: (status: Feedback['status']) => void;
   onUpdateImpact: (impact: Feedback['impact']) => void;
   onDelete: () => void;
-  onAddComment: (body: string) => void;
+  onAddComment: (body: string) => Promise<void>;
   isUpdatingStatus: boolean;
   isUpdatingImpact: boolean;
   isAddingComment: boolean;
   onPushToRemote?: () => void;
   remoteProviderName?: string | null;
 }
-
 
 const impactOptions = [
   {
@@ -44,12 +48,6 @@ const impactOptions = [
     color: 'text-impact-nitpick',
   },
 ];
-
-
-function formatTimestamp(isoString: string): string {
-  const date = new Date(isoString);
-  return date.toLocaleString();
-}
 
 interface DiffSnippetLine {
   line_number: number;
@@ -88,7 +86,7 @@ const DiffSnippetViewer: React.FC<{ snippet: DiffSnippet }> = ({ snippet }) => {
               <span
                 className={
                   line.is_addition
-                    ? 'text-status-added'
+                    ? 'text-status-done'
                     : line.is_deletion
                       ? 'text-status-ignored'
                       : 'text-text-secondary'
@@ -119,6 +117,9 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
   rulesById,
   categoriesById,
   comments,
+  isCommentsLoading,
+  commentsError,
+  onRetryComments,
   onUpdateStatus,
   onUpdateImpact,
   onDelete,
@@ -131,8 +132,8 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
 }) => {
   const { getFeedbackDiffSnippet } = useTauri();
   const [replyText, setReplyText] = useState('');
-  const [isTitleEditing, setIsTitleEditing] = useState(false);
-  const [titleValue, setTitleValue] = useState('');
+  const [replyError, setReplyError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
   const rule = feedback?.rule_id ? rulesById[feedback.rule_id] : null;
   const category = feedback?.category ? categoriesById[feedback.category] : null;
   const remoteLabel = remoteProviderName ?? 'remote';
@@ -147,16 +148,10 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
     enabled: !!feedback?.id && !!feedback.anchor?.file_path,
   });
 
-  useEffect(() => {
-    if (feedback) {
-      setTitleValue(feedback.title);
-    }
-  }, [feedback]);
-
   if (!feedback) {
     return (
       <div className="bg-bg-primary text-text-disabled flex h-full flex-col items-center justify-center">
-        <div className="space-y-4 text-center opacity-50">
+        <div className="space-y-4 text-center">
           <div className="bg-bg-secondary mx-auto flex h-16 w-16 items-center justify-center rounded-2xl shadow-sm">
             <ICONS.ICON_PLAN size={32} />
           </div>
@@ -169,45 +164,30 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
     );
   }
 
-  const handleTitleEdit = () => {
-    setTitleValue(feedback.title);
-    setIsTitleEditing(true);
-  };
-
-  const handleTitleSave = () => {
-    // TODO: Implement title update when backend supports it
-    setIsTitleEditing(false);
-  };
-
-  const handleAddComment = () => {
-    if (replyText.trim()) {
-      onAddComment(replyText.trim());
+  const handleAddComment = async () => {
+    if (!replyText.trim() || isAddingComment || sending) return;
+    setSending(true);
+    setReplyError(null);
+    try {
+      await onAddComment(replyText.trim());
       setReplyText('');
+    } catch (error) {
+      setReplyError(String(error));
+    } finally {
+      setSending(false);
     }
   };
 
   return (
     <div className="bg-bg-primary flex h-full flex-col">
-      <div className="border-border bg-bg-secondary/50 border-b px-4 py-3">
-        <div className="mb-3 flex items-center justify-between">
-          {isTitleEditing ? (
-            <input
-              type="text"
-              value={titleValue}
-              onChange={e => setTitleValue(e.target.value)}
-              onBlur={handleTitleSave}
-              onKeyDown={e => e.key === 'Enter' && handleTitleSave()}
-              className="bg-bg-tertiary border-border text-text-primary focus:border-brand flex-1 rounded border px-2 py-1 text-sm focus:outline-none"
-              autoFocus
-            />
-          ) : (
-            <h2
-              onClick={handleTitleEdit}
-              className="text-text-primary hover:text-brand flex-1 cursor-pointer truncate text-sm font-medium"
-            >
-              {feedback.title || 'Untitled Feedback'}
+      <div className="review-detail-header border-border border-b">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-text-tertiary mb-2 text-xs font-medium">Review feedback</p>
+            <h2 className="text-text-primary text-lg leading-snug font-semibold break-words">
+              {feedback.title || 'Untitled feedback'}
             </h2>
-          )}
+          </div>
           <div className="ml-2 flex items-center gap-1">
             {remoteProviderName && onPushToRemote && feedback.status !== 'ignored' && (
               <button
@@ -252,28 +232,42 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
           </div>
         </div>
 
-        <div className="flex w-full items-center justify-between">
+        <div className="flex w-full flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
             {feedback.anchor?.file_path ? (
-              <span className="text-text-tertiary font-mono text-[10px]">
-                {feedback.anchor.file_path}:{feedback.anchor.line_number}
+              <span className="text-text-tertiary font-mono text-xs break-all">
+                {feedback.anchor.file_path}
+                {feedback.anchor.line_number ? `:${feedback.anchor.line_number}` : ''}
               </span>
             ) : (
-              <span className="text-text-tertiary font-mono text-[10px]">General</span>
+              <span className="text-text-tertiary font-mono text-xs break-all">General</span>
             )}
             {feedback.rule_id && (
-              <span className="text-text-tertiary text-[10px]">
+              <span className="text-text-tertiary text-xs">
                 Rule: {rule?.text || feedback.rule_id}
               </span>
             )}
             {!feedback.rule_id && feedback.category && (
-              <span className="text-text-tertiary text-[10px]">
+              <span className="text-text-tertiary text-xs">
                 Category: {category?.name || feedback.category}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Select
+              aria-label="Feedback status"
+              value={feedback.status}
+              onChange={value => onUpdateStatus(value as Feedback['status'])}
+              disabled={isUpdatingStatus}
+              options={[
+                { value: 'todo', label: 'To do' },
+                { value: 'in_progress', label: 'In progress' },
+                { value: 'done', label: 'Done' },
+                { value: 'ignored', label: 'Ignored' },
+              ]}
+            />
+            <Select
+              aria-label="Feedback impact"
               value={feedback.impact}
               onChange={val => onUpdateImpact(val as Feedback['impact'])}
               options={impactOptions}
@@ -283,13 +277,14 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
         </div>
       </div>
 
-      <div className="custom-scrollbar flex-1 space-y-4 overflow-y-auto p-4">
+      <div className="custom-scrollbar flex-1 space-y-6 overflow-y-auto p-6">
         {feedback.anchor && feedback.anchor.file_path && (
           <div className="bg-bg-secondary/50 border-border/50 rounded-md border p-3">
             <div className="mb-2 flex items-center gap-2">
               <ICONS.TAB_CHANGES size={12} className="text-text-tertiary" />
-              <span className="text-text-tertiary font-mono text-[10px]">
-                {feedback.anchor.file_path}:{feedback.anchor.line_number}
+              <span className="text-text-tertiary font-mono text-xs break-all">
+                {feedback.anchor.file_path}
+                {feedback.anchor.line_number ? `:${feedback.anchor.line_number}` : ''}
               </span>
               <span className="text-text-disabled text-[10px]">
                 ({feedback.anchor.side === 'old' ? 'old' : 'new'})
@@ -301,7 +296,7 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
               <DiffSnippetViewer snippet={diffSnippet} />
             ) : (
               <div className="bg-bg-tertiary text-text-disabled flex h-20 items-center justify-center rounded text-xs">
-                Unable to load diff snippet
+                No code excerpt available for this location.
               </div>
             )}
           </div>
@@ -310,8 +305,18 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
         <div className="space-y-3">
           <h3 className="text-text-secondary text-xs font-medium">Comments</h3>
 
-          {comments.length === 0 ? (
-            <p className="text-text-disabled text-xs italic opacity-50">No comments yet</p>
+          {commentsError ? (
+            <InlineError
+              title="Could not load comments"
+              message={String(commentsError)}
+              onRetry={onRetryComments}
+            />
+          ) : isCommentsLoading ? (
+            <p role="status" className="text-text-tertiary text-xs">
+              Loading comments…
+            </p>
+          ) : comments.length === 0 ? (
+            <p className="text-text-disabled text-xs">No comments yet</p>
           ) : (
             comments.map(comment => (
               <div key={comment.id} className="flex gap-3">
@@ -323,8 +328,8 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
                 <div className="min-w-0 flex-1">
                   <div className="mb-1 flex items-center gap-2">
                     <span className="text-text-primary text-xs font-medium">{comment.author}</span>
-                    <span className="text-text-tertiary text-[10px]">
-                      {formatTimestamp(comment.created_at)}
+                    <span className="text-text-tertiary text-xs">
+                      {displayDate(comment.created_at) ?? 'Unknown date'}
                     </span>
                   </div>
                   <MarkdownRenderer className="prose prose-invert prose-sm text-text-secondary max-w-none">
@@ -337,9 +342,15 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
         </div>
       </div>
 
-      <div className="border-border border-t p-3">
-        <div className="border-border bg-bg-secondary focus-within:border-brand/50 focus-within:ring-brand/50 relative rounded-lg border shadow-sm transition-all focus-within:ring-1">
+      <div className="border-border border-t p-4">
+        {replyError && (
+          <div className="mb-3">
+            <InlineError title="Reply was not sent" message={replyError} />
+          </div>
+        )}
+        <div className="review-reply border-border bg-bg-secondary relative rounded-lg border">
           <textarea
+            aria-label="Reply to feedback"
             value={replyText}
             onChange={e => setReplyText(e.target.value)}
             onKeyDown={e => {
@@ -348,21 +359,19 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
               }
             }}
             placeholder="Write a reply..."
-            className="text-text-primary placeholder:text-text-disabled w-full resize-none bg-transparent px-3 py-2.5 text-xs focus:outline-none"
+            className="text-text-primary placeholder:text-text-disabled w-full resize-none bg-transparent px-3 py-2.5 text-[13px] leading-6 focus:outline-none"
             rows={Math.max(1, Math.min(5, replyText.split('\n').length))}
             style={{ minHeight: '36px' }}
-            disabled={isAddingComment}
+            disabled={isAddingComment || sending}
           />
           <div className="flex items-center justify-between px-2 pt-1 pb-2">
-            <span className="text-text-disabled px-1 text-[10px] opacity-0 transition-opacity group-focus-within:opacity-100 focus-within:opacity-100">
-              {replyText.length > 0 ? '⌘ + Enter to send' : ''}
-            </span>
+            <span className="text-text-disabled px-1 text-[11px]">⌘ / Ctrl + Enter to reply</span>
             <button
               onClick={handleAddComment}
-              disabled={!replyText.trim() || isAddingComment}
-              className="bg-brand text-brand-fg hover:bg-brand/90 rounded px-2.5 py-1 text-[10px] font-medium transition-all disabled:opacity-50"
+              disabled={!replyText.trim() || isAddingComment || sending}
+              className="bg-brand text-brand-fg hover:bg-brand/90 rounded px-3 py-2 text-xs font-medium transition-all disabled:opacity-50"
             >
-              {isAddingComment ? 'Sending...' : 'Reply'}
+              {isAddingComment || sending ? 'Sending…' : 'Reply'}
             </button>
           </div>
         </div>

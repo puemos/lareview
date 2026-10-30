@@ -6,10 +6,7 @@ interface UncoveredFilesProps {
   onSelectFile: (fileName: string) => void;
 }
 
-export const UncoveredFiles: React.FC<UncoveredFilesProps> = ({
-  uncoveredFiles,
-  onSelectFile,
-}) => {
+export const UncoveredFiles: React.FC<UncoveredFilesProps> = ({ uncoveredFiles, onSelectFile }) => {
   const [expanded, setExpanded] = useState(false);
 
   if (uncoveredFiles.length === 0) {
@@ -20,6 +17,7 @@ export const UncoveredFiles: React.FC<UncoveredFilesProps> = ({
     <div className="bg-bg-secondary/30 border-border/50 rounded-lg border">
       <button
         onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
         className="hover:bg-bg-tertiary/30 flex w-full items-center justify-between px-4 py-3 transition-colors"
       >
         <div className="flex items-center gap-2">
@@ -44,7 +42,7 @@ export const UncoveredFiles: React.FC<UncoveredFilesProps> = ({
               className="hover:bg-bg-tertiary/30 border-border/20 flex w-full items-center gap-2 border-b px-4 py-2 text-left transition-colors last:border-b-0"
             >
               <ICONS.FILE size={12} className="text-text-disabled flex-shrink-0" />
-              <span className="text-text-secondary min-w-0 flex-1 truncate font-mono text-xs">
+              <span className="text-text-secondary min-w-0 flex-1 font-mono text-xs break-all">
                 {file}
               </span>
             </button>

@@ -17,7 +17,7 @@
   <a href="https://www.rust-lang.org"><img alt="Rust" src="https://img.shields.io/badge/rust-1.99.1-orange?style=flat-square" /></a>
 </p>
 
-[![LaReview hero screenshot](assets/screenshots/review.webp)](assets/screenshots/review.webp)
+[![Completed Local Git review with tasks, file risk, and issue checks](assets/screenshots/review.webp)](assets/screenshots/review.webp)
 
 ---
 
@@ -87,6 +87,23 @@ lareview --agent claude
 
 The CLI launches the GUI in the background and passes your diff/repo info seamlessly.
 
+## On-prem and other Git hosts
+
+Clone your repository using your usual Git credentials, then link the local folder in
+**Repositories**. In **Generate Review**, select that repository, choose **Local Git**,
+enter a base and head branch, tag, or commit, and click **Compare changes**. Inspect the diff,
+then click **Start Review** with your chosen agent.
+
+Comparison uses the two commit snapshots (`git diff BASE HEAD`) already present locally.
+Fetch remote branches with Git first. LaReview does not change your checkout or staged
+changes. The review records both resolved commit IDs and can use the head commit through
+the existing snapshot permission flow. This works with on-prem Git, Bitbucket, Gitea,
+Azure DevOps, GitHub Enterprise, and repositories without a remote. Host-specific PR
+metadata, inbox, and posting comments remain available through the GitHub/GitLab integrations.
+
+The terminal workflow also works from any local clone: `lareview main feature` or
+`git diff main feature | lareview`.
+
 ## Supported Agents
 
 LaReview launches compatible harnesses through commands already available on your `PATH`, or an executable override configured in Settings. It does not provide an in-app harness installer.
@@ -95,6 +112,7 @@ LaReview launches compatible harnesses through commands already available on you
 | --- | --- |
 | Claude | `npx -y @agentclientprotocol/claude-agent-acp@0.65.0` |
 | Codex | `npx -y @agentclientprotocol/codex-acp@1.1.9` |
+| GitHub Copilot | `copilot --acp --stdio` |
 | Gemini | `gemini --acp` |
 | Grok | `grok --no-auto-update agent stdio` |
 | Kimi | `kimi acp` |
@@ -120,6 +138,20 @@ General ACP support is not sufficient: the harness must forward LaReview's clien
 
 > [!NOTE]
 > LaReview does not require a custom LaReview server. Your PR data is fetched locally via `gh` or `glab`, and plan generation runs via your chosen AI agent.
+
+### GitHub Copilot setup
+
+Install the [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli)
+and sign in by running `copilot` and using `/login`. Restart LaReview, then select
+**GitHub Copilot** in the Agent picker. If the executable is outside your `PATH`, set its
+path in Settings. LaReview uses Copilot's native [ACP stdio server](https://docs.github.com/en/copilot/reference/copilot-cli-reference/acp-server);
+no additional adapter or `gh copilot` extension is needed. Models and session options are
+discovered from the installed CLI, and require an authenticated Copilot account or a
+configured bring-your-own-key provider.
+
+For each review, LaReview supplies its local task server through Copilot's
+`--additional-mcp-config` launch option, because Copilot's ACP session API accepts
+only HTTP/SSE MCP entries. This uses the same local stdio task server as the other agents.
 
 ## Installation
 

@@ -12,6 +12,7 @@ export interface UseFeedbackResult {
   isPending: boolean;
   error: Error | null;
   createFeedback: (vars: CreateFeedbackInput) => void;
+  createFeedbackAsync: (vars: CreateFeedbackInput) => Promise<string>;
   isCreating: boolean;
   updateStatus: (vars: { feedbackId: string; status: Feedback['status'] }) => void;
   isUpdatingStatus: boolean;
@@ -164,6 +165,7 @@ export function useFeedback(reviewId: string | null): UseFeedbackResult {
     isPending,
     error: error instanceof Error ? error : error ? new Error(String(error)) : null,
     createFeedback: createMutation.mutate,
+    createFeedbackAsync: createMutation.mutateAsync,
     isCreating: createMutation.isPending,
     updateStatus: statusMutation.mutate,
     isUpdatingStatus: statusMutation.isPending,

@@ -8,6 +8,7 @@ pub fn get_content(path: &str) -> Option<&'static [u8]> {
         // Icons
         "assets/icons/claude.svg" => Some(include_bytes!("../assets/icons/claude.svg")),
         "assets/icons/codex.svg" => Some(include_bytes!("../assets/icons/codex.svg")),
+        "assets/icons/copilot.svg" => Some(include_bytes!("../assets/icons/copilot.svg")),
         "assets/icons/gemini.svg" => Some(include_bytes!("../assets/icons/gemini.svg")),
         "assets/icons/grok.svg" => Some(include_bytes!("../assets/icons/grok.svg")),
         "assets/icons/kimi.svg" => Some(include_bytes!("../assets/icons/kimi.svg")),

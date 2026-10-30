@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { ICONS } from '../../constants/icons';
+import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import type { ReviewTask, Feedback } from '../../types';
 import { useTauri } from '../../hooks/useTauri';
+import { Dialog } from '../Common/Dialog';
+import { InlineError } from '../Common/InlineError';
 
 export type ExportFormat = 'markdown' | 'remote';
-
 interface SelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -34,396 +34,195 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const isRemoteAvailable = Boolean(remoteProviderName);
-  const RemoteIcon = remoteProviderName === 'GitLab' ? ICONS.ICON_GITLAB : ICONS.ICON_GITHUB;
-  const remoteCopyLabel = remoteProviderName ? `${remoteProviderName} review` : 'remote review';
-
-  // Initialize selection when modal opens
+  const wasOpen = useRef(false);
   useEffect(() => {
-    if (isOpen) {
-      setSelectedTasks(new Set(tasks.map(t => t.id)));
-      setSelectedFeedbacks(new Set(feedbacks.map(f => f.id)));
+    if (isOpen && !wasOpen.current) {
+      setSelectedTasks(new Set(tasks.map(task => task.id)));
+      setSelectedFeedbacks(new Set(feedbacks.map(feedback => feedback.id)));
       setResultUrl(null);
       setError(null);
-      setIsProcessing(false);
-      // Default to remote if available, otherwise Markdown
-      setFormat(isRemoteAvailable ? 'remote' : 'markdown');
+      setFormat('markdown');
     }
-  }, [isOpen, tasks, feedbacks, isRemoteAvailable]);
-
-  if (!isOpen) return null;
-
-  const toggleTask = (id: string) => {
-    const next = new Set(selectedTasks);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setSelectedTasks(next);
-  };
-
-  const toggleFeedback = (id: string) => {
-    const next = new Set(selectedFeedbacks);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setSelectedFeedbacks(next);
-  };
-
+    wasOpen.current = isOpen;
+  }, [isOpen, tasks, feedbacks]);
+  const selectedCount = selectedTasks.size + selectedFeedbacks.size;
   const handleConfirm = async () => {
+    if (isProcessing || selectedCount === 0) return;
     setIsProcessing(true);
     setError(null);
     try {
       const result = await onConfirm(
         format,
-        Array.from(selectedTasks),
-        Array.from(selectedFeedbacks)
+        tasks.filter(task => selectedTasks.has(task.id)).map(task => task.id),
+        feedbacks
+          .filter(feedback => selectedFeedbacks.has(feedback.id))
+          .map(feedback => feedback.id)
       );
-      if (format === 'remote' && result) {
+      if (format === 'remote') {
+        if (!result)
+          throw new Error(
+            'The provider did not return a review URL. Check the remote review before trying again.'
+          );
         setResultUrl(result);
-      } else if (format === 'markdown') {
+      } else {
         onClose();
-        toast('Copied to Clipboard', {
-          description: 'Review markdown is ready to paste.',
-        });
+        toast('Copied to clipboard', { description: 'Review Markdown is ready to paste.' });
       }
-    } catch (e) {
-      setError(String(e));
+    } catch (error) {
+      setError(String(error));
     } finally {
       setIsProcessing(false);
     }
   };
-
-  if (resultUrl) {
-    return (
-      <div className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm duration-200">
-        <div className="bg-bg-primary border-border/50 animate-in zoom-in-95 flex w-full max-w-sm flex-col rounded-xl border p-8 text-center shadow-2xl duration-200">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10 text-green-500 ring-1 ring-green-500/20">
-            <ICONS.ICON_CHECK size={32} weight="bold" />
-          </div>
-          <h3 className="text-text-primary mb-2 text-xl font-bold">Review Pushed!</h3>
-          <p className="text-text-secondary mb-8 text-sm leading-relaxed">
-            The review has been posted to your remote review.
-          </p>
-          <div className="space-y-3">
-            <button
-              onClick={() => resultUrl && openUrl(resultUrl)}
-              className="bg-accent hover:bg-accent/90 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.98]"
-            >
-              <ICONS.ACTION_OPEN_WINDOW size={16} weight="bold" />
-              Open remote review
-            </button>
-            <button
-              onClick={onClose}
-              className="text-text-secondary hover:text-text-primary block w-full py-2.5 text-sm font-medium transition-colors"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm duration-200">
-      <div className="bg-bg-primary border-border/50 animate-in zoom-in-95 flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl border shadow-2xl duration-200">
-        {/* Header */}
-        <div className="border-border/50 bg-bg-secondary/30 flex items-center justify-between rounded-t-xl border-b px-5 py-4">
-          <div className="flex items-center gap-2.5">
-            <div className="bg-accent/10 text-accent rounded-md p-1.5">
-              <ICONS.ACTION_EXPORT size={18} />
-            </div>
-            <h3 className="text-text-primary text-sm font-semibold">Export Review</h3>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary rounded p-1 transition-all"
-          >
-            <ICONS.ACTION_CLOSE size={18} />
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      busy={isProcessing}
+      title={resultUrl ? 'Review posted' : 'Export review'}
+      description={
+        resultUrl
+          ? 'Your selected items were posted to the remote review.'
+          : 'Choose the tasks and feedback to include.'
+      }
+    >
+      {resultUrl ? (
+        <div className="flex justify-end gap-3">
+          <button className="settings-secondary-action" onClick={onClose}>
+            Close
+          </button>
+          <button className="settings-secondary-action" onClick={() => openUrl(resultUrl)}>
+            Open remote review
           </button>
         </div>
-
-        <div className="custom-scrollbar flex-1 space-y-8 overflow-y-auto p-6">
-          {/* Format Selection */}
-          <section>
-            <h4 className="text-text-tertiary mb-3 px-1 text-[11px] font-bold tracking-wider uppercase">
-              Output Format
-            </h4>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => setFormat('markdown')}
-                className={`group relative flex flex-row items-center gap-3 rounded-lg border px-4 py-3 transition-all ${
-                  format === 'markdown'
-                    ? 'border-accent/30 bg-accent/5 text-text-primary shadow-sm'
-                    : 'border-border/30 bg-bg-secondary/30 text-text-secondary hover:border-border/50 hover:bg-bg-secondary'
-                }`}
-              >
-                {format === 'markdown' && (
-                  <div className="absolute top-2 right-2 flex items-center justify-center">
-                    <div className="bg-accent animate-in fade-in zoom-in-50 h-1.5 w-1.5 rounded-full duration-200" />
-                  </div>
-                )}
-                <div
-                  className={`rounded-md p-2 ${format === 'markdown' ? 'bg-accent/10' : 'bg-bg-tertiary'}`}
-                >
-                  <ICONS.TAB_DESCRIPTION
-                    size={20}
-                    className={
-                      format === 'markdown'
-                        ? 'text-accent'
-                        : 'text-text-disabled group-hover:text-text-secondary transition-colors'
-                    }
-                  />
-                </div>
-                <div className="text-left">
-                  <p className="mb-0.5 text-sm font-medium">Markdown</p>
-                  <p className="text-text-tertiary text-[10px]">Copy to clipboard</p>
-                </div>
-              </button>
-
-              <button
-                disabled={!isRemoteAvailable}
-                onClick={() => setFormat('remote')}
-                className={`group relative flex flex-row items-center gap-3 rounded-lg border px-4 py-3 transition-all ${
-                  !isRemoteAvailable
-                    ? 'cursor-not-allowed border-dashed opacity-50'
-                    : 'cursor-pointer'
-                } ${
-                  format === 'remote'
-                    ? 'border-accent/30 bg-accent/5 text-text-primary shadow-sm'
-                    : 'border-border/30 bg-bg-secondary/30 text-text-secondary hover:border-border/50 hover:bg-bg-secondary'
-                }`}
-              >
-                {format === 'remote' && (
-                  <div className="absolute top-2 right-2 flex items-center justify-center">
-                    <div className="bg-accent animate-in fade-in zoom-in-50 h-1.5 w-1.5 rounded-full duration-200" />
-                  </div>
-                )}
-                <div
-                  className={`rounded-md p-2 ${format === 'remote' ? 'bg-accent/10' : 'bg-bg-tertiary'}`}
-                >
-                  <RemoteIcon
-                    size={20}
-                    className={
-                      format === 'remote'
-                        ? 'text-accent'
-                        : 'text-text-disabled group-hover:text-text-secondary transition-colors'
-                    }
-                  />
-                </div>
-                <div className="text-left">
-                  <p className="mb-0.5 text-sm font-medium">Remote Review</p>
-                  <p className="text-text-tertiary text-[10px]">
-                    {isRemoteAvailable
-                      ? `Post to your ${remoteCopyLabel}`
-                      : 'No remote review available'}
-                  </p>
-                </div>
-              </button>
-            </div>
-          </section>
-
-          {/* Task Selection */}
-          <section>
-            <div className="mb-3 flex items-center justify-between px-1">
-              <h4 className="text-text-tertiary text-[11px] font-bold tracking-wider uppercase">
-                Tasks ({selectedTasks.size}/{tasks.length})
-              </h4>
-              <button
-                onClick={() =>
-                  setSelectedTasks(
-                    selectedTasks.size === tasks.length ? new Set() : new Set(tasks.map(t => t.id))
-                  )
-                }
-                className="text-accent hover:text-accent/80 text-[10px] font-medium transition-colors"
-              >
-                {selectedTasks.size === tasks.length ? 'Deselect All' : 'Select All'}
-              </button>
-            </div>
-            <div className="grid grid-cols-1 gap-2">
-              {tasks.length === 0 ? (
-                <div className="border-border/50 rounded-lg border border-dashed p-4 text-center">
-                  <p className="text-text-disabled text-xs">No review tasks</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {tasks.map(task => (
-                    <label
-                      key={task.id}
-                      className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-all select-none ${
-                        selectedTasks.has(task.id)
-                          ? 'bg-accent/5 border-accent/20'
-                          : 'bg-bg-secondary/30 border-border/30 hover:bg-bg-secondary hover:border-border/50'
-                      }`}
-                    >
-                      <div className="relative mt-0.5 flex items-center justify-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedTasks.has(task.id)}
-                          onChange={() => toggleTask(task.id)}
-                          className="peer border-border/60 checked:bg-accent checked:border-accent h-4 w-4 cursor-pointer appearance-none rounded border transition-all"
-                        />
-                        <div className="pointer-events-none absolute h-1.5 w-1.5 rounded-full bg-white opacity-0 transition-opacity duration-200 peer-checked:opacity-100" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p
-                          className={`mb-1 line-clamp-1 text-xs font-medium ${
-                            selectedTasks.has(task.id) ? 'text-text-primary' : 'text-text-secondary'
-                          }`}
-                        >
-                          {task.title}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium ${
-                              task.stats.risk === 'high'
-                                ? 'bg-red-500/10 text-red-500'
-                                : task.stats.risk === 'medium'
-                                  ? 'bg-yellow-500/10 text-yellow-500'
-                                  : 'bg-blue-500/10 text-blue-500'
-                            }`}
-                          >
-                            {task.stats.risk} risk
-                          </span>
-                        </div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
-
-          {/* Feedback Selection */}
-          <section>
-            <div className="mb-3 flex items-center justify-between px-1">
-              <h4 className="text-text-tertiary text-[11px] font-bold tracking-wider uppercase">
-                Feedback ({selectedFeedbacks.size}/{feedbacks.length})
-              </h4>
-              <button
-                onClick={() =>
-                  setSelectedFeedbacks(
-                    selectedFeedbacks.size === feedbacks.length
-                      ? new Set()
-                      : new Set(feedbacks.map(f => f.id))
-                  )
-                }
-                className="text-accent hover:text-accent/80 text-[10px] font-medium transition-colors"
-              >
-                {selectedFeedbacks.size === feedbacks.length ? 'Deselect All' : 'Select All'}
-              </button>
-            </div>
-            <div className="grid grid-cols-1 gap-2">
-              {feedbacks.length === 0 ? (
-                <div className="border-border/50 rounded-lg border border-dashed p-4 text-center">
-                  <p className="text-text-disabled text-xs">No feedback items</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {feedbacks.map(fb => (
-                    <label
-                      key={fb.id}
-                      className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-all select-none ${
-                        selectedFeedbacks.has(fb.id)
-                          ? 'bg-accent/5 border-accent/20'
-                          : 'bg-bg-secondary/30 border-border/30 hover:bg-bg-secondary hover:border-border/50'
-                      }`}
-                    >
-                      <div className="relative mt-0.5 flex items-center justify-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedFeedbacks.has(fb.id)}
-                          onChange={() => toggleFeedback(fb.id)}
-                          className="peer border-border/60 checked:bg-accent checked:border-accent h-4 w-4 cursor-pointer appearance-none rounded border transition-all"
-                        />
-                        <div className="pointer-events-none absolute h-1.5 w-1.5 rounded-full bg-white opacity-0 transition-opacity duration-200 peer-checked:opacity-100" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p
-                          className={`mb-1 line-clamp-1 text-xs font-medium ${
-                            selectedFeedbacks.has(fb.id)
-                              ? 'text-text-primary'
-                              : 'text-text-secondary'
-                          }`}
-                        >
-                          {fb.title || 'Untitled Feedback'}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium ${
-                              fb.impact === 'blocking'
-                                ? 'bg-red-500/10 text-red-500'
-                                : fb.impact === 'nitpick'
-                                  ? 'bg-bg-tertiary text-text-secondary'
-                                  : 'bg-blue-500/10 text-blue-500'
-                            }`}
-                          >
-                            {fb.impact}
-                          </span>
-                        </div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
-        </div>
-
-        {/* Footer */}
-        <div className="border-border/50 bg-bg-secondary/30 rounded-b-xl border-t p-5 backdrop-blur-sm">
-          {error && (
-            <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-500">
-              <ICONS.ICON_WARNING size={16} />
-              {error}
-            </div>
+      ) : (
+        <fieldset disabled={isProcessing} className="min-w-0 space-y-6">
+          <fieldset className="space-y-3">
+            <legend className="text-text-secondary mb-3 text-sm font-medium">Destination</legend>
+            <label className="text-text-secondary flex items-center gap-3 text-[13px]">
+              <input
+                type="radio"
+                name="export-format"
+                checked={format === 'markdown'}
+                onChange={() => setFormat('markdown')}
+              />
+              Copy Markdown to clipboard
+            </label>
+            {remoteProviderName && (
+              <label className="text-text-secondary flex items-center gap-3 text-[13px]">
+                <input
+                  type="radio"
+                  name="export-format"
+                  checked={format === 'remote'}
+                  onChange={() => setFormat('remote')}
+                />
+                Post to {remoteProviderName}
+              </label>
+            )}
+          </fieldset>
+          <ExportItems
+            title="Tasks"
+            items={tasks}
+            selected={selectedTasks}
+            onChange={setSelectedTasks}
+          />
+          <ExportItems
+            title="Feedback"
+            items={feedbacks}
+            selected={selectedFeedbacks}
+            onChange={setSelectedFeedbacks}
+          />
+          {format === 'remote' && (
+            <p className="text-text-secondary bg-bg-secondary rounded-md p-3 text-xs leading-6">
+              This will publish {selectedCount} selected {selectedCount === 1 ? 'item' : 'items'} to
+              the linked {remoteProviderName} review.
+            </p>
           )}
-          <div className="flex items-center justify-between">
-            <div className="text-text-tertiary text-[11px] font-medium">
-              <span className="text-text-primary">
-                {selectedTasks.size + selectedFeedbacks.size}
-              </span>{' '}
-              items selected
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={onClose}
-                className="text-text-secondary hover:text-text-primary px-4 py-2 text-xs font-medium transition-colors"
-                disabled={isProcessing}
-              >
+          {error && <InlineError title="Could not export review" message={error} />}
+          <div className="border-border flex flex-wrap items-center justify-between gap-3 border-t pt-5">
+            <span className="text-text-tertiary text-xs">{selectedCount} selected</span>
+            <div className="flex gap-3">
+              <button onClick={onClose} className="settings-secondary-action">
                 Cancel
               </button>
               <button
                 onClick={handleConfirm}
-                disabled={
-                  isProcessing || (selectedTasks.size === 0 && selectedFeedbacks.size === 0)
-                }
-                className="bg-accent hover:bg-accent/90 flex min-w-[140px] items-center justify-center gap-2 rounded-lg px-6 py-2 text-xs font-semibold text-white shadow-sm transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isProcessing || selectedCount === 0}
+                className="bg-brand text-brand-fg disabled:bg-bg-tertiary disabled:text-text-disabled rounded-md px-4 py-2 text-xs font-medium"
               >
-                {isProcessing ? (
-                  <>
-                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                    {format === 'remote' ? 'Pushing...' : 'Generating...'}
-                  </>
-                ) : (
-                  <>
-                    {format === 'remote' ? (
-                      <>
-                        <RemoteIcon size={14} weight="bold" />
-                        Post to remote
-                      </>
-                    ) : (
-                      <>
-                        <ICONS.ACTION_COPY size={14} weight="bold" />
-                        Copy Markdown
-                      </>
-                    )}
-                  </>
-                )}
+                {isProcessing
+                  ? 'Exporting…'
+                  : format === 'remote'
+                    ? 'Post to remote'
+                    : 'Copy Markdown'}
               </button>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
+        </fieldset>
+      )}
+    </Dialog>
   );
 };
+
+function ExportItems({
+  title,
+  items,
+  selected,
+  onChange,
+}: {
+  title: string;
+  items: Array<{ id: string; title: string }>;
+  selected: Set<string>;
+  onChange: (selected: Set<string>) => void;
+}) {
+  return (
+    <fieldset className="min-w-0">
+      <legend className="text-text-primary mb-3 w-full text-sm font-medium">
+        {title}{' '}
+        <span className="text-text-tertiary text-xs">
+          {selected.size} of {items.length}
+        </span>
+      </legend>
+      {items.length > 0 ? (
+        <>
+          <button
+            type="button"
+            className="text-text-secondary mb-2 rounded py-1 text-xs underline underline-offset-4"
+            onClick={() =>
+              onChange(
+                selected.size === items.length ? new Set() : new Set(items.map(item => item.id))
+              )
+            }
+          >
+            {selected.size === items.length
+              ? `Deselect all ${title.toLowerCase()}`
+              : `Select all ${title.toLowerCase()}`}
+          </button>
+          <div className="divide-border divide-y">
+            {items.map(item => (
+              <label
+                key={item.id}
+                className="text-text-secondary flex cursor-pointer items-start gap-3 py-3 text-[13px] leading-5"
+              >
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 shrink-0"
+                  checked={selected.has(item.id)}
+                  onChange={() => {
+                    const next = new Set(selected);
+                    if (next.has(item.id)) next.delete(item.id);
+                    else next.add(item.id);
+                    onChange(next);
+                  }}
+                />
+                <span className="min-w-0 break-words">{item.title || 'Untitled feedback'}</span>
+              </label>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="text-text-tertiary text-xs">No {title.toLowerCase()} to include.</p>
+      )}
+    </fieldset>
+  );
+}

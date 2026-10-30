@@ -3,6 +3,37 @@ use crate::infra::diff::index::DiffIndex;
 use serde::{Deserialize, Serialize};
 
 #[tauri::command]
+pub async fn fetch_local_git_diff(
+    state: tauri::State<'_, crate::state::AppState>,
+    repo_id: String,
+    base: String,
+    head: String,
+) -> Result<ParsedDiff, String> {
+    let repo = {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        db.repo_repo()
+            .find_all()
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .find(|repo| repo.id == repo_id)
+            .ok_or_else(|| "Select a linked repository first".to_string())?
+    };
+    let diff = crate::infra::vcs::git::compare_refs(&repo.path, &base, &head)
+        .await
+        .map_err(|e| e.to_string())?;
+    let mut parsed = parse_diff(diff.diff_text)?;
+    parsed.title = Some(format!("{}: {} → {}", repo.name, base.trim(), head.trim()));
+    parsed.source = Some(ReviewSource::LocalGit {
+        repo_id,
+        base_ref: base.trim().to_string(),
+        head_ref: head.trim().to_string(),
+        base_sha: diff.base_sha,
+        head_sha: diff.head_sha,
+    });
+    Ok(parsed)
+}
+
+#[tauri::command]
 pub fn parse_diff(diff_text: String) -> Result<ParsedDiff, String> {
     let index = DiffIndex::new(&diff_text).map_err(|e| e.to_string())?;
     let manifest = index.generate_hunk_manifest_json();

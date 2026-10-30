@@ -81,4 +81,41 @@ describe('GenerationContext', () => {
 
     expect(mockTauri.stop_generation).toHaveBeenCalledWith('run-two');
   });
+
+  it('uses the resolved local Git head for the existing snapshot workflow', async () => {
+    mockTauri.getLinkedRepos.mockResolvedValueOnce([
+      {
+        id: 'on-prem',
+        name: 'Internal repo',
+        path: '/repo',
+        remotes: [],
+        allow_snapshot_access: true,
+      },
+    ]);
+    const source = {
+      type: 'local_git' as const,
+      repo_id: 'on-prem',
+      base_ref: 'main',
+      head_ref: 'feature',
+      base_sha: 'abc',
+      head_sha: 'def',
+    };
+    const { result } = renderHook(() => useGeneration(), { wrapper: createWrapper() });
+    await act(async () => {
+      await result.current.startGeneration({
+        diffText: 'diff --git a/a.ts b/a.ts',
+        agentId: 'test-agent',
+        repoId: 'on-prem',
+        source,
+      });
+    });
+    expect(mockTauri.generateReview).toHaveBeenCalledWith(
+      'diff --git a/a.ts b/a.ts',
+      'test-agent',
+      'on-prem',
+      source,
+      true,
+      undefined
+    );
+  });
 });

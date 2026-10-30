@@ -57,11 +57,16 @@ export const ReviewView: React.FC = () => {
     updateImpact,
     isUpdatingImpact: isUpdatingFeedbackImpact,
     deleteFeedback,
-    createFeedback,
+    createFeedbackAsync,
     isCreating: isCreatingFeedback,
   } = useFeedback(reviewId);
   const { data: rules = [] } = useRules();
-  const { comments, isLoading: isCommentsLoading } = useFeedbackComments(selectedFeedbackId);
+  const {
+    comments,
+    isLoading: isCommentsLoading,
+    error: commentsError,
+    refetch: refetchComments,
+  } = useFeedbackComments(selectedFeedbackId);
   const addCommentMutation = useAddComment();
   const {
     exportReviewMarkdown,
@@ -83,6 +88,7 @@ export const ReviewView: React.FC = () => {
   });
 
   const [activeTab, setActiveTab] = useState<'diff' | 'description' | 'diagram'>('description');
+  const [browseAllFiles, setBrowseAllFiles] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('tasks');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPushModalOpen, setIsPushModalOpen] = useState(false);
@@ -93,6 +99,8 @@ export const ReviewView: React.FC = () => {
     selectTask(null);
     selectFeedback(null);
     selectFile(null);
+    setBrowseAllFiles(false);
+    setActiveTab('description');
   }, [reviewId, selectFeedback, selectFile, selectTask]);
 
   // Feedback Modal State
@@ -110,13 +118,24 @@ export const ReviewView: React.FC = () => {
       !selectedTaskId &&
       !isTasksLoading &&
       reviewViewMode === 'review' &&
-      sidebarTab === 'tasks'
+      sidebarTab === 'tasks' &&
+      !browseAllFiles
     ) {
       selectTask(tasks[0].id);
     }
-  }, [tasks, selectedTaskId, isTasksLoading, selectTask, reviewViewMode, sidebarTab]);
+  }, [
+    tasks,
+    selectedTaskId,
+    isTasksLoading,
+    selectTask,
+    reviewViewMode,
+    sidebarTab,
+    browseAllFiles,
+  ]);
 
   const handleStartReview = () => {
+    setBrowseAllFiles(false);
+    setActiveTab('description');
     setReviewViewMode('review');
     setSidebarTab('tasks');
     if (tasks.length > 0) {
@@ -125,6 +144,8 @@ export const ReviewView: React.FC = () => {
   };
 
   const handleSelectTaskFromSummary = (taskId: string) => {
+    setBrowseAllFiles(false);
+    setActiveTab('description');
     selectTask(taskId);
     setReviewViewMode('review');
     setSidebarTab('tasks');
@@ -140,6 +161,9 @@ export const ReviewView: React.FC = () => {
     const file = parsedDiff?.files?.find(f => f.name === fileName || f.new_path === fileName);
     if (file) {
       selectFile(file);
+      selectTask(null);
+      setBrowseAllFiles(true);
+      setActiveTab('diff');
       setReviewViewMode('review');
       setSidebarTab('tasks');
     }
@@ -210,9 +234,9 @@ export const ReviewView: React.FC = () => {
     }
   };
 
-  const handleAddComment = (body: string) => {
+  const handleAddComment = async (body: string) => {
     if (selectedFeedbackId) {
-      addCommentMutation.mutate({ feedbackId: selectedFeedbackId, body });
+      await addCommentMutation.mutateAsync({ feedbackId: selectedFeedbackId, body });
     }
   };
 
@@ -271,14 +295,14 @@ export const ReviewView: React.FC = () => {
     setIsAddFeedbackModalOpen(true);
   };
 
-  const handleCreateFeedback = (
+  const handleCreateFeedback = async (
     title: string,
     impact: 'blocking' | 'nice_to_have' | 'nitpick',
     content: string
   ) => {
     if (!reviewId) return;
 
-    createFeedback({
+    await createFeedbackAsync({
       review_id: reviewId,
       title,
       content,
@@ -357,7 +381,7 @@ export const ReviewView: React.FC = () => {
 
   // Review mode - sidebar + content
   return (
-    <div className="bg-bg-primary flex h-full">
+    <div className="review-workspace bg-bg-primary flex h-full">
       <ReviewSidebar
         sidebarTab={sidebarTab}
         tasks={tasks}
@@ -369,7 +393,12 @@ export const ReviewView: React.FC = () => {
         isFeedbacksLoading={isFeedbacksLoading}
         confidenceThreshold={filterConfig.confidenceThreshold}
         onSidebarTabChange={setSidebarTab}
-        onSelectTask={selectTask}
+        onSelectTask={taskId => {
+          setBrowseAllFiles(false);
+          selectTask(taskId);
+          selectFile(null);
+          setActiveTab('description');
+        }}
         onSelectFeedback={selectFeedback}
         onOpenExportModal={() => setIsModalOpen(true)}
         onAddGlobalFeedback={handleAddGlobalFeedback}
@@ -378,7 +407,7 @@ export const ReviewView: React.FC = () => {
         categoriesById={categoriesById}
       />
 
-      <div className="bg-bg-primary relative flex min-w-0 flex-1 flex-col">
+      <div className="bg-bg-primary relative flex min-h-0 min-w-0 flex-1 flex-col">
         <Suspense fallback={<DiffSkeleton />}>
           {diffError ? (
             <ErrorState
@@ -387,10 +416,14 @@ export const ReviewView: React.FC = () => {
             />
           ) : sidebarTab === 'feedback' ? (
             <FeedbackDetail
+              key={selectedFeedbackId}
               feedback={selectedFeedback}
               rulesById={rulesById}
               categoriesById={categoriesById}
-              comments={isCommentsLoading ? [] : comments}
+              comments={comments}
+              isCommentsLoading={isCommentsLoading}
+              commentsError={commentsError}
+              onRetryComments={() => void refetchComments()}
               onUpdateStatus={handleFeedbackStatusChange}
               onUpdateImpact={handleFeedbackImpactChange}
               onDelete={handleDeleteFeedback}
@@ -403,7 +436,7 @@ export const ReviewView: React.FC = () => {
             />
           ) : (
             <>
-              {selectedTask && parsedDiff ? (
+              {selectedTask && parsedDiff && !browseAllFiles ? (
                 <TaskDetail
                   task={selectedTask}
                   parsedDiff={parsedDiff}
@@ -427,8 +460,10 @@ export const ReviewView: React.FC = () => {
                 />
               ) : parsedDiff ? (
                 <div className="flex flex-1 flex-col">
-                  <div className="border-border bg-bg-primary h-10 border-b" />
-                  <div className="relative flex-1">
+                  <div className="border-border text-text-secondary border-b px-5 py-3 text-sm font-medium">
+                    All changed files
+                  </div>
+                  <div className="relative flex min-h-0 flex-1">
                     <DiffViewer
                       files={parsedDiff.files || []}
                       selectedFile={selectedFile}

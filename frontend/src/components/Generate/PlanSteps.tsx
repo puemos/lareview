@@ -9,12 +9,14 @@ export interface PlanStep {
 
 interface PlanStepsProps {
   steps: PlanStep[];
+  isRunning?: boolean;
   className?: string;
   emptyMessage?: string;
 }
 
 export const PlanSteps: React.FC<PlanStepsProps> = ({
   steps,
+  isRunning = false,
   className,
   emptyMessage = 'No plan generated yet',
 }) => {
@@ -22,7 +24,7 @@ export const PlanSteps: React.FC<PlanStepsProps> = ({
     return (
       <div
         className={clsx(
-          'text-text-disabled flex min-h-[160px] flex-col items-center justify-center gap-2 text-center opacity-60',
+          'text-text-disabled flex min-h-[160px] flex-col items-center justify-center gap-2 text-center',
           className
         )}
       >
@@ -34,7 +36,7 @@ export const PlanSteps: React.FC<PlanStepsProps> = ({
 
   return (
     <div className={clsx('space-y-1', className)}>
-      {steps.map(step => {
+      {steps.map((step, index) => {
         const status = (step.status || 'pending').toLowerCase();
         const isDone = status === 'completed' || status === 'done';
         const isInProgress = status === 'in_progress' || status === 'inprogress';
@@ -50,7 +52,10 @@ export const PlanSteps: React.FC<PlanStepsProps> = ({
           Icon = (
             <CircleDashedIcon
               size={16}
-              className="text-status-in_progress mt-0.5 shrink-0 animate-[spin_2000ms_linear_infinite]"
+              className={clsx(
+                'text-status-in_progress mt-0.5 shrink-0',
+                isRunning && 'animate-[spin_2000ms_linear_infinite]'
+              )}
             />
           );
         } else if (isFailed) {
@@ -60,19 +65,33 @@ export const PlanSteps: React.FC<PlanStepsProps> = ({
         }
 
         return (
-          <div key={step.content} className="animate-fade-in group flex items-start gap-3 text-xs">
+          <div
+            key={`${index}-${step.content}`}
+            className="group flex items-start gap-3 py-2 text-[13px]"
+          >
             {Icon}
             <span
               className={clsx(
                 'leading-relaxed font-medium transition-colors',
                 isDone
-                  ? 'text-text-primary line-through opacity-70'
+                  ? 'text-text-secondary'
                   : isInProgress
                     ? 'text-text-primary'
                     : 'text-text-secondary group-hover:text-text-primary'
               )}
             >
               {step.content}
+            </span>
+            <span className="text-text-tertiary ml-auto shrink-0 text-[11px]">
+              {isDone
+                ? 'Done'
+                : isFailed
+                  ? 'Failed'
+                  : isInProgress
+                    ? isRunning
+                      ? 'In progress'
+                      : 'Paused'
+                    : 'Pending'}
             </span>
           </div>
         );

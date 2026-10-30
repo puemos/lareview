@@ -7,31 +7,24 @@ interface ViewModeToggleProps {
   disabled: boolean;
 }
 
-export const ViewModeToggle: React.FC<ViewModeToggleProps> = ({ mode, onChange, disabled }) => {
-  return (
-    <div className="bg-bg-secondary/90 ring-border pointer-events-auto flex h-8 rounded-md p-0.5 shadow-lg ring-1 shadow-black/20 backdrop-blur-md">
+export const ViewModeToggle: React.FC<ViewModeToggleProps> = ({ mode, onChange, disabled }) => (
+  <div
+    className="border-border/50 bg-bg-secondary/50 pointer-events-auto inline-flex h-8 shrink-0 items-center gap-0.5 rounded-md border p-0.5"
+    role="group"
+    aria-label="Diff view"
+  >
+    {(['raw', 'diff'] as const).map(value => (
       <button
-        onClick={() => onChange('raw')}
-        className={`flex items-center gap-1.5 rounded-[4px] px-3 text-[10px] font-medium transition-[background-color,color,box-shadow] ${
-          mode === 'raw'
-            ? 'bg-bg-tertiary text-text-primary shadow-sm'
-            : 'text-text-disabled hover:text-text-secondary'
-        }`}
+        key={value}
+        type="button"
+        onClick={() => onChange(value)}
+        disabled={value === 'diff' && disabled}
+        aria-pressed={mode === value}
+        className={`focus-visible:outline-brand inline-flex h-6 items-center gap-1.5 rounded px-2.5 text-[11px] font-medium transition-colors focus-visible:outline-2 ${mode === value ? 'text-text-primary bg-white/[0.07]' : 'text-text-disabled hover:text-text-secondary'}`}
       >
-        <Code size={14} /> Raw
+        {value === 'raw' ? <Code size={13} /> : <Eye size={13} />}
+        {value === 'raw' ? 'Raw' : 'Preview'}
       </button>
-      <div className="bg-border/50 mx-0.5 my-1 w-px" />
-      <button
-        onClick={() => onChange('diff')}
-        className={`flex items-center gap-1.5 rounded-[4px] px-3 text-[10px] font-medium transition-[background-color,color,box-shadow] ${
-          mode === 'diff'
-            ? 'bg-bg-tertiary text-text-primary shadow-sm'
-            : 'text-text-disabled hover:text-text-secondary'
-        }`}
-        disabled={disabled}
-      >
-        <Eye size={14} /> Preview
-      </button>
-    </div>
-  );
-};
+    ))}
+  </div>
+);

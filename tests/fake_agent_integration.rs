@@ -6,6 +6,15 @@ use std::sync::Arc;
 
 #[tokio::test]
 async fn test_generate_tasks_with_fake_agent_finalize_only() {
+    generate_with_fake_agent("fake").await;
+}
+
+#[tokio::test]
+async fn test_copilot_receives_mcp_at_launch_instead_of_via_acp() {
+    generate_with_fake_agent("copilot").await;
+}
+
+async fn generate_with_fake_agent(agent_id: &str) {
     let mut agent_path = std::env::current_exe()
         .unwrap()
         .parent()
@@ -30,7 +39,7 @@ index 0000000..1111111 100644\n\
     let run_context = RunContext {
         review_id: "review".to_string(),
         run_id: "run".to_string(),
-        agent_id: "fake".to_string(),
+        agent_id: agent_id.to_string(),
         input_ref: "diff".to_string(),
         diff_text: Arc::from(diff_text),
         diff_hash: "hash".to_string(),
@@ -48,7 +57,11 @@ index 0000000..1111111 100644\n\
         repo_root: None,
         cleanup_path: None,
         agent_command: agent_path.to_string(),
-        agent_args: Vec::new(),
+        agent_args: if agent_id == "copilot" {
+            vec!["--expect-copilot-mcp".to_string()]
+        } else {
+            Vec::new()
+        },
         agent_config: Vec::new(),
         progress_tx: Some(progress_tx),
         mcp_server_binary: Some(std::path::PathBuf::from(env!("CARGO_BIN_EXE_lareview"))),

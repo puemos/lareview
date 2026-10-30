@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Trash, Spinner } from '@phosphor-icons/react';
-import { LayoutGroup, motion, useReducedMotion } from 'framer-motion';
+import { Trash, Spinner, GitPullRequest, GitBranch, Code } from '@phosphor-icons/react';
+import './generateWorkspace.css';
 import { useTauri } from '../../hooks/useTauri';
 import { useAppStore } from '../../store';
 import { useAgents } from '../../hooks/useAgents';
@@ -10,10 +10,13 @@ import { useGeneration } from '../../contexts/useGeneration';
 import { DiffEditorPanel } from './DiffEditorPanel';
 import { AgentConfigPanel } from './AgentConfigPanel';
 import { VcsInputCard } from './VcsInputCard';
+import { LocalGitInput } from './LocalGitInput';
 import { ViewModeToggle } from './ViewModeToggle';
 import { DiffStats } from './DiffStats';
 import { countAdditions, countDeletions } from './DiffEditorPanel';
 import { toAgentConfigSelections } from '../../lib/agent-config';
+import { InlineError } from '../Common/InlineError';
+import { findSourceRepository } from '../../lib/source-repository';
 
 interface GenerateViewProps {
   onNavigate: (view: ViewType) => void;
@@ -33,16 +36,15 @@ const isVcsSource = (
 
 export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavigate }) => {
   const [diffText, setDiffText] = useState('');
-  const lastAutoSwitchedTextRef = React.useRef('');
   const [isLoadingPr, setIsLoadingPr] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
 
   const [validationError, setValidationError] = useState<string | null>(null);
-  const shouldReduceMotion = useReducedMotion();
+  const [startError, setStartError] = useState<string | null>(null);
 
-  const { fetchRemotePr } = useTauri();
+  const { fetchRemotePr, fetchLocalGitDiff } = useTauri();
   const { startGeneration } = useGeneration();
-  const { data: agents = [] } = useAgents();
+  const { data: agents = [], isLoading: isAgentsLoading, error: agentsError } = useAgents();
   const { data: repos = [], addRepo, cloneRepo, selectRepoFolder } = useRepos();
 
   const setDiffTextStore = useAppStore(state => state.setDiffText);
@@ -64,6 +66,9 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   const setPrRef = useAppStore(state => state.setPrRef);
   const viewMode = useAppStore(state => state.viewMode);
   const setViewMode = useAppStore(state => state.setViewMode);
+  const [sourceMode, setSourceMode] = useState<'remote' | 'local' | 'paste'>(
+    pendingSource?.type === 'local_git' || (!pendingSource && selectedRepoId) ? 'local' : 'remote'
+  );
 
   const [repoLinkCallout, setRepoLinkCallout] = useState<RepoLinkCallout | null>(null);
 
@@ -76,8 +81,12 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   }, [globalDiffText]);
 
   useEffect(() => {
-    if (agents.length > 0 && !agentId) {
-      setAgentIdStore(agents[0].id);
+    if (
+      agents.length > 0 &&
+      !agents.some(agent => agent.id === agentId && agent.available !== false)
+    ) {
+      const available = agents.find(agent => agent.available !== false);
+      if (available) setAgentIdStore(available.id);
     }
   }, [agents, agentId, setAgentIdStore]);
 
@@ -105,44 +114,9 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   const isDiffValid = diffText.trim().length > 0 && !diffValidationError;
   const isComposerEmpty = !diffText.trim() && !pendingSource;
 
-  // Auto-switch to diff mode on valid pasting
-  useEffect(() => {
-    if (viewMode === 'raw' && isDiffValid && diffText !== lastAutoSwitchedTextRef.current) {
-      setViewMode('diff');
-      lastAutoSwitchedTextRef.current = diffText;
-    }
-  }, [diffText, viewMode, isDiffValid, setViewMode]);
-
   const findMatchingRepo = useCallback(
     (source: Extract<ReviewSource, { type: 'github_pr' | 'gitlab_mr' }>) => {
-      if (source.type === 'github_pr') {
-        const target = `${source.owner}/${source.repo}`.toLowerCase();
-        let matchingRepo = repos.find(r =>
-          r.remotes.some((url: string) => url.toLowerCase().includes(target))
-        );
-
-        if (!matchingRepo) {
-          matchingRepo = repos.find(r => r.name.toLowerCase() === source.repo.toLowerCase());
-        }
-
-        return matchingRepo || null;
-      }
-
-      const targetHost = source.host.toLowerCase();
-      const targetPath = source.project_path.toLowerCase();
-      let matchingRepo = repos.find(r =>
-        r.remotes.some((url: string) => {
-          const lower = url.toLowerCase();
-          return lower.includes(targetHost) && lower.includes(targetPath);
-        })
-      );
-
-      if (!matchingRepo) {
-        const repoName = source.project_path.split('/').pop() || source.project_path;
-        matchingRepo = repos.find(r => r.name.toLowerCase() === repoName.toLowerCase());
-      }
-
-      return matchingRepo || null;
+      return findSourceRepository(source, repos) ?? null;
     },
     [repos]
   );
@@ -204,7 +178,9 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   }, [addRepo, selectRepoFolder, setSelectedRepoId]);
 
   const handleGenerate = useCallback(async () => {
+    if (isStarting || isLoadingPr) return;
     setValidationError(null);
+    setStartError(null);
 
     const error = validateDiff(diffText);
     if (error) {
@@ -215,30 +191,37 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     setDiffTextStore(diffText);
     setAgentIdStore(agentId);
     setIsStarting(true);
-    const result = await startGeneration({
-      diffText,
-      agentId,
-      repoId: selectedRepoId || undefined,
-      source: pendingSource,
-      agentConfig: toAgentConfigSelections(agentConfigPreferences[agentId] || []),
-    });
-    setIsStarting(false);
-    if (result) {
-      setReviewId(result.review_id);
-      setTasks([]);
-      selectTask(null);
-      selectFeedback(null);
-      selectFile(null);
-      setReviewViewMode('summary');
-      setDiffText('');
-      setDiffTextStore('');
-      setParsedDiff(null);
-      setPendingSource(null);
-      setPrRef('');
-      setViewMode('raw');
-      _onNavigate('review');
+    try {
+      const result = await startGeneration({
+        diffText,
+        agentId,
+        repoId: selectedRepoId || undefined,
+        source: pendingSource,
+        agentConfig: toAgentConfigSelections(agentConfigPreferences[agentId] || []),
+      });
+      if (result) {
+        setReviewId(result.review_id);
+        setTasks([]);
+        selectTask(null);
+        selectFeedback(null);
+        selectFile(null);
+        setReviewViewMode('summary');
+        setDiffText('');
+        setDiffTextStore('');
+        setParsedDiff(null);
+        setPendingSource(null);
+        setPrRef('');
+        setViewMode('raw');
+        _onNavigate('review');
+      }
+    } catch (error) {
+      setStartError(String(error));
+    } finally {
+      setIsStarting(false);
     }
   }, [
+    isStarting,
+    isLoadingPr,
     diffText,
     agentId,
     validateDiff,
@@ -311,6 +294,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
   const handleClear = useCallback(() => {
     setDiffText('');
     setDiffTextStore('');
+    setStartError(null);
     setParsedDiff(null);
     setPendingSource(null);
     setPrRef('');
@@ -319,123 +303,177 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
     setRepoLinkCallout(null);
   }, [setDiffTextStore, setParsedDiff, setPendingSource, setPrRef, setViewMode]);
 
+  const handleCompareRefs = async (base: string, head: string) => {
+    if (!selectedRepoId) return false;
+    setIsLoadingPr(true);
+    setValidationError(null);
+    try {
+      const diff = await fetchLocalGitDiff(selectedRepoId, base, head);
+      setDiffText(diff.diff_text);
+      setParsedDiff(diff);
+      setPendingSource(diff.source ?? null);
+      setPrRef('');
+      setRepoLinkCallout(null);
+      setViewMode('diff');
+      return true;
+    } catch (error) {
+      setValidationError(String(error));
+      return false;
+    } finally {
+      setIsLoadingPr(false);
+    }
+  };
+
+  const localGitInput = (
+    <LocalGitInput
+      repoName={repos.find(repo => repo.id === selectedRepoId)?.name}
+      source={pendingSource}
+      compact={!isComposerEmpty}
+      isLoading={isLoadingPr}
+      disabled={isStarting}
+      error={validationError}
+      onCompare={handleCompareRefs}
+      onCancelEdit={() => setValidationError(null)}
+      onLinkRepo={() => _onNavigate('repos')}
+    />
+  );
+
+  const sourceTabs = (
+    <div className="generate-source-tabs" role="group" aria-label="Review input source">
+      {(['remote', 'local', 'paste'] as const).map(mode => (
+        <button
+          key={mode}
+          type="button"
+          aria-pressed={sourceMode === mode}
+          disabled={isStarting || isLoadingPr}
+          onClick={() => {
+            if (mode !== sourceMode) {
+              if (mode === 'paste') {
+                setPendingSource(null);
+                setPrRef('');
+                setRepoLinkCallout(null);
+                setViewMode('raw');
+              } else handleClear();
+            }
+            setSourceMode(mode);
+            setValidationError(null);
+          }}
+        >
+          {mode === 'remote' ? (
+            <GitPullRequest size={14} />
+          ) : mode === 'local' ? (
+            <GitBranch size={14} />
+          ) : (
+            <Code size={14} />
+          )}
+          {mode === 'remote' ? 'Pull request' : mode === 'local' ? 'Local Git' : 'Paste diff'}
+        </button>
+      ))}
+    </div>
+  );
+  const repoCallout = (
+    <>
+      {' '}
+      {repoLinkCallout && (
+        <div className="border-border bg-bg-secondary text-text-secondary pointer-events-auto flex flex-wrap items-center justify-between gap-3 rounded-md border px-4 py-3 text-xs">
+          <div className="min-w-0">
+            <div className="text-text-primary font-medium">Add repository context</div>
+            <div className="text-text-tertiary mt-1 leading-5 break-words">
+              Link {repoLinkCallout.label} to review with repository context.
+            </div>
+          </div>
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <button
+              onClick={handleCloneAndLink}
+              disabled={isStarting || isRepoLinking}
+              className="settings-secondary-action"
+            >
+              {isRepoLinking ? <Spinner size={12} className="animate-spin" /> : null}
+              <span>Clone &amp; Link</span>
+            </button>
+            <button
+              onClick={handleLinkExisting}
+              disabled={isStarting || isRepoLinking}
+              className="settings-secondary-action"
+            >
+              Link Existing
+            </button>
+            <button
+              onClick={() => setRepoLinkCallout(null)}
+              disabled={isRepoLinking}
+              className="text-text-tertiary hover:text-text-primary px-1 text-[10px] font-semibold transition-colors disabled:opacity-60"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+  const isSourceEmpty = isComposerEmpty && sourceMode !== 'paste';
+  const hasLocalSource = sourceMode === 'local' && pendingSource?.type === 'local_git';
+
   return (
-    <div className="bg-bg-primary flex h-full flex-col">
+    <div className="generate-workspace bg-bg-primary flex h-full min-w-0 flex-col">
       <AgentConfigPanel
         agents={agents}
         repos={repos}
         selectedAgentId={agentId}
         selectedRepoId={selectedRepoId}
         onAgentSelect={setAgentIdStore}
-        onRepoSelect={setSelectedRepoId}
+        onRepoSelect={repoId => {
+          if (pendingSource?.type === 'local_git' && repoId !== selectedRepoId) handleClear();
+          setSelectedRepoId(repoId);
+        }}
         isStarting={isStarting}
+        isLoadingSource={isLoadingPr}
         onGenerate={handleGenerate}
-        isDiffValid={isDiffValid}
+        isDiffValid={isDiffValid && !isLoadingPr && !validationError}
       />
-
-      <div className="flex flex-1 overflow-hidden">
-        <LayoutGroup id="generate-source-input">
-          <div className="bg-bg-primary relative flex min-w-0 flex-1 flex-col">
-            <div className="flex flex-col gap-2 p-4 pb-0">
-              <div className="flex items-center gap-3">
-                {!isComposerEmpty && (
-                  <motion.div
-                    layoutId="review-source-input"
-                    transition={{
-                      layout: {
-                        duration: shouldReduceMotion ? 0 : 0.22,
-                        ease: [0.23, 1, 0.32, 1],
-                      },
-                    }}
-                    className="min-w-0"
-                  >
-                    <VcsInputCard
-                      pendingSource={pendingSource}
-                      prRef={prRef}
-                      onPrRefChange={setPrRef}
-                      onFetch={handleFetchPr}
-                      isLoading={isLoadingPr}
-                      disabled={isStarting}
-                      onClear={handleClear}
-                    />
-                  </motion.div>
-                )}
-
-                <div className="flex-1" />
-
-                <div className="pointer-events-auto flex gap-2">
-                  {(diffText.trim() || prRef.trim()) && (
-                    <button
-                      onClick={handleClear}
-                      className="bg-bg-secondary/90 hover:bg-bg-tertiary text-text-secondary hover:text-text-primary ring-border flex h-8 items-center gap-1.5 rounded-md px-3 text-[10px] font-medium shadow-sm ring-1 backdrop-blur-sm transition-[background-color,color,transform] active:scale-[0.97]"
-                    >
-                      <Trash size={13} />
-                      <span>Clear</span>
-                    </button>
-                  )}
-
-                  <ViewModeToggle
-                    mode={viewMode}
-                    onChange={setViewMode}
-                    disabled={!diffText.trim()}
-                  />
-                </div>
+      {!isAgentsLoading && (agentsError || !agents.some(agent => agent.available !== false)) && (
+        <div className="border-border border-b px-6 py-3">
+          <InlineError
+            title="No available review agent"
+            message={
+              agentsError
+                ? String(agentsError)
+                : 'Install an agent or configure its command in Settings.'
+            }
+          />
+          <button
+            className="text-text-secondary mt-2 rounded py-1 text-xs underline underline-offset-4"
+            onClick={() => _onNavigate('settings')}
+          >
+            Open settings
+          </button>
+        </div>
+      )}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        {(startError || (validationError && !isSourceEmpty && sourceMode !== 'local')) && (
+          <div className="px-5 pt-3">
+            <InlineError
+              title="Could not prepare review"
+              message={startError ?? validationError ?? ''}
+            />
+          </div>
+        )}
+        {isSourceEmpty ? (
+          <div className="generate-empty pointer-events-none absolute inset-0 z-10 px-8">
+            <div className="pointer-events-auto mx-auto w-full max-w-[600px]">
+              <div className="mb-7">
+                <h1 className="text-text-primary text-2xl font-semibold tracking-[-0.025em]">
+                  Start a review
+                </h1>
+                <p className="text-text-tertiary mt-2 text-[13px] leading-6">
+                  Review a pull request or compare changes in a local repository.
+                </p>
               </div>
-
-              {repoLinkCallout && (
-                <div className="pointer-events-auto flex items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200 shadow-sm">
-                  <div className="min-w-0">
-                    <div className="font-medium text-amber-100">No linked repo found</div>
-                    <div className="truncate text-amber-200/80">
-                      Link or clone {repoLinkCallout.label} to enable snapshots.
-                    </div>
-                  </div>
-                  <div className="flex flex-shrink-0 items-center gap-2">
-                    <button
-                      onClick={handleCloneAndLink}
-                      disabled={isStarting || isRepoLinking}
-                      className="flex items-center gap-1 rounded bg-amber-500/20 px-2 py-1 text-[10px] font-semibold text-amber-100 transition-colors hover:bg-amber-500/30 disabled:opacity-60"
-                    >
-                      {isRepoLinking ? <Spinner size={12} className="animate-spin" /> : null}
-                      <span>Clone &amp; Link</span>
-                    </button>
-                    <button
-                      onClick={handleLinkExisting}
-                      disabled={isStarting || isRepoLinking}
-                      className="bg-bg-secondary/80 hover:bg-bg-tertiary text-text-primary rounded px-2 py-1 text-[10px] font-semibold transition-colors disabled:opacity-60"
-                    >
-                      Link Existing
-                    </button>
-                    <button
-                      onClick={() => setRepoLinkCallout(null)}
-                      disabled={isRepoLinking}
-                      className="text-text-tertiary hover:text-text-primary px-1 text-[10px] font-semibold transition-colors disabled:opacity-60"
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {isComposerEmpty && (
-              <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-8 pb-20">
-                <div className="pointer-events-auto w-full max-w-xl">
-                  <div className="mb-4 text-center">
-                    <h1 className="text-text-primary text-base font-semibold">Start a review</h1>
-                    <p className="text-text-tertiary mt-1 text-xs">
-                      Paste a pull request or merge request link
-                    </p>
-                  </div>
-                  <motion.div
-                    layoutId="review-source-input"
-                    transition={{
-                      layout: {
-                        duration: shouldReduceMotion ? 0 : 0.22,
-                        ease: [0.23, 1, 0.32, 1],
-                      },
-                    }}
-                  >
+              <section className="generate-source-panel">
+                {sourceTabs}
+                <div className="p-5">
+                  {sourceMode === 'local' ? (
+                    localGitInput
+                  ) : (
                     <VcsInputCard
                       pendingSource={pendingSource}
                       prRef={prRef}
@@ -446,28 +484,80 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
                       onClear={handleClear}
                       prominent
                     />
-                  </motion.div>
-                  <p className="text-text-disabled mt-3 text-center text-[11px]">
-                    Or paste a unified diff directly into the editor
-                  </p>
+                  )}
+                  {sourceMode === 'remote' && validationError && (
+                    <p role="alert" className="mt-3 text-xs leading-5 text-red-400">
+                      {validationError}
+                    </p>
+                  )}
                 </div>
-              </div>
-            )}
-
-            <DiffEditorPanel
-              diffText={diffText}
-              viewMode={viewMode}
-              onDiffTextChange={setDiffText}
-              validationError={diffValidationError || validationError}
-            />
-
-            <DiffStats
-              charCount={diffText.length}
-              additions={countAdditions(diffText)}
-              deletions={countDeletions(diffText)}
-            />
+              </section>
+            </div>
           </div>
-        </LayoutGroup>
+        ) : (
+          <div className="generate-loaded-source border-border/50 space-y-3 border-b px-5 py-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {hasLocalSource ? <div className="min-w-0 flex-1">{localGitInput}</div> : sourceTabs}
+              {sourceMode === 'remote' && (
+                <VcsInputCard
+                  pendingSource={pendingSource}
+                  prRef={prRef}
+                  onPrRefChange={setPrRef}
+                  onFetch={handleFetchPr}
+                  isLoading={isLoadingPr}
+                  disabled={isStarting}
+                  onClear={handleClear}
+                />
+              )}
+              {!hasLocalSource && <div className="flex-1" />}
+              {(diffText.trim() || prRef.trim()) && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  aria-label="Clear diff"
+                  disabled={isStarting || isLoadingPr}
+                  className="generate-clear flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[11px]"
+                >
+                  <Trash size={13} />
+                  <span>Clear</span>
+                </button>
+              )}
+              <ViewModeToggle mode={viewMode} onChange={setViewMode} disabled={!diffText.trim()} />
+            </div>
+            {sourceMode === 'local' && !hasLocalSource && (
+              <div className="max-w-[600px]">{localGitInput}</div>
+            )}
+            {repoCallout}
+          </div>
+        )}
+        <div
+          className={`generate-editor-shell flex min-h-0 flex-1 flex-col ${isSourceEmpty ? 'invisible' : ''}`}
+        >
+          <DiffEditorPanel
+            diffText={diffText}
+            viewMode={viewMode}
+            onDiffTextChange={value => {
+              setDiffText(value);
+              setDiffTextStore(value);
+              setPendingSource(null);
+              setParsedDiff(null);
+              setPrRef('');
+              setRepoLinkCallout(null);
+              setSourceMode('paste');
+              setValidationError(null);
+            }}
+            validationError={
+              diffValidationError || (sourceMode === 'remote' ? validationError : null)
+            }
+          />
+        </div>
+        {!isSourceEmpty && (
+          <DiffStats
+            charCount={diffText.length}
+            additions={countAdditions(diffText)}
+            deletions={countDeletions(diffText)}
+          />
+        )}
       </div>
     </div>
   );

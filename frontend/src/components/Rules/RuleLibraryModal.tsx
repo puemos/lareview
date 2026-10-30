@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
 import { ICONS } from '../../constants/icons';
+import { Dialog } from '../Common/Dialog';
+import { SearchField } from '../Common/SearchField';
+import { EmptyPanel } from '../Common/EmptyPanel';
+import { InlineError } from '../Common/InlineError';
 import { useRuleLibrary } from '../../hooks/useRuleLibrary';
 import type { LibraryRule, LibraryCategory, RuleScope, LinkedRepo } from '../../types';
 
@@ -33,6 +37,7 @@ const CATEGORY_ORDER: LibraryCategory[] = [
 
 export const RuleLibraryModal: React.FC<RuleLibraryModalProps> = ({ isOpen, onClose, repos }) => {
   const { allRules, addFromLibrary } = useRuleLibrary();
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<LibraryCategory | 'all'>('all');
   const [addingRuleId, setAddingRuleId] = useState<string | null>(null);
   const [addScope, setAddScope] = useState<RuleScope>('global');
@@ -42,10 +47,13 @@ export const RuleLibraryModal: React.FC<RuleLibraryModalProps> = ({ isOpen, onCl
 
   const rules = allRules.data || [];
 
-  const filteredRules =
-    selectedCategory === 'all'
-      ? rules
-      : rules.filter(r => r.library_category === selectedCategory);
+  const filteredRules = rules.filter(
+    rule =>
+      (selectedCategory === 'all' || rule.library_category === selectedCategory) &&
+      [rule.name, rule.description, rule.text, ...rule.tags, rule.glob ?? ''].some(value =>
+        value.toLowerCase().includes(searchQuery.trim().toLowerCase())
+      )
+  );
 
   const rulesByCategory = CATEGORY_ORDER.reduce(
     (acc, cat) => {
@@ -59,11 +67,12 @@ export const RuleLibraryModal: React.FC<RuleLibraryModalProps> = ({ isOpen, onCl
   );
 
   const handleAddRule = (rule: LibraryRule) => {
+    addFromLibrary.reset();
     setAddingRuleId(rule.id);
   };
 
   const confirmAddRule = () => {
-    if (!addingRuleId) return;
+    if (!addingRuleId || addFromLibrary.isPending || (addScope === 'repo' && !addRepoId)) return;
     addFromLibrary.mutate(
       {
         libraryRuleId: addingRuleId,
@@ -89,79 +98,80 @@ export const RuleLibraryModal: React.FC<RuleLibraryModalProps> = ({ isOpen, onCl
   const addingRule = rules.find(r => r.id === addingRuleId);
 
   return (
-    <div className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm duration-200">
-      <div className="bg-bg-primary border-border/50 animate-in zoom-in-95 flex h-[80vh] w-full max-w-4xl flex-col rounded-[2px] border shadow-2xl duration-200">
-        {/* Header */}
-        <div className="border-border/50 bg-bg-secondary/30 flex items-center justify-between rounded-t-[2px] border-b px-5 py-4">
-          <div className="flex items-center gap-2.5">
-            <div className="bg-brand/10 text-brand rounded-[2px] p-1.5">
-              <ICONS.ICON_PLAN size={18} />
-            </div>
-            <div>
-              <h3 className="text-text-primary text-sm font-semibold">Rule Library</h3>
-              <p className="text-text-tertiary text-xs">
-                Pre-built rules to get started quickly
-              </p>
-            </div>
-          </div>
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Rule library"
+      description="Choose a starting point and tailor it to your codebase."
+      busy={addFromLibrary.isPending}
+      className="product-library-dialog"
+      bodyClassName="product-library-body"
+    >
+      {/* Content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Category Sidebar */}
+        <div className="border-border/50 w-44 flex-shrink-0 overflow-y-auto border-r p-3">
           <button
-            onClick={onClose}
-            className="text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary rounded-[2px] p-1 transition-all"
+            onClick={() => setSelectedCategory('all')}
+            aria-pressed={selectedCategory === 'all'}
+            className={`mb-1 w-full rounded-md px-3 py-2 text-left text-xs transition-colors ${
+              selectedCategory === 'all'
+                ? 'bg-brand/10 text-brand'
+                : 'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary'
+            }`}
           >
-            <ICONS.ACTION_CLOSE size={18} />
+            All Rules ({rules.length})
           </button>
+          <div className="border-border/30 my-2 border-t" />
+          {CATEGORY_ORDER.map(cat => {
+            const catRules = rulesByCategory[cat];
+            if (!catRules) return null;
+            const info = CATEGORY_INFO[cat];
+            return (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                aria-pressed={selectedCategory === cat}
+                className={`mb-1 w-full rounded-md px-3 py-2 text-left transition-colors ${
+                  selectedCategory === cat
+                    ? 'bg-brand/10 text-brand'
+                    : 'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary'
+                }`}
+              >
+                <div className="text-xs font-medium">{info.label}</div>
+                <div className="text-[10px] opacity-70">
+                  {catRules.length} {catRules.length === 1 ? 'rule' : 'rules'}
+                </div>
+              </button>
+            );
+          })}
         </div>
 
-        {/* Content */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* Category Sidebar */}
-          <div className="border-border/50 w-48 flex-shrink-0 overflow-y-auto border-r p-3">
-            <button
-              onClick={() => setSelectedCategory('all')}
-              className={`mb-1 w-full rounded-[2px] px-3 py-2 text-left text-xs transition-colors ${
-                selectedCategory === 'all'
-                  ? 'bg-brand/10 text-brand'
-                  : 'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary'
-              }`}
-            >
-              All Rules ({rules.length})
-            </button>
-            <div className="border-border/30 my-2 border-t" />
-            {CATEGORY_ORDER.map(cat => {
-              const catRules = rulesByCategory[cat];
-              if (!catRules) return null;
-              const info = CATEGORY_INFO[cat];
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`mb-1 w-full rounded-[2px] px-3 py-2 text-left transition-colors ${
-                    selectedCategory === cat
-                      ? 'bg-brand/10 text-brand'
-                      : 'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary'
-                  }`}
-                >
-                  <div className="text-xs font-medium">{info.label}</div>
-                  <div className="text-[10px] opacity-70">
-                    {catRules.length} {catRules.length === 1 ? 'rule' : 'rules'}
-                  </div>
-                </button>
-              );
-            })}
+        {/* Rules List */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="border-border/50 flex flex-wrap items-center justify-between gap-3 border-b p-4">
+            <SearchField
+              label="Search library"
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search checks, languages, and topics"
+            />
+            <span className="text-text-disabled text-xs">
+              {filteredRules.length} {filteredRules.length === 1 ? 'rule' : 'rules'}
+            </span>
           </div>
-
-          {/* Rules List */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
             {allRules.isLoading ? (
               <div className="animate-pulse space-y-3">
                 {[1, 2, 3, 4].map(i => (
-                  <div key={i} className="bg-bg-tertiary/50 h-24 rounded-[2px]" />
+                  <div key={i} className="bg-bg-tertiary/50 h-24 rounded-md" />
                 ))}
               </div>
             ) : filteredRules.length === 0 ? (
-              <div className="text-text-tertiary py-12 text-center text-sm">
-                No rules in this category.
-              </div>
+              <EmptyPanel
+                title="No matching library rules"
+                description="Try another search or choose a different category."
+              />
             ) : (
               <div className="space-y-3">
                 {filteredRules.map(rule => (
@@ -170,65 +180,77 @@ export const RuleLibraryModal: React.FC<RuleLibraryModalProps> = ({ isOpen, onCl
                     rule={rule}
                     onAdd={() => handleAddRule(rule)}
                     isAdding={addFromLibrary.isPending && addingRuleId === rule.id}
+                    disabled={addFromLibrary.isPending}
                   />
                 ))}
               </div>
             )}
           </div>
         </div>
+      </div>
 
-        {/* Add Rule Confirmation */}
-        {addingRule && (
-          <div className="border-border/50 bg-bg-secondary/50 border-t p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <ICONS.ICON_PLUS size={14} className="text-brand" />
-              <span className="text-text-primary text-sm font-medium">
-                Add &quot;{addingRule.name}&quot; to your rules
-              </span>
+      {/* Add Rule Confirmation */}
+      {addingRule && (
+        <div className="border-border/50 bg-bg-secondary/50 border-t p-4">
+          {addFromLibrary.error && (
+            <div className="mb-3">
+              <InlineError title="Could not add rule" message={String(addFromLibrary.error)} />
             </div>
-            <div className="flex items-center gap-3">
+          )}
+          <div className="mb-3 flex items-center gap-2">
+            <ICONS.ICON_PLUS size={14} className="text-brand" />
+            <span className="text-text-primary text-sm font-medium">
+              Add &quot;{addingRule.name}&quot; to your rules
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <select
+              aria-label="Rule scope"
+              disabled={addFromLibrary.isPending}
+              value={addScope}
+              onChange={e => setAddScope(e.target.value as RuleScope)}
+              className="bg-bg-tertiary border-border text-text-primary focus:border-brand focus:ring-brand/20 rounded-md border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none"
+            >
+              <option value="global">Every repository</option>
+              <option value="repo">Repository</option>
+            </select>
+            {addScope === 'repo' && (
               <select
-                value={addScope}
-                onChange={e => setAddScope(e.target.value as RuleScope)}
-                className="bg-bg-tertiary border-border text-text-primary focus:border-brand focus:ring-brand/20 rounded-[2px] border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none"
+                aria-label="Repository for library rule"
+                disabled={addFromLibrary.isPending}
+                value={addRepoId}
+                onChange={e => setAddRepoId(e.target.value)}
+                className="bg-bg-tertiary border-border text-text-primary focus:border-brand focus:ring-brand/20 flex-1 rounded-md border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none"
               >
-                <option value="global">Global</option>
-                <option value="repo">Repository</option>
+                <option value="">Select a repository</option>
+                {repos.map(repo => (
+                  <option key={repo.id} value={repo.id}>
+                    {repo.name}
+                  </option>
+                ))}
               </select>
-              {addScope === 'repo' && (
-                <select
-                  value={addRepoId}
-                  onChange={e => setAddRepoId(e.target.value)}
-                  className="bg-bg-tertiary border-border text-text-primary focus:border-brand focus:ring-brand/20 flex-1 rounded-[2px] border px-3 py-2 text-xs transition-all focus:ring-1 focus:outline-none"
-                >
-                  <option value="">Select a repository</option>
-                  {repos.map(repo => (
-                    <option key={repo.id} value={repo.id}>
-                      {repo.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <div className="ml-auto flex items-center gap-2">
-                <button
-                  onClick={cancelAddRule}
-                  className="bg-bg-tertiary text-text-secondary hover:text-text-primary border-border rounded-[2px] border px-3 py-2 text-xs font-medium transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmAddRule}
-                  disabled={addScope === 'repo' && !addRepoId}
-                  className="bg-brand text-bg-primary disabled:bg-bg-tertiary disabled:text-text-disabled rounded-[2px] px-3 py-2 text-xs font-semibold transition-all hover:brightness-110 disabled:cursor-not-allowed"
-                >
-                  {addFromLibrary.isPending ? 'Adding...' : 'Add Rule'}
-                </button>
-              </div>
+            )}
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={cancelAddRule}
+                disabled={addFromLibrary.isPending}
+                className="bg-bg-tertiary text-text-secondary hover:text-text-primary border-border rounded-md border px-3 py-2 text-xs font-medium transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmAddRule}
+                disabled={addFromLibrary.isPending || (addScope === 'repo' && !addRepoId)}
+                aria-busy={addFromLibrary.isPending}
+                className="bg-brand text-bg-primary disabled:bg-bg-tertiary disabled:text-text-disabled rounded-md px-3 py-2 text-xs font-semibold transition-all hover:brightness-110 disabled:cursor-not-allowed"
+              >
+                {addFromLibrary.isPending ? 'Adding…' : 'Add rule'}
+              </button>
             </div>
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </Dialog>
   );
 };
 
@@ -236,19 +258,20 @@ interface RuleCardProps {
   rule: LibraryRule;
   onAdd: () => void;
   isAdding: boolean;
+  disabled: boolean;
 }
 
-const RuleCard: React.FC<RuleCardProps> = ({ rule, onAdd, isAdding }) => {
+const RuleCard: React.FC<RuleCardProps> = ({ rule, onAdd, isAdding, disabled }) => {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="bg-bg-secondary/40 border-border/50 rounded-[2px] border p-4">
+    <div className="bg-bg-secondary/40 border-border/50 rounded-md border p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h4 className="text-text-primary text-sm font-semibold">{rule.name}</h4>
             {rule.category && (
-              <span className="bg-bg-tertiary text-accent rounded-[2px] px-1.5 py-0.5 text-[9px] font-bold border border-accent/20">
+              <span className="bg-bg-tertiary text-accent border-accent/20 rounded-md border px-1.5 py-0.5 text-[9px] font-bold">
                 {rule.category.toUpperCase()}
               </span>
             )}
@@ -258,13 +281,13 @@ const RuleCard: React.FC<RuleCardProps> = ({ rule, onAdd, isAdding }) => {
             {rule.tags.slice(0, 3).map(tag => (
               <span
                 key={tag}
-                className="bg-bg-tertiary text-text-tertiary rounded-[2px] px-1.5 py-0.5 text-[10px] border border-border/40"
+                className="bg-bg-tertiary text-text-tertiary border-border/40 rounded-md border px-1.5 py-0.5 text-[10px]"
               >
                 {tag}
               </span>
             ))}
             {rule.glob && (
-              <span className="bg-bg-tertiary text-text-tertiary rounded-[2px] px-1.5 py-0.5 font-mono text-[10px] border border-border/40">
+              <span className="bg-bg-tertiary text-text-tertiary border-border/40 rounded-md border px-1.5 py-0.5 font-mono text-[10px]">
                 {rule.glob}
               </span>
             )}
@@ -272,18 +295,20 @@ const RuleCard: React.FC<RuleCardProps> = ({ rule, onAdd, isAdding }) => {
         </div>
         <button
           onClick={onAdd}
-          disabled={isAdding}
-          className="bg-brand/10 text-brand hover:bg-brand/20 flex-shrink-0 rounded-[2px] px-3 py-1.5 text-xs font-bold transition-colors disabled:opacity-50 border border-brand/20"
+          aria-label={`Add ${rule.name}`}
+          disabled={disabled}
+          className="bg-brand/10 text-brand hover:bg-brand/20 border-brand/20 flex-shrink-0 rounded-md border px-3 py-1.5 text-xs font-bold transition-colors disabled:opacity-50"
         >
           {isAdding ? 'Adding...' : 'Add'}
         </button>
       </div>
 
       {/* Expandable rule text */}
-      <div className="mt-4 border-t border-border/20 pt-3">
+      <div className="border-border/20 mt-4 border-t pt-3">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="text-text-tertiary hover:text-text-secondary flex items-center gap-1 text-[10px] transition-colors font-medium"
+          aria-expanded={expanded}
+          className="text-text-tertiary hover:text-text-secondary flex min-h-8 items-center gap-1 text-[11px] font-medium transition-colors"
         >
           <ICONS.CHEVRON_DOWN
             size={10}
@@ -292,7 +317,7 @@ const RuleCard: React.FC<RuleCardProps> = ({ rule, onAdd, isAdding }) => {
           {expanded ? 'Hide rule text' : 'Show rule text'}
         </button>
         {expanded && (
-          <div className="bg-bg-tertiary/30 text-text-secondary mt-2 rounded-[2px] p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap border border-border/30 shadow-inner">
+          <div className="bg-bg-tertiary/30 text-text-secondary border-border/30 mt-2 rounded-md border p-3 text-xs leading-5 whitespace-pre-wrap shadow-inner">
             {rule.text}
           </div>
         )}

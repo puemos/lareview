@@ -1,8 +1,7 @@
 import React from 'react';
 import type { Feedback, ReviewRule, DefaultIssueCategory } from '../../types';
+import { sortFeedback } from '../../lib/feedback-order';
 import { ICONS } from '../../constants/icons';
-import { RulePopover } from './RulePopover';
-import { CategoryBadge } from './CategoryBadge';
 
 interface FeedbackListProps {
   feedbacks: Feedback[];
@@ -41,7 +40,6 @@ const IMPACT_CONFIG = {
   nitpick: { icon: ICONS.IMPACT_NITPICK, color: 'text-impact-nitpick' },
 };
 
-
 export const FeedbackList: React.FC<FeedbackListProps> = ({
   feedbacks,
   rulesById,
@@ -73,7 +71,9 @@ export const FeedbackList: React.FC<FeedbackListProps> = ({
       <div className="custom-scrollbar flex-1 overflow-y-auto">
         <div className="p-4 text-center">
           <ICONS.ICON_PLAN size={24} className="text-text-disabled mx-auto mb-2 opacity-50" />
-          <p className="text-text-disabled text-xs opacity-50">No feedback yet</p>
+          <p className="text-text-disabled text-xs">
+            {hiddenCount > 0 ? 'No feedback matches your filter' : 'No feedback yet'}
+          </p>
           <p className="text-text-tertiary mt-1 text-[10px]">
             {hiddenCount > 0
               ? `${hiddenCount} low-confidence item${hiddenCount > 1 ? 's' : ''} hidden`
@@ -84,13 +84,7 @@ export const FeedbackList: React.FC<FeedbackListProps> = ({
     );
   }
 
-  const sortedFeedbacks = [...filteredFeedbacks].sort((a, b) => {
-    const statusRank = { todo: 0, in_progress: 1, done: 2, ignored: 3 };
-    const rankA = statusRank[a.status] ?? 0;
-    const rankB = statusRank[b.status] ?? 0;
-    if (rankA !== rankB) return rankA - rankB;
-    return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
-  });
+  const sortedFeedbacks = sortFeedback(filteredFeedbacks);
 
   return (
     <div className="custom-scrollbar flex-1 overflow-y-auto">
@@ -111,28 +105,39 @@ export const FeedbackList: React.FC<FeedbackListProps> = ({
           <button
             key={feedback.id}
             onClick={() => onSelectFeedback(feedback.id)}
+            aria-current={isActive ? 'true' : undefined}
             className={`group border-border/50 hover:bg-bg-secondary/80 relative w-full border-b px-4 py-3 text-left transition-all ${
-              isActive ? 'bg-bg-secondary shadow-inner' : ''
+              isActive ? 'bg-bg-secondary' : ''
             }`}
           >
-            {isActive && <div className="bg-brand absolute top-0 bottom-0 left-0 w-[2px]" />}
-            <div className="flex w-full min-w-0 items-center gap-2.5">
-              <div className="flex-shrink-0">
+            <div className="flex w-full min-w-0 items-start gap-2.5">
+              <div className="mt-1 flex-shrink-0">
                 <impact.icon size={14} className={impact.color} />
               </div>
               <h3
-                className={`flex-1 truncate text-xs leading-relaxed font-medium ${
+                className={`flex-1 text-[13px] leading-relaxed font-medium ${
                   isActive
                     ? 'text-text-primary'
                     : 'text-text-secondary group-hover:text-text-primary'
-                } ${feedback.status === 'done' || feedback.status === 'ignored' ? 'text-text-disabled line-through opacity-50' : ''}`}
+                } `}
               >
                 {feedback.title || 'Untitled Feedback'}
               </h3>
-              {hasRuleBadge && <RulePopover rule={rule} ruleId={feedback.rule_id || ''} />}
-              {hasCategoryBadge && (
-                <CategoryBadge category={category} categoryId={feedback.category || ''} />
-              )}
+            </div>
+            <div className="text-text-tertiary mt-2 ml-6 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+              <span>
+                {feedback.impact === 'blocking'
+                  ? 'Blocking'
+                  : feedback.impact === 'nice_to_have'
+                    ? 'Nice to have'
+                    : 'Nitpick'}
+              </span>
+              <span>
+                {feedback.status === 'todo' ? 'To do' : feedback.status.replace('_', ' ')}
+              </span>
+              <span>{Math.round(feedback.confidence * 100)}% confidence</span>
+              {hasRuleBadge && <span title={rule?.text}>{'Rule'}</span>}
+              {hasCategoryBadge && <span>{category?.name ?? feedback.category}</span>}
             </div>
           </button>
         );

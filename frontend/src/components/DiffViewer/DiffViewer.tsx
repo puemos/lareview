@@ -4,6 +4,8 @@ import { DiffEditor } from '@monaco-editor/react';
 import type { DiffFile } from '../../types';
 import { useTauri } from '../../hooks/useTauri';
 import { getLanguageFromPath } from '../../utils/languages';
+import { InlineError } from '../Common/InlineError';
+import { countDiffChanges } from '../../lib/diff-stats';
 import { GutterMenu } from './GutterMenu';
 
 interface DiffViewerProps {
@@ -27,16 +29,17 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
   selectedFile,
   onSelectFile,
   highlightedHunks = [],
-  viewMode = 'split',
+  viewMode = 'unified',
   onAddFeedback,
   repoRoot,
 }) => {
   return (
-    <div className="bg-bg-primary flex h-full">
+    <div className="review-diff-layout bg-bg-primary flex min-h-0 min-w-0 flex-1">
       <FileList files={files} selectedFile={selectedFile} onSelectFile={onSelectFile} />
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {selectedFile ? (
           <DiffContent
+            key={selectedFile.name}
             file={selectedFile}
             highlightedHunks={highlightedHunks.filter(
               h => h.file === selectedFile.name || h.file === selectedFile.new_path
@@ -68,9 +71,10 @@ const FileList: React.FC<FileListProps> = ({ files, selectedFile, onSelectFile }
   const [expanded, setExpanded] = useState(true);
 
   return (
-    <div className="border-border bg-bg-secondary/30 flex w-64 flex-col border-r">
-      <div
-        className="border-border hover:bg-bg-secondary flex cursor-pointer items-center justify-between border-b px-3 py-2"
+    <div className="review-diff-files border-border bg-bg-secondary/30 flex w-56 shrink-0 flex-col border-r">
+      <button
+        aria-expanded={expanded}
+        className="border-border hover:bg-bg-secondary flex min-h-10 items-center justify-between border-b px-3 py-2"
         onClick={() => setExpanded(!expanded)}
       >
         <span className="text-text-secondary text-xs font-bold tracking-wider uppercase">
@@ -79,7 +83,7 @@ const FileList: React.FC<FileListProps> = ({ files, selectedFile, onSelectFile }
         <div className="text-text-disabled">
           {expanded ? <CaretDown size={14} /> : <CaretRight size={14} />}
         </div>
-      </div>
+      </button>
       {expanded && (
         <div className="custom-scrollbar flex-1 overflow-y-auto">
           {files.map(file => (
@@ -105,13 +109,14 @@ interface FileListItemProps {
 }
 
 const FileListItem: React.FC<FileListItemProps> = ({ file, isSelected, onClick }) => {
-  const additions = file.hunks.reduce((sum, h) => sum + h.new_lines, 0);
-  const deletions = file.hunks.reduce((sum, h) => sum + h.old_lines, 0);
+  const { additions, deletions } = countDiffChanges([file]);
   const path = file.name || file.new_path || 'unknown';
 
   return (
     <button
       onClick={onClick}
+      aria-current={isSelected ? 'true' : undefined}
+      aria-label={path}
       className={`group border-border/50 hover:bg-bg-secondary w-full border-b px-3 py-2 text-left transition-colors ${
         isSelected ? 'bg-bg-secondary border-l-brand border-l-2' : ''
       }`}
@@ -123,12 +128,10 @@ const FileListItem: React.FC<FileListItemProps> = ({ file, isSelected, onClick }
         >
           {path.split('/').pop()}
         </span>
-        <span className="text-status-added text-[10px]">+{additions}</span>
-        <span className="text-status-deleted text-[10px]">-{deletions}</span>
+        <span className="text-status-done text-xs">+{additions}</span>
+        <span className="text-xs text-red-400">-{deletions}</span>
       </div>
-      <div className="text-text-disabled ml-5 truncate font-mono text-[10px] opacity-60">
-        {path}
-      </div>
+      <div className="text-text-tertiary ml-5 truncate font-mono text-[11px]">{path}</div>
     </button>
   );
 };
@@ -149,10 +152,13 @@ interface DiffContentProps {
 const DiffContent: React.FC<DiffContentProps> = ({
   file,
   highlightedHunks,
+  viewMode,
   onAddFeedback,
   repoRoot,
 }) => {
   const { openInEditor } = useTauri();
+  const [editorError, setEditorError] = useState<string | null>(null);
+  const [displayMode, setDisplayMode] = useState<'unified' | 'split'>(viewMode);
   const path = file.name || file.new_path || 'unknown';
   const language = getLanguageFromPath(path);
   // Ref to store diff editor instance
@@ -163,11 +169,12 @@ const DiffContent: React.FC<DiffContentProps> = ({
   // Actually, for new files, side-by-side with original empty is standard, but let's ensure the minimap helps.
 
   const handleOpenInEditor = async () => {
+    setEditorError(null);
     try {
       const lineNumber = highlightedHunks.length > 0 ? highlightedHunks[0].newStart : 1;
       await openInEditor(path, lineNumber, repoRoot || undefined);
     } catch (error) {
-      console.error('Failed to open file in editor:', error);
+      setEditorError(String(error));
     }
   };
 
@@ -198,7 +205,7 @@ const DiffContent: React.FC<DiffContentProps> = ({
       try {
         await openInEditor(path, menuState.line, repoRoot || undefined);
       } catch (error) {
-        console.error('Failed to open file in editor:', error);
+        setEditorError(String(error));
       }
     }
   };
@@ -220,16 +227,16 @@ const DiffContent: React.FC<DiffContentProps> = ({
       for (let i = 0; i < contentLines.length; i++) {
         const line = contentLines[i];
 
-        if (line.startsWith('@@')) {
+        if (line.startsWith('@@') || line.startsWith('\\ No newline') || !line) {
           continue;
         }
 
-        if (line.startsWith('-') && !line.startsWith('---')) {
+        if (line.startsWith('-')) {
           // Deletion: add to original only
           originalLines.push(line.slice(1));
           origLineMap.push(origLine);
           origLine++;
-        } else if (line.startsWith('+') && !line.startsWith('+++')) {
+        } else if (line.startsWith('+')) {
           // Addition: add to modified only
           modifiedLines.push(line.slice(1));
           modLineMap.push(modLine);
@@ -365,28 +372,43 @@ const DiffContent: React.FC<DiffContentProps> = ({
     (file.hunks.every(h => h.old_lines === 0) && file.hunks.some(h => h.new_lines > 0));
 
   return (
-    <div className="bg-bg-primary flex flex-1 flex-col overflow-hidden">
-      <div className="border-border bg-bg-secondary/50 flex items-center justify-between border-b px-4 py-2">
+    <div className="bg-bg-primary flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="border-border flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
         <div className="flex items-center gap-3">
-          <span className="text-text-primary font-mono text-xs">{path}</span>
+          <span className="text-text-primary font-mono text-xs break-all">{path}</span>
           {isNewFile && (
             <span className="text-status-added border-status-added/20 bg-status-added/10 rounded border px-1.5 text-[10px] font-medium">
               NEW
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleOpenInEditor}
-            className="bg-bg-tertiary hover:bg-bg-secondary text-text-secondary hover:text-text-primary border-border flex items-center gap-1.5 rounded border px-2 py-1 transition-colors"
-            title="Open in External Editor"
-          >
-            <ArrowSquareOut size={12} />
-            <span className="text-[10px] font-medium">Open in Editor</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1" role="group" aria-label="Diff layout">
+            {(['unified', 'split'] as const).map(mode => (
+              <button
+                key={mode}
+                aria-pressed={displayMode === mode}
+                onClick={() => setDisplayMode(mode)}
+                className={`rounded px-2 py-1.5 text-xs ${displayMode === mode ? 'bg-bg-tertiary text-text-primary' : 'text-text-tertiary hover:text-text-primary'}`}
+              >
+                {mode === 'unified' ? 'Unified' : 'Split'}
+              </button>
+            ))}
+          </div>
+          {repoRoot && (
+            <button
+              onClick={handleOpenInEditor}
+              className="bg-bg-tertiary hover:bg-bg-secondary text-text-secondary hover:text-text-primary border-border flex items-center gap-1.5 rounded border px-2 py-1 transition-colors"
+              title="Open in External Editor"
+            >
+              <ArrowSquareOut size={12} />
+              <span className="text-xs font-medium">Open in editor</span>
+            </button>
+          )}
         </div>
       </div>
-      <div className="flex-1 overflow-hidden">
+      {editorError && <InlineError title="Could not open editor" message={editorError} />}
+      <div className="min-h-0 flex-1 overflow-hidden">
         <DiffEditor
           key={path}
           height="100%"
@@ -400,7 +422,7 @@ const DiffContent: React.FC<DiffContentProps> = ({
           options={{
             readOnly: true,
             minimap: {
-              enabled: true,
+              enabled: false,
               renderCharacters: false,
               scale: 2,
               showSlider: 'always',
@@ -410,7 +432,7 @@ const DiffContent: React.FC<DiffContentProps> = ({
             fontFamily: "'GeistMono', 'Monaco', monospace",
             scrollBeyondLastLine: false,
             padding: { top: 16, bottom: 16 },
-            renderSideBySide: true, // Keep split view even for new files as it's often preferred for consistency, but improved minimap helps
+            renderSideBySide: displayMode === 'split',
             automaticLayout: true,
             originalEditable: false,
             renderLineHighlight: 'none',
@@ -449,11 +471,14 @@ const DiffContent: React.FC<DiffContentProps> = ({
           }}
         />
       </div>
+      <p className="border-border text-text-tertiary border-t px-4 py-2 text-[11px]">
+        Diff excerpt · Line numbers refer to the original files.
+      </p>
       <GutterMenu
         position={menuState ? { x: menuState.x, y: menuState.y } : null}
         onClose={closeMenu}
         onAddFeedback={handleMenuAddFeedback}
-        onOpenInEditor={handleMenuOpenInEditor}
+        onOpenInEditor={repoRoot ? handleMenuOpenInEditor : undefined}
       />
     </div>
   );

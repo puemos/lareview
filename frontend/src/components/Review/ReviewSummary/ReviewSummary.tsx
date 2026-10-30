@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import './reviewSummary.css';
 import ReactMarkdown from 'react-markdown';
 import { ArrowRight } from '@phosphor-icons/react';
 import { ICONS } from '../../../constants/icons';
@@ -10,6 +11,7 @@ import { UncoveredFiles } from './UncoveredFiles';
 import { MergeConfidenceBadge } from './MergeConfidenceBadge';
 import { useIssueChecks } from '../../../hooks/useIssueChecks';
 import { useTauri } from '../../../hooks/useTauri';
+import { countOpenBlockers } from '../../../lib/review-summary';
 import { sourceUrl } from './sourceUrl';
 import { ReviewUsagePopover } from '../ReviewUsagePopover';
 import { reviewHeaderControlClass } from '../reviewHeaderStyles';
@@ -44,6 +46,17 @@ const SourceBadge: React.FC<SourceBadgeProps> = ({ source }) => {
 
   if (source.type === 'diff_paste') {
     return <span className="text-text-disabled text-xs">Diff paste</span>;
+  }
+
+  if (source.type === 'local_git') {
+    return (
+      <span
+        className="text-text-tertiary text-xs break-words"
+        title={`${source.base_sha} → ${source.head_sha}`}
+      >
+        Local Git · {source.base_ref} → {source.head_ref}
+      </span>
+    );
   }
 
   const isGitHub = source.type === 'github_pr';
@@ -96,8 +109,12 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
   onSelectTask,
   onStartReview,
 }) => {
-  const [isExpanded, setIsExpanded] = React.useState(false);
-  const { data: issueChecks = [], isLoading: isChecksLoading } = useIssueChecks(runId);
+  const {
+    data: issueChecks = [],
+    isLoading: isChecksLoading,
+    error: checksError,
+    refetch: refetchChecks,
+  } = useIssueChecks(runId);
 
   const uncoveredFiles = useMemo(() => {
     const allDiffFiles = parsedDiff?.files?.map(f => f.new_path) ?? [];
@@ -105,22 +122,33 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
     return allDiffFiles.filter(f => !coveredFiles.has(f));
   }, [parsedDiff, tasks]);
 
-  const blockingCount =
-    feedbacks.filter(f => f.impact === 'blocking').length +
-    issueChecks.reduce((sum, c) => sum + c.findings.filter(f => f.impact === 'blocking').length, 0);
+  const fileCount = parsedDiff?.files?.length ?? new Set(tasks.flatMap(task => task.files)).size;
+
+  const blockingCount = countOpenBlockers(feedbacks, issueChecks);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div
+      className="flex h-full min-w-0 flex-col overflow-hidden"
+      role="region"
+      aria-label="Review overview"
+    >
       {/* Header */}
-      <div className="border-border bg-bg-secondary/50 flex items-center justify-between gap-4 border-b px-6 py-4">
-        <div className="min-w-0">
+      <div className="border-border/50 flex shrink-0 flex-wrap items-center justify-between gap-4 border-b px-8 py-6">
+        <div className="min-w-0 flex-1">
           {review?.source && <SourceBadge source={review.source} />}
           <h2
-            className="text-text-primary truncate text-lg font-semibold"
+            className="text-text-primary mt-2 text-[22px] leading-tight font-semibold tracking-[-0.025em] break-words"
             title={review?.title || parsedDiff?.title || 'Review Summary'}
           >
             {review?.title || parsedDiff?.title || 'Review Summary'}
           </h2>
+          <p className="text-text-tertiary mt-2 text-xs">
+            {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
+            <span className="mx-2">·</span>
+            {fileCount} {fileCount === 1 ? 'file' : 'files'}
+            <span className="mx-2">·</span>
+            {feedbacks.length} feedback
+          </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {run && <ReviewUsagePopover run={run} />}
@@ -130,84 +158,64 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
             onClick={onStartReview}
             className={`${reviewHeaderControlClass} bg-brand text-brand-fg hover:bg-brand/90 border-transparent px-4 text-sm font-medium`}
           >
-            Start Review
+            Open review
             <ArrowRight size={16} className="opacity-70" />
           </button>
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 space-y-6 overflow-auto p-6">
-        {/* Blocking Issues */}
-        {blockingCount > 0 && (
-          <div className="bg-status-error/5 border-status-error/20 flex items-center gap-3 rounded-lg border px-4 py-3">
-            <div className="bg-status-error/10 flex h-8 w-8 items-center justify-center rounded-full">
-              <span className="text-status-error text-lg font-bold">{blockingCount}</span>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-[1120px] space-y-6 px-8 py-8">
+          {/* Blocking Issues */}
+          {blockingCount > 0 && (
+            <div className="bg-impact-blocking/5 border-impact-blocking/20 flex items-center gap-3 rounded-lg border px-4 py-3">
+              <div className="bg-impact-blocking/10 flex h-8 w-8 items-center justify-center rounded-full">
+                <span className="text-impact-blocking text-lg font-bold">{blockingCount}</span>
+              </div>
+              <div>
+                <p className="text-impact-blocking text-sm font-medium">
+                  {blockingCount} open blocking {blockingCount === 1 ? 'issue' : 'issues'}
+                </p>
+                <p className="text-text-tertiary text-xs">Review these items before approving</p>
+              </div>
             </div>
-            <div>
-              <p className="text-status-error text-sm font-medium">
-                {blockingCount} Blocking {blockingCount === 1 ? 'Issue' : 'Issues'}
-              </p>
-              <p className="text-status-error/70 text-xs">Review these items before approving</p>
+          )}
+
+          {/* Summary */}
+          {review?.summary && (
+            <div className="border-border/50 relative border-b pb-7">
+              <h3 className="text-text-primary mb-3 text-[13px] font-medium">Summary</h3>
+              <div className="prose prose-sm prose-invert text-text-secondary prose-p:my-2 max-w-[78ch] text-[14px] leading-6">
+                <ReactMarkdown>{review.summary}</ReactMarkdown>
+              </div>
             </div>
+          )}
+
+          {/* Two-column layout for Task Flow and Files Heatmap */}
+          <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+            <TaskFlow tasks={tasks} onSelectTask={onSelectTask} />
+            <FilesHeatmap diffFiles={parsedDiff?.files} tasks={tasks} onSelectFile={onSelectFile} />
           </div>
-        )}
 
-        {/* Summary */}
-        {review?.summary && (
-          <div className="bg-bg-tertiary/30 border-border/50 relative rounded-lg border p-4">
-            <h3 className="text-text-secondary mb-2 text-xs font-medium tracking-wide uppercase">
-              Summary
-            </h3>
-            <div
-              className={`prose prose-sm prose-invert max-w-none transition-all duration-300 ease-in-out ${
-                !isExpanded
-                  ? 'max-h-24 overflow-hidden [mask-image:linear-gradient(to_bottom,black_50%,transparent_100%)]'
-                  : 'max-h-[2000px]'
-              }`}
-            >
-              <ReactMarkdown>{review.summary}</ReactMarkdown>
-            </div>
-            <button
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="text-brand hover:text-brand/80 mt-2 flex items-center gap-1 text-xs font-medium transition-colors"
-            >
-              {isExpanded ? (
-                <>
-                  <ICONS.CHEVRON_UP size={12} />
-                  Show less
-                </>
-              ) : (
-                <>
-                  <ICONS.CHEVRON_DOWN size={12} />
-                  Show more
-                </>
-              )}
-            </button>
+          {/* Two-column layout for Issue Checklist and Key Feedback */}
+          <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+            <IssueChecklist
+              checks={issueChecks}
+              error={checksError}
+              onRetry={() => void refetchChecks()}
+              isLoading={isChecksLoading}
+              feedbacks={feedbacks}
+              onSelectFeedback={onSelectFeedback}
+            />
+            <KeyFeedback feedbacks={feedbacks} onSelectFeedback={onSelectFeedback} />
           </div>
-        )}
 
-        {/* Two-column layout for Task Flow and Files Heatmap */}
-        <div className="grid grid-cols-2 items-start gap-6">
-          <TaskFlow tasks={tasks} onSelectTask={onSelectTask} />
-          <FilesHeatmap tasks={tasks} onSelectFile={onSelectFile} />
+          {/* Uncovered Files */}
+          {uncoveredFiles.length > 0 && (
+            <UncoveredFiles uncoveredFiles={uncoveredFiles} onSelectFile={onSelectFile} />
+          )}
         </div>
-
-        {/* Two-column layout for Issue Checklist and Key Feedback */}
-        <div className="grid grid-cols-2 items-start gap-6">
-          <IssueChecklist
-            checks={issueChecks}
-            isLoading={isChecksLoading}
-            feedbacks={feedbacks}
-            onSelectFeedback={onSelectFeedback}
-          />
-          <KeyFeedback feedbacks={feedbacks} onSelectFeedback={onSelectFeedback} />
-        </div>
-
-        {/* Uncovered Files */}
-        {uncoveredFiles.length > 0 && (
-          <UncoveredFiles uncoveredFiles={uncoveredFiles} onSelectFile={onSelectFile} />
-        )}
       </div>
     </div>
   );

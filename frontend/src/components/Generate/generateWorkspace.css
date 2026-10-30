@@ -1,0 +1,193 @@
+.generate-empty {
+  padding-top: clamp(64px, 14vh, 144px);
+  overflow-y: auto;
+  padding-bottom: 48px;
+}
+.generate-source-panel {
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 0.09);
+  border-radius: 12px;
+  background: var(--color-bg-secondary);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.12);
+}
+.generate-source-tabs {
+  display: flex;
+  gap: 24px;
+  padding: 0 20px;
+  border-bottom: 1px solid rgb(255 255 255 / 0.06);
+}
+.generate-source-tabs button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 15px 0;
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  font-weight: 500;
+  transition: color 120ms;
+}
+.generate-source-tabs button[aria-pressed='true'] {
+  color: var(--color-text-primary);
+}
+.generate-source-tabs button[aria-pressed='true']::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: var(--color-brand);
+  border-radius: 1px;
+}
+.generate-source-tabs button:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 4px;
+}
+.generate-loaded-source .generate-source-tabs {
+  gap: 16px;
+  border: 0;
+  padding: 0;
+}
+.generate-loaded-source .generate-source-tabs button {
+  padding: 7px 0;
+}
+.generate-clear {
+  color: var(--color-text-tertiary);
+  transition:
+    background-color 120ms,
+    color 120ms;
+}
+.generate-clear:hover {
+  background: rgb(255 255 255 / 0.04);
+  color: var(--color-text-primary);
+}
+
+.generate-primary-button {
+  background: var(--color-brand);
+  color: var(--color-brand-fg);
+  transition:
+    background-color 120ms,
+    transform 120ms,
+    opacity 120ms;
+}
+.generate-primary-button:enabled:hover {
+  filter: brightness(1.06);
+}
+.generate-primary-button:enabled:active {
+  transform: scale(0.98);
+}
+.generate-primary-button:disabled {
+  background: rgb(255 255 255 / 0.055);
+  color: var(--color-text-disabled);
+}
+.generate-primary-button:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 3px;
+}
+
+.local-ref-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 320px;
+  min-width: 0;
+  padding: 12px 16px;
+  border: 1px solid rgb(255 255 255 / 0.11);
+  border-radius: 8px;
+  background: var(--color-bg-primary);
+}
+.local-ref-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+}
+.local-ref-field > span {
+  color: var(--color-text-disabled);
+  font-size: 10px;
+  font-weight: 500;
+}
+.local-ref-pair:focus-within {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 2px rgb(194 173 240 / 0.08);
+}
+
+.generate-loaded-source > div:first-child {
+  align-items: flex-start;
+}
+.local-source-summary {
+  min-height: 32px;
+}
+.local-git-input {
+  max-width: 600px;
+}
+
+@media (max-width: 1000px) {
+  .generate-empty {
+    padding-top: 56px;
+    padding-right: 24px;
+    padding-left: 24px;
+  }
+  .generate-loaded-source {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+  .local-source-summary {
+    gap: 8px;
+  }
+  .local-source-repo {
+    max-width: 96px;
+  }
+  .local-source-refs > span {
+    max-width: 72px;
+  }
+  .local-source-ready,
+  .generate-clear > span {
+    display: none;
+  }
+  .local-git-form > div:last-child {
+    flex-wrap: wrap;
+  }
+}
+
+.generate-workspace button:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 3px;
+}
+.local-ref-pair:has(input[aria-invalid='true']) {
+  border-color: rgb(243 139 168 / 0.5);
+}
+@media (prefers-reduced-motion: reduce) {
+  .generate-primary-button:active {
+    transform: none;
+  }
+  .generate-workspace button {
+    transition-duration: 0ms;
+  }
+}
+
+@media (max-width: 1000px) {
+  .generate-diff-layout {
+    flex-direction: column;
+  }
+  .generate-diff-files {
+    width: 100%;
+    min-height: 0;
+    max-height: 150px;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+}
+
+.local-ref-pair input:focus-visible,
+.vcs-input-card input:focus-visible {
+  outline: none;
+}
+.local-ref-pair:focus-within {
+  box-shadow: none;
+}
+.vcs-input-card:focus-within {
+  border-color: var(--color-brand);
+}

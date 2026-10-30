@@ -13,6 +13,7 @@ import qwenIcon from '../../assets/icons/qwen.svg';
 import grokIcon from '../../assets/icons/grok.svg';
 import opencodeIcon from '../../assets/icons/opencode.svg';
 import codexIcon from '../../assets/icons/codex.svg';
+import copilotIcon from '../../assets/icons/copilot.svg';
 import {
   configFieldLabelClass,
   configFieldTriggerClass,
@@ -30,6 +31,7 @@ const AGENT_ICONS: Record<string, string> = {
   grok: grokIcon,
   opencode: opencodeIcon,
   codex: codexIcon,
+  copilot: copilotIcon,
 };
 
 interface Agent {
@@ -42,19 +44,21 @@ interface AgentSelectorProps {
   agents: Agent[];
   selectedAgentId: string;
   onSelect: (id: string) => void;
+  disabled?: boolean;
 }
 
 export const AgentSelector: React.FC<AgentSelectorProps> = ({
   agents,
   selectedAgentId,
   onSelect,
+  disabled = false,
 }) => {
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
 
   return (
     <div className="space-y-1.5">
       <label className={configFieldLabelClass}>Agent</label>
-      <Select.Root value={selectedAgentId} onValueChange={onSelect}>
+      <Select.Root value={selectedAgentId} onValueChange={onSelect} disabled={disabled}>
         <Select.Trigger
           className={`${configFieldTriggerClass} data-[placeholder]:text-text-disabled w-full justify-between`}
           aria-label="Agent"

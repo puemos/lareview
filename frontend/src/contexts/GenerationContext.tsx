@@ -94,7 +94,9 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           source &&
           'head_sha' in source &&
           source.head_sha &&
-          (source.type === 'github_pr' || source.type === 'gitlab_mr')
+          (source.type === 'github_pr' ||
+            source.type === 'gitlab_mr' ||
+            source.type === 'local_git')
         ) {
           try {
             const linkedRepos = await getLinkedRepos();
@@ -134,7 +136,8 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         });
         return null;
       }
-    }, [
+    },
+    [
       generateReview,
       getLinkedRepos,
       parseDiff,
@@ -156,6 +159,7 @@ export const GenerationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         toast.error('Failed to stop review', {
           description: error instanceof Error ? error.message : String(error),
         });
+        throw error;
       }
     },
     [stop_generation]
