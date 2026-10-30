@@ -233,7 +233,7 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
         </div>
 
         <div className="flex w-full flex-wrap items-start justify-between gap-3">
-          <div className="space-y-1">
+          <div className="flex min-w-0 flex-col gap-1">
             {feedback.anchor?.file_path ? (
               <span className="text-text-tertiary font-mono text-xs break-all">
                 {feedback.anchor.file_path}

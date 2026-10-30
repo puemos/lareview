@@ -1,0 +1,92 @@
+diff --git a/docs/webhooks.md b/docs/webhooks.md
+index 9f836ea..6380ff2 100644
+--- a/docs/webhooks.md
++++ b/docs/webhooks.md
+@@ -2,3 +2,9 @@
+ 
+ Verify the provider signature before applying an order update.
+ A successful delivery receives HTTP 204.
++
++## Retries and retention
++
++Deliveries are identified by the provider event ID. Replayed events
++receive HTTP 204 without applying the payment a second time.
++Keep delivery receipts for 30 days.
+diff --git a/src/config/webhooks.ts b/src/config/webhooks.ts
+index 46bbb32..ad73c1a 100644
+--- a/src/config/webhooks.ts
++++ b/src/config/webhooks.ts
+@@ -1,3 +1,4 @@
+ export const webhookConfig = {
+   signatureToleranceSeconds: 300,
++  receiptRetentionDays: 30,
+ };
+diff --git a/src/orders/applyPayment.ts b/src/orders/applyPayment.ts
+index 610f0ef..599ca29 100644
+--- a/src/orders/applyPayment.ts
++++ b/src/orders/applyPayment.ts
+@@ -4,6 +4,9 @@ import type { PaymentEvent } from "../webhooks/types";
+ export async function applyPayment(tx: Transaction, event: PaymentEvent) {
+   await tx.orders.update({
+     where: { id: event.orderId },
+-    data: { paidAmount: { increment: event.amount } },
++    data: {
++      paidAmount: { increment: event.amount },
++      lastPaymentEventId: event.id,
++    },
+   });
+ }
+diff --git a/src/webhooks/handle.ts b/src/webhooks/handle.ts
+index 4440a3f..495923d 100644
+--- a/src/webhooks/handle.ts
++++ b/src/webhooks/handle.ts
+@@ -1,11 +1,19 @@
+ import { db } from "../db";
+ import { verifySignature } from "./signature";
+ import { applyPayment } from "../orders/applyPayment";
++import { hasReceipt, recordReceipt } from "./receipts";
+ 
+ export async function handleWebhook(request: Request) {
+   const event = await verifySignature(request);
+-  await db.transaction(async (tx) => {
++
++  if (await hasReceipt(event.id)) {
++    return new Response(null, { status: 204 });
++  }
++
++  await recordReceipt(event.id);
++  void db.transaction(async (tx) => {
+     await applyPayment(tx, event);
+   });
++
+   return new Response(null, { status: 204 });
+ }
+diff --git a/src/webhooks/receipts.ts b/src/webhooks/receipts.ts
+index a141127..ac8f914 100644
+--- a/src/webhooks/receipts.ts
++++ b/src/webhooks/receipts.ts
+@@ -5,3 +5,9 @@ export async function hasReceipt(eventId: string) {
+     where: { eventId },
+   }));
+ }
++
++export async function recordReceipt(eventId: string) {
++  return db.webhookReceipts.create({
++    data: { eventId, receivedAt: new Date() },
++  });
++}
+diff --git a/tests/webhooks/replay.test.ts b/tests/webhooks/replay.test.ts
+index ba33a3f..8b184ab 100644
+--- a/tests/webhooks/replay.test.ts
++++ b/tests/webhooks/replay.test.ts
+@@ -6,4 +6,10 @@ describe("payment webhooks", () => {
+     await deliver(paymentEvent);
+     expect(await order.paidAmount()).toBe(4900);
+   });
++
++  it("does not apply a sequential replay twice", async () => {
++    await deliver(paymentEvent);
++    await deliver(paymentEvent);
++    expect(await order.paidAmount()).toBe(4900);
++  });
+ });
