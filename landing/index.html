@@ -22,9 +22,6 @@
         <meta property="og:type" content="website">
         <meta property="og:url" content="https://lareview.dev/">
         <meta property="og:image" content="https://lareview.dev/assets/og-image.jpg?v=0458edcf0239">
-        <meta property="og:image:width" content="1200">
-        <meta property="og:image:height" content="630">
-        <meta property="og:image:alt" content="LaReview review tasks grouped by flow in an example payment-webhook change">
         <meta property="og:site_name" content="LaReview">
 
         <!-- Twitter -->
@@ -33,7 +30,6 @@
         <meta name="twitter:title" content="LaReview: The Code Review Workbench">
         <meta name="twitter:description" content="Turn diffs into structured review tasks with local-first AI. Privacy-focused, depth-oriented.">
         <meta name="twitter:image" content="https://lareview.dev/assets/og-image.jpg?v=0458edcf0239">
-        <meta name="twitter:image:alt" content="LaReview review tasks grouped by flow in an example payment-webhook change">
 
         <!-- Structured Data -->
         <script type="application/ld+json">
@@ -191,9 +187,22 @@
                 <div
                     class="lg:w-[58.333333%] relative overflow-hidden flex items-center justify-center"
                 >
-                    <div class="w-full aspect-video overflow-hidden bg-velura-dark">
-                        <video autoplay loop muted playsinline preload="metadata" poster="./assets/video/demo-poster.webp?v=a25c238b7035" class="h-full w-full object-contain" aria-label="LaReview demo video showing the code review workflow">
-                            <source src="./assets/video/demo.mp4" type="video/mp4" />
+                    <div class="w-full aspect-video bg-neutral-200 overflow-hidden">
+                        <video
+                            autoplay
+                            loop
+                            muted
+                            playsinline
+                            preload="metadata"
+                            poster="./assets/video/demo-poster.webp?v=a25c238b7035"
+                            class="w-full h-full object-cover"
+                            aria-label="LaReview demo video showing the code review workflow"
+                        >
+                            <source
+                                src="./assets/video/demo.mp4"
+                                type="video/mp4"
+                            />
+                            Your browser does not support the video tag.
                         </video>
                     </div>
                 </div>
@@ -248,11 +257,6 @@
                                 class="text-[10px] font-mono uppercase tracking-tighter opacity-50 group-hover:opacity-100 transition-opacity"
                                 >Codex</span
                             >
-                        </div>
-
-                        <div class="flex flex-row items-center gap-2 group" role="listitem">
-                            <img src="./assets/icons/copilot.svg" alt="GitHub Copilot" class="h-5 w-auto" loading="lazy" decoding="async" />
-                            <span class="text-[10px] font-mono uppercase tracking-tighter opacity-50 group-hover:opacity-100 transition-opacity">GitHub Copilot</span>
                         </div>
 
                         <div class="flex flex-row items-center gap-2 group" role="listitem">
@@ -377,117 +381,274 @@
             </div>
         </section>
 
-        <section id="features" aria-labelledby="features-heading">
-            <div class="feature-intro">
-                <p class="feature-eyebrow">Inside the workbench</p>
-                <h2 id="features-heading">The review, step by step.</h2>
-                <p>An illustrative payment-webhook change, from setup to actionable feedback.</p>
-            </div>
-            <article class="feature-row">
-                <div class="feature-copy">
-                    <p class="feature-eyebrow">01 / INPUT</p>
-                    <h3>Start with the right context.</h3>
-                    <p>Load a pull request, compare local Git refs, or paste a diff. Use the agent and checkout you already work with.</p>
+        <section id="features" aria-labelledby="features-heading" class="w-full">
+            <h2 id="features-heading" class="sr-only">Features</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2">
+                <div
+                    class="border-b border-r-0 md:border-r border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                >
+                    <div class="mb-auto">
+                        <span
+                            class="block text-5xl font-display font-light mb-4"
+                            >01</span
+                        >
+                        <h3 class="text-2xl font-bold uppercase mb-2">
+                            AI-Powered Planning
+                        </h3>
+                        <p class="text-velura-gray min-h-12">
+                            Input a PR (GitHub/GitLab) or diff. LaReview acts as a staff engineer, looking for flows and hazards to build a structured review plan.
+                        </p>
+                    </div>
+                    <div class="mt-8 border border-theme p-2 bg-stone-200">
+                        <img
+                            src="./assets/screenshots/generate.webp?v=fcbf6098f678"
+                            alt="Local Git comparison for commerce-api from main to feat/webhook-retries"
+                            class="w-full cursor-zoom-in lightbox-trigger"
+                            loading="lazy"
+                            decoding="async"
+                        />
+                    </div>
                 </div>
-                <div class="feature-visual">
-                    <button type="button" class="lightbox-trigger feature-shot " aria-label="Enlarge: Local Git comparison for commerce-api from main to feat/webhook-retries">
-                        <img src="./assets/screenshots/generate.webp?v=fcbf6098f678" alt="Local Git comparison for commerce-api from main to feat/webhook-retries" width="2400" height="968" loading="lazy" decoding="async" />
-                    </button>
+
+                <div
+                    class="border-b border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                >
+                    <div class="mb-auto">
+                        <span
+                            class="block text-5xl font-display font-light mb-4"
+                            >02</span
+                        >
+                        <h3 class="text-2xl font-bold uppercase mb-2">
+                            Task-Focused Review
+                        </h3>
+                        <p class="text-velura-gray min-h-12">
+                            See all your review tasks at a glance, grouped by flow and ordered by risk. Track progress, view feedback items, and navigate the change with a files heatmap.
+                        </p>
+                    </div>
+                    <div class="mt-8 border border-theme p-2 bg-stone-200">
+                        <img
+                            src="./assets/screenshots/review.webp?v=403b2e4d42e0"
+                            alt="Four payment-webhook review tasks grouped by flow, with one complete and one in progress"
+                            class="w-full cursor-zoom-in lightbox-trigger"
+                            loading="lazy"
+                            decoding="async"
+                        />
+                    </div>
                 </div>
-            </article>
-            <article class="feature-row">
-                <div class="feature-copy">
-                    <p class="feature-eyebrow">02 / REVIEW PLAN</p>
-                    <h3>One concern at a time.</h3>
-                    <p>Follow a review plan grouped by flow and ordered by risk. Keep progress visible while you work through the change.</p>
+
+                <div
+                    class="border-b border-r-0 md:border-r border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                >
+                    <div class="mb-auto">
+                        <span
+                            class="block text-5xl font-display font-light mb-4"
+                            >03</span
+                        >
+                        <h3 class="text-2xl font-bold uppercase mb-2">
+                            High-Signal Framework
+                        </h3>
+                        <p class="text-velura-gray min-h-12">
+                            The AI proactively identifies bugs and authenticates them against your rules. No comment spam, just focused feedback threads anchored to specific lines.
+                        </p>
+                    </div>
+                    <div class="mt-8 border border-theme p-2 bg-stone-200">
+                        <img
+                            src="./assets/screenshots/review-feedback-item.webp?v=75148d4a882c"
+                            alt="A transaction-safety finding with its receipt-write anchor and supporting explanation"
+                            class="w-full cursor-zoom-in lightbox-trigger"
+                        />
+                    </div>
                 </div>
-                <div class="feature-visual">
-                    <button type="button" class="lightbox-trigger feature-shot " aria-label="Enlarge: Four payment-webhook review tasks grouped by flow, with one complete and one in progress">
-                        <img src="./assets/screenshots/review.webp?v=403b2e4d42e0" alt="Four payment-webhook review tasks grouped by flow, with one complete and one in progress" width="2212" height="1172" loading="lazy" decoding="async" />
-                    </button>
+
+                <div
+                    class="border-b border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                >
+                    <div class="mb-auto">
+                        <span
+                            class="block text-5xl font-display font-light mb-4"
+                            >04</span
+                        >
+                        <h3 class="text-2xl font-bold uppercase mb-2">
+                            Custom Rules
+                        </h3>
+                        <p class="text-velura-gray min-h-12">
+                            Define rules like "DB queries must have timeouts" or "API changes need a migration note" to enforce standards automatically.
+                        </p>
+                    </div>
+                    <div class="mt-8 border border-theme p-2 bg-stone-200">
+                        <img
+                            src="./assets/screenshots/rules.webp?v=54fd588a2971"
+                            alt="Two enabled commerce-api rules about transaction safety and acknowledgment after commit"
+                            class="w-full cursor-zoom-in lightbox-trigger"
+                            loading="lazy"
+                            decoding="async"
+                        />
+                    </div>
                 </div>
-            </article>
-            <article class="feature-row">
-                <div class="feature-copy">
-                    <p class="feature-eyebrow">03 / FEEDBACK</p>
-                    <h3>See the evidence.</h3>
-                    <p>Move from a finding to the code that explains it. Each thread has a concrete location, severity, and a reason to act.</p>
+
+                <div
+                    class="border-b border-r-0 md:border-r border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                >
+                    <div class="mb-auto">
+                        <span
+                            class="block text-5xl font-display font-light mb-4"
+                            >05</span
+                        >
+                        <h3 class="text-2xl font-bold uppercase mb-2">
+                            Local Context
+                        </h3>
+                        <p class="text-velura-gray min-h-12">
+                            Link local Git repos to give the agent full access to search your codebase without upload. Works with your existing AI coding agent.
+                        </p>
+                    </div>
+                    <div class="mt-8 border border-theme p-2 bg-stone-200">
+                        <img
+                            src="./assets/screenshots/repos.webp?v=5aa97353d994"
+                            alt="Linked commerce-api checkout with a Review changes action"
+                            class="w-full cursor-zoom-in lightbox-trigger"
+                            loading="lazy"
+                            decoding="async"
+                        />
+                    </div>
                 </div>
-                <div class="feature-visual">
-                    <button type="button" class="lightbox-trigger feature-shot " aria-label="Enlarge: A transaction-safety finding with its receipt-write anchor and supporting explanation">
-                        <img src="./assets/screenshots/review-feedback-item.webp?v=75148d4a882c" alt="A transaction-safety finding with its receipt-write anchor and supporting explanation" width="3072" height="2144" loading="lazy" decoding="async" />
-                    </button>
+
+                <div
+                    class="border-b border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                >
+                    <div class="mb-auto">
+                        <span
+                            class="block text-5xl font-display font-light mb-4"
+                            >06</span
+                        >
+                        <h3 class="text-2xl font-bold uppercase mb-2">
+                            Git Host Sync
+                        </h3>
+                        <p class="text-velura-gray min-h-12">
+                            Submit your review feedback directly to GitHub/GitLab PRs
+                            with automatic summary generation.
+                        </p>
+                    </div>
+                    <div class="mt-8 border border-theme p-2 bg-stone-200">
+                        <img
+                            src="./assets/screenshots/export-github.webp?v=88340a581d27"
+                            alt="Selected feedback and explicit publish controls for the linked GitLab review"
+                            class="w-full cursor-zoom-in lightbox-trigger"
+                            loading="lazy"
+                            decoding="async"
+                        />
+                    </div>
                 </div>
-            </article>
-            <article class="feature-row">
-                <div class="feature-copy">
-                    <p class="feature-eyebrow">04 / TEAM RULES</p>
-                    <h3>Make your standards explicit.</h3>
-                    <p>Teach the agent the requirements that matter to your team: atomic writes, retryable failures, and acknowledgment after commit.</p>
+
+                <div
+                    class="border-b border-r-0 md:border-r border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                >
+                    <div class="mb-auto">
+                        <span
+                            class="block text-5xl font-display font-light mb-4"
+                            >07</span
+                        >
+                        <h3 class="text-2xl font-bold uppercase mb-2">
+                            Visual Diagrams
+                        </h3>
+                        <p class="text-velura-gray min-h-12">
+                            Visualize the flow. Automatically generate diagrams to see architectural changes before you read a single line of code.
+                        </p>
+                    </div>
+                    <div class="mt-8 border border-theme p-2 bg-stone-200">
+                        <img
+                            src="./assets/screenshots/review-diagram.webp?v=d5535f2c81e4"
+                            alt="New-payment flow showing early acknowledgment and a receipt remaining after rollback"
+                            class="w-full cursor-zoom-in lightbox-trigger"
+                            loading="lazy"
+                            decoding="async"
+                        />
+                    </div>
                 </div>
-                <div class="feature-visual">
-                    <button type="button" class="lightbox-trigger feature-shot " aria-label="Enlarge: Two enabled commerce-api rules about transaction safety and acknowledgment after commit">
-                        <img src="./assets/screenshots/rules.webp?v=54fd588a2971" alt="Two enabled commerce-api rules about transaction safety and acknowledgment after commit" width="3968" height="1440" loading="lazy" decoding="async" />
-                    </button>
+
+                <div
+                    class="border-b border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                >
+                    <div class="mb-auto">
+                        <span
+                            class="block text-5xl font-display font-light mb-4"
+                            >08</span
+                        >
+                        <h3 class="text-2xl font-bold uppercase mb-2">
+                            Learning Patterns
+                        </h3>
+                        <p class="text-velura-gray min-h-12">
+                            The AI learns from rejected feedback. Mark suggestions as "ignored" during reviews, then analyze rejections to discover patterns that calibrate future reviews—fewer nitpicks, more signal.
+                        </p>
+                    </div>
+                    <div class="mt-8 border border-theme p-2 bg-stone-200">
+                        <img
+                            src="./assets/screenshots/learnings.webp?v=91639c5b8c07"
+                            alt="Enabled review preferences prioritizing order-state failures and skipping generated-client formatting comments"
+                            class="w-full cursor-zoom-in lightbox-trigger"
+                            loading="lazy"
+                            decoding="async"
+                        />
+                    </div>
                 </div>
-            </article>
-            <article class="feature-row">
-                <div class="feature-copy">
-                    <p class="feature-eyebrow">05 / LOCAL CONTEXT</p>
-                    <h3>Keep the code within reach.</h3>
-                    <p>Link the checkout once, then start a review directly from the repository. The agent can inspect the surrounding code as it reviews.</p>
+
+                <div
+                    class="border-b border-theme p-8 md:p-12 min-h-[500px] flex flex-col"
+                >
+                    <div class="mb-auto">
+                        <span
+                            class="block text-5xl font-display font-light mb-4"
+                            >09</span
+                        >
+                        <h3 class="text-2xl font-bold uppercase mb-2">
+                            CLI Support
+                        </h3>
+                        <p class="text-velura-gray mb-4 min-h-12">
+                            Launch reviews directly from your terminal. Load PRs
+                            or pipe a git diff
+                        </p>
+                        <div class="mt-8 border border-theme p-2 bg-stone-200">
+                            <div
+                                class="font-mono text-base bg-[#1B1D2E] text-velura-bg p-4 rounded-sm w-full aspect-video"
+                            >
+                                <div class="flex space-x-1">
+                                    <span class="opacity-50">$</span>
+                                    <span class="text-green-500">lareview</span>
+                                </div>
+                                <div class="flex space-x-1">
+                                    <span class="opacity-50">$</span>
+                                    <span
+                                        ><span class="text-green-500"
+                                            >lareview</span
+                                        >
+                                        pr
+                                        <span class="text-red-300"
+                                            >owner/repo#123</span
+                                        ></span
+                                    >
+                                </div>
+                                <div class="flex space-x-1">
+                                    <span class="opacity-50">$</span>
+                                    <span
+                                        ><span class="text-green-500">git</span>
+                                        diff |
+                                        <span class="text-green-500"
+                                            >lareview</span
+                                        ></span
+                                    >
+                                </div>
+                                <div class="flex space-x-1">
+                                    <span class="opacity-50">$</span>
+                                    <span
+                                        ><span class="text-green-500"
+                                            >lareview</span
+                                        >
+                                        --agent claude</span
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="feature-visual">
-                    <button type="button" class="lightbox-trigger feature-shot feature-shot--compact" aria-label="Enlarge: Linked commerce-api checkout with a Review changes action">
-                        <img src="./assets/screenshots/repos.webp?v=5aa97353d994" alt="Linked commerce-api checkout with a Review changes action" width="1280" height="728" loading="lazy" decoding="async" />
-                    </button>
-                </div>
-            </article>
-            <article class="feature-row">
-                <div class="feature-copy">
-                    <p class="feature-eyebrow">06 / SHARE</p>
-                    <h3>Choose what leaves the workbench.</h3>
-                    <p>Select the tasks and feedback you want to share. Copy Markdown or post the selected items to the linked GitHub or GitLab review.</p>
-                </div>
-                <div class="feature-visual">
-                    <button type="button" class="lightbox-trigger feature-shot " aria-label="Enlarge: Three selected feedback items and explicit controls to publish to the linked GitLab review">
-                        <img src="./assets/screenshots/export-github.webp?v=88340a581d27" alt="Three selected feedback items and explicit controls to publish to the linked GitLab review" width="2336" height="1464" loading="lazy" decoding="async" />
-                    </button>
-                </div>
-            </article>
-            <article class="feature-row">
-                <div class="feature-copy">
-                    <p class="feature-eyebrow">07 / SYSTEM FLOW</p>
-                    <h3>Understand the failure path.</h3>
-                    <p>Read the change as a system. Here, a diagram makes the unawaited transaction and skipped-retry risk visible.</p>
-                </div>
-                <div class="feature-visual">
-                    <button type="button" class="lightbox-trigger feature-shot feature-shot--diagram" aria-label="Enlarge: New-payment flow showing early acknowledgment and a receipt remaining after rollback">
-                        <img src="./assets/screenshots/review-diagram.webp?v=d5535f2c81e4" alt="New-payment flow showing early acknowledgment and a receipt remaining after rollback" width="1616" height="1924" loading="lazy" decoding="async" />
-                    </button>
-                </div>
-            </article>
-            <article class="feature-row">
-                <div class="feature-copy">
-                    <p class="feature-eyebrow">08 / LEARNING</p>
-                    <h3>Keep the useful feedback.</h3>
-                    <p>Turn rejected suggestions into review preferences. Prioritize observable failures and spend less time on noise.</p>
-                </div>
-                <div class="feature-visual">
-                    <button type="button" class="lightbox-trigger feature-shot " aria-label="Enlarge: Enabled review preferences prioritizing order-state failures and skipping generated-client formatting comments">
-                        <img src="./assets/screenshots/learnings.webp?v=91639c5b8c07" alt="Enabled review preferences prioritizing order-state failures and skipping generated-client formatting comments" width="3968" height="1304" loading="lazy" decoding="async" />
-                    </button>
-                </div>
-            </article>
-            <div class="feature-row feature-cli">
-                <div class="feature-copy">
-                    <p class="feature-eyebrow">09 / COMMAND LINE</p>
-                    <h3>Start where you work.</h3>
-                    <p>Open a review from your terminal, load a pull request, or pipe in a diff.</p>
-                </div>
-                <pre aria-label="LaReview command-line examples"><code><span>$</span> lareview pr owner/repo#123
-<span>$</span> git diff | lareview
-<span>$</span> lareview --agent copilot</code></pre>
             </div>
         </section>
 
@@ -672,57 +833,64 @@
         </footer>
     </main>
 
-    <!-- Native dialog provides keyboard focus management and Escape dismissal. -->
-    <dialog id="lightbox" aria-label="Screenshot preview" class="fixed inset-0 m-auto h-full max-h-none w-full max-w-none border-0 bg-transparent p-0 backdrop:bg-black/90">
-        <div id="lightbox-surface" class="flex h-full w-full cursor-zoom-out items-center justify-center p-4 md:p-10">
-            <img id="lightbox-img" alt="" class="max-h-full max-w-full object-contain shadow-2xl" />
-            <form method="dialog" class="absolute top-4 right-4">
-                <button class="rounded bg-black/70 p-2 text-white hover:text-gray-300 focus-visible:outline-2 focus-visible:outline-offset-4" aria-label="Close screenshot preview">
-                    <i class="ph-bold ph-x text-3xl" aria-hidden="true"></i>
-                </button>
-            </form>
-            <button type="button" id="lightbox-zoom" aria-pressed="false" class="min-h-11 fixed right-5 bottom-5 rounded bg-black/80 px-4 py-2 text-sm text-white">Zoom in</button>
-        </div>
-    </dialog>
+    <!-- Lightbox -->
+    <div id="lightbox" class="fixed inset-0 z-[100] hidden bg-black/90 cursor-zoom-out p-4 md:p-10 flex items-center justify-center opacity-0 transition-opacity duration-300" aria-hidden="true">
+        <img id="lightbox-img" src="" alt="Enlarged screenshot" class="max-w-full max-h-full w-auto h-auto object-contain shadow-2xl rounded-sm transform scale-95 transition-transform duration-300 select-none">
+        <button id="lightbox-close" class="absolute top-4 right-4 text-white hover:text-gray-300 focus:outline-none p-2" aria-label="Close lightbox">
+            <i class="ph-bold ph-x text-3xl"></i>
+        </button>
+    </div>
 
     <script>
         const lightbox = document.getElementById('lightbox');
         const lightboxImg = document.getElementById('lightbox-img');
-        const surface = document.getElementById('lightbox-surface');
-        const zoomButton = document.getElementById('lightbox-zoom');
+        const closeBtn = document.getElementById('lightbox-close');
+        // Select all elements with the 'lightbox-trigger' class
+        // This ensures distinct handling and future-proofing
+        const triggers = document.querySelectorAll('.lightbox-trigger');
 
-        function setZoom(zoomed) {
-            surface.classList.toggle('is-zoomed', zoomed);
-            zoomButton.setAttribute('aria-pressed', String(zoomed));
-            zoomButton.textContent = zoomed ? 'Fit to screen' : 'Zoom in';
-            surface.scrollTop = 0;
-            surface.scrollLeft = 0;
+        function openLightbox(src) {
+            lightboxImg.src = src;
+            lightbox.classList.remove('hidden');
+            // Small delay to allow display:block to apply before opacity transition
+            setTimeout(() => {
+                lightbox.classList.remove('opacity-0');
+                lightboxImg.classList.remove('scale-95');
+                lightboxImg.classList.add('scale-100');
+            }, 10);
+            document.body.style.overflow = 'hidden';
         }
-        zoomButton.addEventListener('click', () => setZoom(!surface.classList.contains('is-zoomed')));
-        lightboxImg.addEventListener('click', () => setZoom(!surface.classList.contains('is-zoomed')));
-        let previousOverflow = '';
 
-        document.querySelectorAll('.lightbox-trigger').forEach(trigger => {
-            trigger.addEventListener('click', () => {
-                const screenshot = trigger.querySelector('img');
-                lightboxImg.src = screenshot.src;
-                lightboxImg.alt = screenshot.alt;
-                setZoom(false);
-                previousOverflow = document.body.style.overflow;
-                document.body.style.overflow = 'hidden';
-                lightbox.showModal();
+        function closeLightbox() {
+            lightbox.classList.add('opacity-0');
+            lightboxImg.classList.remove('scale-100');
+            lightboxImg.classList.add('scale-95');
+            setTimeout(() => {
+                lightbox.classList.add('hidden');
+                lightboxImg.src = '';
+            }, 300);
+            document.body.style.overflow = '';
+        }
+
+        triggers.forEach(trigger => {
+            trigger.addEventListener('click', (e) => {
+                e.preventDefault(); // Prevent any default link behavior if applicable
+                openLightbox(e.currentTarget.src);
             });
         });
 
-        surface.addEventListener('click', event => {
-            if (event.target === surface) lightbox.close();
+        closeBtn.addEventListener('click', closeLightbox);
+
+        lightbox.addEventListener('click', (e) => {
+            if (e.target !== lightboxImg) {
+                closeLightbox();
+            }
         });
 
-        lightbox.addEventListener('close', () => {
-            document.body.style.overflow = previousOverflow;
-            setZoom(false);
-            lightboxImg.removeAttribute('src');
-            lightboxImg.alt = '';
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !lightbox.classList.contains('hidden')) {
+                closeLightbox();
+            }
         });
     </script>
 
