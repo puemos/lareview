@@ -298,7 +298,7 @@ export const InboxView: React.FC<InboxViewProps> = ({ onNavigate }) => {
 
           {grouped.actionable.length > 0 && (
             <section className="mb-6">
-              <h2 className="text-text-secondary mb-3 text-[13px] font-medium">
+              <h2 className="text-text-secondary mb-3 text-[0.8125rem] font-medium">
                 Awaiting your review ({grouped.actionable.length})
               </h2>
               <div className="flex flex-col gap-2">
@@ -317,7 +317,7 @@ export const InboxView: React.FC<InboxViewProps> = ({ onNavigate }) => {
 
           {grouped.done.length > 0 && (
             <section>
-              <h2 className="text-text-secondary mb-3 text-[13px] font-medium">
+              <h2 className="text-text-secondary mb-3 text-[0.8125rem] font-medium">
                 Already reviewed ({grouped.done.length})
               </h2>
               <div className="flex flex-col gap-2">
@@ -378,22 +378,22 @@ const CandidateRow: React.FC<CandidateRowProps> = ({
     <div className="inbox-request border-border/60 bg-bg-secondary/20 hover:bg-bg-secondary/40 flex items-center gap-4 rounded-lg border px-4 py-4 transition-colors">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-text-tertiary font-mono text-[11px]">
+          <span className="text-text-tertiary font-mono text-[0.6875rem]">
             {candidate.repo}#{candidate.number}
           </span>
           {candidate.isDraft && (
-            <span className="text-text-tertiary border-border rounded border px-1.5 py-0.5 text-[11px]">
+            <span className="text-text-tertiary border-border rounded border px-1.5 py-0.5 text-[0.6875rem]">
               Draft
             </span>
           )}
-          <span className={`flex items-center gap-1.5 text-[11px] ${tone}`}>
+          <span className={`flex items-center gap-1.5 text-[0.6875rem] ${tone}`}>
             <span className="h-1 w-1 rounded-full bg-current" aria-hidden="true" />
             {label}
           </span>
         </div>
         <p
           title={candidate.title}
-          className="text-text-primary mt-2 line-clamp-2 text-[15px] leading-6 font-medium"
+          className="text-text-primary mt-2 line-clamp-2 text-[0.9375rem] leading-6 font-medium"
         >
           {candidate.title}
         </p>

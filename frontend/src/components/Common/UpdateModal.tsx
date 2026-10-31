@@ -44,7 +44,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
               <ICONS.ARROW_UP size={18} />
             </div>
             <h3 className="text-text-primary text-sm font-semibold">Update Available</h3>
-            <span className="bg-brand/10 text-brand rounded-full px-2 py-0.5 text-[10px] font-medium">
+            <span className="bg-brand/10 text-brand rounded-full px-2 py-0.5 text-[0.625rem] font-medium">
               v{currentVersion} → v{updateInfo.latestVersion}
             </span>
           </div>

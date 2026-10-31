@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ICONS } from '../../constants/icons';
 import { parseDiffLocally } from '../../utils/diffParser';
 import { getLanguageFromPath } from '../../utils/languages';
+import { useAppearanceStore } from '../../store/appearance';
 
 interface DiffEditorPanelProps {
   diffText: string;
@@ -19,6 +20,7 @@ export const DiffEditorPanel: React.FC<DiffEditorPanelProps> = ({
   onDiffTextChange,
   validationError,
 }) => {
+  const codeFontSize = useAppearanceStore(state => state.codeFontSize);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [isFileListExpanded, setIsFileListExpanded] = useState(true);
 
@@ -138,7 +140,7 @@ export const DiffEditorPanel: React.FC<DiffEditorPanelProps> = ({
                     </span>
                   </div>
                   {file.name.includes('/') && (
-                    <div className="text-text-disabled mt-0.5 ml-5 truncate text-[10px]">
+                    <div className="text-text-disabled mt-0.5 ml-5 truncate text-[0.625rem]">
                       {file.name}
                     </div>
                   )}
@@ -153,7 +155,7 @@ export const DiffEditorPanel: React.FC<DiffEditorPanelProps> = ({
         {viewMode === 'raw' && !diffText.trim() && (
           <div className="pointer-events-none absolute top-14 left-16 z-10 max-w-sm pr-5">
             <h2 className="text-text-secondary text-base font-medium">Paste a unified diff</h2>
-            <p className="text-text-tertiary mt-2 text-[13px] leading-6">
+            <p className="text-text-tertiary mt-2 text-[0.8125rem] leading-6">
               Copy the output of <code className="text-text-secondary">git diff main...HEAD</code>,
               then paste it here. Use Preview to inspect the changed files.
             </p>
@@ -174,8 +176,8 @@ export const DiffEditorPanel: React.FC<DiffEditorPanelProps> = ({
               renderLineHighlight: 'none',
               renderOverviewRuler: false,
               minimap: { enabled: false },
-              fontSize: 12,
-              lineHeight: 20,
+              fontSize: codeFontSize,
+              lineHeight: Math.round(codeFontSize * (5 / 3)),
               fontFamily: "'GeistMono', 'Monaco', monospace",
               scrollBeyondLastLine: false,
               padding: { top: 16, bottom: 16 },
@@ -194,8 +196,8 @@ export const DiffEditorPanel: React.FC<DiffEditorPanelProps> = ({
             options={{
               ariaLabel: 'Unified diff input',
               minimap: { enabled: false },
-              fontSize: 12,
-              lineHeight: 20,
+              fontSize: codeFontSize,
+              lineHeight: Math.round(codeFontSize * (5 / 3)),
               fontFamily: "'GeistMono', 'Monaco', monospace",
               scrollBeyondLastLine: false,
               padding: { top: 16, bottom: 16 },

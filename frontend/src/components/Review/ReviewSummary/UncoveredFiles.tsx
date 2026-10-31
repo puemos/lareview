@@ -23,7 +23,7 @@ export const UncoveredFiles: React.FC<UncoveredFilesProps> = ({ uncoveredFiles, 
         <div className="flex items-center gap-2">
           <ICONS.FILE size={16} className="text-text-disabled" />
           <h3 className="text-text-primary text-sm font-medium">Uncovered Files</h3>
-          <span className="bg-bg-tertiary text-text-secondary rounded-full px-2 py-0.5 text-[10px] font-medium">
+          <span className="bg-bg-tertiary text-text-secondary rounded-full px-2 py-0.5 text-[0.625rem] font-medium">
             {uncoveredFiles.length}
           </span>
         </div>

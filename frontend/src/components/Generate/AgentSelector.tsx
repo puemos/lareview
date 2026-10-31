@@ -106,7 +106,7 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
                   <div className="flex items-center gap-2">
                     <Select.ItemText>{agent.name}</Select.ItemText>
                     {agent.available === false && (
-                      <span className="text-[10px] font-medium text-red-400">(Unavailable)</span>
+                      <span className="text-[0.625rem] font-medium text-red-400">(Unavailable)</span>
                     )}
                   </div>
                   <div className="absolute right-2 flex w-4 items-center justify-center">

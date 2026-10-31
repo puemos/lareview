@@ -180,7 +180,7 @@ export const LearningView: React.FC = () => {
             />
           )}
           <div className="border-border/50 flex flex-wrap items-start justify-between gap-4 border-b pb-5">
-            <p className="text-text-tertiary max-w-[65ch] text-[13px] leading-6">
+            <p className="text-text-tertiary max-w-[65ch] text-[0.8125rem] leading-6">
               Ignore unhelpful feedback during a review, then analyze those decisions to shape
               future reviews. You can also add patterns yourself.
             </p>
@@ -204,7 +204,7 @@ export const LearningView: React.FC = () => {
           {compact.isSuccess && compact.data && <CompactionResultBanner result={compact.data} />}
 
           {learningStatus && learningStatus.last_compaction_at && (
-            <div className="text-text-tertiary text-[10px]">
+            <div className="text-text-tertiary text-[0.625rem]">
               Last analysis: {displayDate(learningStatus.last_compaction_at) ?? 'Not recorded'}
             </div>
           )}
@@ -761,14 +761,14 @@ const PatternList: React.FC<PatternListProps> = ({
                 </div>
 
                 {/* Middle: Tags */}
-                <div className="text-text-tertiary flex flex-wrap items-center gap-2 text-[10px]">
+                <div className="text-text-tertiary flex flex-wrap items-center gap-2 text-[0.625rem]">
                   {pattern.category && (
-                    <span className="text-text-tertiary border-border/50 rounded-md border px-2 py-0.5 text-[11px]">
+                    <span className="text-text-tertiary border-border/50 rounded-md border px-2 py-0.5 text-[0.6875rem]">
                       {pattern.category.replace('-', ' ')}
                     </span>
                   )}
                   {pattern.file_extension && (
-                    <span className="text-text-tertiary border-border/50 rounded-md border px-2 py-0.5 font-mono text-[11px]">
+                    <span className="text-text-tertiary border-border/50 rounded-md border px-2 py-0.5 font-mono text-[0.6875rem]">
                       *.{pattern.file_extension}
                     </span>
                   )}
@@ -782,7 +782,7 @@ const PatternList: React.FC<PatternListProps> = ({
 
               {/* Bottom: Footer with Actions */}
               <div className="border-border/50 flex items-center justify-between border-t px-4 py-3">
-                <div className="text-text-tertiary flex items-center gap-4 text-[10px]">
+                <div className="text-text-tertiary flex items-center gap-4 text-[0.625rem]">
                   {displayDate(pattern.updated_at) && (
                     <time dateTime={pattern.updated_at}>
                       Updated {displayDate(pattern.updated_at)}

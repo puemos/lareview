@@ -86,7 +86,7 @@ export const PrInput: React.FC<PrInputProps> = ({
       <button
         type="submit"
         disabled={!prRef.trim() || isLoading || disabled}
-        className="flex min-w-[48px] flex-shrink-0 items-center justify-center gap-1 px-3 py-1.5 text-[10px] font-medium opacity-80 transition-colors hover:opacity-100 disabled:opacity-50"
+        className="flex min-w-[48px] flex-shrink-0 items-center justify-center gap-1 px-3 py-1.5 text-[0.625rem] font-medium opacity-80 transition-colors hover:opacity-100 disabled:opacity-50"
       >
         {isLoading ? <Spinner size={14} className="text-text-primary animate-spin" /> : 'Fetch'}
       </button>

@@ -35,7 +35,7 @@ export const ImpactBadge: React.FC<ImpactBadgeProps> = ({
 }) => {
   const config = impactConfig[impact];
   const Icon = config.icon;
-  const textSize = size === 'sm' ? 'text-[11px]' : 'text-xs';
+  const textSize = size === 'sm' ? 'text-[0.6875rem]' : 'text-xs';
   const iconSize = size === 'sm' ? 10 : 12;
 
   return (

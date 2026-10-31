@@ -1,3 +1,9 @@
 allowBuilds:
   '@parcel/watcher': true
   '@tailwindcss/oxide': true
+
+overrides:
+  minimatch@<11.0.1: ^11.0.1
+
+patchedDependencies:
+  resp-modifier@6.0.2: patches/resp-modifier@6.0.2.patch

@@ -6,7 +6,7 @@ interface DiffStatsProps {
   deletions: number;
 }
 export const DiffStats: React.FC<DiffStatsProps> = ({ charCount, additions, deletions }) => (
-  <div className="border-border/50 bg-bg-secondary/60 text-text-disabled flex h-7 shrink-0 items-center justify-between border-t px-5 text-[10px] select-none">
+  <div className="border-border/50 bg-bg-secondary/60 text-text-disabled flex h-7 shrink-0 items-center justify-between border-t px-5 text-[0.625rem] select-none">
     <span title={`${charCount.toLocaleString()} characters`}>
       {charCount ? 'Unified diff' : 'Paste a unified diff to get started'}
     </span>

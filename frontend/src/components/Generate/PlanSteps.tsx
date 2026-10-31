@@ -67,7 +67,7 @@ export const PlanSteps: React.FC<PlanStepsProps> = ({
         return (
           <div
             key={`${index}-${step.content}`}
-            className="group flex items-start gap-3 py-2 text-[13px]"
+            className="group flex items-start gap-3 py-2 text-[0.8125rem]"
           >
             {Icon}
             <span
@@ -82,7 +82,7 @@ export const PlanSteps: React.FC<PlanStepsProps> = ({
             >
               {step.content}
             </span>
-            <span className="text-text-tertiary ml-auto shrink-0 text-[11px]">
+            <span className="text-text-tertiary ml-auto shrink-0 text-[0.6875rem]">
               {isDone
                 ? 'Done'
                 : isFailed

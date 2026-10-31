@@ -23,7 +23,7 @@
   gap: 7px;
   padding: 15px 0;
   color: var(--color-text-tertiary);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   transition: color 120ms;
 }
@@ -106,7 +106,7 @@
 }
 .local-ref-field > span {
   color: var(--color-text-disabled);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 500;
 }
 .local-ref-pair:focus-within {
