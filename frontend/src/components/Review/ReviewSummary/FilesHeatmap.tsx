@@ -48,7 +48,7 @@ export const FilesHeatmap: React.FC<FilesHeatmapProps> = ({
       <div className="review-section-heading">
         <div className="flex items-center gap-2">
           <ICONS.ICON_FILES size={14} className="text-text-tertiary" />
-          <h3 className="text-text-primary text-[13px] font-medium">Files changed</h3>
+          <h3 className="text-text-primary text-[0.8125rem] font-medium">Files changed</h3>
         </div>
         <span className="text-text-disabled text-xs">
           {files.length} {files.length === 1 ? 'file' : 'files'}
@@ -70,12 +70,12 @@ export const FilesHeatmap: React.FC<FilesHeatmapProps> = ({
                 {file.name.split('/').pop()}
               </span>
               {file.name.includes('/') && (
-                <span className="text-text-tertiary mt-0.5 block text-[11px] leading-5 break-all">
+                <span className="text-text-tertiary mt-0.5 block text-[0.6875rem] leading-5 break-all">
                   {file.name}
                 </span>
               )}
             </span>
-            <span className="text-text-tertiary flex items-center gap-1.5 text-[11px] capitalize">
+            <span className="text-text-tertiary flex items-center gap-1.5 text-[0.6875rem] capitalize">
               <span
                 className={`${file.risk ? riskColor[file.risk] : 'bg-text-disabled'} h-1.5 w-1.5 rounded-full`}
               />

@@ -139,7 +139,7 @@ export const RuleLibraryModal: React.FC<RuleLibraryModalProps> = ({ isOpen, onCl
                 }`}
               >
                 <div className="text-xs font-medium">{info.label}</div>
-                <div className="text-[10px] opacity-70">
+                <div className="text-[0.625rem] opacity-70">
                   {catRules.length} {catRules.length === 1 ? 'rule' : 'rules'}
                 </div>
               </button>
@@ -271,7 +271,7 @@ const RuleCard: React.FC<RuleCardProps> = ({ rule, onAdd, isAdding, disabled }) 
           <div className="flex items-center gap-2">
             <h4 className="text-text-primary text-sm font-semibold">{rule.name}</h4>
             {rule.category && (
-              <span className="bg-bg-tertiary text-accent border-accent/20 rounded-md border px-1.5 py-0.5 text-[9px] font-bold">
+              <span className="bg-bg-tertiary text-accent border-accent/20 rounded-md border px-1.5 py-0.5 text-[0.5625rem] font-bold">
                 {rule.category.toUpperCase()}
               </span>
             )}
@@ -281,13 +281,13 @@ const RuleCard: React.FC<RuleCardProps> = ({ rule, onAdd, isAdding, disabled }) 
             {rule.tags.slice(0, 3).map(tag => (
               <span
                 key={tag}
-                className="bg-bg-tertiary text-text-tertiary border-border/40 rounded-md border px-1.5 py-0.5 text-[10px]"
+                className="bg-bg-tertiary text-text-tertiary border-border/40 rounded-md border px-1.5 py-0.5 text-[0.625rem]"
               >
                 {tag}
               </span>
             ))}
             {rule.glob && (
-              <span className="bg-bg-tertiary text-text-tertiary border-border/40 rounded-md border px-1.5 py-0.5 font-mono text-[10px]">
+              <span className="bg-bg-tertiary text-text-tertiary border-border/40 rounded-md border px-1.5 py-0.5 font-mono text-[0.625rem]">
                 {rule.glob}
               </span>
             )}
@@ -308,7 +308,7 @@ const RuleCard: React.FC<RuleCardProps> = ({ rule, onAdd, isAdding, disabled }) 
         <button
           onClick={() => setExpanded(!expanded)}
           aria-expanded={expanded}
-          className="text-text-tertiary hover:text-text-secondary flex min-h-8 items-center gap-1 text-[11px] font-medium transition-colors"
+          className="text-text-tertiary hover:text-text-secondary flex min-h-8 items-center gap-1 text-[0.6875rem] font-medium transition-colors"
         >
           <ICONS.CHEVRON_DOWN
             size={10}

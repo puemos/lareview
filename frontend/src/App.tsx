@@ -201,7 +201,7 @@ function App() {
                 toastOptions={{
                   classNames: {
                     title: '!font-semibold',
-                    description: '!text-text-secondary !text-[11px]',
+                    description: '!text-text-secondary !text-[0.6875rem]',
                   },
                   className:
                     '!shadow-custom !bg-bg-tertiary !text-text-primary !rounded-lg !border !border-border !py-3',

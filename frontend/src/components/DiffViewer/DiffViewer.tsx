@@ -7,6 +7,7 @@ import { getLanguageFromPath } from '../../utils/languages';
 import { InlineError } from '../Common/InlineError';
 import { countDiffChanges } from '../../lib/diff-stats';
 import { GutterMenu } from './GutterMenu';
+import { useAppearanceStore } from '../../store/appearance';
 
 interface DiffViewerProps {
   files: DiffFile[];
@@ -131,7 +132,7 @@ const FileListItem: React.FC<FileListItemProps> = ({ file, isSelected, onClick }
         <span className="text-status-done text-xs">+{additions}</span>
         <span className="text-xs text-red-400">-{deletions}</span>
       </div>
-      <div className="text-text-tertiary ml-5 truncate font-mono text-[11px]">{path}</div>
+      <div className="text-text-tertiary ml-5 truncate font-mono text-[0.6875rem]">{path}</div>
     </button>
   );
 };
@@ -157,6 +158,7 @@ const DiffContent: React.FC<DiffContentProps> = ({
   repoRoot,
 }) => {
   const { openInEditor } = useTauri();
+  const codeFontSize = useAppearanceStore(state => state.codeFontSize);
   const [editorError, setEditorError] = useState<string | null>(null);
   const [displayMode, setDisplayMode] = useState<'unified' | 'split'>(viewMode);
   const path = file.name || file.new_path || 'unknown';
@@ -377,7 +379,7 @@ const DiffContent: React.FC<DiffContentProps> = ({
         <div className="flex items-center gap-3">
           <span className="text-text-primary font-mono text-xs break-all">{path}</span>
           {isNewFile && (
-            <span className="text-status-added border-status-added/20 bg-status-added/10 rounded border px-1.5 text-[10px] font-medium">
+            <span className="text-status-added border-status-added/20 bg-status-added/10 rounded border px-1.5 text-[0.625rem] font-medium">
               NEW
             </span>
           )}
@@ -427,8 +429,8 @@ const DiffContent: React.FC<DiffContentProps> = ({
               scale: 2,
               showSlider: 'always',
             },
-            fontSize: 12,
-            lineHeight: 20,
+            fontSize: codeFontSize,
+            lineHeight: Math.round(codeFontSize * (5 / 3)),
             fontFamily: "'GeistMono', 'Monaco', monospace",
             scrollBeyondLastLine: false,
             padding: { top: 16, bottom: 16 },
@@ -471,7 +473,7 @@ const DiffContent: React.FC<DiffContentProps> = ({
           }}
         />
       </div>
-      <p className="border-border text-text-tertiary border-t px-4 py-2 text-[11px]">
+      <p className="border-border text-text-tertiary border-t px-4 py-2 text-[0.6875rem]">
         Diff excerpt · Line numbers refer to the original files.
       </p>
       <GutterMenu

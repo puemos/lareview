@@ -65,7 +65,7 @@ export const VcsInputCard: React.FC<VcsInputCardProps> = ({
             onClick={onClear}
             disabled={disabled || isLoading}
             aria-label="Clear loaded pull request"
-            className="flex flex-shrink-0 items-center justify-center px-3 py-1.5 text-[10px] font-medium opacity-80 transition-colors hover:opacity-100"
+            className="flex flex-shrink-0 items-center justify-center px-3 py-1.5 text-[0.625rem] font-medium opacity-80 transition-colors hover:opacity-100"
           >
             <X size={12} />
           </button>

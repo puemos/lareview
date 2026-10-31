@@ -165,7 +165,7 @@ const TabButton: React.FC<TabButtonProps> = ({ active, onClick, icon: Icon, labe
       <Icon size={12} />
       {label}
       {count !== undefined && count > 0 && (
-        <span className="text-[10px] opacity-60">({count})</span>
+        <span className="text-[0.625rem] opacity-60">({count})</span>
       )}
     </div>
   </button>

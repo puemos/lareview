@@ -401,7 +401,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
             <button
               onClick={() => setRepoLinkCallout(null)}
               disabled={isRepoLinking}
-              className="text-text-tertiary hover:text-text-primary px-1 text-[10px] font-semibold transition-colors disabled:opacity-60"
+              className="text-text-tertiary hover:text-text-primary px-1 text-[0.625rem] font-semibold transition-colors disabled:opacity-60"
             >
               Dismiss
             </button>
@@ -464,7 +464,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
                 <h1 className="text-text-primary text-2xl font-semibold tracking-[-0.025em]">
                   Start a review
                 </h1>
-                <p className="text-text-tertiary mt-2 text-[13px] leading-6">
+                <p className="text-text-tertiary mt-2 text-[0.8125rem] leading-6">
                   Review a pull request or compare changes in a local repository.
                 </p>
               </div>
@@ -516,7 +516,7 @@ export const GenerateView: React.FC<GenerateViewProps> = ({ onNavigate: _onNavig
                   onClick={handleClear}
                   aria-label="Clear diff"
                   disabled={isStarting || isLoadingPr}
-                  className="generate-clear flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[11px]"
+                  className="generate-clear flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[0.6875rem]"
                 >
                   <Trash size={13} />
                   <span>Clear</span>

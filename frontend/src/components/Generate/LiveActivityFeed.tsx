@@ -56,7 +56,7 @@ export const LiveActivityFeed: React.FC<LiveActivityFeedProps> = ({ messages, is
         {isRunning && (
           <span className="flex items-center gap-1.5">
             <span className="bg-success h-1.5 w-1.5 animate-pulse rounded-full" />
-            <span className="text-success font-mono text-[10px]">Running</span>
+            <span className="text-success font-mono text-[0.625rem]">Running</span>
           </span>
         )}
       </div>
@@ -79,7 +79,7 @@ export const LiveActivityFeed: React.FC<LiveActivityFeedProps> = ({ messages, is
         <button
           type="button"
           onClick={jumpToLatest}
-          className="bg-bg-tertiary border-border text-text-secondary hover:text-text-primary shadow-custom absolute right-4 bottom-4 rounded-md border px-2.5 py-1.5 text-[10px] font-medium transition-colors active:scale-[0.97]"
+          className="bg-bg-tertiary border-border text-text-secondary hover:text-text-primary shadow-custom absolute right-4 bottom-4 rounded-md border px-2.5 py-1.5 text-[0.625rem] font-medium transition-colors active:scale-[0.97]"
         >
           Jump to latest
         </button>
@@ -126,7 +126,7 @@ const TimelineItem: React.FC<{ message: ProgressMessage }> = ({ message }) => {
     <div className="group flex flex-col gap-1.5 rounded-md p-2 transition-colors hover:bg-white/5">
       {/* Header row: Tag and Timestamp */}
       <div className="flex items-center justify-between pb-1">
-        <span className={clsx('rounded px-1 py-0.5 text-[11px] font-medium', getTypeStyles())}>
+        <span className={clsx('rounded px-1 py-0.5 text-[0.6875rem] font-medium', getTypeStyles())}>
           {{
             agent_message: 'Agent',
             agent_thought: 'Reasoning',
@@ -139,13 +139,13 @@ const TimelineItem: React.FC<{ message: ProgressMessage }> = ({ message }) => {
             ? ` · ${message.data.status}`
             : ''}
         </span>
-        <span className="text-text-tertiary font-mono text-[11px]">
+        <span className="text-text-tertiary font-mono text-[0.6875rem]">
           {formatTimestamp(message.timestamp)}
         </span>
       </div>
 
       {/* Content row */}
-      <div className="text-text-secondary pl-1 text-[13px] leading-6 break-words whitespace-pre-wrap">
+      <div className="text-text-secondary pl-1 text-[0.8125rem] leading-6 break-words whitespace-pre-wrap">
         {message.message}
       </div>
     </div>

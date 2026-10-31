@@ -174,7 +174,7 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
                 <span className="flex items-center gap-1.5">
                   Changes
                   {diffStats.additions > 0 || diffStats.deletions > 0 ? (
-                    <span className="font-mono text-[10px] opacity-70">
+                    <span className="font-mono text-[0.625rem] opacity-70">
                       +{diffStats.additions}/-{diffStats.deletions}
                     </span>
                   ) : null}

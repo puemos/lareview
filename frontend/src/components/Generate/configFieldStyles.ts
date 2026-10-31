@@ -1,5 +1,5 @@
 export const configFieldLabelClass =
-  'text-text-disabled block h-3 text-[10px] leading-3 font-medium tracking-[0.06em] uppercase';
+  'text-text-disabled block h-3 text-[0.625rem] leading-3 font-medium tracking-[0.06em] uppercase';
 
 export const configFieldTriggerClass =
   'bg-bg-primary border-border/70 text-text-primary hover:border-text-disabled flex h-8 items-center rounded-md border px-3 text-xs transition-[background-color,border-color,box-shadow] disabled:cursor-not-allowed disabled:opacity-60';

@@ -49,9 +49,9 @@ const CheckItem: React.FC<CheckItemProps> = ({ check, feedbacks, onSelectFeedbac
       >
         <StatusIcon size={13} className={config.color} weight="bold" />
         <span className="text-text-secondary min-w-0 flex-1 text-xs">{check.display_name}</span>
-        {!hasFindings && <span className="text-text-disabled text-[10px]">{config.label}</span>}
+        {!hasFindings && <span className="text-text-disabled text-[0.625rem]">{config.label}</span>}
         {check.status === 'found' && check.findings.length > 0 && (
-          <span className="bg-impact-blocking/10 text-impact-blocking rounded px-1.5 py-0.5 text-[10px] font-medium">
+          <span className="bg-impact-blocking/10 text-impact-blocking rounded px-1.5 py-0.5 text-[0.625rem] font-medium">
             {check.findings.length} {check.findings.length === 1 ? 'issue' : 'issues'}
           </span>
         )}
@@ -82,7 +82,7 @@ const CheckItem: React.FC<CheckItemProps> = ({ check, feedbacks, onSelectFeedbac
                 }`}
                 disabled={!linkedFeedback}
               >
-                <span className="text-text-primary min-w-0 flex-1 text-[13px] leading-5">
+                <span className="text-text-primary min-w-0 flex-1 text-[0.8125rem] leading-5">
                   {finding.title}
                 </span>
                 <ImpactBadge impact={finding.impact} size="sm" />
@@ -111,7 +111,7 @@ export const IssueChecklist: React.FC<IssueChecklistProps> = ({
         <div className="review-section-heading">
           <div className="flex items-center gap-2">
             <ICONS.STATUS_ISSUES size={14} className="text-text-tertiary" />
-            <h3 className="text-text-primary text-[13px] font-medium">Checks</h3>
+            <h3 className="text-text-primary text-[0.8125rem] font-medium">Checks</h3>
           </div>
         </div>
         <div className="animate-pulse space-y-2 p-4">
@@ -129,7 +129,7 @@ export const IssueChecklist: React.FC<IssueChecklistProps> = ({
         <div className="review-section-heading">
           <div className="flex items-center gap-2">
             <ICONS.STATUS_ISSUES size={14} className="text-text-tertiary" />
-            <h3 className="text-text-primary text-[13px] font-medium">Checks</h3>
+            <h3 className="text-text-primary text-[0.8125rem] font-medium">Checks</h3>
           </div>
         </div>
         <div className="text-text-disabled px-4 py-6 text-center text-sm">
@@ -161,15 +161,15 @@ export const IssueChecklist: React.FC<IssueChecklistProps> = ({
       <div className="review-section-heading">
         <div className="flex items-center gap-2">
           <ICONS.STATUS_ISSUES size={14} className="text-text-tertiary" />
-          <h3 className="text-text-primary text-[13px] font-medium">Checks</h3>
+          <h3 className="text-text-primary text-[0.8125rem] font-medium">Checks</h3>
         </div>
         {foundCount === 0 && (
-          <span className="text-text-disabled text-[11px]">
+          <span className="text-text-disabled text-[0.6875rem]">
             {clearCount} clear · {checks.length} categories
           </span>
         )}
         {foundCount > 0 && (
-          <span className="bg-impact-blocking/10 text-impact-blocking rounded-full px-2 py-0.5 text-[10px] font-medium">
+          <span className="bg-impact-blocking/10 text-impact-blocking rounded-full px-2 py-0.5 text-[0.625rem] font-medium">
             {totalFindings} {totalFindings === 1 ? 'issue' : 'issues'} in {foundCount}{' '}
             {foundCount === 1 ? 'category' : 'categories'}
           </span>

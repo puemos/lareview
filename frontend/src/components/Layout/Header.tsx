@@ -13,7 +13,7 @@ export const Header: React.FC<HeaderProps> = ({ version }) => {
         <span className="font-display text-xs font-medium tracking-wide text-gray-400">
           lareview
         </span>
-        <span className="rounded px-1.5 font-mono text-[10px] text-gray-600">{version}</span>
+        <span className="rounded px-1.5 font-mono text-[0.625rem] text-gray-600">{version}</span>
       </div>
     </header>
   );

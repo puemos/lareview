@@ -44,7 +44,7 @@ const renderValueItem = (value: AgentSessionConfigSelectValue) => (
     <div className="min-w-0 flex-1">
       <Select.ItemText>{value.name}</Select.ItemText>
       {value.description && (
-        <div className="text-text-tertiary mt-0.5 line-clamp-2 text-[10px] leading-4">
+        <div className="text-text-tertiary mt-0.5 line-clamp-2 text-[0.625rem] leading-4">
           {value.description}
         </div>
       )}
@@ -62,7 +62,7 @@ const renderOptions = (
     if (!isConfigGroup(option)) return renderValueItem(option);
     return (
       <Select.Group key={option.group}>
-        <Select.Label className="text-text-disabled px-3 pt-2 pb-1 text-[9px] font-bold tracking-wider uppercase">
+        <Select.Label className="text-text-disabled px-3 pt-2 pb-1 text-[0.5625rem] font-bold tracking-wider uppercase">
           {option.name}
         </Select.Label>
         {option.options.map(renderValueItem)}
@@ -203,7 +203,7 @@ export const HarnessConfigControls: React.FC<HarnessConfigControlsProps> = ({
         disabled={disabled || config.isFetching}
         title={config.error instanceof Error ? config.error.message : String(config.error)}
         className={clsx(
-          'text-text-disabled hover:text-text-secondary flex items-center justify-between text-[10px] transition-colors disabled:opacity-60',
+          'text-text-disabled hover:text-text-secondary flex items-center justify-between text-[0.625rem] transition-colors disabled:opacity-60',
           compact ? 'bg-bg-tertiary border-border h-8 w-full rounded-md border px-3' : 'w-full px-1'
         )}
       >
@@ -226,7 +226,7 @@ export const HarnessConfigControls: React.FC<HarnessConfigControlsProps> = ({
     const loadingControl = (
       <div
         className={clsx(
-          'text-text-disabled flex items-center gap-2 text-[10px]',
+          'text-text-disabled flex items-center gap-2 text-[0.625rem]',
           compact ? 'bg-bg-tertiary border-border h-8 w-full rounded-md border px-3' : 'px-1'
         )}
       >

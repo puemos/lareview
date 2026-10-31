@@ -83,10 +83,10 @@ const TaskGroupSection: React.FC<TaskGroupSectionProps> = ({
               >
                 <StatusIcon size={15} className={`${status.color} mt-1 shrink-0`} />
                 <span className="min-w-0 flex-1">
-                  <span className="text-text-primary block text-[13px] leading-5">
+                  <span className="text-text-primary block text-[0.8125rem] leading-5">
                     {task.title}
                   </span>
-                  <span className="text-text-tertiary mt-1.5 flex gap-3 text-[11px]">
+                  <span className="text-text-tertiary mt-1.5 flex gap-3 text-[0.6875rem]">
                     <span>
                       {task.status === 'done'
                         ? 'Done'
@@ -152,7 +152,7 @@ export const TaskFlow: React.FC<TaskFlowProps> = ({ tasks, onSelectTask }) => {
         <div className="review-section-heading">
           <div className="flex items-center gap-2">
             <ICONS.ICON_PLAN size={14} className="text-text-tertiary" />
-            <h3 className="text-text-primary text-[13px] font-medium">Review tasks</h3>
+            <h3 className="text-text-primary text-[0.8125rem] font-medium">Review tasks</h3>
           </div>
         </div>
         <div className="text-text-disabled px-4 py-6 text-center text-sm">No tasks generated.</div>
@@ -165,7 +165,7 @@ export const TaskFlow: React.FC<TaskFlowProps> = ({ tasks, onSelectTask }) => {
       <div className="review-section-heading">
         <div className="flex items-center gap-2">
           <ICONS.ICON_PLAN size={14} className="text-text-tertiary" />
-          <h3 className="text-text-primary text-[13px] font-medium">Review tasks</h3>
+          <h3 className="text-text-primary text-[0.8125rem] font-medium">Review tasks</h3>
         </div>
         <span className="text-text-disabled text-xs">
           {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}

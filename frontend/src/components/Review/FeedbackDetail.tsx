@@ -67,7 +67,7 @@ interface DiffSnippet {
 const DiffSnippetViewer: React.FC<{ snippet: DiffSnippet }> = ({ snippet }) => {
   return (
     <div className="bg-bg-tertiary border-border/50 overflow-hidden rounded border font-mono text-xs">
-      <div className="bg-bg-secondary/50 border-border/50 text-text-tertiary border-b px-2 py-1 text-[10px]">
+      <div className="bg-bg-secondary/50 border-border/50 text-text-tertiary border-b px-2 py-1 text-[0.625rem]">
         {snippet.hunk_header}
       </div>
       <div className="max-h-48 space-y-0.5 overflow-y-auto p-2">
@@ -286,7 +286,7 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
                 {feedback.anchor.file_path}
                 {feedback.anchor.line_number ? `:${feedback.anchor.line_number}` : ''}
               </span>
-              <span className="text-text-disabled text-[10px]">
+              <span className="text-text-disabled text-[0.625rem]">
                 ({feedback.anchor.side === 'old' ? 'old' : 'new'})
               </span>
             </div>
@@ -321,7 +321,7 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
             comments.map(comment => (
               <div key={comment.id} className="flex gap-3">
                 <div className="bg-brand/20 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full">
-                  <span className="text-brand text-[10px] font-medium">
+                  <span className="text-brand text-[0.625rem] font-medium">
                     {comment.author.charAt(0).toUpperCase()}
                   </span>
                 </div>
@@ -359,13 +359,13 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
               }
             }}
             placeholder="Write a reply..."
-            className="text-text-primary placeholder:text-text-disabled w-full resize-none bg-transparent px-3 py-2.5 text-[13px] leading-6 focus:outline-none"
+            className="text-text-primary placeholder:text-text-disabled w-full resize-none bg-transparent px-3 py-2.5 text-[0.8125rem] leading-6 focus:outline-none"
             rows={Math.max(1, Math.min(5, replyText.split('\n').length))}
             style={{ minHeight: '36px' }}
             disabled={isAddingComment || sending}
           />
           <div className="flex items-center justify-between px-2 pt-1 pb-2">
-            <span className="text-text-disabled px-1 text-[11px]">⌘ / Ctrl + Enter to reply</span>
+            <span className="text-text-disabled px-1 text-[0.6875rem]">⌘ / Ctrl + Enter to reply</span>
             <button
               onClick={handleAddComment}
               disabled={!replyText.trim() || isAddingComment || sending}

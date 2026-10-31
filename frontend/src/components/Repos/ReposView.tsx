@@ -192,17 +192,17 @@ const RepoCard: React.FC<RepoCardProps> = ({ repo, onReview, onRemove }) => (
     </div>
 
     <div>
-      <h3 className="text-text-primary mb-1 truncate text-[15px] font-medium">{repo.name}</h3>
+      <h3 className="text-text-primary mb-1 truncate text-[0.9375rem] font-medium">{repo.name}</h3>
       <p
         title={repo.path}
-        className="text-text-tertiary mb-4 line-clamp-2 font-mono text-[11px] leading-5 break-all select-text"
+        className="text-text-tertiary mb-4 line-clamp-2 font-mono text-[0.6875rem] leading-5 break-all select-text"
       >
         {repo.path}
       </p>
 
       <div className="border-border/50 mt-2 flex w-full items-center gap-3 border-t pt-3">
         {displayDate(repo.linked_at) && (
-          <time dateTime={repo.linked_at} className="text-text-disabled text-[11px]">
+          <time dateTime={repo.linked_at} className="text-text-disabled text-[0.6875rem]">
             Linked {displayDate(repo.linked_at)}
           </time>
         )}

@@ -19,6 +19,7 @@ import {
   Trash,
   Robot,
   Timer,
+  TextAa,
 } from '@phosphor-icons/react';
 import type {
   ViewType,
@@ -43,15 +44,16 @@ import { useTauri } from '../../hooks/useTauri';
 import { useDelayedLoading } from '../../hooks/useDelayedLoading';
 import { useFeedbackFilterConfig, useTimeoutConfig } from '../../hooks/useSettings';
 import { VcsSkeleton, CliSkeleton, EditorSkeleton, AgentsSkeleton } from './SettingsSkeleton';
+import { AppearanceSettings } from './AppearanceSettings';
 
 interface SettingsViewProps {
   onNavigate: (view: ViewType) => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = () => {
-  const [activeTab, setActiveTab] = useState<'vcs' | 'cli' | 'editor' | 'feedback' | 'agents'>(
-    'vcs'
-  );
+  const [activeTab, setActiveTab] = useState<
+    'vcs' | 'cli' | 'editor' | 'feedback' | 'agents' | 'appearance'
+  >('vcs');
 
   return (
     <div className="bg-bg-primary flex h-full flex-col">
@@ -61,6 +63,12 @@ export const SettingsView: React.FC<SettingsViewProps> = () => {
         {/* Sidebar */}
         <div className="settings-navigation">
           <nav aria-label="Settings sections">
+            <TabButton
+              icon={<TextAa size={14} />}
+              label="Appearance"
+              isActive={activeTab === 'appearance'}
+              onClick={() => setActiveTab('appearance')}
+            />
             <TabButton
               icon={<Gear size={14} />}
               label="Git providers"
@@ -101,6 +109,7 @@ export const SettingsView: React.FC<SettingsViewProps> = () => {
         {/* Content */}
         <div className="settings-content" key={activeTab}>
           <div className="settings-section space-y-8">
+            {activeTab === 'appearance' && <AppearanceSettings />}
             {activeTab === 'vcs' && <VcsSettings />}
             {activeTab === 'cli' && <CliSettings />}
             {activeTab === 'editor' && <EditorSettings />}
@@ -148,7 +157,7 @@ const SectionHeader: React.FC<{ title: string; description: string }> = ({
 }) => (
   <div className="settings-section-heading">
     <h2 className="text-text-primary mb-2 text-lg font-semibold tracking-[-0.015em]">{title}</h2>
-    <p className="text-text-tertiary text-[13px] leading-6">{description}</p>
+    <p className="text-text-tertiary text-[0.8125rem] leading-6">{description}</p>
   </div>
 );
 
@@ -262,7 +271,7 @@ const VcsSettings: React.FC = () => {
                 {item.cliPath && (
                   <dl className="border-border/50 mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t pt-4 text-xs">
                     <dt className="text-text-disabled">Executable</dt>
-                    <dd className="text-text-secondary min-w-0 font-mono text-[11px] break-all select-text">
+                    <dd className="text-text-secondary min-w-0 font-mono text-[0.6875rem] break-all select-text">
                       {item.cliPath}
                     </dd>
                   </dl>
@@ -378,7 +387,7 @@ const CliSettings: React.FC = () => {
               )}
             </div>
             {status.path && (
-              <p className="text-text-tertiary border-border/50 mt-4 border-t pt-4 font-mono text-[11px] break-all select-text">
+              <p className="text-text-tertiary border-border/50 mt-4 border-t pt-4 font-mono text-[0.6875rem] break-all select-text">
                 {status.path}
               </p>
             )}
@@ -537,7 +546,7 @@ const EditorSettings: React.FC = () => {
             </p>
           )}
           {selected && (
-            <p className="text-text-tertiary font-mono text-[11px] leading-5 break-all select-text">
+            <p className="text-text-tertiary font-mono text-[0.6875rem] leading-5 break-all select-text">
               {selected.path}
             </p>
           )}
@@ -638,7 +647,7 @@ const FeedbackFilterSettings: React.FC = () => {
               className={`rounded-md border p-3 text-left transition-colors ${draft === preset.value ? 'border-brand/70 bg-brand/5 text-text-primary' : 'border-border text-text-secondary hover:bg-bg-tertiary'}`}
             >
               <span className="block text-xs font-medium">{preset.label}</span>
-              <span className="text-text-tertiary mt-1 block text-[11px] leading-5">
+              <span className="text-text-tertiary mt-1 block text-[0.6875rem] leading-5">
                 {preset.description}
               </span>
             </button>
@@ -1193,12 +1202,12 @@ const AgentsSettings: React.FC = () => {
                     <h3 className="text-text-primary flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-medium">
                       {agent.name}
                       {agent.available ? (
-                        <span className="text-status-done flex items-center gap-1 text-[10px] font-medium">
+                        <span className="text-status-done flex items-center gap-1 text-[0.625rem] font-medium">
                           <CheckCircle size={12} weight="fill" />
                           Available
                         </span>
                       ) : (
-                        <span className="text-status-in_progress flex items-center gap-1 text-[10px] font-medium">
+                        <span className="text-status-in_progress flex items-center gap-1 text-[0.625rem] font-medium">
                           <Warning size={12} weight="fill" />
                           Not found
                         </span>
@@ -1315,7 +1324,7 @@ const AgentsSettings: React.FC = () => {
                         <span className="text-text-tertiary mb-1 block text-xs font-medium">
                           Command
                         </span>
-                        <code className="text-text-secondary block font-mono text-[11px] leading-5 break-all select-text">
+                        <code className="text-text-secondary block font-mono text-[0.6875rem] leading-5 break-all select-text">
                           {agent.path || '(Default)'}
                         </code>
                       </div>

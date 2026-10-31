@@ -99,7 +99,7 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
         <fieldset disabled={isProcessing} className="min-w-0 space-y-6">
           <fieldset className="space-y-3">
             <legend className="text-text-secondary mb-3 text-sm font-medium">Destination</legend>
-            <label className="text-text-secondary flex items-center gap-3 text-[13px]">
+            <label className="text-text-secondary flex items-center gap-3 text-[0.8125rem]">
               <input
                 type="radio"
                 name="export-format"
@@ -109,7 +109,7 @@ export const SelectionModal: React.FC<SelectionModalProps> = ({
               Copy Markdown to clipboard
             </label>
             {remoteProviderName && (
-              <label className="text-text-secondary flex items-center gap-3 text-[13px]">
+              <label className="text-text-secondary flex items-center gap-3 text-[0.8125rem]">
                 <input
                   type="radio"
                   name="export-format"
@@ -202,7 +202,7 @@ function ExportItems({
             {items.map(item => (
               <label
                 key={item.id}
-                className="text-text-secondary flex cursor-pointer items-start gap-3 py-3 text-[13px] leading-5"
+                className="text-text-secondary flex cursor-pointer items-start gap-3 py-3 text-[0.8125rem] leading-5"
               >
                 <input
                   type="checkbox"

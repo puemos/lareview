@@ -137,7 +137,7 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
         <div className="min-w-0 flex-1">
           {review?.source && <SourceBadge source={review.source} />}
           <h2
-            className="text-text-primary mt-2 text-[22px] leading-tight font-semibold tracking-[-0.025em] break-words"
+            className="text-text-primary mt-2 text-[1.375rem] leading-tight font-semibold tracking-[-0.025em] break-words"
             title={review?.title || parsedDiff?.title || 'Review Summary'}
           >
             {review?.title || parsedDiff?.title || 'Review Summary'}
@@ -185,8 +185,8 @@ export const ReviewSummary: React.FC<ReviewSummaryProps> = ({
           {/* Summary */}
           {review?.summary && (
             <div className="border-border/50 relative border-b pb-7">
-              <h3 className="text-text-primary mb-3 text-[13px] font-medium">Summary</h3>
-              <div className="prose prose-sm prose-invert text-text-secondary prose-p:my-2 max-w-[78ch] text-[14px] leading-6">
+              <h3 className="text-text-primary mb-3 text-[0.8125rem] font-medium">Summary</h3>
+              <div className="prose prose-sm prose-invert text-text-secondary prose-p:my-2 max-w-[78ch] text-[0.875rem] leading-6">
                 <ReactMarkdown>{review.summary}</ReactMarkdown>
               </div>
             </div>

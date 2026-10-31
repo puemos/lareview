@@ -42,19 +42,19 @@ export function LocalGitInput({
         </span>
         <span className="text-text-disabled">/</span>
         <span
-          className="local-source-refs text-text-secondary flex min-w-0 items-center gap-2 font-mono text-[11px]"
+          className="local-source-refs text-text-secondary flex min-w-0 items-center gap-2 font-mono text-[0.6875rem]"
           title={`${source.base_sha} → ${source.head_sha}`}
         >
           <span className="max-w-36 truncate">{source.base_ref}</span>
           <ArrowRight size={12} className="shrink-0" />
           <span className="max-w-36 truncate">{source.head_ref}</span>
         </span>
-        <span className="local-source-ready text-status-done ml-1 text-[10px]">Ready</span>
+        <span className="local-source-ready text-status-done ml-1 text-[0.625rem]">Ready</span>
         <button
           type="button"
           disabled={busy}
           onClick={() => setEditing(true)}
-          className="text-text-tertiary hover:text-text-primary rounded px-2 py-1 text-[11px] transition-colors"
+          className="text-text-tertiary hover:text-text-primary rounded px-2 py-1 text-[0.6875rem] transition-colors"
           aria-label="Edit comparison"
         >
           Change
@@ -100,7 +100,7 @@ export function LocalGitInput({
               onChange={e => setBase(e.target.value)}
               disabled={busy}
               placeholder="main"
-              className="text-text-primary w-full min-w-0 bg-transparent font-mono text-[13px] outline-none"
+              className="text-text-primary w-full min-w-0 bg-transparent font-mono text-[0.8125rem] outline-none"
             />
           </label>
           <ArrowRight size={15} className="text-text-disabled self-center" />
@@ -114,12 +114,12 @@ export function LocalGitInput({
               onChange={e => setHead(e.target.value)}
               disabled={busy}
               placeholder="HEAD or feature/branch"
-              className="text-text-primary w-full min-w-0 bg-transparent font-mono text-[13px] outline-none"
+              className="text-text-primary w-full min-w-0 bg-transparent font-mono text-[0.8125rem] outline-none"
             />
           </label>
         </div>
         <div className="flex items-center justify-between gap-4">
-          <p id={helperId} className="text-text-disabled text-[11px]">
+          <p id={helperId} className="text-text-disabled text-[0.6875rem]">
             Branches, tags, or commit hashes.
           </p>
           <div className="flex items-center gap-2">
@@ -154,7 +154,7 @@ export function LocalGitInput({
         </div>
       </form>
       {source?.type === 'local_git' && (
-        <p className="text-text-secondary font-mono text-[11px]">
+        <p className="text-text-secondary font-mono text-[0.6875rem]">
           Loaded {source.base_ref} ({source.base_sha.slice(0, 7)}) → {source.head_ref} (
           {source.head_sha.slice(0, 7)})
         </p>

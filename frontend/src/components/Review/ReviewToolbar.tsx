@@ -69,7 +69,7 @@ export const ReviewToolbar: React.FC<ReviewToolbarProps> = ({
         <div className="bg-bg-tertiary/50 border-border/50 flex items-center rounded border">
           <button
             onClick={() => onTabChange('description')}
-            className={`flex items-center gap-1.5 rounded-[3px] px-3 py-1.5 text-[11px] font-medium transition-all ${
+            className={`flex items-center gap-1.5 rounded-[3px] px-3 py-1.5 text-[0.6875rem] font-medium transition-all ${
               activeTab === 'description'
                 ? 'bg-bg-primary text-text-primary shadow-sm'
                 : 'text-text-disabled hover:text-text-secondary'
@@ -81,7 +81,7 @@ export const ReviewToolbar: React.FC<ReviewToolbarProps> = ({
           <div className="bg-border/50 mx-0.5 h-3 w-px" />
           <button
             onClick={() => onTabChange('diff')}
-            className={`flex items-center gap-1.5 rounded-[3px] px-3 py-1.5 text-[11px] font-medium transition-all ${
+            className={`flex items-center gap-1.5 rounded-[3px] px-3 py-1.5 text-[0.6875rem] font-medium transition-all ${
               activeTab === 'diff'
                 ? 'bg-bg-primary text-text-primary shadow-sm'
                 : 'text-text-disabled hover:text-text-secondary'
@@ -96,7 +96,7 @@ export const ReviewToolbar: React.FC<ReviewToolbarProps> = ({
               <div className="bg-border/50 mx-0.5 h-3 w-px" />
               <button
                 onClick={() => onTabChange('diagram')}
-                className={`flex items-center gap-1.5 rounded-[3px] px-3 py-1.5 text-[11px] font-medium transition-all ${
+                className={`flex items-center gap-1.5 rounded-[3px] px-3 py-1.5 text-[0.6875rem] font-medium transition-all ${
                   activeTab === 'diagram'
                     ? 'bg-bg-primary text-text-primary shadow-sm'
                     : 'text-text-disabled hover:text-text-secondary'
