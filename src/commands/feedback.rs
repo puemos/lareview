@@ -248,10 +248,29 @@ pub fn get_feedback_diff_snippet(
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Review run not found".to_string())?;
 
-    let diff_index = crate::infra::diff::index::DiffIndex::new(&review_run.diff_text)
-        .map_err(|e| e.to_string())?;
+    build_feedback_diff_snippet(
+        &review_run.diff_text,
+        &file_path,
+        line_number,
+        side,
+        context_lines,
+    )
+}
 
-    let file_index = match diff_index.files.get(&file_path) {
+fn build_feedback_diff_snippet(
+    diff_text: &str,
+    file_path: &str,
+    line_number: u32,
+    side: FeedbackSide,
+    context_lines: u32,
+) -> Result<Option<FeedbackDiffSnippet>, String> {
+    if line_number == 0 {
+        return Ok(None);
+    }
+    let diff_index =
+        crate::infra::diff::index::DiffIndex::new(diff_text).map_err(|e| e.to_string())?;
+
+    let file_index = match diff_index.files.get(file_path) {
         Some(f) => f,
         None => return Ok(None),
     };
@@ -290,77 +309,110 @@ pub fn get_feedback_diff_snippet(
         coords.0, hunk.source_length, coords.1, hunk.target_length
     );
 
-    let mut snippet_lines: Vec<DiffSnippetLine> = Vec::new();
-
-    let start_in_hunk = match side {
-        crate::domain::FeedbackSide::Old => {
-            if line_number >= coords.0 {
-                Some((line_number - coords.0) as usize)
-            } else {
-                Some(0)
-            }
-        }
-        crate::domain::FeedbackSide::New => {
-            if line_number >= coords.1 {
-                Some((line_number - coords.1) as usize)
-            } else {
-                Some(0)
-            }
-        }
-    };
-
-    let context_start = start_in_hunk
-        .map(|s| s.saturating_sub(context_lines as usize))
-        .unwrap_or(0);
-
-    let context_end = start_in_hunk
-        .map(|s| std::cmp::min(s + context_lines as usize + 1, hunk.target_length))
-        .unwrap_or(hunk.target_length);
-
-    let coords_clone = coords;
-    let mut current_line_in_hunk = 0;
+    let mut lines: Vec<DiffSnippetLine> = Vec::new();
+    let mut target_index = None;
     crate::infra::diff::index::DiffIndex::walk_hunk_lines(
         hunk,
-        coords_clone,
+        coords,
         |_pos, line, old_num, new_num| {
-            if current_line_in_hunk >= context_start && current_line_in_hunk < context_end {
-                let is_add = line.line_type.as_str() == unidiff::LINE_TYPE_ADDED;
-                let is_del = line.line_type.as_str() == unidiff::LINE_TYPE_REMOVED;
-                let prefix = if is_add {
-                    "+"
-                } else if is_del {
-                    "-"
-                } else {
-                    " "
-                };
-                let display_line_number = match side {
-                    crate::domain::FeedbackSide::Old => old_num,
-                    crate::domain::FeedbackSide::New => new_num,
-                };
+            let is_add = line.line_type.as_str() == unidiff::LINE_TYPE_ADDED;
+            let is_del = line.line_type.as_str() == unidiff::LINE_TYPE_REMOVED;
+            let prefix = if is_add {
+                "+"
+            } else if is_del {
+                "-"
+            } else {
+                " "
+            };
+            let display_line_number = match side {
+                crate::domain::FeedbackSide::Old => old_num,
+                crate::domain::FeedbackSide::New => new_num,
+            };
 
-                snippet_lines.push(DiffSnippetLine {
-                    line_number: display_line_number.unwrap_or(0),
-                    content: line.value.trim_end().to_string(),
-                    prefix: prefix.to_string(),
-                    is_addition: is_add,
-                    is_deletion: is_del,
-                });
+            if display_line_number == Some(line_number) {
+                target_index = Some(lines.len());
             }
-            current_line_in_hunk += 1;
+            lines.push(DiffSnippetLine {
+                line_number: display_line_number.unwrap_or(0),
+                content: line.value.trim_end().to_string(),
+                prefix: prefix.to_string(),
+                is_addition: is_add,
+                is_deletion: is_del,
+            });
         },
     );
 
-    let highlighted_line = match side {
-        crate::domain::FeedbackSide::Old => anchor.line_number,
-        crate::domain::FeedbackSide::New => anchor.line_number,
+    let Some(target_index) = target_index else {
+        return Ok(None);
     };
+    let context = context_lines.min(20) as usize;
+    let start = target_index.saturating_sub(context);
+    let end = (target_index + context + 1).min(lines.len());
+    let snippet_lines = lines.into_iter().skip(start).take(end - start).collect();
 
     Ok(Some(FeedbackDiffSnippet {
-        file_path,
+        file_path: file_path.to_string(),
         hunk_header,
         lines: snippet_lines,
-        highlighted_line,
+        highlighted_line: Some(line_number),
     }))
+}
+
+#[cfg(test)]
+mod snippet_tests {
+    use super::*;
+
+    const DIFF: &str = "diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts\n@@ -10,4 +10,5 @@\n first\n-old one\n-old two\n+new one\n+new two\n+new three\n last\n";
+
+    #[test]
+    fn centers_on_source_line_after_replacements() {
+        let snippet = build_feedback_diff_snippet(DIFF, "a.ts", 14, FeedbackSide::New, 1)
+            .unwrap()
+            .unwrap();
+        assert_eq!(snippet.lines.len(), 2);
+        assert_eq!(snippet.lines[0].content, "new three");
+        assert_eq!(snippet.lines[1].line_number, 14);
+        assert_eq!(snippet.lines[1].content, "last");
+    }
+
+    #[test]
+    fn shows_deleted_evidence_on_its_original_side() {
+        let snippet = build_feedback_diff_snippet(DIFF, "a.ts", 12, FeedbackSide::Old, 0)
+            .unwrap()
+            .unwrap();
+        assert_eq!(snippet.lines.len(), 1);
+        assert_eq!(snippet.lines[0].content, "old two");
+        assert!(snippet.lines[0].is_deletion);
+        assert_eq!(snippet.highlighted_line, Some(12));
+    }
+
+    #[test]
+    fn omits_unavailable_locations() {
+        for (path, line) in [("missing.ts", 14), ("a.ts", 99), ("a.ts", 0)] {
+            assert!(
+                build_feedback_diff_snippet(DIFF, path, line, FeedbackSide::New, 3)
+                    .unwrap()
+                    .is_none()
+            );
+        }
+    }
+
+    #[test]
+    fn shows_snippets_for_added_and_deleted_files() {
+        let added = "diff --git a/new.ts b/new.ts\n--- /dev/null\n+++ b/new.ts\n@@ -0,0 +1,2 @@\n+first\n+second\n";
+        let deleted = "diff --git a/old.ts b/old.ts\n--- a/old.ts\n+++ /dev/null\n@@ -1,2 +0,0 @@\n-first\n-second\n";
+        for (diff, path, side) in [
+            (added, "new.ts", FeedbackSide::New),
+            (deleted, "old.ts", FeedbackSide::Old),
+        ] {
+            let snippet = build_feedback_diff_snippet(diff, path, 2, side, 3)
+                .unwrap()
+                .unwrap();
+            assert_eq!(snippet.lines.len(), 2);
+            assert_eq!(snippet.lines[1].content, "second");
+            assert_eq!(snippet.lines[1].line_number, 2);
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

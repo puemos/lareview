@@ -116,10 +116,19 @@ pub fn save_issue_check(config: &ServerConfig, args: Value) -> Result<String> {
 
 /// Create a Comment with the finding's description and evidence
 fn create_comment_from_finding(finding: &IssueFinding, feedback_id: &str, now: &str) -> Comment {
-    let body = format!(
-        "{}\n\n**Evidence:** {}",
-        finding.description, finding.evidence
-    );
+    let evidence = finding.evidence.trim();
+    let evidence = if evidence.starts_with("```") || evidence.starts_with("~~~") {
+        evidence.to_string()
+    } else {
+        let longest_ticks = evidence
+            .split(|c| c != '`')
+            .map(str::len)
+            .max()
+            .unwrap_or(0);
+        let fence = "`".repeat((longest_ticks + 1).max(3));
+        format!("{fence}\n{evidence}\n{fence}")
+    };
+    let body = format!("{}\n\n**Evidence:**\n\n{}", finding.description, evidence);
 
     Comment {
         id: format!("comment-{}", uuid::Uuid::new_v4()),
@@ -404,6 +413,25 @@ pub fn save_merge_confidence(config: &ServerConfig, args: Value) -> Result<Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn evidence_is_rendered_as_code_without_losing_backticks() {
+        let value = serde_json::json!({
+            "title": "Test", "description": "Description",
+            "evidence": "const message = `Hello, ${name}`;", "impact": "blocking"
+        });
+        let mut finding = parse_finding(&value, "check", 0, "now").unwrap();
+        let comment = create_comment_from_finding(&finding, "feedback", "now");
+        assert_eq!(
+            comment.body,
+            "Description\n\n**Evidence:**\n\n```\nconst message = `Hello, ${name}`;\n```"
+        );
+
+        finding.evidence = "```ts\nconst x = 1;\n```".to_string();
+        let comment = create_comment_from_finding(&finding, "feedback", "now");
+        assert!(comment.body.ends_with(&finding.evidence));
+        assert_eq!(comment.body.matches("```").count(), 2);
+    }
 
     #[test]
     fn test_normalize_rule_id() {

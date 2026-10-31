@@ -8,6 +8,7 @@ import { InlineError } from '../Common/InlineError';
 import { countDiffChanges } from '../../lib/diff-stats';
 import { GutterMenu } from './GutterMenu';
 import { useAppearanceStore } from '../../store/appearance';
+import type { CodeLocation } from '../../lib/code-references';
 
 interface DiffViewerProps {
   files: DiffFile[];
@@ -23,6 +24,8 @@ interface DiffViewerProps {
   viewMode?: 'unified' | 'split';
   onAddFeedback?: (file: DiffFile, line: number, side: 'old' | 'new') => void;
   repoRoot?: string | null;
+  focusLocation?: Pick<CodeLocation, 'line' | 'side'>;
+  showFileList?: boolean;
 }
 
 export const DiffViewer: React.FC<DiffViewerProps> = ({
@@ -33,10 +36,14 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
   viewMode = 'unified',
   onAddFeedback,
   repoRoot,
+  focusLocation,
+  showFileList = true,
 }) => {
   return (
     <div className="review-diff-layout bg-bg-primary flex min-h-0 min-w-0 flex-1">
-      <FileList files={files} selectedFile={selectedFile} onSelectFile={onSelectFile} />
+      {showFileList && (
+        <FileList files={files} selectedFile={selectedFile} onSelectFile={onSelectFile} />
+      )}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {selectedFile ? (
           <DiffContent
@@ -48,6 +55,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
             viewMode={viewMode}
             onAddFeedback={onAddFeedback}
             repoRoot={repoRoot}
+            focusLocation={focusLocation}
           />
         ) : (
           <div className="text-text-disabled flex flex-1 items-center justify-center">
@@ -148,6 +156,7 @@ interface DiffContentProps {
   viewMode: 'unified' | 'split';
   onAddFeedback?: (file: DiffFile, line: number, side: 'old' | 'new') => void;
   repoRoot?: string | null;
+  focusLocation?: Pick<CodeLocation, 'line' | 'side'>;
 }
 
 const DiffContent: React.FC<DiffContentProps> = ({
@@ -156,11 +165,14 @@ const DiffContent: React.FC<DiffContentProps> = ({
   viewMode,
   onAddFeedback,
   repoRoot,
+  focusLocation,
 }) => {
   const { openInEditor } = useTauri();
   const codeFontSize = useAppearanceStore(state => state.codeFontSize);
   const [editorError, setEditorError] = useState<string | null>(null);
-  const [displayMode, setDisplayMode] = useState<'unified' | 'split'>(viewMode);
+  const [displayMode, setDisplayMode] = useState<'unified' | 'split'>(
+    focusLocation?.side === 'old' ? 'split' : viewMode
+  );
   const path = file.name || file.new_path || 'unknown';
   const language = getLanguageFromPath(path);
   // Ref to store diff editor instance
@@ -173,7 +185,8 @@ const DiffContent: React.FC<DiffContentProps> = ({
   const handleOpenInEditor = async () => {
     setEditorError(null);
     try {
-      const lineNumber = highlightedHunks.length > 0 ? highlightedHunks[0].newStart : 1;
+      const lineNumber =
+        focusLocation?.line ?? (highlightedHunks.length > 0 ? highlightedHunks[0].newStart : 1);
       await openInEditor(path, lineNumber, repoRoot || undefined);
     } catch (error) {
       setEditorError(String(error));
@@ -307,6 +320,24 @@ const DiffContent: React.FC<DiffContentProps> = ({
       },
     });
 
+    if (focusLocation) {
+      const lineMap = focusLocation.side === 'old' ? originalLineMap : modifiedLineMap;
+      const index = lineMap.indexOf(focusLocation.line);
+      if (index >= 0) {
+        const targetEditor = focusLocation.side === 'old' ? originalEditor : modifiedEditor;
+        const line = index + 1;
+        targetEditor.createDecorationsCollection([
+          {
+            range: new monaco.Range(line, 1, line, 1),
+            options: { isWholeLine: true, className: 'evidence-code-highlight' },
+          },
+        ]);
+        targetEditor.setPosition({ lineNumber: line, column: 1 });
+        targetEditor.revealLineInCenter(line);
+        targetEditor.focus();
+      }
+    }
+
     [originalEditor, modifiedEditor].forEach(ed => {
       // Decoration tracking per editor to prevent stuck icons
       let hoverDecorations: string[] = [];
@@ -375,6 +406,14 @@ const DiffContent: React.FC<DiffContentProps> = ({
 
   return (
     <div className="bg-bg-primary flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      {focusLocation &&
+        !(focusLocation.side === 'old' ? originalLineMap : modifiedLineMap).includes(
+          focusLocation.line
+        ) && (
+          <p role="status" className="border-border text-text-tertiary border-b px-4 py-2 text-xs">
+            Line {focusLocation.line} is outside this diff excerpt.
+          </p>
+        )}
       <div className="border-border flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
         <div className="flex items-center gap-3">
           <span className="text-text-primary font-mono text-xs break-all">{path}</span>
@@ -422,6 +461,9 @@ const DiffContent: React.FC<DiffContentProps> = ({
           originalLanguage={language}
           modifiedLanguage={language}
           options={{
+            ...(focusLocation
+              ? { selectionHighlight: false, occurrencesHighlight: 'off' as const }
+              : {}),
             readOnly: true,
             minimap: {
               enabled: false,
@@ -453,7 +495,7 @@ const DiffContent: React.FC<DiffContentProps> = ({
               showMoves: true,
             },
             hideUnchangedRegions: {
-              enabled: true,
+              enabled: !focusLocation,
               contextLineCount: 3,
 
               minimumLineCount: 15, // Slightly lowered for better hiding
