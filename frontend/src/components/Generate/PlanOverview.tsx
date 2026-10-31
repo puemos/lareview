@@ -20,7 +20,7 @@ export const PlanOverview: React.FC<PlanOverviewProps> = ({
           <ListChecks size={14} />
           Plan
         </h2>
-        <span className="bg-bg-tertiary text-text-secondary rounded px-1.5 text-[11px]">
+        <span className="bg-bg-tertiary text-text-secondary rounded px-1.5 text-[0.6875rem]">
           {items.filter(item => item.status === 'completed' || item.status === 'done').length} of{' '}
           {items.length} done
         </span>

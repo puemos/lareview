@@ -2,6 +2,8 @@ allowBuilds:
   esbuild: true
 
 overrides:
+  # Keep glob preprocessing patched; legacy callers use the named export below.
+  minimatch@<11.0.1: ^11.0.1
   # Monaco pins an older DOMPurify; keep its sanitizer patched.
   dompurify@<3.4.17: ^3.4.17
   # Mermaid 11 needs the prototype-pollution fix in KaTeX 0.18.2.
@@ -12,3 +14,6 @@ overrides:
 peerDependencyRules:
   allowedVersions:
     eslint: "10"
+
+patchedDependencies:
+  eslint-plugin-react@7.37.5: patches/eslint-plugin-react@7.37.5.patch

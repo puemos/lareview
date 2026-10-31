@@ -90,13 +90,13 @@ export function UsagePopover({
                   AI usage
                 </h3>
                 {isActive && (
-                  <span className="text-status-done flex items-center gap-1 text-[10px]">
+                  <span className="text-status-done flex items-center gap-1 text-[0.625rem]">
                     <span className="h-1 w-1 rounded-full bg-current" />
                     Live
                   </span>
                 )}
               </div>
-              <p className="text-text-tertiary mt-1 text-[11px] leading-relaxed [overflow-wrap:anywhere]">
+              <p className="text-text-tertiary mt-1 text-[0.6875rem] leading-relaxed [overflow-wrap:anywhere]">
                 {usage.model || agentName}
                 {usage.model && <span className="text-text-disabled"> · {agentName}</span>}
               </p>
@@ -150,7 +150,7 @@ export function UsagePopover({
               <div className="px-4 pt-1 pb-4">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-text-tertiary text-xs">Estimated cost</span>
-                  <span className="text-text-tertiary text-[11px]">
+                  <span className="text-text-tertiary text-[0.6875rem]">
                     {isActive ? 'This generation so far' : 'This generation'}
                   </span>
                 </div>
@@ -159,7 +159,7 @@ export function UsagePopover({
                 >
                   {cost}
                   {usage.cost && (
-                    <span className="text-text-tertiary text-[10px] font-normal tracking-normal">
+                    <span className="text-text-tertiary text-[0.625rem] font-normal tracking-normal">
                       {usage.cost.currency}
                     </span>
                   )}
@@ -186,7 +186,7 @@ export function UsagePopover({
 
               {contextPercent !== null && (
                 <div className="border-border/50 border-t px-4 py-3.5">
-                  <div className="text-text-tertiary mb-2 flex items-center justify-between gap-3 text-[11px]">
+                  <div className="text-text-tertiary mb-2 flex items-center justify-between gap-3 text-[0.6875rem]">
                     <span>Context window</span>
                     <span className="tabular-nums">
                       {formatTokens(usage.context_used)} / {formatTokens(usage.context_size)}
@@ -210,7 +210,7 @@ export function UsagePopover({
                 </div>
               )}
 
-              <div className="border-border/50 bg-bg-secondary/30 text-text-tertiary border-t px-4 py-3 text-[11px] leading-relaxed">
+              <div className="border-border/50 bg-bg-secondary/30 text-text-tertiary border-t px-4 py-3 text-[0.6875rem] leading-relaxed">
                 {usage.cost
                   ? 'Agent-reported estimate. Billing may differ by plan. A dash means not reported.'
                   : 'Cost was not reported. Token counts do not determine subscription charges. A dash means not reported.'}

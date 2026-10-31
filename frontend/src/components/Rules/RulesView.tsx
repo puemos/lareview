@@ -404,7 +404,7 @@ const RuleForm: React.FC<RuleFormProps> = ({
       <fieldset disabled={isLoading} className="min-w-0 space-y-4">
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1">
-            <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
+            <span className="text-text-disabled text-[0.625rem] font-bold tracking-wider uppercase">
               Scope
             </span>
             <select
@@ -418,7 +418,7 @@ const RuleForm: React.FC<RuleFormProps> = ({
           </label>
 
           <label className="space-y-1">
-            <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
+            <span className="text-text-disabled text-[0.625rem] font-bold tracking-wider uppercase">
               Repository
             </span>
             <select
@@ -445,7 +445,7 @@ const RuleForm: React.FC<RuleFormProps> = ({
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1">
-            <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
+            <span className="text-text-disabled text-[0.625rem] font-bold tracking-wider uppercase">
               Category (optional)
             </span>
             <input
@@ -458,7 +458,7 @@ const RuleForm: React.FC<RuleFormProps> = ({
           </label>
 
           <label className="space-y-1">
-            <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
+            <span className="text-text-disabled text-[0.625rem] font-bold tracking-wider uppercase">
               File pattern (optional)
             </span>
             <input
@@ -472,7 +472,7 @@ const RuleForm: React.FC<RuleFormProps> = ({
         </div>
 
         <label className="space-y-1">
-          <span className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
+          <span className="text-text-disabled text-[0.625rem] font-bold tracking-wider uppercase">
             Rule text
           </span>
           <textarea
@@ -564,7 +564,7 @@ const RuleSection: React.FC<RuleSectionProps> = ({
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-text-primary text-[13px] font-medium">{title}</h3>
+        <h3 className="text-text-primary text-[0.8125rem] font-medium">{title}</h3>
         <span className="text-text-disabled text-xs">
           {isLoading
             ? 'Loading…'
@@ -631,14 +631,14 @@ const RuleSection: React.FC<RuleSectionProps> = ({
                     </div>
 
                     {/* Middle: Tags */}
-                    <div className="text-text-tertiary flex flex-wrap items-center gap-2 text-[11px]">
+                    <div className="text-text-tertiary flex flex-wrap items-center gap-2 text-[0.6875rem]">
                       {rule.scope === 'repo' && (
                         <span className="bg-bg-tertiary border-border/50 rounded-md border px-2 py-0.5">
                           {repoName(rule.repo_id)}
                         </span>
                       )}
                       {rule.category && (
-                        <span className="text-text-tertiary border-border/50 rounded-md border px-2 py-0.5 text-[11px]">
+                        <span className="text-text-tertiary border-border/50 rounded-md border px-2 py-0.5 text-[0.6875rem]">
                           {rule.category}
                         </span>
                       )}
@@ -652,7 +652,7 @@ const RuleSection: React.FC<RuleSectionProps> = ({
 
                   {/* Bottom: Footer with Meta and Actions */}
                   <div className="border-border/50 flex items-center justify-between border-t px-4 py-3">
-                    <div className="text-text-tertiary flex items-center gap-4 text-[10px]">
+                    <div className="text-text-tertiary flex items-center gap-4 text-[0.625rem]">
                       {displayDate(rule.updated_at) && (
                         <time dateTime={rule.updated_at}>
                           Updated {displayDate(rule.updated_at)}
@@ -719,7 +719,7 @@ const RuleEffectivenessIndicator: React.FC<RuleEffectivenessIndicatorProps> = ({
         {acceptancePercent}% accepted
       </span>
       {isNoisy && (
-        <span className="bg-status-ignored/10 text-status-ignored border-status-ignored/20 rounded-[2px] border px-1.5 py-0.5 text-[9px] font-bold tracking-tighter uppercase">
+        <span className="bg-status-ignored/10 text-status-ignored border-status-ignored/20 rounded-[2px] border px-1.5 py-0.5 text-[0.5625rem] font-bold tracking-tighter uppercase">
           Noisy
         </span>
       )}

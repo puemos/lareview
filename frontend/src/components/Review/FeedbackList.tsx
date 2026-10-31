@@ -23,7 +23,7 @@ const FeedbackSkeleton: React.FC = () => (
         <div className="bg-bg-tertiary h-2 w-1/2 animate-pulse rounded" />
         <div className="flex items-center gap-2">
           <div className="bg-bg-tertiary h-2 w-12 animate-pulse rounded" />
-          <span className="text-text-disabled text-[10px]">·</span>
+          <span className="text-text-disabled text-[0.625rem]">·</span>
           <div className="bg-bg-tertiary h-2 w-16 animate-pulse rounded" />
         </div>
       </div>
@@ -74,7 +74,7 @@ export const FeedbackList: React.FC<FeedbackListProps> = ({
           <p className="text-text-disabled text-xs">
             {hiddenCount > 0 ? 'No feedback matches your filter' : 'No feedback yet'}
           </p>
-          <p className="text-text-tertiary mt-1 text-[10px]">
+          <p className="text-text-tertiary mt-1 text-[0.625rem]">
             {hiddenCount > 0
               ? `${hiddenCount} low-confidence item${hiddenCount > 1 ? 's' : ''} hidden`
               : 'Add inline feedback from the diff view'}
@@ -115,7 +115,7 @@ export const FeedbackList: React.FC<FeedbackListProps> = ({
                 <impact.icon size={14} className={impact.color} />
               </div>
               <h3
-                className={`flex-1 text-[13px] leading-relaxed font-medium ${
+                className={`flex-1 text-[0.8125rem] leading-relaxed font-medium ${
                   isActive
                     ? 'text-text-primary'
                     : 'text-text-secondary group-hover:text-text-primary'
@@ -124,7 +124,7 @@ export const FeedbackList: React.FC<FeedbackListProps> = ({
                 {feedback.title || 'Untitled Feedback'}
               </h3>
             </div>
-            <div className="text-text-tertiary mt-2 ml-6 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+            <div className="text-text-tertiary mt-2 ml-6 flex flex-wrap gap-x-3 gap-y-1 text-[0.6875rem]">
               <span>
                 {feedback.impact === 'blocking'
                   ? 'Blocking'
@@ -143,7 +143,7 @@ export const FeedbackList: React.FC<FeedbackListProps> = ({
         );
       })}
       {hiddenCount > 0 && (
-        <div className="text-text-tertiary px-4 py-2 text-center text-[10px]">
+        <div className="text-text-tertiary px-4 py-2 text-center text-[0.625rem]">
           {hiddenCount} low-confidence item{hiddenCount > 1 ? 's' : ''} hidden
         </div>
       )}

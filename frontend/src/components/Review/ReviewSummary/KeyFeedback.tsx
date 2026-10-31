@@ -21,12 +21,12 @@ const FeedbackItem: React.FC<FeedbackItemProps> = ({ feedback, onClick }) => {
       className="hover:bg-bg-tertiary/30 border-border/30 flex w-full items-center gap-2 border-b px-3 py-2 text-left transition-colors last:border-b-0"
     >
       <ICONS.ICON_FEEDBACK size={14} className="text-text-secondary flex-shrink-0" />
-      <span className="text-text-primary min-w-0 flex-1 text-[13px] leading-5">
+      <span className="text-text-primary min-w-0 flex-1 text-[0.8125rem] leading-5">
         {feedback.title}
       </span>
       <span className="flex shrink-0 flex-col items-end gap-1">
         <ImpactBadge impact={feedback.impact} size="sm" />
-        <span className="text-text-tertiary text-[11px]">
+        <span className="text-text-tertiary text-[0.6875rem]">
           {feedback.status === 'todo' ? 'To do' : feedback.status.replace('_', ' ')}
         </span>
       </span>
@@ -43,14 +43,14 @@ export const KeyFeedback: React.FC<KeyFeedbackProps> = ({ feedbacks, onSelectFee
         <div className="review-section-heading">
           <div className="flex items-center gap-2">
             <ICONS.ICON_FEEDBACK size={14} className="text-text-tertiary" />
-            <h3 className="text-text-primary text-[13px] font-medium">Feedback</h3>
+            <h3 className="text-text-primary text-[0.8125rem] font-medium">Feedback</h3>
           </div>
         </div>
         <div className="flex items-start gap-3 px-4 py-4">
           <ICONS.ICON_FEEDBACK size={16} className="text-text-disabled mt-0.5 shrink-0" />
           <div>
             <p className="text-text-secondary text-xs">No feedback items yet</p>
-            <p className="text-text-disabled mt-1 text-[11px] leading-5">
+            <p className="text-text-disabled mt-1 text-[0.6875rem] leading-5">
               Feedback you add during review appears here.
             </p>
           </div>
@@ -64,7 +64,7 @@ export const KeyFeedback: React.FC<KeyFeedbackProps> = ({ feedbacks, onSelectFee
       <div className="review-section-heading">
         <div className="flex items-center gap-2">
           <ICONS.ICON_FEEDBACK size={14} className="text-text-tertiary" />
-          <h3 className="text-text-primary text-[13px] font-medium">Feedback</h3>
+          <h3 className="text-text-primary text-[0.8125rem] font-medium">Feedback</h3>
         </div>
         <span className="text-text-disabled text-xs">
           {feedbacks.length} {feedbacks.length === 1 ? 'item' : 'items'}

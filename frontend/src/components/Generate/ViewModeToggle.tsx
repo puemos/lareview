@@ -20,7 +20,7 @@ export const ViewModeToggle: React.FC<ViewModeToggleProps> = ({ mode, onChange, 
         onClick={() => onChange(value)}
         disabled={value === 'diff' && disabled}
         aria-pressed={mode === value}
-        className={`focus-visible:outline-brand inline-flex h-6 items-center gap-1.5 rounded px-2.5 text-[11px] font-medium transition-colors focus-visible:outline-2 ${mode === value ? 'text-text-primary bg-white/[0.07]' : 'text-text-disabled hover:text-text-secondary'}`}
+        className={`focus-visible:outline-brand inline-flex h-6 items-center gap-1.5 rounded px-2.5 text-[0.6875rem] font-medium transition-colors focus-visible:outline-2 ${mode === value ? 'text-text-primary bg-white/[0.07]' : 'text-text-disabled hover:text-text-secondary'}`}
       >
         {value === 'raw' ? <Code size={13} /> : <Eye size={13} />}
         {value === 'raw' ? 'Raw' : 'Preview'}

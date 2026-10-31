@@ -109,7 +109,7 @@ export const MergeConfidenceBadge: React.FC<MergeConfidenceBadgeProps> = ({ runI
               {/* Reasons */}
               {hasReasons && (
                 <div className="border-border/30 mt-3 border-t pt-3">
-                  <p className="text-text-disabled mb-2 text-[10px] font-medium tracking-wide uppercase">
+                  <p className="text-text-disabled mb-2 text-[0.625rem] font-medium tracking-wide uppercase">
                     Assessment
                   </p>
                   <ul className="max-h-40 space-y-1.5 overflow-y-auto">

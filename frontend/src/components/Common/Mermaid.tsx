@@ -126,7 +126,7 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className }) => {
         </button>
 
         {showRaw && (
-          <pre className="bg-bg-surface text-text-secondary border-border mt-2 w-full max-w-lg overflow-auto rounded border p-4 text-left font-mono text-[10px]">
+          <pre className="bg-bg-surface text-text-secondary border-border mt-2 w-full max-w-lg overflow-auto rounded border p-4 text-left font-mono text-[0.625rem]">
             {chart}
           </pre>
         )}

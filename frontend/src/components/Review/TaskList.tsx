@@ -75,7 +75,7 @@ export const TaskList: React.FC<TaskListProps> = ({
                 </span>
               </div>
               <h3
-                className={`flex-1 text-[13px] leading-relaxed font-medium ${
+                className={`flex-1 text-[0.8125rem] leading-relaxed font-medium ${
                   selectedTaskId === task.id
                     ? 'text-text-primary'
                     : 'text-text-secondary group-hover:text-text-primary'
@@ -83,7 +83,7 @@ export const TaskList: React.FC<TaskListProps> = ({
               >
                 {task.title}
               </h3>
-              <span className="text-text-tertiary shrink-0 pt-0.5 text-[11px]">
+              <span className="text-text-tertiary shrink-0 pt-0.5 text-[0.6875rem]">
                 {task.status === 'done'
                   ? 'Done'
                   : task.status === 'in_progress'

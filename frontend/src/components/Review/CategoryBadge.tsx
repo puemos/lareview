@@ -12,7 +12,7 @@ export const CategoryBadge: React.FC<CategoryBadgeProps> = ({ category, category
   return (
     <TooltipPrimitive.Root delayDuration={0}>
       <TooltipPrimitive.Trigger asChild>
-        <span className="bg-brand/20 text-brand hover:bg-brand/30 cursor-help rounded-[2px] px-2 py-0.5 text-[9px] font-semibold tracking-wide uppercase transition-colors">
+        <span className="bg-brand/20 text-brand hover:bg-brand/30 cursor-help rounded-[2px] px-2 py-0.5 text-[0.5625rem] font-semibold tracking-wide uppercase transition-colors">
           {category?.name || categoryId}
         </span>
       </TooltipPrimitive.Trigger>
@@ -26,10 +26,10 @@ export const CategoryBadge: React.FC<CategoryBadgeProps> = ({ category, category
             className="bg-bg-elevated border-border z-50 max-w-xs overflow-hidden rounded-[2px] border p-3 shadow-xl backdrop-blur-sm"
           >
             <div className="border-border/50 mb-2 flex items-center justify-between border-b pb-1.5 focus:outline-none">
-              <span className="text-text-tertiary text-[10px] font-bold tracking-tight uppercase">
+              <span className="text-text-tertiary text-[0.625rem] font-bold tracking-tight uppercase">
                 Issue Category
               </span>
-              <span className="bg-brand/20 text-brand rounded-[2px] px-1.5 py-0.5 text-[9px] font-medium">
+              <span className="bg-brand/20 text-brand rounded-[2px] px-1.5 py-0.5 text-[0.5625rem] font-medium">
                 {category?.name || categoryId}
               </span>
             </div>
@@ -38,10 +38,10 @@ export const CategoryBadge: React.FC<CategoryBadgeProps> = ({ category, category
             </div>
             {category?.examples && category.examples.length > 0 && (
               <div className="border-border/30 border-t pt-1.5">
-                <span className="text-text-disabled mb-1 block text-[9px] font-medium uppercase">
+                <span className="text-text-disabled mb-1 block text-[0.5625rem] font-medium uppercase">
                   Examples:
                 </span>
-                <ul className="text-text-secondary space-y-0.5 text-[10px]">
+                <ul className="text-text-secondary space-y-0.5 text-[0.625rem]">
                   {category.examples.slice(0, 3).map((example, idx) => (
                     <li key={idx} className="flex items-start gap-1">
                       <span className="text-text-disabled">•</span>

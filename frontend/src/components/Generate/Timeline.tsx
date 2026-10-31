@@ -120,7 +120,7 @@ export const Timeline: React.FC<TimelineProps> = ({ messages }) => {
             rowVirtualizer.scrollToIndex(visibleMessages.length - 1, { align: 'end' });
             setIsAtBottom(true);
           }}
-          className="bg-bg-tertiary border-border text-text-secondary hover:text-text-primary animate-fade-in absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 transform items-center gap-2 rounded-full border px-3 py-1.5 font-mono text-[10px] shadow-xl transition-all"
+          className="bg-bg-tertiary border-border text-text-secondary hover:text-text-primary animate-fade-in absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 transform items-center gap-2 rounded-full border px-3 py-1.5 font-mono text-[0.625rem] shadow-xl transition-all"
         >
           <span>↓ Jump to Bottom</span>
         </button>
@@ -206,7 +206,7 @@ const ThinkingItem = ({ text, virtualizer }: { text: string; virtualizer: any })
     >
       <button
         onClick={toggle}
-        className="text-text-tertiary hover:text-text-secondary flex w-fit items-center gap-2 font-mono text-[10px] transition-colors select-none"
+        className="text-text-tertiary hover:text-text-secondary flex w-fit items-center gap-2 font-mono text-[0.625rem] transition-colors select-none"
       >
         {isExpanded ? <CaretDown size={10} /> : <CaretRight size={10} />}
         <span>{'>'} thinking_process...</span>
@@ -320,7 +320,7 @@ const ToolCallItem = ({ data, virtualizer }: { data: any; virtualizer: any }) =>
 
         <div
           className={clsx(
-            'shrink-0 font-mono text-[10px]',
+            'shrink-0 font-mono text-[0.625rem]',
             isFailed
               ? 'text-status-deleted'
               : isCompleted
@@ -347,10 +347,10 @@ const ToolCallItem = ({ data, virtualizer }: { data: any; virtualizer: any }) =>
           >
             <div className="space-y-2 py-1">
               <div className="space-y-0.5">
-                <div className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
+                <div className="text-text-disabled text-[0.625rem] font-bold tracking-wider uppercase">
                   Input
                 </div>
-                <div className="text-text-secondary bg-bg-tertiary/40 border-border/50 overflow-x-auto rounded border p-2 font-mono text-[10px]">
+                <div className="text-text-secondary bg-bg-tertiary/40 border-border/50 overflow-x-auto rounded border p-2 font-mono text-[0.625rem]">
                   <pre className="break-all whitespace-pre-wrap">
                     {typeof rawInput === 'object'
                       ? JSON.stringify(rawInput, null, 2)
@@ -361,10 +361,10 @@ const ToolCallItem = ({ data, virtualizer }: { data: any; virtualizer: any }) =>
 
               {rawOutput && (
                 <div className="space-y-0.5">
-                  <div className="text-text-disabled text-[10px] font-bold tracking-wider uppercase">
+                  <div className="text-text-disabled text-[0.625rem] font-bold tracking-wider uppercase">
                     Output
                   </div>
-                  <div className="text-text-secondary bg-bg-tertiary/40 border-border/50 max-h-[200px] overflow-x-auto rounded border p-2 font-mono text-[10px]">
+                  <div className="text-text-secondary bg-bg-tertiary/40 border-border/50 max-h-[200px] overflow-x-auto rounded border p-2 font-mono text-[0.625rem]">
                     <pre className="break-all whitespace-pre-wrap">
                       {typeof rawOutput === 'object'
                         ? JSON.stringify(rawOutput, null, 2)

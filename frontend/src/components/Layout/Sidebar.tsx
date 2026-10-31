@@ -81,13 +81,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
-      className="border-border flex max-h-screen w-56 shrink-0 flex-col gap-0.5 overflow-hidden border-r bg-gray-950/50 max-[1000px]:w-48"
+      className="border-border flex max-h-screen w-56 shrink-0 flex-col gap-0.5 overflow-x-hidden overflow-y-auto border-r bg-gray-950/50 max-[1000px]:w-48"
       role="navigation"
       aria-label="Main sidebar"
     >
       <WindowDragRegion className="h-10 w-full shrink-0" />
       {error && (
-        <div className="bg-status-ignored/10 border-status-ignored/20 text-status-ignored mx-2 rounded-md border px-3 py-2 text-[10px]">
+        <div className="bg-status-ignored/10 border-status-ignored/20 text-status-ignored mx-2 rounded-md border px-3 py-2 text-[0.625rem]">
           {error}
         </div>
       )}
@@ -179,7 +179,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ariaLabel="Navigate to Inbox"
       />
 
-      <p className="text-text-disabled mt-5 mb-2 px-5 text-[10px] font-medium tracking-[0.08em] uppercase">
+      <p className="text-text-disabled mt-5 mb-2 px-5 text-[0.625rem] font-medium tracking-[0.08em] uppercase">
         Workspace
       </p>
 
@@ -216,16 +216,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="h-2" />
 
       <div className="border-border/40 flex h-10 shrink-0 items-center justify-between border-t px-5">
-        <span className="text-text-tertiary text-[11px] font-medium">LaReview</span>
+        <span className="text-text-tertiary text-[0.6875rem] font-medium">LaReview</span>
         {currentVersion ? (
-          <span className="text-text-disabled text-[10px]">v{currentVersion}</span>
+          <span className="text-text-disabled text-[0.625rem]">v{currentVersion}</span>
         ) : (
           <div className="bg-bg-tertiary h-3 w-12 animate-pulse rounded" />
         )}
         {updateAvailable && (
           <button
             onClick={() => onUpdateClick?.()}
-            className="text-brand/70 hover:text-brand flex items-center gap-1 text-[10px] transition-colors"
+            className="text-brand/70 hover:text-brand flex items-center gap-1 text-[0.625rem] transition-colors"
           >
             <ICONS.ARROW_UP size={10} />
             <span>Update</span>
@@ -265,7 +265,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
 }) => (
   <button
     onClick={onClick}
-    className={`group mx-2 flex min-h-9 items-center gap-2.5 rounded-md px-3 py-2 text-[13px] transition-colors select-none ${
+    className={`group mx-2 flex min-h-9 items-center gap-2.5 rounded-md px-3 py-2 text-[0.8125rem] transition-colors select-none ${
       isActive
         ? 'text-text-primary bg-white/[0.065]'
         : 'text-text-tertiary hover:text-text-primary hover:bg-white/[0.035]'
