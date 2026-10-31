@@ -25,7 +25,7 @@ describe('Appearance settings', () => {
     vi.restoreAllMocks();
   });
 
-  it('updates interface and code sizes independently, with a way back to the defaults', () => {
+  it('previews interface size without applying or persisting it until saved', () => {
     render(<AppearanceSettings />);
     const reset = screen.getByRole('button', { name: 'Restore default sizes' });
     expect(reset).toBeDisabled();
@@ -33,7 +33,12 @@ describe('Appearance settings', () => {
     fireEvent.change(screen.getByRole('slider', { name: 'Interface text' }), {
       target: { value: '150' },
     });
-    expect(document.documentElement.style.fontSize).toBe('150%');
+    expect(document.documentElement.style.fontSize).toBe('100%');
+    expect(useAppearanceStore.getState().interfaceScale).toBe(100);
+    expect(JSON.parse(stored.get('lareview-appearance')!).state.interfaceScale).toBe(100);
+    expect(screen.getByRole('heading', { name: 'Review with confidence' }).style.fontSize).toBe(
+      '1.3125rem'
+    );
     expect(
       screen.getByText('function greet(name: string)', { exact: false }).parentElement
     ).toHaveStyle({ fontSize: '12px' });
@@ -41,15 +46,37 @@ describe('Appearance settings', () => {
     fireEvent.change(screen.getByRole('slider', { name: 'Code text' }), {
       target: { value: '20' },
     });
-    expect(document.documentElement.style.fontSize).toBe('150%');
+    expect(document.documentElement.style.fontSize).toBe('100%');
     expect(
       screen.getByText('function greet(name: string)', { exact: false }).parentElement
     ).toHaveStyle({ fontSize: '20px' });
 
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(document.documentElement.style.fontSize).toBe('150%');
+    expect(JSON.parse(stored.get('lareview-appearance')!).state.interfaceScale).toBe(150);
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
+    expect(screen.getByRole('heading', { name: 'Review with confidence' }).style.fontSize).toBe(
+      '0.875rem'
+    );
+
     fireEvent.click(reset);
+    expect(document.documentElement.style.fontSize).toBe('150%');
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(document.documentElement.style.fontSize).toBe('100%');
     expect(useAppearanceStore.getState()).toMatchObject(APPEARANCE_DEFAULTS);
     expect(reset).toBeDisabled();
+  });
+
+  it('discards an unsaved interface draft when leaving settings', () => {
+    const { unmount } = render(<AppearanceSettings />);
+    fireEvent.change(screen.getByRole('slider', { name: 'Interface text' }), {
+      target: { value: '200' },
+    });
+    unmount();
+    render(<AppearanceSettings />);
+    expect(screen.getByRole('slider', { name: 'Interface text' })).toHaveValue('100');
+    expect(document.documentElement.style.fontSize).toBe('100%');
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
   });
 
   it('restores both sizes from persisted preferences before applying interface sizing', async () => {
