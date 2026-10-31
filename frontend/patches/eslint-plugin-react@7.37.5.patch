@@ -1,0 +1,30 @@
+diff --git a/lib/rules/no-danger.js b/lib/rules/no-danger.js
+--- a/lib/rules/no-danger.js
++++ b/lib/rules/no-danger.js
+@@ -10 +10 @@
+-const minimatch = require('minimatch');
++const { minimatch } = require('minimatch');
+diff --git a/lib/rules/forbid-component-props.js b/lib/rules/forbid-component-props.js
+--- a/lib/rules/forbid-component-props.js
++++ b/lib/rules/forbid-component-props.js
+@@ -8 +8 @@
+-const minimatch = require('minimatch');
++const { minimatch } = require('minimatch');
+diff --git a/lib/rules/jsx-handler-names.js b/lib/rules/jsx-handler-names.js
+--- a/lib/rules/jsx-handler-names.js
++++ b/lib/rules/jsx-handler-names.js
+@@ -8 +8 @@
+-const minimatch = require('minimatch');
++const { minimatch } = require('minimatch');
+diff --git a/lib/rules/no-unstable-nested-components.js b/lib/rules/no-unstable-nested-components.js
+--- a/lib/rules/no-unstable-nested-components.js
++++ b/lib/rules/no-unstable-nested-components.js
+@@ -8 +8 @@
+-const minimatch = require('minimatch');
++const { minimatch } = require('minimatch');
+diff --git a/lib/rules/jsx-pascal-case.js b/lib/rules/jsx-pascal-case.js
+--- a/lib/rules/jsx-pascal-case.js
++++ b/lib/rules/jsx-pascal-case.js
+@@ -9 +9 @@
+-const minimatch = require('minimatch');
++const { minimatch } = require('minimatch');
