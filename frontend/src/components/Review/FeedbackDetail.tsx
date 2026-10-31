@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Feedback, Comment, ReviewRule, DefaultIssueCategory } from '../../types';
+import type { Feedback, Comment, ReviewRule, DefaultIssueCategory, DiffFile } from '../../types';
 import { ICONS } from '../../constants/icons';
 import { MarkdownRenderer } from '../ui/MarkdownRenderer';
 import { useQuery } from '@tanstack/react-query';
@@ -8,6 +8,12 @@ import { useTauri } from '../../hooks/useTauri';
 import { InlineError } from '../Common/InlineError';
 import { displayDate } from '../../utils/dates';
 import { Select } from '../Common/Select';
+import { Dialog } from '../Common/Dialog';
+import { DiffViewer } from '../DiffViewer/DiffViewer';
+import { codeLocationHref, diffSourceLines, type CodeLocation } from '../../lib/code-references';
+import { useAppearanceStore } from '../../store/appearance';
+
+const EMPTY_FILES: DiffFile[] = [];
 
 interface FeedbackDetailProps {
   feedback: Feedback | null;
@@ -26,6 +32,8 @@ interface FeedbackDetailProps {
   isAddingComment: boolean;
   onPushToRemote?: () => void;
   remoteProviderName?: string | null;
+  files?: DiffFile[];
+  repoRoot?: string | null;
 }
 
 const impactOptions = [
@@ -65,8 +73,12 @@ interface DiffSnippet {
 }
 
 const DiffSnippetViewer: React.FC<{ snippet: DiffSnippet }> = ({ snippet }) => {
+  const codeFontSize = useAppearanceStore(state => state.codeFontSize);
   return (
-    <div className="bg-bg-tertiary border-border/50 overflow-hidden rounded border font-mono text-xs">
+    <div
+      className="bg-bg-tertiary border-border/50 overflow-hidden rounded border font-mono"
+      style={{ fontSize: codeFontSize, lineHeight: 1.6 }}
+    >
       <div className="bg-bg-secondary/50 border-border/50 text-text-tertiary border-b px-2 py-1 text-[0.625rem]">
         {snippet.hunk_header}
       </div>
@@ -80,7 +92,7 @@ const DiffSnippetViewer: React.FC<{ snippet: DiffSnippet }> = ({ snippet }) => {
                 isHighlighted ? 'bg-brand/10 border-brand -mx-2 border-l-2 px-2' : ''
               }`}
             >
-              <span className="text-text-disabled w-6 text-right select-none">
+              <span className="text-text-disabled min-w-[4ch] shrink-0 text-right tabular-nums select-none">
                 {line.line_number || ''}
               </span>
               <span
@@ -129,17 +141,26 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
   isAddingComment,
   onPushToRemote,
   remoteProviderName,
+  files = EMPTY_FILES,
+  repoRoot,
 }) => {
   const { getFeedbackDiffSnippet } = useTauri();
+  const codeFontSize = useAppearanceStore(state => state.codeFontSize);
   const [replyText, setReplyText] = useState('');
   const [replyError, setReplyError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [codeLocation, setCodeLocation] = useState<CodeLocation | null>(null);
   const rule = feedback?.rule_id ? rulesById[feedback.rule_id] : null;
   const category = feedback?.category ? categoriesById[feedback.category] : null;
   const remoteLabel = remoteProviderName ?? 'remote';
   const RemoteIcon = remoteProviderName === 'GitLab' ? ICONS.ICON_GITLAB : ICONS.ICON_GITHUB;
 
-  const { data: diffSnippet, isLoading: isDiffLoading } = useQuery<DiffSnippet | null>({
+  const {
+    data: diffSnippet,
+    isLoading: isDiffLoading,
+    error: diffSnippetError,
+    refetch: retryDiffSnippet,
+  } = useQuery<DiffSnippet | null>({
     queryKey: ['feedback-diff', feedback?.id],
     queryFn: () => {
       if (!feedback?.id) return Promise.resolve(null);
@@ -163,6 +184,28 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
       </div>
     );
   }
+
+  const anchorPath = feedback.anchor?.file_path;
+  const anchorFile = anchorPath
+    ? files.find(file => [file.name, file.new_path, file.old_path].includes(anchorPath))
+    : undefined;
+  const anchorSide = feedback.anchor?.side ?? 'new';
+  const anchorLocation: CodeLocation | null = anchorFile
+    ? {
+        file: anchorFile,
+        line: feedback.anchor?.line_number ?? diffSourceLines(anchorFile, anchorSide)[0]?.line ?? 1,
+        side: anchorSide,
+      }
+    : null;
+  const codeRows =
+    codeLocation?.file.hunks.reduce(
+      (count, hunk) => count + (hunk.content?.split('\n').length ?? 0),
+      0
+    ) ?? 0;
+  const codePreviewHeight = Math.max(
+    300,
+    Math.min(600, codeRows * Math.round(codeFontSize * (5 / 3)) + 100)
+  );
 
   const handleAddComment = async () => {
     if (!replyText.trim() || isAddingComment || sending) return;
@@ -279,18 +322,42 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
 
       <div className="custom-scrollbar flex-1 space-y-6 overflow-y-auto p-6">
         {feedback.anchor && feedback.anchor.file_path && (
-          <div className="bg-bg-secondary/50 border-border/50 rounded-md border p-3">
+          <section
+            aria-label="Code evidence"
+            className="bg-bg-secondary/50 border-border/50 rounded-md border p-3"
+          >
             <div className="mb-2 flex items-center gap-2">
               <ICONS.TAB_CHANGES size={12} className="text-text-tertiary" />
-              <span className="text-text-tertiary font-mono text-xs break-all">
-                {feedback.anchor.file_path}
-                {feedback.anchor.line_number ? `:${feedback.anchor.line_number}` : ''}
-              </span>
+              {anchorLocation ? (
+                <a
+                  href={codeLocationHref(anchorLocation)}
+                  onClick={event => {
+                    event.preventDefault();
+                    setCodeLocation(anchorLocation);
+                  }}
+                  className="text-brand font-mono text-xs break-all underline underline-offset-2"
+                  title="View in changes"
+                >
+                  {feedback.anchor.file_path}
+                  {feedback.anchor.line_number ? `:${feedback.anchor.line_number}` : ''}
+                </a>
+              ) : (
+                <span className="text-text-tertiary font-mono text-xs break-all">
+                  {feedback.anchor.file_path}
+                  {feedback.anchor.line_number ? `:${feedback.anchor.line_number}` : ''}
+                </span>
+              )}
               <span className="text-text-disabled text-[0.625rem]">
                 ({feedback.anchor.side === 'old' ? 'old' : 'new'})
               </span>
             </div>
-            {isDiffLoading ? (
+            {diffSnippetError ? (
+              <InlineError
+                title="Could not load code excerpt"
+                message={String(diffSnippetError)}
+                onRetry={() => void retryDiffSnippet()}
+              />
+            ) : isDiffLoading ? (
               <DiffSnippetSkeleton />
             ) : diffSnippet ? (
               <DiffSnippetViewer snippet={diffSnippet} />
@@ -299,7 +366,7 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
                 No code excerpt available for this location.
               </div>
             )}
-          </div>
+          </section>
         )}
 
         <div className="space-y-3">
@@ -332,7 +399,10 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
                       {displayDate(comment.created_at) ?? 'Unknown date'}
                     </span>
                   </div>
-                  <MarkdownRenderer className="prose prose-invert prose-sm text-text-secondary max-w-none">
+                  <MarkdownRenderer
+                    className="prose prose-invert prose-sm text-text-secondary max-w-none"
+                    codeContext={{ files, anchor: feedback.anchor, onOpen: setCodeLocation }}
+                  >
                     {comment.body}
                   </MarkdownRenderer>
                 </div>
@@ -365,7 +435,9 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
             disabled={isAddingComment || sending}
           />
           <div className="flex items-center justify-between px-2 pt-1 pb-2">
-            <span className="text-text-disabled px-1 text-[0.6875rem]">⌘ / Ctrl + Enter to reply</span>
+            <span className="text-text-disabled px-1 text-[0.6875rem]">
+              ⌘ / Ctrl + Enter to reply
+            </span>
             <button
               onClick={handleAddComment}
               disabled={!replyText.trim() || isAddingComment || sending}
@@ -376,6 +448,30 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
           </div>
         </div>
       </div>
+      {codeLocation && (
+        <Dialog
+          isOpen
+          onClose={() => setCodeLocation(null)}
+          title="Referenced code"
+          description={`${codeLocation.file.name}:${codeLocation.line} · ${codeLocation.side === 'old' ? 'Old' : 'New'} version`}
+          className="product-library-dialog"
+          bodyClassName="evidence-code-body"
+        >
+          <div
+            className="flex min-h-0 w-full"
+            style={{ height: codePreviewHeight, maxHeight: 'calc(100vh - 200px)' }}
+          >
+            <DiffViewer
+              files={[codeLocation.file]}
+              selectedFile={codeLocation.file}
+              onSelectFile={() => {}}
+              focusLocation={codeLocation}
+              showFileList={false}
+              repoRoot={repoRoot}
+            />
+          </div>
+        </Dialog>
+      )}
     </div>
   );
 };

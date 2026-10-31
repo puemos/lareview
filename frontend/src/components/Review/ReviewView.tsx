@@ -418,6 +418,8 @@ export const ReviewView: React.FC = () => {
             <FeedbackDetail
               key={selectedFeedbackId}
               feedback={selectedFeedback}
+              files={parsedDiff?.files}
+              repoRoot={repoRoot}
               rulesById={rulesById}
               categoriesById={categoriesById}
               comments={comments}

@@ -296,6 +296,12 @@ textarea:focus-visible {
   padding: 24px;
 }
 
+.product-dialog-body.evidence-code-body {
+  display: flex;
+  overflow: hidden;
+  padding: 0;
+}
+
 .product-dialog.product-library-dialog {
   width: min(960px, calc(100vw - 48px));
 }
