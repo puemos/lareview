@@ -33,8 +33,8 @@ importers:
         specifier: ^1.4.1
         version: 1.4.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@tanstack/query-sync-storage-persister':
-        specifier: ^5.105.0
-        version: 5.105.0
+        specifier: ^5.105.1
+        version: 5.105.1
       '@tanstack/react-query':
         specifier: ^5.105.0
         version: 5.105.0(@types/react@19.3.0)(react@19.3.1)
@@ -1174,14 +1174,20 @@ packages:
   '@tanstack/query-core@5.105.0':
     resolution: {integrity: sha512-7p56vRmT/z4UJ6sctGIdl5WRUQyUv53IUpUwEKi2g97zMbO7zh8ZsCLffGAvCPBR4xD72e3VXsDyLwXHhoNTMQ==}
 
+  '@tanstack/query-core@5.105.1':
+    resolution: {integrity: sha512-B/rNlZoZ54w1dlddiUt9oEe1SLM+37c00SKLJEg9YH+7as3Y54P81o9Fh+2ujZ36tXPnQJ5oVe7AcyEWkyFhPg==}
+
   '@tanstack/query-devtools@5.105.0':
     resolution: {integrity: sha512-vRJf9XRHB+P2aMSAEHWtMLsAf1nC9NSsHVqSHiT/FZYU/+5LEo2BOrXKskURQnJEzg6whaBeP6iMn0PS30KJrQ==}
 
   '@tanstack/query-persist-client-core@5.105.0':
     resolution: {integrity: sha512-bOy2lMzzEyacL6s9hIa0tKmaIr/TM24HZaK9a20ctZjPYlCs6NhGdgbxi20RcdJWZwWunkLqPDnxfClD7QIyKg==}
 
-  '@tanstack/query-sync-storage-persister@5.105.0':
-    resolution: {integrity: sha512-8Rq31cmUnLlxj/MTpw/nGw3gkCQwRZhl1fh0VQa4NNTzYX4emg56TyTZSCet62RkcFWJkfkfGlgHMbazp/U8SQ==}
+  '@tanstack/query-persist-client-core@5.105.1':
+    resolution: {integrity: sha512-uxh0ysDkfeNFvEsCZFgSZiqTebKC+SlfL6zUKqbdoT+wyobaHu6l7IwY4kuNqgJrCjZndIfwIKe5sgrHJ9lB+g==}
+
+  '@tanstack/query-sync-storage-persister@5.105.1':
+    resolution: {integrity: sha512-hrqcmTDtEZJ8FR486FrQjZYb6cp5PeBvE1d6uvdH5+zQym8eQVvVSqm+lbweOljJoihZ7NxrKie9Vl/oQKrmAg==}
 
   '@tanstack/react-query-devtools@5.105.0':
     resolution: {integrity: sha512-FfRQxvqngBYqTLsuAB+qaj0Ef3KkUpknuRoyUjcl8OCZhwPocTHEvhMPAoBmk1FtO6nXUIVCC7F9A2AHH01SLQ==}
@@ -4562,6 +4568,8 @@ snapshots:
 
   '@tanstack/query-core@5.105.0': {}
 
+  '@tanstack/query-core@5.105.1': {}
+
   '@tanstack/query-devtools@5.105.0(csstype@3.2.3)':
     dependencies:
       '@kobalte/core': 0.13.14(solid-js@1.9.17)
@@ -4582,10 +4590,14 @@ snapshots:
     dependencies:
       '@tanstack/query-core': 5.105.0
 
-  '@tanstack/query-sync-storage-persister@5.105.0':
+  '@tanstack/query-persist-client-core@5.105.1':
     dependencies:
-      '@tanstack/query-core': 5.105.0
-      '@tanstack/query-persist-client-core': 5.105.0
+      '@tanstack/query-core': 5.105.1
+
+  '@tanstack/query-sync-storage-persister@5.105.1':
+    dependencies:
+      '@tanstack/query-core': 5.105.1
+      '@tanstack/query-persist-client-core': 5.105.1
 
   '@tanstack/react-query-devtools@5.105.0(@tanstack/react-query@5.105.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(csstype@3.2.3)(react@19.3.1)':
     dependencies:
