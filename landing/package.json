@@ -13,7 +13,7 @@
     "sync": "mkdir -p ./dist/styles && cp ./index.html ./dist/index.html && rm -rf ./dist/assets && cp -R ../assets ./dist/assets"
   },
   "devDependencies": {
-    "@tailwindcss/cli": "^4.3.3",
+    "@tailwindcss/cli": "^4.3.5",
     "browser-sync": "^3.0.4",
     "chokidar-cli": "^3.0.0",
     "concurrently": "^10.0.6",
